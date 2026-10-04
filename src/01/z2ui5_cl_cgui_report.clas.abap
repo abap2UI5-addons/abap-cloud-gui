@@ -351,7 +351,6 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
     "! the authorization to run the report - checked at the start and before
     "! every run; abap_false shows nothing but the message. Redefine it with
     "! the AUTHORITY-CHECK of the report
-
     METHODS authority_check
       RETURNING
         VALUE(result) TYPE abap_bool.

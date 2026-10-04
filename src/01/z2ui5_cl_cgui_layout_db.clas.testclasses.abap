@@ -12,6 +12,8 @@ CLASS ltcl_test DEFINITION FINAL FOR TESTING
 
     METHODS setup.
     METHODS teardown.
+    "! every row of the test report - SETUP and TEARDOWN cannot call each other
+    METHODS delete_test_rows.
 
     METHODS layout
       RETURNING
@@ -37,11 +39,17 @@ CLASS ltcl_test IMPLEMENTATION.
   METHOD setup.
 
     mo_store = z2ui5_cl_cgui_layout_db=>factory( ).
-    teardown( ).
+    delete_test_rows( ).
 
   ENDMETHOD.
 
   METHOD teardown.
+
+    delete_test_rows( ).
+
+  ENDMETHOD.
+
+  METHOD delete_test_rows.
 
     DATA(lv_report) = CONV z2ui5_cgui_lay-report( cv_report ).
     DELETE FROM z2ui5_cgui_lay WHERE report = @lv_report.

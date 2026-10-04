@@ -2470,7 +2470,7 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
     READ TABLE tab INDEX a ASSIGNING <row_a>.
     READ TABLE tab INDEX b ASSIGNING <row_b>.
     LOOP AT order INTO DATA(ls_order).
-      DATA(lv_name) = condense( CONV string( ls_order-name ) ).
+      DATA(lv_name) = condense( ls_order-name ).
       UNASSIGN: <val_a>, <val_b>.
       ASSIGN COMPONENT lv_name OF STRUCTURE <row_a> TO <val_a>.
       ASSIGN COMPONENT lv_name OF STRUCTURE <row_b> TO <val_b>.

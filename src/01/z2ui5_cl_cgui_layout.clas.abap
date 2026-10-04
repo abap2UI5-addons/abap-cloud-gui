@@ -9,7 +9,6 @@
 "!   apply  - take over result-layout
 "!   save   - take it over and save it as result-name (result-is_default,
 "!            result-shared, result-protected)
-
 "!   delete - delete the saved layout result-name
 "! and with no action on cancel.
 CLASS z2ui5_cl_cgui_layout DEFINITION PUBLIC FINAL CREATE PRIVATE.

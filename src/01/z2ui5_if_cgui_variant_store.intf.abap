@@ -5,7 +5,6 @@
 "! initialization( ) with set_variant_store( store ); set_variant_store( )
 "! without a store keeps the variants in the browser's local storage. The
 "! store travels in the draft of the app - it must be serializable.
-
 INTERFACE z2ui5_if_cgui_variant_store PUBLIC.
 
   INTERFACES if_serializable_object.
