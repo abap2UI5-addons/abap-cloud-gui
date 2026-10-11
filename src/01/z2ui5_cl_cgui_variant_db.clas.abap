@@ -1,8 +1,9 @@
 "! Selection variants on the server - kept in table Z2UI5_CGUI_VAR, one
 "! namespace per report as in the classic variant maintenance. A variant
 "! belongs to the user who saved it first; shared it is seen by every user,
-"! protected only its owner changes or deletes it. The default store of
-"! every report - set_variant_store( ) in initialization( ) names another.
+"! protected only its owner changes or deletes it, private nobody else
+"! touches it. The default store of every report - set_variant_store( ) in
+"! initialization( ) names another.
 CLASS z2ui5_cl_cgui_variant_db DEFINITION PUBLIC FINAL CREATE PRIVATE.
 
   PUBLIC SECTION.
@@ -86,11 +87,22 @@ CLASS z2ui5_cl_cgui_variant_db IMPLEMENTATION.
     ls_db-variant = variant-name.
     DATA(lv_user) = user( ).
 
-    SELECT SINGLE owner, protected
+    SELECT SINGLE owner, shared, protected
       FROM z2ui5_cgui_var
       WHERE report = @ls_db-report AND variant = @ls_db-variant
       INTO @DATA(ls_old).
     IF sy-subrc = 0.
+      " another user's private variant is not in this user's list - saved
+      " over, it was lost and the new one went to its owner, out of sight
+      IF ls_old-shared = abap_false AND ls_old-owner <> lv_user.
+        RAISE EXCEPTION TYPE z2ui5_cx_cgui_error
+          EXPORTING
+            val = replace( val  = replace( val  = 'Variant &1 is a private variant of user &2'(002)
+                                           sub  = `&1`
+                                           with = variant-name )
+                           sub  = `&2`
+                           with = ls_old-owner ).
+      ENDIF.
       IF ls_old-protected = abap_true AND ls_old-owner <> lv_user.
         RAISE EXCEPTION TYPE z2ui5_cx_cgui_error
           EXPORTING
@@ -125,11 +137,12 @@ CLASS z2ui5_cl_cgui_variant_db IMPLEMENTATION.
     DATA(lv_report) = CONV z2ui5_cgui_var-report( to_upper( report ) ).
     DATA(lv_name) = CONV z2ui5_cgui_var_name( name ).
 
-    SELECT SINGLE owner, protected
+    SELECT SINGLE owner, shared, protected
       FROM z2ui5_cgui_var
       WHERE report = @lv_report AND variant = @lv_name
       INTO @DATA(ls_old).
-    IF sy-subrc <> 0.
+    " another user's private variant is none of this user's business
+    IF sy-subrc <> 0 OR ( ls_old-shared = abap_false AND ls_old-owner <> user( ) ).
       RETURN.
     ENDIF.
     IF ls_old-protected = abap_true AND ls_old-owner <> user( ).

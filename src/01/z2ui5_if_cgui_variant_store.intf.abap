@@ -17,7 +17,8 @@ INTERFACE z2ui5_if_cgui_variant_store PUBLIC.
     RETURNING
       VALUE(result) TYPE z2ui5_cl_cgui_variant=>ty_t_variant.
 
-  "! save variant - refused when another user owns it and protected it
+  "! save variant - refused when another user owns it and protected it or
+  "! kept it private
   METHODS save
     IMPORTING
       report  TYPE clike

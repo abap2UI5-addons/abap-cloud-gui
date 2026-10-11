@@ -134,6 +134,29 @@ CLASS ltcl_test IMPLEMENTATION.
         " refused, as it should be
     ENDTRY.
 
+    " private - not saved over: it was lost, and the new one went to its owner
+    TRY.
+        mo_store->save( report  = cv_report
+                        variant = variant( `PRIVATE` ) ).
+        cl_abap_unit_assert=>fail( `a private variant of another user was saved over` ).
+      CATCH z2ui5_cx_cgui_error ##NO_HANDLER.
+        " refused, as it should be
+    ENDTRY.
+    TRY.
+        mo_store->delete( report = cv_report
+                          name   = `PRIVATE` ).
+      CATCH z2ui5_cx_cgui_error ##NO_HANDLER.
+        " refused is fine as well - the row must stay either way
+    ENDTRY.
+    DATA(lv_report) = CONV z2ui5_cgui_var-report( cv_report ).
+    DATA(lv_private) = CONV z2ui5_cgui_var-variant( `PRIVATE` ).
+    SELECT SINGLE owner FROM z2ui5_cgui_var
+      WHERE report = @lv_report AND variant = @lv_private
+      INTO @DATA(lv_owner).
+    cl_abap_unit_assert=>assert_subrc( exp = 0 ).
+    cl_abap_unit_assert=>assert_equals( act = lv_owner
+                                        exp = `ZZ_OTHER` ).
+
   ENDMETHOD.
 
 ENDCLASS.
