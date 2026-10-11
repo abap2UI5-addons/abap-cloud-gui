@@ -62,7 +62,7 @@ CLASS z2ui5_cl_cgui_r2c_04 IMPLEMENTATION.
       UP TO @p_rows ROWS
       WHERE carrid   IN @s_carrid
         AND cityfrom IN @s_cityfr
-      ORDER BY carrid connid.
+      ORDER BY carrid, connid.
     IF gt_spfli IS INITIAL.
       message( text = 'No connections found'
                type = `W` ).

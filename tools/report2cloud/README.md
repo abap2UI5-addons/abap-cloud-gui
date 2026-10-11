@@ -256,7 +256,7 @@ class `ZR2C` must exist in the target system.
 | a FORM parameter `TYPE p` (generic) | `LIKE` the data object every `PERFORM` passes, else kept with a TODO - the transpiled runtime has no generic packed type and fails to describe the class |
 | `SET PF-STATUS`, `SET TITLEBAR` | dropped with a TODO - the GUI status is not part of the input; `set_pf_status( functions = )` and `set_title( )` take them by hand |
 | local classes and interfaces | `.clas.locals_imp.abap`; their definitions go to `.clas.locals_def.abap` when the class is typed with them |
-| ABAP SQL (`SELECT`, `INSERT`, `UPDATE`, `MODIFY`, `DELETE` on the database) | strict mode, as ABAP Cloud requires: host variables escaped with `@`, the field list separated by commas - syntax only, the parser tells a host variable from a column |
+| ABAP SQL (`SELECT`, `INSERT`, `UPDATE`, `MODIFY`, `DELETE` on the database) | strict mode, as ABAP Cloud requires: host variables escaped with `@`, the field list, `ORDER BY` and `GROUP BY` separated by commas - syntax only, the parser tells a host variable from a column |
 | everything else | copied as written, comments included (`*` comments become `"` comments) |
 
 ## Refused
