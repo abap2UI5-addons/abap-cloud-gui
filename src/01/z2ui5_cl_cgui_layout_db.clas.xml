@@ -19,6 +19,12 @@
      <ENTRY>Layout &amp;1 is protected by user &amp;2</ENTRY>
      <LENGTH>60</LENGTH>
     </item>
+    <item>
+     <ID>I</ID>
+     <KEY>002</KEY>
+     <ENTRY>Layout &amp;1 is a private layout of user &amp;2</ENTRY>
+     <LENGTH>60</LENGTH>
+    </item>
    </TPOOL>
   </asx:values>
  </asx:abap>

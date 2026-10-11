@@ -1,9 +1,10 @@
 "! ALV layouts on the server - kept in table Z2UI5_CGUI_LAY, one namespace
 "! per report and ALV handle as in the classic layout maintenance. A layout
 "! belongs to the user who saved it first; shared it is seen by every user,
-"! protected only its owner changes or deletes it. The default layout is
-"! personal: the flag of a layout counts for its owner only. The report
-"! runtime uses this store unless set_layout_store( ) names another one.
+"! protected only its owner changes or deletes it, private nobody else
+"! touches it. The default layout is personal: the flag of a layout counts
+"! for its owner only. The report runtime uses this store unless
+"! set_layout_store( ) names another one.
 CLASS z2ui5_cl_cgui_layout_db DEFINITION PUBLIC FINAL CREATE PRIVATE.
 
   PUBLIC SECTION.
@@ -114,11 +115,22 @@ CLASS z2ui5_cl_cgui_layout_db IMPLEMENTATION.
     ls_db-layout = layout-name.
     DATA(lv_user) = CONV z2ui5_cgui_lay-owner( user( ) ).
 
-    SELECT SINGLE owner, protected, is_default
+    SELECT SINGLE owner, shared, protected, is_default
       FROM z2ui5_cgui_lay
       WHERE report = @ls_db-report AND handle = @ls_db-handle AND layout = @ls_db-layout
       INTO @DATA(ls_old).
     IF sy-subrc = 0.
+      " another user's private layout is not in this user's list - saved
+      " over, it was lost and the new one went to its owner, out of sight
+      IF ls_old-shared = abap_false AND ls_old-owner <> lv_user.
+        RAISE EXCEPTION TYPE z2ui5_cx_cgui_error
+          EXPORTING
+            val = replace( val  = replace( val  = 'Layout &1 is a private layout of user &2'(002)
+                                           sub  = `&1`
+                                           with = layout-name )
+                           sub  = `&2`
+                           with = ls_old-owner ).
+      ENDIF.
       IF ls_old-protected = abap_true AND ls_old-owner <> lv_user.
         protected_error( name  = layout-name
                          owner = ls_old-owner ).
@@ -163,11 +175,12 @@ CLASS z2ui5_cl_cgui_layout_db IMPLEMENTATION.
     DATA(lv_handle) = CONV z2ui5_cgui_lay-handle( to_upper( handle ) ).
     DATA(lv_name) = CONV z2ui5_cgui_lay-layout( name ).
 
-    SELECT SINGLE owner, protected
+    SELECT SINGLE owner, shared, protected
       FROM z2ui5_cgui_lay
       WHERE report = @lv_report AND handle = @lv_handle AND layout = @lv_name
       INTO @DATA(ls_old).
-    IF sy-subrc <> 0.
+    " another user's private layout is none of this user's business
+    IF sy-subrc <> 0 OR ( ls_old-shared = abap_false AND ls_old-owner <> user( ) ).
       RETURN.
     ENDIF.
     IF ls_old-protected = abap_true AND ls_old-owner <> user( ).

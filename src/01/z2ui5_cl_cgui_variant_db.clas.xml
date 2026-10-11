@@ -19,6 +19,12 @@
      <ENTRY>Variant &amp;1 is protected by user &amp;2</ENTRY>
      <LENGTH>60</LENGTH>
     </item>
+    <item>
+     <ID>I</ID>
+     <KEY>002</KEY>
+     <ENTRY>Variant &amp;1 is a private variant of user &amp;2</ENTRY>
+     <LENGTH>60</LENGTH>
+    </item>
    </TPOOL>
   </asx:values>
  </asx:abap>

@@ -20,8 +20,9 @@ INTERFACE z2ui5_if_cgui_layout_store PUBLIC.
     RETURNING
       VALUE(result) TYPE z2ui5_cl_cgui_layout=>ty_t_saved.
 
-  "! save layout - refused when another user owns it and protected it. A
-  "! default layout takes the flag from the other layouts of the user
+  "! save layout - refused when another user owns it and protected it or
+  "! kept it private. A default layout takes the flag from the other
+  "! layouts of the user
   METHODS save
     IMPORTING
       report TYPE clike
