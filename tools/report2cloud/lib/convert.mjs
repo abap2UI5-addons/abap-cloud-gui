@@ -2501,9 +2501,12 @@ class Converter {
   }
 
   /** ABAP SQL in strict mode, as ABAP Cloud demands it: host variables
-   *  escaped with @, the field list separated by commas. Syntax only - the
-   *  parser tells a host variable (SQLSource, SQLTarget) from a column. A
-   *  statement that escapes already is left as it is. */
+   *  escaped with @, the field list, ORDER BY and GROUP BY separated by
+   *  commas. Syntax only - the parser tells a host variable (SQLSource,
+   *  SQLTarget) from a column. A statement that escapes already is left as
+   *  it is. INTO stays where the report has it: strict mode takes it in front
+   *  of WHERE, and abaplint's downport cannot carry `WHERE ... INTO ... UP TO
+   *  n ROWS` to 7.02. */
   strictSql(s, ov) {
     if (!["Select", "SelectLoop", "UpdateDatabase", "ModifyDatabase", "InsertDatabase", "DeleteDatabase", "OpenCursor"].includes(kind(s))) return;
     if (s.getTokens().some((t) => t.getStr().startsWith("@"))) return;
@@ -2528,14 +2531,25 @@ class Converter {
       changed = true;
     }
     if (!changed) return;
+    const comma = (tok) => {
+      const k = key(tok);
+      ov.set(k, `${ov.has(k) ? ov.get(k) : tok.getStr()},`);
+    };
     for (const list of findAll(s, "SQLFieldList")) {
       const fields = children(list, "SQLField");
       if (fields.length < 2 || list.getTokens().some((t) => t.getStr() === ",")) continue;
-      for (const f of fields.slice(0, -1)) {
-        const last = f.getLastToken();
-        const k = key(last);
-        ov.set(k, `${ov.has(k) ? ov.get(k) : last.getStr()},`);
+      for (const f of fields.slice(0, -1)) comma(f.getLastToken());
+    }
+    // ORDER BY a b DESCENDING / GROUP BY a b: an item is a column and the
+    // words that follow it
+    for (const list of [...findAll(s, "SQLOrderBy"), ...findAll(s, "SQLGroupBy")]) {
+      if (list.getTokens().some((t) => t.getStr() === ",")) continue;
+      const items = [];
+      for (const c of list.getChildren()) {
+        if (!isToken(c)) items.push([c]);
+        else if (items.length) items[items.length - 1].push(c);
       }
+      for (const item of items.slice(0, -1)) comma(item[item.length - 1].getLastToken());
     }
   }
 

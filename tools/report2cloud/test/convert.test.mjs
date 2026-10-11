@@ -110,10 +110,11 @@ test("TOP-OF-PAGE, END-OF-SELECTION, HIDE and AT LINE-SELECTION", () => {
   assert.match(abap, /SPLIT hide AT \|\\t\| INTO TABLE DATA\(lt_hide\)\.\n {4}gs_flight-carrid = VALUE #\( lt_hide\[ 1 \] OPTIONAL \)\./);
 });
 
-test("ABAP SQL in strict mode: host variables escaped, the field list separated", () => {
+test("ABAP SQL in strict mode: host variables escaped, the lists separated", () => {
   const abap = classOf("zr2c_02_flights");
   assert.match(abap, /SELECT carrid, connid, fldate, price, currency, seatsmax, seatsocc/);
   assert.match(abap, /INTO TABLE @gt_flight\n {6}UP TO @p_max ROWS\n {6}WHERE carrid = @p_carrid\n {8}AND fldate IN @s_fldate\./);
+  assert.match(classOf("zr2c_04_salv"), /ORDER BY carrid, connid\./, "ORDER BY is a list as well");
 });
 
 test("MESSAGE: literal, text symbol, message class short and long form, DISPLAY LIKE, sy-msgty", () => {

@@ -181,9 +181,10 @@ CLASS ltcl_test IMPLEMENTATION.
         " refused is fine as well - the row must stay either way
     ENDTRY.
     DATA(lv_report) = CONV z2ui5_cgui_lay-report( cv_report ).
+    DATA(lv_handle) = CONV z2ui5_cgui_lay-handle( cv_handle ).
     DATA(lv_private) = CONV z2ui5_cgui_lay-layout( `PRIVATE` ).
     SELECT SINGLE owner FROM z2ui5_cgui_lay
-      WHERE report = @lv_report AND layout = @lv_private
+      WHERE report = @lv_report AND handle = @lv_handle AND layout = @lv_private
       INTO @DATA(lv_owner).
     cl_abap_unit_assert=>assert_subrc( exp = 0 ).
     cl_abap_unit_assert=>assert_equals( act = lv_owner
