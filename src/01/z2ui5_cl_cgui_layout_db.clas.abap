@@ -143,14 +143,10 @@ CLASS z2ui5_cl_cgui_layout_db IMPLEMENTATION.
 
     " one default layout per user
     IF ls_db-is_default = abap_true AND ls_db-owner = lv_user.
-      SELECT * FROM z2ui5_cgui_lay
+      UPDATE z2ui5_cgui_lay SET is_default = @abap_false
         WHERE report = @ls_db-report AND handle = @ls_db-handle
           AND owner = @lv_user AND is_default = @abap_true
-        INTO TABLE @DATA(lt_default).
-      LOOP AT lt_default INTO DATA(ls_default) WHERE layout <> ls_db-layout.
-        ls_default-is_default = abap_false.
-        MODIFY z2ui5_cgui_lay FROM @ls_default.
-      ENDLOOP.
+          AND layout <> @ls_db-layout.
     ENDIF.
 
     MODIFY z2ui5_cgui_lay FROM @ls_db.
