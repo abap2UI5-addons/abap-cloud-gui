@@ -157,6 +157,7 @@ CLASS ltcl_test DEFINITION FINAL FOR TESTING
     METHODS url_values_screen_only FOR TESTING.
     METHODS url_skip_screen FOR TESTING.
     METHODS url_range FOR TESTING.
+    METHODS variant_screen_only FOR TESTING.
     METHODS submit_starts_report FOR TESTING.
     METHODS link_holds_values FOR TESTING.
     METHODS parameter_id FOR TESTING.
@@ -684,6 +685,26 @@ CLASS ltcl_test IMPLEMENTATION.
                                         exp = `CP` ).
     cl_abap_unit_assert=>assert_equals( act = mo_cut->url_from_range( lt_value )
                                         exp = `A,B..C,!D,>=E,F*` ).
+
+  ENDMETHOD.
+
+  METHOD variant_screen_only.
+
+    " a variant names the fields of the screen - one from the browser's
+    " storage may name anything, and sets no other attribute
+    DATA(lo_store) = NEW ltcl_variant_store( ).
+    lo_store->mt_variant = VALUE #( ( name   = `V1`
+                                      values = VALUE #( ( name = `P_CARRID`  kind = `P` low = `LH` )
+                                                        ( name = `mv_secret` kind = `P` low = `abc` )
+                                                        ( name = `MV_UCOMM`  kind = `P` low = `X` ) ) ) ).
+    mo_cut->set_variant_store( lo_store ).
+    mo_cut->set_variant( `V1` ).
+    init( ).
+
+    cl_abap_unit_assert=>assert_equals( act = mo_report->p_carrid
+                                        exp = `LH` ).
+    cl_abap_unit_assert=>assert_initial( mo_report->mv_secret ).
+    cl_abap_unit_assert=>assert_initial( mo_report->mv_ucomm ).
 
   ENDMETHOD.
 

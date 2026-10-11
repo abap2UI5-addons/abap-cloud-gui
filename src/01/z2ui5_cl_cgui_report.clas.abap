@@ -2792,6 +2792,8 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
 
   METHOD variant_apply.
 
+    DATA lt_value TYPE z2ui5_cl_cgui_variant=>ty_t_value.
+
     DATA(lt_variant) = variant_catalog( ).
 
     READ TABLE lt_variant REFERENCE INTO DATA(lr_variant) WITH KEY name = name.
@@ -2799,8 +2801,19 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
       RETURN.
     ENDIF.
 
+    " only the fields of the screen, as variant_save( ) collects them - a
+    " catalog from the browser's local storage holds what the browser sent
+    " and sets no other attribute of the class
+    DATA(lt_field) = screen_fields( ).
+    LOOP AT lr_variant->values REFERENCE INTO DATA(lr_value).
+      DATA(lv_field) = to_upper( lr_value->name ).
+      IF line_exists( lt_field[ name = lv_field ] ).
+        INSERT lr_value->* INTO TABLE lt_value.
+      ENDIF.
+    ENDLOOP.
+
     z2ui5_cl_cgui_variant=>values_set( app    = me
-                                       values = lr_variant->values ).
+                                       values = lt_value ).
     mv_cgui_variant = name.
     mt_cgui_var_protect = lr_variant->protect.
     mt_cgui_var_hide = lr_variant->hide.
