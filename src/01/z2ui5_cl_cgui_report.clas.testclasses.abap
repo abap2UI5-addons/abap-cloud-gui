@@ -157,6 +157,8 @@ CLASS ltcl_test DEFINITION FINAL FOR TESTING
     METHODS url_values_screen_only FOR TESTING.
     METHODS url_skip_screen FOR TESTING.
     METHODS url_range FOR TESTING.
+    METHODS variant_screen_only FOR TESTING.
+    METHODS events_screen_only FOR TESTING.
     METHODS submit_starts_report FOR TESTING.
     METHODS link_holds_values FOR TESTING.
     METHODS parameter_id FOR TESTING.
@@ -684,6 +686,46 @@ CLASS ltcl_test IMPLEMENTATION.
                                         exp = `CP` ).
     cl_abap_unit_assert=>assert_equals( act = mo_cut->url_from_range( lt_value )
                                         exp = `A,B..C,!D,>=E,F*` ).
+
+  ENDMETHOD.
+
+  METHOD variant_screen_only.
+
+    " a variant names the fields of the screen - one from the browser's
+    " storage may name anything, and sets no other attribute
+    DATA(lo_store) = NEW ltcl_variant_store( ).
+    lo_store->mt_variant = VALUE #( ( name   = `V1`
+                                      values = VALUE #( ( name = `P_CARRID`  kind = `P` low = `LH` )
+                                                        ( name = `mv_secret` kind = `P` low = `abc` )
+                                                        ( name = `MV_UCOMM`  kind = `P` low = `X` ) ) ) ).
+    mo_cut->set_variant_store( lo_store ).
+    mo_cut->set_variant( `V1` ).
+    init( ).
+
+    cl_abap_unit_assert=>assert_equals( act = mo_report->p_carrid
+                                        exp = `LH` ).
+    cl_abap_unit_assert=>assert_initial( mo_report->mv_secret ).
+    cl_abap_unit_assert=>assert_initial( mo_report->mv_ucomm ).
+
+  ENDMETHOD.
+
+  METHOD events_screen_only.
+
+    " F4 and the multiple selection name their field in the argument - an
+    " attribute that is no field of the screen opens nothing
+    init( ).
+    event( name = z2ui5_cl_cgui_selscreen=>cs_event-select_option
+           args = VALUE #( ( `MT_ROW` ) ) ).
+    cl_abap_unit_assert=>assert_not_bound( mo_client->mo_called ).
+
+    event( name = z2ui5_cl_cgui_selscreen=>cs_event-value_request
+           args = VALUE #( ( `MV_SECRET` ) ) ).
+    cl_abap_unit_assert=>assert_not_bound( mo_client->mo_called ).
+
+    " a field of the screen still does
+    event( name = z2ui5_cl_cgui_selscreen=>cs_event-select_option
+           args = VALUE #( ( `s_code` ) ) ).
+    cl_abap_unit_assert=>assert_bound( mo_client->mo_called ).
 
   ENDMETHOD.
 
