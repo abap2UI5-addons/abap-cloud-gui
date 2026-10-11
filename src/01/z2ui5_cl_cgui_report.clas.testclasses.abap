@@ -158,6 +158,7 @@ CLASS ltcl_test DEFINITION FINAL FOR TESTING
     METHODS url_skip_screen FOR TESTING.
     METHODS url_range FOR TESTING.
     METHODS variant_screen_only FOR TESTING.
+    METHODS events_screen_only FOR TESTING.
     METHODS submit_starts_report FOR TESTING.
     METHODS link_holds_values FOR TESTING.
     METHODS parameter_id FOR TESTING.
@@ -705,6 +706,26 @@ CLASS ltcl_test IMPLEMENTATION.
                                         exp = `LH` ).
     cl_abap_unit_assert=>assert_initial( mo_report->mv_secret ).
     cl_abap_unit_assert=>assert_initial( mo_report->mv_ucomm ).
+
+  ENDMETHOD.
+
+  METHOD events_screen_only.
+
+    " F4 and the multiple selection name their field in the argument - an
+    " attribute that is no field of the screen opens nothing
+    init( ).
+    event( name = z2ui5_cl_cgui_selscreen=>cs_event-select_option
+           args = VALUE #( ( `MT_ROW` ) ) ).
+    cl_abap_unit_assert=>assert_not_bound( mo_client->mo_called ).
+
+    event( name = z2ui5_cl_cgui_selscreen=>cs_event-value_request
+           args = VALUE #( ( `MV_SECRET` ) ) ).
+    cl_abap_unit_assert=>assert_not_bound( mo_client->mo_called ).
+
+    " a field of the screen still does
+    event( name = z2ui5_cl_cgui_selscreen=>cs_event-select_option
+           args = VALUE #( ( `s_code` ) ) ).
+    cl_abap_unit_assert=>assert_bound( mo_client->mo_called ).
 
   ENDMETHOD.
 

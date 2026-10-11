@@ -804,6 +804,14 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
       RETURNING
         VALUE(result) TYPE z2ui5_cl_cgui_selscreen=>ty_t_field.
 
+    "! abap_true when field is a field of the selection screen or of the
+    "! popup screen - the attribute name an event argument carries
+    METHODS screen_field_check
+      IMPORTING
+        field         TYPE string
+      RETURNING
+        VALUE(result) TYPE abap_bool.
+
     "! the inputs of the roundtrip: the select-option buffer into the ranges,
     "! character fields to upper case
     METHODS input_sync.
@@ -1729,8 +1737,12 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
         after_call_selection_screen( dynnr = lv_dynnr
                                      subrc = 4 ).
 
+      " the argument names the attribute - from the browser, so only a field
+      " of the screen, never another attribute of the class
       WHEN z2ui5_cl_cgui_selscreen=>cs_event-select_option.
-        on_range_popup( client->get_event_arg( ) ).
+        IF screen_field_check( client->get_event_arg( ) ) = abap_true.
+          on_range_popup( client->get_event_arg( ) ).
+        ENDIF.
 
       WHEN z2ui5_cl_cgui_selscreen=>cs_event-help_request.
         at_selection_screen_on_help( client->get_event_arg( ) ).
@@ -1739,10 +1751,12 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
         on_print( ).
 
       WHEN z2ui5_cl_cgui_selscreen=>cs_event-value_request.
-        mv_cgui_value_field = client->get_event_arg( ).
-        mv_cgui_value_part = to_upper( client->get_event_arg( 2 ) ).
-        at_value_request( mv_cgui_value_field ).
-        CLEAR: mv_cgui_value_field, mv_cgui_value_part.
+        IF screen_field_check( client->get_event_arg( ) ) = abap_true.
+          mv_cgui_value_field = client->get_event_arg( ).
+          mv_cgui_value_part = to_upper( client->get_event_arg( 2 ) ).
+          at_value_request( mv_cgui_value_field ).
+          CLEAR: mv_cgui_value_field, mv_cgui_value_part.
+        ENDIF.
 
       WHEN z2ui5_cl_cgui_list=>cs_event-line_selection.
         cursor_from_list( line = CONV i( client->get_event_arg( ) )
@@ -2079,6 +2093,15 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
                                                      app    = me ).
     selection_screen( screen ).
     result = screen->get_fields( ).
+
+  ENDMETHOD.
+
+  METHOD screen_field_check.
+
+    DATA(lv_name) = to_upper( field ).
+    result = xsdbool( lv_name IS NOT INITIAL
+                      AND ( line_exists( mt_cgui_field[ name = lv_name ] )
+                         OR line_exists( mt_cgui_dynnr_field[ name = lv_name ] ) ) ).
 
   ENDMETHOD.
 
