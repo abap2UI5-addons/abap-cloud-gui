@@ -18,7 +18,7 @@
       // every abaplint config at once, bump-core moves it weekly after the gates
       // passed on the new tag, and the weekly canary run lints once against main.
       "url": "https://github.com/abap2UI5/abap2UI5",
-      "branch": "1.146.0",
+      "branch": "1.148.0",
       "folder": "/abap2UI5",
       "files": "/src/**/*.*"
     },
