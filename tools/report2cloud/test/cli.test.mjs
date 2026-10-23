@@ -2,7 +2,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { CORPUS, HERE } from "./corpus.mjs";
@@ -64,4 +64,39 @@ test("usage: --help, a wrong option, a missing file", () => {
   assert.equal(run("x.prog.abap", "--nope").status, 1);
   assert.equal(run(join(CORPUS, "missing.prog.abap")).status, 1);
   assert.equal(run().status, 1);
+});
+
+test("--includes names the folder of the includes; a refusal in an include names the include's file", () => {
+  const out = mkdtempSync(join(tmpdir(), "report2cloud-cli-"));
+  try {
+    // the report beside no includes: refused, naming the file it looked for
+    const alone = join(out, "zr2c_13_includes.prog.abap");
+    writeFileSync(alone, readFileSync(join(CORPUS, "zr2c_13_includes.prog.abap"), "utf8"));
+    const refused = run(alone, "--out", out);
+    assert.equal(refused.status, 2);
+    assert.ok(refused.stderr.includes(`${alone}:10:1 - INCLUDE - no such include beside the report`), refused.stderr);
+    // with the folder: converted, and the includes counted
+    const r = run(alone, "--out", out, "--includes", CORPUS);
+    assert.equal(r.status, 0, r.stderr);
+    assert.match(r.stdout, /2 include\(s\) inlined/);
+    assert.match(readFileSync(join(out, "zcl_r2c_13_includes.clas.abap"), "utf8"), /METHOD fill_lines\./);
+    // a refusal inside an include is reported at the include's own line
+    const top = join(out, "zr2c_13_includes_top.prog.abap");
+    writeFileSync(top, `${readFileSync(join(CORPUS, "zr2c_13_includes_top.prog.abap"), "utf8")}\nSELECTION-SCREEN FUNCTION KEY 1.\n`);
+    const inInclude = run(alone, "--out", out);
+    assert.equal(inInclude.status, 2);
+    assert.ok(inInclude.stderr.includes(`${top}:21:1 - SELECTION-SCREEN FUNCTION KEY`), inInclude.stderr);
+  } finally {
+    rmSync(out, { recursive: true, force: true });
+  }
+});
+
+test("coverage: the corpus as numbers - converted, refused, the reasons ranked", () => {
+  const r = spawnSync(process.execPath, [join(HERE, "..", "coverage.mjs"), CORPUS], { encoding: "utf8" });
+  assert.equal(r.status, 0, r.stderr);
+  assert.match(r.stdout, /^report2cloud coverage: 14 report\(s\) - 13 converted \(93 %\), 1 refused/);
+  assert.match(r.stdout, /includes: 1 report\(s\) with includes inlined/);
+  assert.match(r.stdout, /Refused - the next constructs to map \(reports affected\)\n(.*\n)*.*CALL SCREEN/);
+  assert.match(r.stdout, /Objects to check for ABAP Cloud/);
+  assert.equal(spawnSync(process.execPath, [join(HERE, "..", "coverage.mjs")], { encoding: "utf8" }).status, 1);
 });

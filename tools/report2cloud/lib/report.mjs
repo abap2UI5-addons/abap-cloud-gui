@@ -5,20 +5,29 @@
 // every mapped construct with its line.
 
 const cell = (s) => String(s).replace(/\|/g, "\\|").replace(/\n/g, " ");
-const at = (file, row, col) => (row ? `${file}:${row}:${col}` : file);
 
 /** the markdown report of a conversion result; lint: { v750, cloud } as
- *  lists of abaplint findings, when the gates ran */
-export function migrationReport(result, { source, texts, lint } = {}) {
+ *  lists of abaplint findings, when the gates ran; includes: what
+ *  lib/includes.mjs inlined (`included`, `missing`) and its `origin( )`,
+ *  so a position of a row from an include names the include */
+export function migrationReport(result, { source, texts, lint, includes } = {}) {
   const cls = result.className;
   const files = Object.keys(result.draft).sort();
   const lines = [];
   const push = (...l) => lines.push(...l);
+  const main = String(source).split("/").pop();
+  const at = (file, row, col) => {
+    if (!row) return file;
+    const o = includes?.origin?.(row);
+    if (o && o.file !== main) return `${o.file}:${o.row}:${col}`;
+    return `${file}:${o?.row ?? row}:${col}`;
+  };
 
   push(`# report2cloud: ${result.programName.toUpperCase()} → ${cls}`, "");
   push("| | |", "|---|---|");
   push(`| Source | \`${source}\` |`);
   push(`| Text pool | ${texts ? `\`${texts}\`` : "none - texts are placeholders, see the TODOs"} |`);
+  if (includes?.included?.length) push(`| Includes | inlined: ${includes.included.map((i) => `\`${i}\``).join(", ")} |`);
   push(`| Result | ${result.ok ? `**converted** - ${files.map((f) => `\`${f}\``).join(", ")}` : `**refused** - ${result.refusals.length} statement(s) cannot be mapped, no class written`} |`);
   push(`| Mapped | ${result.mapped.length} construct(s) |`);
   push(`| TODO | ${result.todos.length} |`);
@@ -70,7 +79,10 @@ export function migrationReport(result, { source, texts, lint } = {}) {
 
   push("## Mapped", "");
   push("| Line | Classic | abap-cloud-gui |", "|---|---|---|");
-  for (const m of result.mapped) push(`| ${m.row} | \`${cell(m.classic)}\` | ${cell(m.target)} |`);
+  for (const m of result.mapped) {
+    const o = includes?.origin?.(m.row);
+    push(`| ${o && o.file !== main ? `${o.file}:${o.row}` : o?.row ?? m.row} | \`${cell(m.classic)}\` | ${cell(m.target)} |`);
+  }
   push("");
 
   push("## Next steps", "");

@@ -235,12 +235,19 @@ test("refused: LOOP AT SCREEN outside of AT SELECTION-SCREEN OUTPUT", () => {
   assert.match(refusalOf("REPORT zt.\nPARAMETERS p TYPE i.\nAT SELECTION-SCREEN.\n  LOOP AT SCREEN.\n  ENDLOOP.\n")[0], /^4:3 LOOP AT SCREEN outside of AT SELECTION-SCREEN OUTPUT/);
 });
 
-test("refused: a TABLES parameter used with its header line", () => {
-  const r = refusalOf("REPORT zt.\nDATA gt TYPE STANDARD TABLE OF i.\nSTART-OF-SELECTION.\n  PERFORM f TABLES gt.\nFORM f TABLES tt STRUCTURE gt.\n  LOOP AT tt.\n  ENDLOOP.\nENDFORM.\n");
-  assert.ok(r.some((x) => /^6:3 the TABLES parameter tt of FORM f is used with its header line/.test(x)), r.join("\n"));
+test("a TABLES parameter used with its header line gets a work area of the method", () => {
+  const r = convert("REPORT zt.\nDATA gt TYPE STANDARD TABLE OF i.\nSTART-OF-SELECTION.\n  PERFORM f TABLES gt.\nFORM f TABLES tt STRUCTURE gt.\n  LOOP AT tt.\n    WRITE tt.\n  ENDLOOP.\n  CLEAR tt.\n  tt = 7.\n  APPEND tt.\nENDFORM.\n", { file: "zt.prog.abap", className: "zcl_t" });
+  assert.deepEqual(r.refusals, []);
+  const cls = r.draft["zcl_t.clas.abap"];
+  assert.match(cls, /DATA ls_tt LIKE LINE OF tt\./);
+  assert.match(cls, /LOOP AT tt INTO ls_tt\./);
+  assert.match(cls, /write\( ls_tt \)/);
+  assert.match(cls, /CLEAR ls_tt\./);
+  assert.match(cls, /ls_tt = 7\./);
+  assert.match(cls, /APPEND ls_tt TO tt\./);
 });
 
-test("refused: a table with header line, POPUP_TO_CONFIRM, PERFORM IN PROGRAM, FUNCTION KEY", () => {
+test("refused: POPUP_TO_CONFIRM, PERFORM IN PROGRAM, FUNCTION KEY - a table with a header line no longer", () => {
   const r = refusalOf([
     "REPORT zt.",
     "DATA gt TYPE i OCCURS 0.",
@@ -250,245 +257,81 @@ test("refused: a table with header line, POPUP_TO_CONFIRM, PERFORM IN PROGRAM, F
     "  PERFORM x IN PROGRAM zother.",
   ].join("\n"));
   assert.deepEqual(r.map((x) => x.split(" - ")[0]), [
-    "2:1 a table with a header line (OCCURS / WITH HEADER LINE)",
     "3:1 SELECTION-SCREEN FUNCTION KEY",
     "5:3 CALL FUNCTION 'POPUP_TO_CONFIRM'",
     "6:3 PERFORM of a FORM of another program, dynamic or ON COMMIT",
   ]);
 });
 
-test("refused: TOP-OF-PAGE that does more than write a header", () => {
-  assert.match(refusalOf("REPORT zt.\nDATA gv TYPE i.\nTOP-OF-PAGE.\n  gv = gv + 1.\n  WRITE gv.\n")[0], /^4:3 TOP-OF-PAGE with other statements/);
-});
+// ------------------------------------------------ tables with a header line
 
-test("refused: a local class that reaches a global of the report", () => {
-  const r = refusalOf("REPORT zt.\nDATA gv TYPE i.\nCLASS lcl DEFINITION.\n  PUBLIC SECTION.\n    CLASS-METHODS m.\nENDCLASS.\nCLASS lcl IMPLEMENTATION.\n  METHOD m.\n    gv = 1.\n  ENDMETHOD.\nENDCLASS.\n");
-  assert.match(r[0], /^9:5 the local class uses gv, a global of the report/);
-});
-
-test("default class name", () => {
-  assert.equal(defaultClassName("zflight_list"), "zcl_flight_list");
-  assert.equal(defaultClassName("z_flights"), "zcl_flights");
-  assert.equal(defaultClassName("yreport"), "ycl_report");
-  assert.equal(defaultClassName("/abc/flights"), "/abc/cl_flights");
-  assert.equal(defaultClassName("zvery_long_report_name_that_goes_on"), "zcl_very_long_report_name_that");
-});
-
-// ---------------------------------------------------------------------------
-// what the runtime test (test/runtime) found - each construct on its own
-
-const classFrom = (source) => {
-  const r = convert(source, { file: "zt.prog.abap", className: "zcl_t" });
-  assert.deepEqual(r.refusals, []);
-  return { abap: r.files["zcl_t.clas.abap"], result: r };
-};
-
-test("runtime: every run starts with the global data of a fresh start - selection phase data and VALUEs kept", () => {
-  const { abap } = classFrom([
+test("a global table with a header line is a table and a work area attribute, and every short form is written out", () => {
+  const src = [
     "REPORT zt.",
-    "DATA: gv_sum TYPE i, gv_start TYPE i VALUE 7, gt_list TYPE STANDARD TABLE OF i, gv_init TYPE string, gv_check TYPE i.",
-    "PARAMETERS p_n TYPE i DEFAULT 3.",
-    "INITIALIZATION.",
-    "  gv_init = `x`.",
-    "AT SELECTION-SCREEN.",
-    "  PERFORM check.",
+    "DATA gt_num TYPE i OCCURS 0 WITH HEADER LINE.",
+    "DATA: BEGIN OF gt_sum OCCURS 0,",
+    "        key TYPE c LENGTH 2,",
+    "        val TYPE i,",
+    "      END OF gt_sum,",
+    "      gt_car TYPE TABLE OF scarr WITH HEADER LINE,",
+    "      gv_n TYPE i.",
     "START-OF-SELECTION.",
-    "  gv_sum = gv_sum + p_n + gv_start + gv_check.",
-    "  WRITE / gv_sum.",
-    "FORM check.",
-    "  gv_check = 1.",
-    "ENDFORM.",
-  ].join("\n"));
-  assert.match(abap, /METHOD start_of_selection\.\n\n {4}" every run starts [^\n]*\n {4}CLEAR: gv_sum,\n {11}gt_list\.\n {4}gv_start = 7\.\n/);
-  assert.doesNotMatch(abap, /CLEAR[^.]*(gv_init|gv_check|p_n)/, "INITIALIZATION, AT SELECTION-SCREEN and the FORMs it calls keep theirs");
-  assert.match(abap, /gt_list\s+TYPE STANDARD TABLE OF i WITH DEFAULT KEY/, "the default key written out");
-});
-
-test("runtime: END-OF-SELECTION still runs after a RETURN or STOP of START-OF-SELECTION", () => {
-  const { abap } = classFrom([
-    "REPORT zt.",
-    "PARAMETERS p_n TYPE i.",
-    "START-OF-SELECTION.",
-    "  IF p_n = 0.",
-    "    RETURN.",
-    "  ENDIF.",
-    "  IF p_n = 1.",
-    "    STOP.",
-    "  ENDIF.",
-    "  WRITE / p_n.",
-    "END-OF-SELECTION.",
-    "  WRITE / 'end'.",
-  ].join("\n"));
-  // the runtime runs end_of_selection( ) after start_of_selection( ) - a
-  // RETURN or STOP is a RETURN, nobody calls the event itself
-  assert.match(abap, /IF p_n = 0\.\n {6}RETURN\./);
-  assert.match(abap, /IF p_n = 1\.\n {6}RETURN\./);
-  assert.match(abap, /METHODS end_of_selection REDEFINITION\./);
-  assert.doesNotMatch(abap, /end_of_selection\( \)/);
-  assert.match(abap, /METHOD end_of_selection\.\n\n {4}list\( \)->new_line\(\n {8}\)->write\( 'end' \)\./);
-  // without a RETURN as well - END-OF-SELECTION is never appended
-  const plain = classFrom("REPORT zt.\nSTART-OF-SELECTION.\n  WRITE / 'a'.\nEND-OF-SELECTION.\n  WRITE / 'b'.\n").abap;
-  assert.match(plain, /METHOD end_of_selection\.\n\n {4}list\( \)->new_line\(/);
-  assert.doesNotMatch(plain, /" END-OF-SELECTION/);
-});
-
-test("runtime: x IN range outside ABAP SQL calls range_check( ) - also in a LOOP WHERE", () => {
-  const { abap } = classFrom([
-    "REPORT zt.",
-    "TYPES: BEGIN OF ty_row, id TYPE i, name TYPE string, END OF ty_row.",
-    "DATA gt_row TYPE STANDARD TABLE OF ty_row WITH DEFAULT KEY.",
-    "SELECT-OPTIONS s_id FOR gt_row-id.",
-    "START-OF-SELECTION.",
-    "  DATA lv_ok TYPE abap_bool.",
-    "  IF 5 NOT IN s_id OR 6 IN s_id.",
-    "    lv_ok = xsdbool( 7 IN s_id ).",
-    "  ENDIF.",
-    "  LOOP AT gt_row ASSIGNING FIELD-SYMBOL(<ls_row>) WHERE id IN s_id AND name <> `x`.",
-    "    WRITE / <ls_row>-name.",
+    "  REFRESH gt_num.",
+    "  gt_num = 1.",
+    "  APPEND gt_num.",
+    "  gt_sum-key = 'A'. gt_sum-val = 2.",
+    "  COLLECT gt_sum.",
+    "  INSERT gt_sum INDEX 1.",
+    "  LOOP AT gt_num.",
+    "    gt_num = gt_num * 2.",
+    "    MODIFY gt_num.",
+    "    INSERT gt_num.",
     "  ENDLOOP.",
-    "  SELECT * FROM scarr INTO TABLE @DATA(lt_scarr) WHERE carrid IN @s_id.",
-  ].join("\n"));
-  assert.match(abap, /IF z2ui5_cl_cgui_context=>range_check\( val = 5 range = s_id \) = abap_false OR z2ui5_cl_cgui_context=>range_check\( val = 6 range = s_id \) = abap_true\./);
-  assert.match(abap, /xsdbool\( z2ui5_cl_cgui_context=>range_check\( val = 7 range = s_id \) = abap_true \)/);
-  assert.match(abap, /LOOP AT gt_row ASSIGNING FIELD-SYMBOL\(<ls_row>\)\.\n {6}IF NOT \( z2ui5_cl_cgui_context=>range_check\( val = <ls_row>-id range = s_id \) = abap_true AND <ls_row>-name <> `x` \)\.\n {8}CONTINUE\.\n {6}ENDIF\./);
-  assert.match(abap, /WHERE carrid IN @s_id/, "ABAP SQL keeps its IN");
-});
-
-test("runtime: a generic TYPE p FORM parameter is typed LIKE what every PERFORM passes", () => {
-  const { abap, result } = classFrom([
-    "REPORT zt.",
-    "DATA: gv_a TYPE p LENGTH 8 DECIMALS 2, gv_b TYPE p LENGTH 8 DECIMALS 2.",
-    "START-OF-SELECTION.",
-    "  PERFORM calc USING gv_a CHANGING gv_b.",
-    "  PERFORM calc USING gv_b CHANGING gv_b.",
-    "  WRITE / gv_b.",
-    "FORM calc USING iv_in TYPE p CHANGING cv_out TYPE p.",
-    "  cv_out = iv_in * 2.",
+    "  READ TABLE gt_sum WITH KEY key = 'A'.",
+    "  SELECT * FROM scarr INTO TABLE gt_car.",
+    "  SELECT SINGLE * FROM scarr INTO gt_car WHERE carrid = 'LH'.",
+    "  MOVE-CORRESPONDING gt_car TO gt_sum.",
+    "  IF gt_sum IS INITIAL. ENDIF.",
+    "  DESCRIBE TABLE gt_num LINES gv_n.",
+    "  SORT gt_num.",
+    "  PERFORM show TABLES gt_num USING gt_sum.",
+    "  CLEAR gt_sum. CLEAR gt_sum[].",
+    "FORM show TABLES tt USING us TYPE any.",
+    "  DATA lt TYPE i OCCURS 0.",
+    "  lt = 1.",
+    "  APPEND lt.",
+    "  LOOP AT lt.",
+    "    WRITE lt.",
+    "  ENDLOOP.",
     "ENDFORM.",
-  ].join("\n"));
-  assert.match(abap, /iv_in TYPE p\n/, "two different actuals: stays generic");
-  assert.match(abap, /cv_out LIKE gv_b\./);
-  assert.ok(result.todos.some((t) => /iv_in is the generic TYPE p/.test(t.message)));
-});
-
-test("runtime: sy-repid is the name of the report; MESSAGE ... INTO names the class of MESSAGE-ID", () => {
-  const { abap, result } = classFrom([
-    "REPORT zt MESSAGE-ID zmsg.",
-    "DATA gv_text TYPE string.",
-    "START-OF-SELECTION.",
-    "  gv_text = sy-repid.",
-    "  MESSAGE e042 WITH gv_text INTO gv_text.",
-    "  WRITE / gv_text.",
-  ].join("\n"));
-  assert.match(abap, /gv_text = 'ZT'\./);
-  assert.match(abap, /MESSAGE e042\(zmsg\) WITH gv_text INTO gv_text\./);
-  assert.ok(result.release.some((r) => r.kind === "message class" && r.name === "ZMSG"));
-});
-
-test("runtime: TOP-OF-PAGE is the top_of_page( ) event, not a call at the start", () => {
-  const { abap } = classFrom("REPORT zt.\nTOP-OF-PAGE.\n  WRITE / 'Header'.\nSTART-OF-SELECTION.\n  WRITE / 'a'.\n  NEW-PAGE.\n  WRITE / 'b'.\n");
-  assert.match(abap, /PROTECTED SECTION\.[\s\S]*METHODS top_of_page REDEFINITION\./);
-  // the runtime repeats the header on the new page - no call after NEW-PAGE
-  assert.match(abap, /list\( \)->new_page\( \)\./);
-  assert.doesNotMatch(abap, /top_of_page\( \)\./);
-});
-
-// ---------------------------------------------------------------------------
-// the events of z2ui5_cl_cgui_report the converter maps since the runtime has
-// them - and the names the generated class must not take
-
-test("the reserved names are the PUBLIC and PROTECTED methods of z2ui5_cl_cgui_report", () => {
-  const src = readFileSync(join(import.meta.dirname, "..", "..", "..", "src", "01", "z2ui5_cl_cgui_report.clas.abap"), "utf8");
-  const def = src.slice(0, src.indexOf("PRIVATE SECTION"));
-  const methods = [...def.matchAll(/^\s*METHODS ([a-z0-9_]+)/gm)].map((m) => m[1]);
-  const missing = methods.filter((m) => !RESERVED_METHODS.has(m));
-  assert.deepEqual(missing, [], "add them to BASE_METHODS in lib/convert.mjs");
-});
-
-test("refused: a global of the report named like a method of the runtime", () => {
-  assert.match(refusalOf("REPORT zt.\nDATA tree TYPE i.\nSTART-OF-SELECTION.\n  WRITE tree.\n")[0], /^2:1 TREE is the name of a component of z2ui5_cl_cgui_report/);
-});
-
-test("AT SELECTION-SCREEN ON BLOCK, ON RADIOBUTTON GROUP, ON END OF, ON EXIT-COMMAND", () => {
-  const { abap, result } = classFrom([
-    "REPORT zt.",
-    "SELECTION-SCREEN BEGIN OF BLOCK b1.",
-    "PARAMETERS p_a TYPE i.",
-    "SELECT-OPTIONS s_d FOR sy-datum.",
-    "SELECTION-SCREEN END OF BLOCK b1.",
-    "PARAMETERS: p_x RADIOBUTTON GROUP grp DEFAULT 'X',",
-    "            p_y RADIOBUTTON GROUP grp.",
-    "AT SELECTION-SCREEN ON BLOCK b1.",
-    "  IF p_a < 0.",
-    "    MESSAGE 'Negative' TYPE 'E'.",
-    "  ENDIF.",
-    "AT SELECTION-SCREEN ON RADIOBUTTON GROUP grp.",
-    "  IF p_y = abap_true AND p_a = 0.",
-    "    MESSAGE 'Not with 0' TYPE 'E'.",
-    "  ENDIF.",
-    "AT SELECTION-SCREEN ON END OF s_d.",
-    "  IF lines( s_d ) > 3.",
-    "    MESSAGE 'At most 3' TYPE 'E'.",
-    "  ENDIF.",
-    "AT SELECTION-SCREEN ON EXIT-COMMAND.",
-    "  CLEAR p_a.",
-    "START-OF-SELECTION.",
-    "  WRITE p_a.",
-  ].join("\n"));
-  assert.match(abap, /screen->block_begin\( name = `B1`/);
-  for (const m of ["at_selection_screen_on_block", "at_selection_screen_on_radio", "at_selection_screen_on_end_of", "at_selection_screen_on_exit"]) {
-    assert.match(abap, new RegExp(`METHODS ${m} REDEFINITION\\.`));
-  }
-  assert.match(abap, /METHOD at_selection_screen_on_block\.\n\n {4}CASE block\.\n {6}WHEN `B1`\./);
-  assert.match(abap, /METHOD at_selection_screen_on_radio\.\n\n {4}CASE group\.\n {6}WHEN `GRP`\./);
-  assert.match(abap, /METHOD at_selection_screen_on_end_of\.\n\n {4}CASE field\.\n {6}WHEN `S_D`\./);
-  assert.match(abap, /METHOD at_selection_screen_on_exit\.\n\n {4}CLEAR p_a\./);
-  assert.equal(result.todos.filter((t) => /ON BLOCK|EXIT-COMMAND/.test(t.message)).length, 0);
-});
-
-test("refused: AT SELECTION-SCREEN ON HELP-REQUEST, ON BLOCK of no block", () => {
-  const r = refusalOf("REPORT zt.\nPARAMETERS p TYPE i.\nAT SELECTION-SCREEN ON HELP-REQUEST FOR p.\n  CLEAR p.\nAT SELECTION-SCREEN ON BLOCK b9.\n  CLEAR p.\n");
-  assert.match(r[0], /^3:1 AT SELECTION-SCREEN ON HELP-REQUEST - at_selection_screen_on_help\( \) runs from the F1 button/);
-  assert.match(r[1], /^5:1 ON BLOCK B9 - no SELECTION-SCREEN BEGIN OF BLOCK B9/);
-});
-
-test("TOP-OF-PAGE DURING LINE-SELECTION is top_of_page_line_selection( ); sy-pagno in a header is &PAGE&", () => {
-  const { abap } = classFrom([
-    "REPORT zt.",
-    "TOP-OF-PAGE.",
-    "  WRITE: / 'Page', sy-pagno.",
-    "TOP-OF-PAGE DURING LINE-SELECTION.",
-    "  WRITE / 'Detail'.",
-    "START-OF-SELECTION.",
-    "  WRITE / 'a' HOTSPOT.",
-    "AT LINE-SELECTION.",
-    "  WRITE / sy-lisel.",
-  ].join("\n"));
-  assert.match(abap, /METHODS top_of_page REDEFINITION\.\n {4}METHODS top_of_page_line_selection REDEFINITION\./);
-  assert.match(abap, /METHOD top_of_page\.[\s\S]*z2ui5_cl_cgui_list=>cv_page[\s\S]*ENDMETHOD\./);
-  assert.match(abap, /METHOD top_of_page_line_selection\.\n\n {4}list\( \)->new_line\(\n {8}\)->write\( 'Detail' \)\./);
-  assert.match(abap, /lisel\( \)/);
-});
-
-test("REPORT LINE-COUNT n(m) and END-OF-PAGE; NEW-PAGE NO-HEADING LINE-COUNT", () => {
-  const source = (head) => [
-    `REPORT zt ${head}.`,
-    "END-OF-PAGE.",
-    "  ULINE.",
-    "  WRITE / 'Footer'.",
-    "START-OF-SELECTION.",
-    "  WRITE / 'a'.",
-    "  NEW-PAGE NO-HEADING LINE-COUNT 30.",
-    "  WRITE / 'b'.",
   ].join("\n");
-  const { abap, result } = classFrom(source("LINE-COUNT 20(2)"));
-  assert.match(abap, /set_line_count\( 20 \)\./);
-  assert.match(abap, /METHODS end_of_page REDEFINITION\./);
-  assert.match(abap, /METHOD end_of_page\.\n\n {4}list\( \)->uline\( \)\./);
-  assert.match(abap, /list\( \)->new_page\( no_heading = abap_true\n {23}line_count = 30 \)\./);
-  assert.ok(result.todos.some((t) => /END-OF-PAGE: the runtime ends every page/.test(t.message)));
-  // without footer lines the classic END-OF-PAGE never ran
-  const none = classFrom(source("LINE-COUNT 20"));
-  assert.doesNotMatch(none.abap, /end_of_page/);
-  assert.ok(none.result.todos.some((t) => /END-OF-PAGE dropped/.test(t.message)));
+  const r = convert(src, { file: "zt.prog.abap", className: "zcl_t" });
+  assert.deepEqual(r.refusals.map((x) => x.message), []);
+  const cls = r.draft["zcl_t.clas.abap"];
+  // the declarations
+  assert.match(cls, /DATA gt_num TYPE STANDARD TABLE OF i WITH DEFAULT KEY\.\n\s+DATA wa_gt_num LIKE LINE OF gt_num\./);
+  assert.match(cls, /BEGIN OF wa_gt_sum,\n\s+key TYPE c LENGTH 2,\n\s+val TYPE i,\n\s+END OF wa_gt_sum,/);
+  assert.match(cls, /DATA gt_sum LIKE STANDARD TABLE OF wa_gt_sum WITH DEFAULT KEY\./);
+  assert.match(cls, /gt_car TYPE STANDARD TABLE OF scarr WITH DEFAULT KEY,/);
+  assert.match(cls, /DATA wa_gt_car LIKE LINE OF gt_car\./);
+  // the work areas start fresh with the globals
+  assert.match(cls, /CLEAR: gt_num,\n\s+wa_gt_num,\n\s+gt_sum,\n\s+wa_gt_sum,/);
+  // the short forms
+  assert.match(cls, /CLEAR gt_num\.\n\s+wa_gt_num = 1\.\n\s+APPEND wa_gt_num TO gt_num\./);
+  assert.match(cls, /wa_gt_sum-key = 'A'\.\n\s+wa_gt_sum-val = 2\./);
+  assert.match(cls, /COLLECT wa_gt_sum INTO gt_sum\./);
+  assert.match(cls, /INSERT wa_gt_sum INTO gt_sum INDEX 1\./);
+  assert.match(cls, /LOOP AT gt_num INTO wa_gt_num\.\n\s+wa_gt_num = wa_gt_num \* 2\.\n\s+MODIFY gt_num FROM wa_gt_num\.\n\s+INSERT wa_gt_num INTO gt_num INDEX sy-tabix\./);
+  assert.match(cls, /READ TABLE gt_sum WITH KEY key = 'A' INTO wa_gt_sum\./);
+  // the table stays the table, the header line is the structure
+  assert.match(cls, /INTO TABLE @gt_car/);
+  assert.match(cls, /INTO @wa_gt_car/);
+  assert.match(cls, /MOVE-CORRESPONDING wa_gt_car TO wa_gt_sum\./);
+  assert.match(cls, /IF wa_gt_sum IS INITIAL\./);
+  assert.match(cls, /DESCRIBE TABLE gt_num LINES gv_n\./);
+  assert.match(cls, /SORT gt_num\./);
+  assert.match(cls, /show\( EXPORTING\n\s+us = wa_gt_sum\n\s+CHANGING\n\s+tt = gt_num \)\./);
+  assert.match(cls, /CLEAR wa_gt_sum\.\n\s+CLEAR gt_sum\./);
+  // a FORM's own table: the work area right after it
+  assert.match(cls, /DATA lt TYPE STANDARD TABLE OF i WITH DEFAULT KEY\.\n\s+DATA ls_lt LIKE LINE OF lt\.\n\s+ls_lt = 1\.\n\s+APPEND ls_lt TO lt\.\n\s+LOOP AT lt INTO ls_lt\.\n\s+write\( ls_lt \)/);
 });

@@ -76,7 +76,7 @@ export function unquote(s) {
 export function renderTokens(tokens, overrides = new Map(), colon = undefined) {
   let out = "";
   let prev;
-  let refCol = tokens.length ? tokens[0].getCol() : 1;
+  let refCol = tokens.length ? colOf(tokens[0]) : 1;
   let lineStart = 0;
   for (const tok of tokens) {
     const k = key(tok);
@@ -87,21 +87,43 @@ export function renderTokens(tokens, overrides = new Map(), colon = undefined) {
     } else if (crossesColon) {
       if (repl !== null) {
         out += " ";
-        refCol = tok.getCol() - (out.length - lineStart);
+        refCol = colOf(tok) - (out.length - lineStart);
         out += repl;
       }
-    } else if (tok.getRow() === prev.getRow()) {
-      const gap = tok.getCol() - (prev.getCol() + prev.getStr().length);
-      if (repl !== null) out += " ".repeat(Math.max(gap, 0)) + repl;
+    } else if (rowOf(tok) === rowOf(prev)) {
+      // a macro's parameter is longer or shorter than the &n it replaced:
+      // the gap of the macro's body may come out negative, and ABAP wants
+      // a blank between two tokens, so an expanded statement keeps one
+      const gap = colOf(tok) - (colOf(prev) + prev.getStr().length);
+      if (repl !== null) out += " ".repeat(Math.max(gap, virtual(tok) && gap <= 0 ? virtualGap(prev, tok) : 0)) + repl;
     } else if (repl !== null) {
       out += "\n";
       lineStart = out.length;
-      out += " ".repeat(Math.max(tok.getCol() - refCol, 2)) + repl;
+      out += " ".repeat(Math.max(colOf(tok) - refCol, 2)) + repl;
     }
     prev = tok;
   }
   return out;
 }
+
+// A token of a statement the parser expanded from a macro call stands at
+// the call's position (every token of it), and remembers the position in
+// the macro's body as vrow / vcol - which is what the spacing is read from.
+const virtual = (tok) => tok.getStart() instanceof abaplint.VirtualPosition;
+// Whether a blank stands between two tokens of an expanded statement whose
+// body positions do not say (a parameter longer than its &n): the lexer's
+// token class does - a Dash, ParenLeft or Plus without a W on that side
+// touches its neighbour, and two words never do.
+const GLUED = /^W?(Dash|Plus|ParenLeft|ParenRight|BracketLeft|BracketRight|InstanceArrow|StaticArrow|At|Colon|Comma|Punctuation)W?$/;
+function virtualGap(prev, tok) {
+  const p = prev.constructor.name;
+  const t = tok.constructor.name;
+  if (p.endsWith("W") || t.startsWith("W")) return 1;
+  if (GLUED.test(p) || GLUED.test(t)) return 0;
+  return 1;
+}
+const rowOf = (tok) => (virtual(tok) ? tok.getStart().vrow : tok.getRow());
+const colOf = (tok) => (virtual(tok) ? tok.getStart().vcol : tok.getCol());
 
 const before = (a, b) => a.getRow() < b.getRow() || (a.getRow() === b.getRow() && a.getCol() < b.getCol());
 

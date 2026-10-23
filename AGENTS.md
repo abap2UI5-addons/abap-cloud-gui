@@ -180,14 +180,20 @@ static gates.
 ## report2cloud
 
 `tools/report2cloud` converts a classic report (`.prog.abap`, its text pool
-from the `.prog.xml`) into a class inheriting from `z2ui5_cl_cgui_report`:
+from the `.prog.xml`, its includes from the `.prog.abap` files beside it)
+into a class inheriting from `z2ui5_cl_cgui_report`:
 `npm run report2cloud -- zreport.prog.abap [--class zcl_x] [--out dir]`. It
-parses with `@abaplint/core` at the version of `@abaplint/cli`, writes the
+inlines the includes before the parse (`lib/includes.mjs`, every line of the
+result knows its file and row), parses with `@abaplint/core` at the version
+of `@abaplint/cli` - which expands the macros at their calls - writes the
 class in abapGit format plus a migration report, and refuses with
 `file:row:col` what has no counterpart (dynpros, batch input, `SUBMIT`,
 native SQL, ...). The mapping table and the refusals are in its README.
 It is the only converter and the only generator of this repository - there
-is no ABAP tooling on the stack.
+is no ABAP tooling on the stack. `npm run report2cloud:coverage -- <dir>`
+(`coverage.mjs`) is the measurement over a folder of reports: converted,
+refused and why, ranked - the README's roadmap is ordered by it, so run it
+on a real corpus before picking the next construct to map.
 
 - **It writes against the API of `src/01` as it is.** A change to a
   signature of `z2ui5_cl_cgui_report`, `_selscreen`, `_list` or `_alv`
@@ -233,6 +239,11 @@ is no ABAP tooling on the stack.
 - **The generated files are abapGit's format** - BOM in the sidecar, LF,
   no trailing blanks, no line over 255 characters; the tests check every
   generated file.
+- **A corpus include is a `.prog.abap` without a `REPORT` statement**, lying
+  beside the report that names it (`corpus.mjs` tells the two apart that
+  way); a token of an expanded macro stands at the call's position and
+  keeps its body position as `vrow` / `vcol`, which `renderTokens( )` reads
+  the spacing from.
 - CI: `.github/workflows/report2cloud.yaml`.
 
 ## Verifying at runtime

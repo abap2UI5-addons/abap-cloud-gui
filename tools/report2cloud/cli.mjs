@@ -2,7 +2,7 @@
 // report2cloud - a classic ABAP report as an abap-cloud-gui report class.
 //
 //   node tools/report2cloud/cli.mjs zreport.prog.abap [--class zcl_name] [--out dir]
-//        [--texts zreport.prog.xml] [--check] [--ddic dir] [--partial]
+//        [--texts zreport.prog.xml] [--includes dir] [--check] [--ddic dir] [--partial]
 //
 // Writes <class>.clas.abap, <class>.clas.xml (abapGit format), the local
 // types and classes of the report as .clas.locals_def/_imp.abap, and the
@@ -16,6 +16,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
 import { convert } from "./lib/convert.mjs";
+import { includesFrom, inlineIncludes } from "./lib/includes.mjs";
 import { parseTextpool } from "./lib/textpool.mjs";
 import { migrationReport } from "./lib/report.mjs";
 
@@ -24,6 +25,8 @@ const USAGE = `usage: node tools/report2cloud/cli.mjs <report.prog.abap> [option
   --class <name>   name of the generated class (default: zcl_ + the report name)
   --out <dir>      output folder (default: the current folder)
   --texts <file>   the report's .prog.xml with its text pool (default: beside the source)
+  --includes <dir> where the report's INCLUDEs are, as abapGit writes them: <include>.prog.abap
+                   (default: beside the source; the includes are inlined before the conversion)
   --report <file>  where to write the migration report (default: <out>/<class>.migration.md)
   --check          lint the class with abaplint - v750 and ABAP Cloud, in a scratch
                    copy of this repository (needs git and network for the dependencies)
@@ -38,7 +41,7 @@ function args(argv) {
     if (a === "--help" || a === "-h") opts.help = true;
     else if (a === "--check") opts.check = true;
     else if (a === "--partial") opts.partial = true;
-    else if (["--class", "--out", "--texts", "--report", "--ddic"].includes(a)) {
+    else if (["--class", "--out", "--texts", "--includes", "--report", "--ddic"].includes(a)) {
       if (argv[i + 1] === undefined) throw new Error(`${a} needs a value`);
       opts[a.slice(2)] = argv[++i];
     } else if (a.startsWith("--")) throw new Error(`unknown option ${a}`);
@@ -68,7 +71,9 @@ async function main() {
     console.error(`${file}: no such file`);
     return 1;
   }
-  const source = readFileSync(file, "utf8");
+  const dirs = [dirname(file), ...(opts.includes ? [resolve(opts.includes)] : [])];
+  const includes = inlineIncludes(readFileSync(file, "utf8"), { file, read: includesFrom(dirs) });
+  const source = includes.source;
   const sibling = file.replace(/\.abap$/i, ".xml");
   const texts = opts.texts ?? (sibling !== file && existsSync(sibling) ? sibling : undefined);
   const textpool = texts ? parseTextpool(readFileSync(texts, "utf8")) : undefined;
@@ -78,9 +83,15 @@ async function main() {
     className: opts.class,
     programName: m ? m[1].replace(/#/g, "/") : undefined,
     textpool,
+    origin: includes.origin,
   });
 
-  for (const r of result.refusals) console.error(`${file}:${r.row}:${r.col} - ${r.message}`);
+  // a position in an include names the include's file, beside the report
+  const where = (row, col) => {
+    const o = includes.origin(row);
+    return `${o.file === basename(file) ? file : join(dirname(file), o.file)}:${o.row}:${col}`;
+  };
+  for (const r of result.refusals) console.error(`${where(r.row, r.col)} - ${r.message}`);
 
   const out = resolve(opts.out ?? ".");
   mkdirSync(out, { recursive: true });
@@ -99,7 +110,7 @@ async function main() {
 
   const reportFile = opts.report ? resolve(opts.report) : join(out, `${result.className}.migration.md`);
   mkdirSync(dirname(reportFile), { recursive: true });
-  writeFileSync(reportFile, migrationReport(result, { source: file, texts, lint }));
+  writeFileSync(reportFile, migrationReport(result, { source: file, texts, lint, includes }));
 
   const written = Object.keys(write).sort();
   if (!result.ok) {
@@ -109,6 +120,7 @@ async function main() {
   }
   console.log(`${result.className}: ${result.mapped.length} constructs mapped, ${result.todos.length} TODO(s), ` +
     `${result.release.length} object(s) to check for ABAP Cloud` +
+    `${includes.included.length ? `, ${includes.included.length} include(s) inlined` : ""}` +
     `${lint ? `, abaplint v750 ${lint.v750.length} / cloud ${lint.cloud.length} finding(s)` : ""}`);
   console.log(`  ${written.map((f) => join(out, f)).join("\n  ")}\n  ${reportFile}`);
   return 0;

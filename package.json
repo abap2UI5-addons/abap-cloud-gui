@@ -12,6 +12,7 @@
     "check": "npm run lint && npm run check:regex && npm run check:cloud && npm run check:702 && npm run check:abap2ui5",
     "test": "npm run check",
     "report2cloud": "node tools/report2cloud/cli.mjs",
+    "report2cloud:coverage": "node tools/report2cloud/coverage.mjs",
     "test:report2cloud": "node --test \"tools/report2cloud/test/*.test.mjs\"",
     "test:report2cloud:runtime": "node --test --test-concurrency=1 \"tools/report2cloud/test/runtime/*.test.mjs\"",
     "unit": "node scripts/unit.mjs"
