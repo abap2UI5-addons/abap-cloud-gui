@@ -331,6 +331,41 @@ test("a popup at the top of an event block: the answer and the SVAL values first
   assert.ok(r.todos.some((t) => /lv_n was declared inline before the call/.test(t.message)));
 });
 
+// ------------------------------------------- columns and secondary lists
+
+test("WRITE AT pos(len), UNDER, NO-GAP, POSITION, RESERVE, sy-linno / sy-colno, sy-lsind and WINDOW", () => {
+  const cls = classOf("zr2c_18_columns");
+  const { result } = converted.get("zr2c_18_columns");
+  assert.equal(result.ok, true);
+  assert.match(cls, /write\( val  = 'Flight'\n\s+pos  = 1\n\s+name = `Flight`/);
+  assert.match(cls, /write\( val     = gs_flight-connid\n\s+under   = `Flight`/);
+  assert.match(cls, /write\( val    = gs_flight-seatsmax\n\s+pos    = gv_col\n\s+len    = 6\n\s+no_gap = abap_true/);
+  assert.match(cls, /list\( \)->reserve\( 2 \)\./);
+  assert.match(cls, /list\( \)->position\( 25 \)\./);
+  assert.match(cls, /write\( list\( \)->current_line\( \) \)/);
+  assert.match(cls, /write\( list\( \)->current_column\( \) \)/);
+  assert.match(cls, /IF lsind\( \) > 2\.\n\s+set_lsind\( 2 \)\./);
+  assert.match(cls, /window\( columns = 60\n\s+lines   = 10 \)\./);
+  assert.ok(!/sy-(lsind|colno|linno)/.test(cls));
+  assert.ok(!result.notes.some((n) => /position|NO-GAP|UNDER/i.test(n.text)), result.notes.map((n) => n.text).join("\n"));
+});
+
+test("SKIP TO LINE, WRITE /(len) and (*), WINDOW outside of AT LINE-SELECTION", () => {
+  const r = convert([
+    "REPORT zt.",
+    "DATA gv TYPE i.",
+    "START-OF-SELECTION.",
+    "  SKIP TO LINE 5.",
+    "  WRITE /(10) gv.",
+    "  WRITE AT (*) gv.",
+    "  WINDOW STARTING AT 1 1.",
+  ].join("\n"), { file: "zt.prog.abap", className: "zcl_t" });
+  const cls = r.draft["zcl_t.clas.abap"];
+  assert.match(cls, /list\( \)->skip_to_line\( 5 \)\./);
+  assert.match(cls, /list\( \)->new_line\(\n\s+\)->write\( val = gv\n\s+len = 10 \)\./);
+  assert.deepEqual(r.refusals.map((x) => x.message.split(" - ")[0]), ["WINDOW outside of AT LINE-SELECTION"]);
+});
+
 // ------------------------------------------------------- the GUI status
 
 test("SET PF-STATUS: the buttons and function keys of the status in the .prog.xml, EXCLUDING, SET TITLEBAR WITH", () => {

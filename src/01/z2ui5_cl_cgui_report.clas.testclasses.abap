@@ -88,6 +88,7 @@ CLASS ltcl_report DEFINITION INHERITING FROM z2ui5_cl_cgui_report FINAL.
     DATA p_check     TYPE xsdboolean.
     DATA mv_block    TYPE string.
     DATA mv_window   TYPE abap_bool.
+    DATA mv_replace TYPE abap_bool.
     DATA mv_exit     TYPE string.
     DATA mv_exit_err TYPE abap_bool.
 
@@ -292,6 +293,10 @@ CLASS ltcl_report IMPLEMENTATION.
   METHOD at_line_selection.
 
     mv_lsel_row = row.
+    " sy-lsind = sy-lsind - 1: the detail replaces the list it comes from
+    IF mv_replace = abap_true.
+      set_lsind( lsind( ) - 1 ).
+    ENDIF.
     IF mv_window = abap_true.
       window( title   = `Detail`
               columns = 50
@@ -611,6 +616,22 @@ CLASS ltcl_test IMPLEMENTATION.
     event( z2ui5_cl_cgui_report=>cs_ucomm-back ).
     cl_abap_unit_assert=>assert_equals( act = mo_cut->mv_cgui_screen
                                         exp = `SELECTION` ).
+
+    " sy-lsind = sy-lsind - 1: a second detail replaces the first, Back
+    " returns to the basic list
+    event( z2ui5_cl_cgui_report=>cs_ucomm-execute ).
+    mo_report->mv_replace = abap_true.
+    event( name = z2ui5_cl_cgui_list=>cs_event-line_selection
+           args = VALUE #( ( `2` ) ( `H1` ) ) ).
+    cl_abap_unit_assert=>assert_equals( act = mo_cut->lsind( )
+                                        exp = 0 ).
+    mo_report->mv_replace = abap_false.
+    event( name = z2ui5_cl_cgui_list=>cs_event-line_selection
+           args = VALUE #( ( `1` ) ( `H2` ) ) ).
+    cl_abap_unit_assert=>assert_equals( act = mo_cut->lsind( )
+                                        exp = 1 ).
+    event( z2ui5_cl_cgui_report=>cs_ucomm-back ).
+    cl_abap_unit_assert=>assert_true( xsdbool( mo_client->mv_view CS `Detail H1` ) ).
 
   ENDMETHOD.
 

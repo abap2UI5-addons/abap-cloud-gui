@@ -128,6 +128,18 @@ CLASS ltcl_test IMPLEMENTATION.
     cl_abap_unit_assert=>assert_equals( act = lt_text[ 1 ]
                                         exp = `AB       CD` ).
 
+    " the items of a line with a position stand in boxes of their width, so
+    " the columns line up whatever the font; a line without one flows
+    lo_list->new_line( )->write( `free` ).
+    DATA(lv_view) = lo_list->stringify( NEW ltcl_client( ) ).
+    cl_abap_unit_assert=>assert_char_cp( act = lv_view
+                                         exp = `*width="5ch"*AB*width="4ch"*width="3ch"*CD*` ).
+    " the two boxes, the spacer and the width of AB itself - the free line
+    " has none
+    cl_abap_unit_assert=>assert_equals( act = count( val = lv_view
+                                                     sub = `ch"` )
+                                        exp = 4 ).
+
   ENDMETHOD.
 
   METHOD write_formats.

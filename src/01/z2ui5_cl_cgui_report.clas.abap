@@ -482,6 +482,13 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
       RETURNING
         VALUE(result) TYPE i.
 
+    "! sy-lsind = n in at_line_selection( ) - the list it writes becomes
+    "! level n: the levels above n - 1 are dropped, so Back returns to level
+    "! n - 1 (0 replaces the basic list). n above the current level is ignored
+    METHODS set_lsind
+      IMPORTING
+        val TYPE i.
+
     "! MESSAGE text TYPE type - S, I, W, E or A. field, the attribute name of
     "! a field of the selection screen, marks that field with the message;
     "! inside at_selection_screen_on( ) it is that method's field by default
@@ -2039,6 +2046,14 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
   METHOD lsind.
 
     result = lines( mt_cgui_level ).
+
+  ENDMETHOD.
+
+  METHOD set_lsind.
+
+    WHILE lines( mt_cgui_level ) > nmax( val1 = 0 val2 = val ).
+      DELETE mt_cgui_level INDEX lines( mt_cgui_level ).
+    ENDWHILE.
 
   ENDMETHOD.
 

@@ -22,10 +22,8 @@ The class uses no database table, DDIC type, function module, class or message c
 Layout, formatting and behaviour of the classic report that the list, the ALV or the selection screen of abap-cloud-gui do not have:
 
 - FORMAT INTENSIFIED / INVERSE / INPUT - the list knows only the color and hotspots
-- WRITE at a position or with a length - the list writes item after item (4×)
 - WRITE ... DD/MM/YYYY - the list writes the value in its default format
 - ULINE AT pos(len) - the line spans the list
-- WRITE ... NO-GAP - the list writes the value in its default format
 
 ## Mapped
 
