@@ -278,6 +278,9 @@ class `ZR2C` must exist in the target system.
 | `WRITE f TO g` | `g = \|{ f }\|.` and a TODO (user formats) |
 | `cl_salv_table=>factory( IMPORTING r_salv_table = o CHANGING t_table = t )` ... `o->display( )` | `alv( t )` at the place of `display( )`, with `set_title( )` (`set_list_header`), `set_column_text( )` (`set_long/medium/short_text`, the longest wins), `set_column_hidden( )` (`set_visible( abap_false )`, `set_technical( )`), `set_line_selection( )` (`SET HANDLER ... get_event( )`, with a TODO for the handler's code). The `REF TO cl_salv_*` variables, `get_columns( )` / `get_column( )` assignments and `TRY ... CATCH cx_salv_*` are removed |
 | `REUSE_ALV_GRID_DISPLAY` / `REUSE_ALV_LIST_DISPLAY` with `TABLES t_outtab = t` | `alv( t )`, `i_grid_title` is `set_title( )`, a field catalog built with `wa-fieldname`, `wa-seltext_*`, `wa-no_out`, `APPEND wa TO fcat` or `APPEND VALUE #( ) TO fcat` gives column texts and hidden columns; `REUSE_ALV_FIELDCATALOG_MERGE`, the layout and a FORM that only built them are dropped, as is the `IF sy-subrc` after the call |
+| `cl_gui_alv_grid` in a container (`cl_gui_custom_container`, `cl_gui_docking_container`, `cl_gui_container=>default_screen`), `set_table_for_first_display( CHANGING it_outtab = t it_fieldcatalog = f EXPORTING is_layout = l )` | `alv( t )` with the LVC field catalog (`fieldname`, `coltext` / `scrtext_*`, `no_out`, `hotspot` as `set_column_hotspot( )`, `do_sum` as `set_column_sum( )`) and `grid_title` of the layout as `set_title( )`. The grid, the container and the handler object go, with their `CREATE OBJECT`, `SET HANDLER`, `refresh_table_display( )` and the other tuning calls; an `IF go_container IS INITIAL` keeps the branch that creates the grid |
+| `CALL SCREEN n` with the grid, `MODULE ... OUTPUT`, `MODULE ... INPUT` | the PBO modules in place of `CALL SCREEN` - the grid shows when the event block is done; the PAI modules are `at_user_command( ucomm )` with the OK code field as `ucomm` (`CLEAR ok_code` and `save_ok = ok_code` go, `LEAVE TO SCREEN 0` / `SET SCREEN 0` are `leave_to_selection_screen( )`). One screen per report; statements after `CALL SCREEN` get a TODO |
+| the handler class of the grid (`METHODS ... FOR EVENT ... OF cl_gui_alv_grid`) | its methods become methods of the report class: `DOUBLE_CLICK` `at_line_selection( )` (`e_row-index` is `row`, the chain gets `set_line_selection( )`), `HOTSPOT_CLICK` `at_link_click( row column )`, `USER_COMMAND` `at_user_command( )` (`e_ucomm` is `ucomm`), `TOOLBAR` the buttons appended to `e_object->mt_toolbar` as `add_function( )` in the chain. `get_selected_rows( IMPORTING et_index_rows = r )` is `get_selected_rows( )` of the runtime, the chain gets `set_selection_mode( )`; `LVC_T_ROW` / `LVC_T_ROID` become the row types of `z2ui5_cl_cgui_alv` |
 | `i_callback_user_command = 'USER_COMMAND'` | `set_line_selection( )`, and the callback FORM is the body of `at_line_selection( )`: its ucomm is `&IC1`, `rs_selfield-tabindex` is `row` |
 | `MESSAGE 'text' / TEXT-001 / v TYPE t` | `message( text type )`, `S` without type |
 | `MESSAGE e001(cls) WITH ...`, `MESSAGE ID ... TYPE ... NUMBER ... WITH ...` | `MESSAGE ... INTO DATA(lv_message).` `message( text = lv_message type = )` - the message class stays the source of the text |
@@ -314,7 +317,7 @@ them are collected, so one run lists everything there is to do.
 
 | Construct | Why |
 |---|---|
-| `CALL SCREEN`, `MODULE`, `SET SCREEN`, `LEAVE TO SCREEN`, `CALL SUBSCREEN`, `CONTROLS` | dynpros have no counterpart in a browser app |
+| `CALL SCREEN`, `MODULE`, `SET SCREEN`, `LEAVE TO SCREEN`, `CALL SUBSCREEN`, `CONTROLS` - but for the screen of one `cl_gui_alv_grid` | dynpros have no counterpart in a browser app |
 | `SELECTION-SCREEN TABBED BLOCK / INCLUDE / FUNCTION KEY`, `SET CURSOR` | not converted; abap-cloud-gui has tabbed blocks, `function_key( )` and `set_cursor_field( )` - port them by hand |
 | `CALL SELECTION-SCREEN n` of a screen the report does not declare, a second call of the same screen with statements after it | the class calls the screens of `selection_screen_dynnr( )`, and `after_call_selection_screen( )` goes on after one call per screen |
 | `SUBMIT ... EXPORTING LIST TO MEMORY`, `TO SAP-SPOOL`, `VIA JOB`, `WITH-FREE SELECTIONS`, `USING SELECTION-SCREEN n` / `SELECTION-SETS OF PROGRAM` | the list of the called report is not in memory, there is no spool and no job from a browser app; the class has its standard selection screen and its own variants only |
@@ -336,7 +339,8 @@ them are collected, so one run lists everything there is to do.
 | `MESSAGE` without message class, `MESSAGE ... RAISING` | |
 | `PERFORM ... IN PROGRAM`, `PERFORM f(prog)`, `IF FOUND`, `ON COMMIT`, a `PERFORM` whose parameters do not match the FORM, a literal passed to a parameter the FORM changes | only FORMs of this report, called as methods |
 | `POPUP_TO_CONFIRM_WITH_MESSAGE`, `POPUP_TO_DECIDE_WITH_MESSAGE`, `POPUP_TO_DECIDE_LIST`, `POPUP_GET_VALUES_DB_CHECKED` | the popups with a T100 message, a list or a DDIC check - `popup_to_decide( )` / `popup_get_values( )` and `at_user_command( )` by hand; the four plain ones are converted (see the mapping) |
-| `GUI_DOWNLOAD`, `GUI_UPLOAD`, `cl_gui_frontend_services`, `cl_gui_alv_grid` and the other SAP GUI controls | there is no SAP GUI frontend and no dynpro container |
+| `GUI_DOWNLOAD`, `GUI_UPLOAD`, `cl_gui_frontend_services` and the SAP GUI controls but `cl_gui_alv_grid` | there is no SAP GUI frontend and no dynpro container |
+| the `DATA_CHANGED` and other handlers of the grid but the four above, a method of `cl_gui_alv_grid` without a counterpart, a handler class with other methods, a handler that uses `me->` or `sender` | an edited cell arrives in `at_data_changed( row column )` - port these by hand |
 | other `REUSE_ALV_*` / `LVC_*` function modules, `F4IF_INT_TABLE_VALUE_REQUEST` outside of an F4, `DYNP_VALUES_READ` / `_UPDATE`, `BDC_*` | |
 | a local class that reads a global of the report, or calls `PERFORM` or `WRITE` | a local class of the generated class cannot reach the report's attributes, FORMs or list |
 | `GENERATE SUBROUTINE POOL`, `INSERT REPORT`, OLE, contexts, ... | not available |
@@ -444,8 +448,11 @@ npm run test:report2cloud:runtime                                          # the
   `EXCLUDING` a table and a literal, `SET TITLEBAR ... WITH`), an evaluation
   that lives by the column (`WRITE AT pos(len)`, `UNDER`, `NO-GAP`,
   `POSITION`, `RESERVE`, `sy-linno` / `sy-colno`) with a drilldown over three
-  levels (`WINDOW`, `sy-lsind` read and set) - and one with `CALL SCREEN`,
-  batch input, native SQL and dynpro modules that must be refused. A report `zr2c_NN_name` becomes the class
+  levels (`WINDOW`, `sy-lsind` read and set), a `cl_gui_alv_grid` in a
+  custom container on screen 100 with an LVC field catalog, a handler class
+  for `DOUBLE_CLICK`, `HOTSPOT_CLICK`, `TOOLBAR` and `USER_COMMAND` and the
+  PBO and PAI modules - and one with `CALL SCREEN`, batch input, native SQL
+  and dynpro modules that must be refused. A report `zr2c_NN_name` becomes the class
   `z2ui5_cl_cgui_r2c_NN`, a name the repository's `object_naming` accepts.
 - `test/convert.test.mjs` - the snapshots of every generated file and
   migration report (`test/snapshots/`), the abapGit format of the files, the

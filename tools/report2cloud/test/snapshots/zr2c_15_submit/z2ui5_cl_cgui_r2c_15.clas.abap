@@ -87,10 +87,15 @@ CLASS z2ui5_cl_cgui_r2c_15 IMPLEMENTATION.
   METHOD at_line_selection.
 
     " the flight list of another report of the corpus, with our values
+    DATA lt_r2c_submit_1 TYPE z2ui5_cl_cgui_variant=>ty_t_value.
+    DATA lt_r2c_lines_1 TYPE z2ui5_cl_cgui_variant=>ty_t_value.
+    CLEAR lt_r2c_submit_1.
+    INSERT VALUE #( name = `P_CARRID` kind = z2ui5_cl_cgui_variant=>cs_kind-parameter low = p_carrid ) INTO TABLE lt_r2c_submit_1.
+    lt_r2c_lines_1 = z2ui5_cl_cgui_variant=>range_lines_get( name = `S_FLDATE` range = s_fldate ).
+    APPEND LINES OF lt_r2c_lines_1 TO lt_r2c_submit_1.
+    INSERT VALUE #( name = `P_MAX` kind = z2ui5_cl_cgui_variant=>cs_kind-select_option sign = 'E' option = `NE` low = p_max ) INTO TABLE lt_r2c_submit_1.
     submit( report = `Z2UI5_CL_CGUI_R2C_02`
-            values = VALUE #( ( name = `P_CARRID` kind = z2ui5_cl_cgui_variant=>cs_kind-parameter low = p_carrid )
-                              ( LINES OF z2ui5_cl_cgui_variant=>range_lines_get( name = `S_FLDATE` range = s_fldate ) )
-                              ( name = `P_MAX` kind = z2ui5_cl_cgui_variant=>cs_kind-select_option sign = 'E' option = `NE` low = p_max ) ) ).
+            values = lt_r2c_submit_1 ).
 
   ENDMETHOD.
 
@@ -103,8 +108,13 @@ CLASS z2ui5_cl_cgui_r2c_15 IMPLEMENTATION.
       WHEN 'HELLO'.
         " the values as a selection table, the called report's own screen first
         gt_rspar = VALUE #( ( selname = 'P_NAME' kind = 'P' sign = 'I' option = 'EQ' low = 'World' ) ).
+        DATA lt_r2c_submit_2 TYPE z2ui5_cl_cgui_variant=>ty_t_value.
+        DATA lt_r2c_lines_2 TYPE z2ui5_cl_cgui_variant=>ty_t_value.
+        CLEAR lt_r2c_submit_2.
+        lt_r2c_lines_2 = z2ui5_cl_cgui_variant=>selection_table_get( gt_rspar ).
+        APPEND LINES OF lt_r2c_lines_2 TO lt_r2c_submit_2.
         submit( report               = `Z2UI5_CL_CGUI_R2C_01`
-                values               = VALUE #( ( LINES OF z2ui5_cl_cgui_variant=>selection_table_get( gt_rspar ) ) )
+                values               = lt_r2c_submit_2
                 via_selection_screen = abap_true
                 using_variant        = 'DEFAULT' ).
       WHEN 'LEAVE'.
