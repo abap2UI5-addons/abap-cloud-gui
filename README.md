@@ -391,10 +391,11 @@ Stage 1 - the converter: the constructs that stop the most reports
       values handed over; a screen of the report's own as a dialog, the
       statements after the call continued in `after_call_selection_screen( )`
       - reports call reports
-- [ ] The synchronous popups (`POPUP_TO_CONFIRM`, `POPUP_TO_DECIDE`): the
-      event block cut at the call, the rest continued in
-      `at_user_command( )` - the one transformation that changes a block's
-      shape, and the one in every report that posts something
+- [x] The synchronous popups (`POPUP_TO_CONFIRM`, `POPUP_TO_CONFIRM_STEP`,
+      `POPUP_TO_DECIDE`, `POPUP_GET_VALUES`): the event block cut at the
+      call, the rest continued in `at_user_command( )` - the one
+      transformation that changes a block's shape, and the one in every
+      report that posts something
 - [ ] `SET PF-STATUS`, `SET TITLEBAR`, `AT PFnn` as `set_pf_status( )`,
       toolbar functions and the keyboard shortcuts of the runtime
 - [ ] Secondary lists (`sy-lsind`) and `WRITE AT` positions, in a monospace

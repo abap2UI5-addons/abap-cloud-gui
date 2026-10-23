@@ -283,6 +283,12 @@ class `ZR2C` must exist in the target system.
 | `FORM f TABLES t STRUCTURE s USING [VALUE(]u[)] TYPE x CHANGING c TYPE y` | private method `f IMPORTING u CHANGING t c`: a `USING` parameter the FORM writes becomes `CHANGING`; `TABLES` gets a table type of its own (`ty_t_s`); an untyped parameter is `TYPE any` with a TODO |
 | `PERFORM f TABLES ... USING ... CHANGING ...` | `f( a )`, `f( p1 = a p2 = b )` or `f( EXPORTING ... CHANGING ... )` with the parameter names of the FORM |
 | `LEAVE LIST-PROCESSING` | `leave_to_selection_screen( )` |
+| `SUBMIT report WITH p = v WITH s IN range WITH s op v [SIGN x] WITH SELECTION-TABLE t [VIA SELECTION-SCREEN] [USING SELECTION-SET v] AND RETURN` | `submit( report = the class values = VALUE #( ... ) via_selection_screen = using_variant = )` - the class of a report beside the input (or in the corpus), else the name report2cloud would give it and a TODO to convert it; `p = v` is a parameter value, every other comparison a range line, `IN range` the lines of `range_lines_get( )`, `WITH SELECTION-TABLE` those of `selection_table_get( )` - the runtime takes the kind from the attribute of the called class. Back returns to the caller; statements after the `SUBMIT` run before the called class starts (a TODO) |
+| `SUBMIT report ...` without `AND RETURN` | `submit( )` and `RETURN` - the classic ended the caller |
+| `SELECTION-SCREEN BEGIN OF SCREEN n [AS WINDOW] [TITLE t]` ... `END OF SCREEN n` | `selection_screen_dynnr( dynnr screen )`, `CASE dynnr. WHEN \`n\`.` with the fields' chain; the screen is a dialog either way |
+| `CALL SELECTION-SCREEN n [STARTING AT x y]` | `call_selection_screen( dynnr title )`. The dialog opens when the method returns, so the statements after the call, in the same branch (also inside a `WHEN` or `IF`), go on in `after_call_selection_screen( dynnr subrc )` - `sy-subrc` of the `IF` right after the call is `subrc` (0 confirmed, 4 cancelled); a call inside a loop, in a FORM, or with statements after the block it stands in gets a TODO instead |
+| `CALL FUNCTION 'POPUP_TO_CONFIRM'` (`TEXT_QUESTION`, `TEXT_BUTTON_1/2`, `TITLEBAR`, `ANSWER`), `POPUP_TO_CONFIRM_STEP` (`TEXTLINE1/2`, `TITEL`), `POPUP_TO_DECIDE` (`TEXTLINE1/2/3`, `TEXT_OPTION1/2`, `TITEL`) | `popup_to_decide( question options ucomm title )` - the two buttons are the options, the answers `1`, `2` and `A` the classic ones (`J`, `N`, `A` for `POPUP_TO_CONFIRM_STEP`, switched in the continuation). The popup opens when the method returns and its answer arrives in `at_user_command( )` with a ucomm of its own (`POPUP_1`, `POPUP_2`, ...), so the statements after the call in its branch are cut off and go on there, `answer = popup_answer( )` first; an `IF sy-subrc` right after the call, which checked the `EXCEPTIONS`, is dropped. Inside a loop, in a FORM, or with statements after the block the call stands in, nothing is cut: a TODO says where to go on. Local data the continuation reads is declared anew there, with a TODO (a value set before the popup is not there) |
+| `CALL FUNCTION 'POPUP_GET_VALUES'` (`TABLES fields` of `SVAL`, `POPUP_TITLE`, `RETURNCODE`) | `popup_get_values_sval( sval ucomm title )` - `FIELDNAME` is the field, `FIELDTEXT` its label, `VALUE` the start value, `FIELD_OBL` required; the continuation in `at_user_command( )` starts with `returncode = SWITCH #( popup_answer( ) WHEN 'A' THEN 'A' ELSE space )` and `popup_values_sval( CHANGING sval = fields )`, which writes what the user entered back into the table (and fills an empty one) |
 | `STOP` | `RETURN` - in `START-OF-SELECTION` the runtime goes on with `end_of_selection( )`, as after the classic `STOP`; in a FORM it only leaves the method (a TODO) |
 | `sy-lisel` in `AT LINE-SELECTION` | `lisel( )` |
 | `sy-pagno` | `z2ui5_cl_cgui_list=>cv_page` in `TOP-OF-PAGE` / `END-OF-PAGE`, `list( )->current_page( )` elsewhere |
@@ -309,7 +315,6 @@ them are collected, so one run lists everything there is to do.
 | `AT SELECTION-SCREEN ON HELP-REQUEST` | `at_selection_screen_on_help( )` runs from the F1 button, which a field only has when its data element has documentation - the block would not run for the other fields |
 | `AT SELECTION-SCREEN ON BLOCK b` / `ON RADIOBUTTON GROUP g` / `ON END OF s` of a block, group or select-option the report does not declare | |
 | `CALL TRANSACTION` (with or without `USING` - batch input) | no SAP GUI transaction can be started; call the released API instead |
-| `SUBMIT` (also `AND RETURN`) | the other report is not part of the input - convert it too and start its class with `submit( report = values = )` |
 | `EXEC SQL` | native SQL is not available on ABAP Cloud |
 | `ASSIGN ('(PROG)FIELD')`, `LOOP AT SCREEN ASSIGNING` | field symbols to screen or foreign program fields |
 | `LOOP AT SCREEN` / `MODIFY SCREEN` outside of `AT SELECTION-SCREEN OUTPUT`, `screen-group2`, `screen-intensified`, ... read in a condition | only the screen of `at_selection_screen_output( screen )` and its six fields exist (an assignment to another field is dropped with a TODO) |
@@ -324,7 +329,7 @@ them are collected, so one run lists everything there is to do.
 | a `TABLES` parameter without a type used with its header line | a work area needs a line type - give the parameter a `STRUCTURE` or a table `TYPE` |
 | `MESSAGE` without message class, `MESSAGE ... RAISING` | |
 | `PERFORM ... IN PROGRAM`, `PERFORM f(prog)`, `IF FOUND`, `ON COMMIT`, a `PERFORM` whose parameters do not match the FORM, a literal passed to a parameter the FORM changes | only FORMs of this report, called as methods |
-| `CALL FUNCTION 'POPUP_TO_CONFIRM'` / `POPUP_TO_DECIDE` / `POPUP_GET_VALUES` | the popup waits for the answer; in abap2UI5 it is asynchronous - `popup_to_confirm( )` / `popup_to_decide( )` / `popup_get_values( )` and `at_user_command( )` |
+| `POPUP_TO_CONFIRM_WITH_MESSAGE`, `POPUP_TO_DECIDE_WITH_MESSAGE`, `POPUP_TO_DECIDE_LIST`, `POPUP_GET_VALUES_DB_CHECKED` | the popups with a T100 message, a list or a DDIC check - `popup_to_decide( )` / `popup_get_values( )` and `at_user_command( )` by hand; the four plain ones are converted (see the mapping) |
 | `GUI_DOWNLOAD`, `GUI_UPLOAD`, `cl_gui_frontend_services`, `cl_gui_alv_grid` and the other SAP GUI controls | there is no SAP GUI frontend and no dynpro container |
 | other `REUSE_ALV_*` / `LVC_*` function modules, `F4IF_INT_TABLE_VALUE_REQUEST` outside of an F4, `DYNP_VALUES_READ` / `_UPDATE`, `BDC_*` | |
 | a local class that reads a global of the report, or calls `PERFORM` or `WRITE` | a local class of the generated class cannot reach the report's attributes, FORMs or list |
@@ -425,9 +430,11 @@ npm run test:report2cloud:runtime                                          # the
   writes them, a `.prog.abap` without a `REPORT` statement is no report of the
   corpus), reports that call reports (`SUBMIT ... WITH ... AND RETURN` of
   another report of the corpus, a selection screen of the report's own called
-  as a dialog, `WITH SELECTION-TABLE`, a `SUBMIT` without `AND RETURN`) - and
-  one with `CALL SCREEN`, batch input, native SQL and dynpro modules that
-  must be refused. A report `zr2c_NN_name` becomes the class
+  as a dialog, `WITH SELECTION-TABLE`, a `SUBMIT` without `AND RETURN`), the
+  synchronous popups of a report that posts something (`POPUP_TO_DECIDE` in
+  `AT LINE-SELECTION`, `POPUP_TO_CONFIRM` with its `EXCEPTIONS` check inside
+  a `WHEN`, `POPUP_GET_VALUES` in a FORM) - and one with `CALL SCREEN`, batch
+  input, native SQL and dynpro modules that must be refused. A report `zr2c_NN_name` becomes the class
   `z2ui5_cl_cgui_r2c_NN`, a name the repository's `object_naming` accepts.
 - `test/convert.test.mjs` - the snapshots of every generated file and
   migration report (`test/snapshots/`), the abapGit format of the files, the

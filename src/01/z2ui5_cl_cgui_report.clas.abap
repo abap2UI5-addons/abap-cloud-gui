@@ -526,6 +526,23 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
         text    TYPE clike                         OPTIONAL
         listbox TYPE z2ui5_cl_cgui_popup=>ty_t_listbox OPTIONAL.
 
+    "! POPUP_GET_VALUES with its SVAL table: fieldname is the name, fieldtext
+    "! the label (the field name when empty), value the start value,
+    "! field_obl marks a required field - popup_get_values( ) with them
+    METHODS popup_get_values_sval
+      IMPORTING
+        sval  TYPE STANDARD TABLE
+        ucomm TYPE clike
+        title TYPE clike OPTIONAL
+        text  TYPE clike OPTIONAL.
+
+    "! what the user entered in the last popup_get_values_sval( ), written
+    "! back into the SVAL table by fieldname - an empty table is filled
+    "! with one line per field (fieldname, fieldtext, value)
+    METHODS popup_values_sval
+      CHANGING
+        sval TYPE STANDARD TABLE.
+
     "! the answer of the last popup_to_decide( )
     METHODS popup_answer
       RETURNING
@@ -4095,6 +4112,97 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
                                                            text    = text
                                                            listbox = listbox
                                                            event   = ucomm ) ).
+
+  ENDMETHOD.
+
+  METHOD popup_get_values_sval.
+
+    DATA lt_field TYPE z2ui5_cl_cgui_popup=>ty_t_field.
+    FIELD-SYMBOLS <line> TYPE any.
+    FIELD-SYMBOLS <comp> TYPE any.
+
+    LOOP AT sval ASSIGNING <line>.
+      DATA(ls_field) = VALUE z2ui5_cl_cgui_popup=>ty_s_field( ).
+      ASSIGN COMPONENT `FIELDNAME` OF STRUCTURE <line> TO <comp>.
+      IF <comp> IS ASSIGNED.
+        ls_field-name = to_upper( <comp> ).
+      ENDIF.
+      UNASSIGN <comp>.
+      ASSIGN COMPONENT `FIELDTEXT` OF STRUCTURE <line> TO <comp>.
+      IF <comp> IS ASSIGNED.
+        ls_field-text = <comp>.
+      ENDIF.
+      UNASSIGN <comp>.
+      IF ls_field-text IS INITIAL.
+        ls_field-text = ls_field-name.
+      ENDIF.
+      ASSIGN COMPONENT `VALUE` OF STRUCTURE <line> TO <comp>.
+      IF <comp> IS ASSIGNED.
+        ls_field-value = <comp>.
+      ENDIF.
+      UNASSIGN <comp>.
+      ASSIGN COMPONENT `FIELD_OBL` OF STRUCTURE <line> TO <comp>.
+      IF <comp> IS ASSIGNED.
+        ls_field-required = xsdbool( <comp> IS NOT INITIAL ).
+      ENDIF.
+      UNASSIGN <comp>.
+      INSERT ls_field INTO TABLE lt_field.
+    ENDLOOP.
+
+    popup_get_values( fields = lt_field
+                      ucomm  = ucomm
+                      title  = title
+                      text   = text ).
+
+  ENDMETHOD.
+
+  METHOD popup_values_sval.
+
+    FIELD-SYMBOLS <line> TYPE any.
+    FIELD-SYMBOLS <comp> TYPE any.
+    DATA lr_line TYPE REF TO data.
+
+    IF sval IS INITIAL.
+      LOOP AT mt_cgui_popup_values REFERENCE INTO DATA(lr_field).
+        CREATE DATA lr_line LIKE LINE OF sval.
+        ASSIGN lr_line->* TO <line>.
+        ASSIGN COMPONENT `FIELDNAME` OF STRUCTURE <line> TO <comp>.
+        IF <comp> IS ASSIGNED.
+          <comp> = lr_field->name.
+        ENDIF.
+        UNASSIGN <comp>.
+        ASSIGN COMPONENT `FIELDTEXT` OF STRUCTURE <line> TO <comp>.
+        IF <comp> IS ASSIGNED.
+          <comp> = lr_field->text.
+        ENDIF.
+        UNASSIGN <comp>.
+        ASSIGN COMPONENT `VALUE` OF STRUCTURE <line> TO <comp>.
+        IF <comp> IS ASSIGNED.
+          <comp> = lr_field->value.
+        ENDIF.
+        UNASSIGN <comp>.
+        INSERT <line> INTO TABLE sval.
+      ENDLOOP.
+      RETURN.
+    ENDIF.
+
+    LOOP AT sval ASSIGNING <line>.
+      ASSIGN COMPONENT `FIELDNAME` OF STRUCTURE <line> TO <comp>.
+      IF <comp> IS NOT ASSIGNED.
+        RETURN.
+      ENDIF.
+      DATA(lv_name) = to_upper( <comp> ).
+      UNASSIGN <comp>.
+      READ TABLE mt_cgui_popup_values REFERENCE INTO lr_field WITH KEY name = lv_name.
+      IF sy-subrc <> 0.
+        CONTINUE.
+      ENDIF.
+      ASSIGN COMPONENT `VALUE` OF STRUCTURE <line> TO <comp>.
+      IF <comp> IS ASSIGNED.
+        <comp> = lr_field->value.
+      ENDIF.
+      UNASSIGN <comp>.
+    ENDLOOP.
 
   ENDMETHOD.
 

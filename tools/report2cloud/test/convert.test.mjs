@@ -272,20 +272,63 @@ test("a TABLES parameter used with its header line gets a work area of the metho
   assert.match(cls, /APPEND ls_tt TO tt\./);
 });
 
-test("refused: POPUP_TO_CONFIRM, PERFORM IN PROGRAM, FUNCTION KEY - a table with a header line no longer", () => {
+test("refused: GUI_DOWNLOAD, PERFORM IN PROGRAM, FUNCTION KEY - a table with a header line and a popup no longer", () => {
   const r = refusalOf([
     "REPORT zt.",
     "DATA gt TYPE i OCCURS 0.",
     "SELECTION-SCREEN FUNCTION KEY 1.",
     "START-OF-SELECTION.",
-    "  CALL FUNCTION 'POPUP_TO_CONFIRM' EXPORTING text_question = 'Sure?'.",
+    "  CALL FUNCTION 'GUI_DOWNLOAD' EXPORTING filename = 'x'.",
     "  PERFORM x IN PROGRAM zother.",
   ].join("\n"));
   assert.deepEqual(r.map((x) => x.split(" - ")[0]), [
     "3:1 SELECTION-SCREEN FUNCTION KEY",
-    "5:3 CALL FUNCTION 'POPUP_TO_CONFIRM'",
+    "5:3 CALL FUNCTION 'GUI_DOWNLOAD'",
     "6:3 PERFORM of a FORM of another program, dynamic or ON COMMIT",
   ]);
+});
+
+test("the synchronous popups: popup_to_decide( ) / popup_get_values_sval( ), the block cut at the call and continued in at_user_command( )", () => {
+  const cls = classOf("zr2c_16_popups");
+  const { result } = converted.get("zr2c_16_popups");
+  assert.equal(result.ok, true);
+  // POPUP_TO_DECIDE in AT LINE-SELECTION: the two lines joined, the options, the CASE on the answer continued
+  assert.match(cls, /METHOD at_line_selection\.\n\n(.*\n)*?\s+popup_to_decide\( question = 'Book the flight' && ` ` && gs_flight-connid\n\s+options  = VALUE #\( \( `Book now` \) \( `Waiting list` \) \)\n\s+ucomm    = `POPUP_1`\n\s+title    = 'Booking' \)\.\n\n\s+ENDMETHOD\./);
+  assert.match(cls, /WHEN `POPUP_1`\.\n\s+lv_answer = popup_answer\( \)\.\n\s+CASE lv_answer\.\n\s+WHEN '1'\.\n\s+book\( gs_flight \)\./);
+  // POPUP_TO_CONFIRM inside a WHEN: the branch continued, the IF sy-subrc of the EXCEPTIONS dropped, the other WHEN kept
+  assert.match(cls, /WHEN 'CANCEL'\.\n\s+popup_to_decide\( question = 'Cancel all bookings of this run\?'\n\s+options  = VALUE #\( \( `Cancel them` \) \( `Keep them` \) \)\n\s+ucomm    = `POPUP_2`\n\s+title    = 'Cancel bookings' \)\.\n\s+WHEN 'PASSENGER'\./);
+  assert.match(cls, /WHEN `POPUP_2`\.\n\s+gv_answer = popup_answer\( \)\.\n\s+IF gv_answer = '1'\./);
+  assert.ok(!/sy-subrc/.test(cls));
+  assert.ok(!/could not be shown/.test(cls));
+  // POPUP_GET_VALUES in a FORM: converted, not cut - a TODO
+  assert.match(cls, /popup_get_values_sval\( sval  = lt_fields\n\s+ucomm = `POPUP_3`\n\s+title = 'Passenger' \)\./);
+  assert.ok(result.todos.some((t) => /POPUP_GET_VALUES' in FORM passenger/.test(t.message)));
+  assert.ok(result.mapped.some((m) => /dropped - the IF sy-subrc after POPUP_TO_CONFIRM/.test(m.target)));
+});
+
+test("a popup at the top of an event block: the answer and the SVAL values first, a local declared inline gets a TODO", () => {
+  const r = convert([
+    "REPORT zt.",
+    "TYPES: BEGIN OF ty_sval, fieldname TYPE c LENGTH 30, value TYPE c LENGTH 132, END OF ty_sval.",
+    "DATA lt_fields TYPE STANDARD TABLE OF ty_sval WITH DEFAULT KEY.",
+    "DATA lv_rc TYPE c LENGTH 1.",
+    "START-OF-SELECTION.",
+    "  DATA(lv_n) = 1.",
+    "  CALL FUNCTION 'POPUP_GET_VALUES' EXPORTING popup_title = 'T' IMPORTING returncode = lv_rc TABLES fields = lt_fields.",
+    "  IF lv_rc = 'A'.",
+    "    RETURN.",
+    "  ENDIF.",
+    "  WRITE: / lt_fields[ 1 ]-value, lv_n.",
+    "  CALL FUNCTION 'POPUP_TO_CONFIRM_STEP' EXPORTING textline1 = 'Go on?' titel = 'T' IMPORTING answer = lv_rc.",
+    "  IF lv_rc = 'J'.",
+    "    WRITE 'yes'.",
+    "  ENDIF.",
+  ].join("\n"), { file: "zt.prog.abap", className: "zcl_t" });
+  const cls = r.draft["zcl_t.clas.abap"];
+  assert.match(cls, /WHEN `POPUP_1`\.\n\s+lv_rc = SWITCH #\( popup_answer\( \) WHEN 'A' THEN 'A' ELSE space \)\.\n\s+popup_values_sval\( CHANGING sval = lt_fields \)\.\n\s+IF lv_rc = 'A'\./);
+  // the second popup is cut out of the first continuation
+  assert.match(cls, /WHEN `POPUP_2`\.\n\s+lv_rc = SWITCH #\( popup_answer\( \) WHEN '1' THEN 'J' WHEN '2' THEN 'N' ELSE 'A' \)\.\n\s+IF lv_rc = 'J'\./);
+  assert.ok(r.todos.some((t) => /lv_n was declared inline before the call/.test(t.message)));
 });
 
 // ------------------------------------------------ tables with a header line

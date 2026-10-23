@@ -169,6 +169,7 @@ CLASS ltcl_test DEFINITION FINAL FOR TESTING
     METHODS range_f4_returns_to_popup FOR TESTING.
     METHODS f4_keeps_other_lines FOR TESTING.
     METHODS popups_of_the_project FOR TESTING.
+    METHODS popup_values_of_an_sval FOR TESTING.
     METHODS alv_layout_default FOR TESTING.
     METHODS alv_layout_without_store FOR TESTING.
 
@@ -933,6 +934,52 @@ CLASS ltcl_test IMPLEMENTATION.
     cl_abap_unit_assert=>assert_true( xsdbool( line_exists( mo_report->s_code[ option = `BT` low = `A` ] ) ) ).
     cl_abap_unit_assert=>assert_true( xsdbool( line_exists( mo_report->s_code[ sign = `E` low = `B` ] ) ) ).
     cl_abap_unit_assert=>assert_false( xsdbool( line_exists( mo_report->s_code[ low = `Q` ] ) ) ).
+
+  ENDMETHOD.
+
+  METHOD popup_values_of_an_sval.
+
+    TYPES:
+      BEGIN OF ty_s_sval,
+        tabname   TYPE c LENGTH 30,
+        fieldname TYPE c LENGTH 30,
+        value     TYPE c LENGTH 132,
+        fieldtext TYPE c LENGTH 60,
+        field_obl TYPE c LENGTH 1,
+      END OF ty_s_sval.
+    DATA lt_sval TYPE STANDARD TABLE OF ty_s_sval WITH DEFAULT KEY.
+
+    init( ).
+    lt_sval = VALUE #( ( tabname = 'SFLIGHT' fieldname = 'carrid' fieldtext = 'Airline' value = 'LH' field_obl = 'X' )
+                       ( tabname = 'SFLIGHT' fieldname = 'CONNID' ) ).
+    mo_cut->popup_get_values_sval( sval  = lt_sval
+                                   ucomm = `VALUES`
+                                   title = `Flight` ).
+    DATA(lo_popup) = CAST z2ui5_cl_cgui_popup( mo_client->mo_called ).
+    cl_abap_unit_assert=>assert_equals( act = lo_popup->mt_field[ 1 ]-name
+                                        exp = `CARRID` ).
+    cl_abap_unit_assert=>assert_equals( act = lo_popup->mt_field[ 1 ]-text
+                                        exp = `Airline` ).
+    cl_abap_unit_assert=>assert_equals( act = lo_popup->mt_field[ 1 ]-value
+                                        exp = `LH` ).
+    cl_abap_unit_assert=>assert_true( lo_popup->mt_field[ 1 ]-required ).
+    cl_abap_unit_assert=>assert_equals( act = lo_popup->mt_field[ 2 ]-text
+                                        exp = `CONNID` ).
+
+    " what the user entered, back into the table - and into an empty one
+    mo_cut->mt_cgui_popup_values = VALUE #( ( name = `CARRID` text = `Airline` value = `AA` )
+                                            ( name = `CONNID` text = `CONNID` value = `0017` ) ).
+    mo_cut->popup_values_sval( CHANGING sval = lt_sval ).
+    cl_abap_unit_assert=>assert_equals( act = lt_sval[ 2 ]-value
+                                        exp = `0017` ).
+    cl_abap_unit_assert=>assert_equals( act = lt_sval[ 1 ]-tabname
+                                        exp = `SFLIGHT` ).
+    CLEAR lt_sval.
+    mo_cut->popup_values_sval( CHANGING sval = lt_sval ).
+    cl_abap_unit_assert=>assert_equals( act = lines( lt_sval )
+                                        exp = 2 ).
+    cl_abap_unit_assert=>assert_equals( act = lt_sval[ 1 ]-fieldname
+                                        exp = `CARRID` ).
 
   ENDMETHOD.
 

@@ -87,12 +87,15 @@ const REFUSED = {
   GetProperty: "GET PROPERTY OF - SAP GUI desktop integration",
 };
 
+// the synchronous popups - a popup of the runtime, the block cut at the call
+const POPUPS = new Set(["POPUP_TO_CONFIRM", "POPUP_TO_CONFIRM_STEP", "POPUP_TO_DECIDE", "POPUP_GET_VALUES"]);
+
 // function modules with no counterpart on a browser app - refused
 const REFUSED_FUNCTIONS = {
-  POPUP_TO_CONFIRM: "POPUP_TO_CONFIRM waits for the answer; in abap2UI5 the popup is asynchronous - call popup_to_confirm( question = ... ucomm = ... ) and continue in at_user_command( ) with that ucomm",
-  POPUP_TO_CONFIRM_STEP: "POPUP_TO_CONFIRM_STEP waits for the answer; use popup_to_confirm( ) and at_user_command( )",
-  POPUP_TO_DECIDE: "POPUP_TO_DECIDE waits for the answer; in abap2UI5 the popup is asynchronous - call popup_to_decide( ) and continue in at_user_command( ) with popup_answer( )",
-  POPUP_GET_VALUES: "POPUP_GET_VALUES waits for the input; in abap2UI5 the popup is asynchronous - call popup_get_values( ) and continue in at_user_command( ) with popup_values( )",
+  POPUP_TO_CONFIRM_WITH_MESSAGE: "POPUP_TO_CONFIRM_WITH_MESSAGE waits for the answer and shows a T100 message - use popup_to_decide( ) with the message text and go on in at_user_command( )",
+  POPUP_TO_DECIDE_WITH_MESSAGE: "POPUP_TO_DECIDE_WITH_MESSAGE waits for the answer and shows a T100 message - use popup_to_decide( ) with the message text and go on in at_user_command( )",
+  POPUP_TO_DECIDE_LIST: "POPUP_TO_DECIDE_LIST waits for the choice - use popup_to_decide( ) with the options and go on in at_user_command( )",
+  POPUP_GET_VALUES_DB_CHECKED: "POPUP_GET_VALUES_DB_CHECKED waits for the input and checks it against the DDIC - use popup_get_values( ) and check in at_user_command( )",
   GUI_DOWNLOAD: "GUI_DOWNLOAD writes to the SAP GUI frontend; offer the file with an abap2UI5 download instead",
   GUI_UPLOAD: "GUI_UPLOAD reads from the SAP GUI frontend; use an abap2UI5 file uploader instead",
   WS_DOWNLOAD: "WS_DOWNLOAD writes to the SAP GUI frontend",
@@ -179,7 +182,7 @@ const BASE_METHODS = ["cgui_run_in_background",
   "selection_screen_dynnr", "after_call_selection_screen", "write", "format", "get_cursor", "lisel",
   "set_cursor_field", "set_selscreen_status", "list", "alv", "tree", "get_selected_rows", "lsind", "message",
   "message_t100", "messages_from_bapiret", "popup_to_confirm", "popup_to_decide",
-  "popup_get_values", "popup_answer", "popup_values", "value_help_popup", "vrm_set_values",
+  "popup_get_values", "popup_get_values_sval", "popup_values_sval", "popup_answer", "popup_values", "value_help_popup", "vrm_set_values",
   "leave_to_selection_screen", "window", "call_selection_screen", "submit", "set_parameter_id", "get_parameter_id",
   "set_line_count", "set_pf_status", "set_title", "set_variant", "set_variant_store", "set_layout_store", "get_link"];
 export const RESERVED_METHODS = new Set([...BASE_METHODS, "client", "cs_ucomm", "z2ui5_if_app~main", "main",
@@ -1124,17 +1127,24 @@ class Converter {
       this.map(f.stmt, `private method \`${f.method}( )\``);
       formMethods.push({ name: f.method, body: this.convertBody(f.body, { method: f.method, form: f }) });
     }
-    for (const f of this.forms) {
-      if (!this.alvCallbacks.has(f.name) && !this.emptyForms.has(f.name) && !f.performed) this.todo(f.stmt, `FORM ${f.name} is not PERFORMed in this report - the private method ${f.method}( ) is unused (abaplint unused_methods)`);
-    }
-
+    // the continuations - a continuation may hold a call that cuts again
     if (this.continuations.length) {
-      const entries = [];
+      const dynnr = [];
+      const ucomm = [];
       while (this.continuations.length) {
         const c = this.continuations.shift();
-        entries.push({ field: c.dynnr, body: this.convertBody(c.stmts, c.ctx) });
+        (c.method === "at_user_command" ? ucomm : dynnr).push({ field: c.field, body: this.convertBody(c.stmts, c.ctx) });
       }
-      methods.push({ name: "after_call_selection_screen", body: caseBody("dynnr", entries) });
+      if (dynnr.length) methods.push({ name: "after_call_selection_screen", body: caseBody("dynnr", dynnr) });
+      if (ucomm.length) {
+        const body = ["\" the answers of the popups - the statements after the CALL FUNCTION", ...caseBody("ucomm", ucomm)];
+        const existing = methods.find((m) => m.name === "at_user_command");
+        if (existing) existing.body.push("", ...body);
+        else methods.push({ name: "at_user_command", body });
+      }
+    }
+    for (const f of this.forms) {
+      if (!this.alvCallbacks.has(f.name) && !this.emptyForms.has(f.name) && !f.performed) this.todo(f.stmt, `FORM ${f.name} is not PERFORMed in this report - the private method ${f.method}( ) is unused (abaplint unused_methods)`);
     }
 
     // the selection screen takes its value helps from the screen pass above
@@ -2053,6 +2063,9 @@ class Converter {
     }
     b.headerParams = new Set(ctx.form?.headerParams ?? []);
     this.currentBody = b;
+    // a continuation starts with what the call left: the answer, the values
+    let prologue = ctx.prologue?.length ? ctx.prologue : undefined;
+    const DECLS = new Set(["Data", "DataBegin", "DataEnd", "FieldSymbol", "Ranges", "Constant", "ConstantBegin", "ConstantEnd", "Type", "TypeBegin", "TypeEnd", "Comment"]);
 
     for (let i = 0; i < stmts.length; i++) {
       const s = stmts[i];
@@ -2060,6 +2073,15 @@ class Converter {
       const first = s.getFirstToken().getRow();
       if (b.lastRow !== undefined && first > b.lastRow + 1 && b.out.length && b.out[b.out.length - 1] !== "") b.out.push("");
       const k = kind(s);
+      if (this.skipStmts?.has(s)) {
+        b.lastRow = s.getLastToken().getRow();
+        continue;
+      }
+      if (prologue && !DECLS.has(k)) {
+        if (b.out.length) b.out.push("");
+        b.out.push(...prologue);
+        prologue = undefined;
+      }
       if (k === "Comment") {
         const text = s.getFirstToken().getStr();
         if (b.lastRow === first && b.out.length && typeof b.out[b.out.length - 1] === "string" && b.out[b.out.length - 1] !== "") {
@@ -2113,6 +2135,7 @@ class Converter {
         b.skipTo = undefined;
       }
     }
+    if (prologue) b.out.push(...prologue);
     this.currentForm = undefined;
     return b.out.flatMap((o) => (typeof o === "string" ? [o] : renderChain(o)));
   }
@@ -2275,37 +2298,22 @@ class Converter {
     out.push(renderNamedCall("call_selection_screen", params));
     this.map(s, "`call_selection_screen( dynnr )` - the screen as a dialog; sy-subrc arrives in `after_call_selection_screen( dynnr subrc )`");
     if (hasSeq(w, "STARTING", "AT")) this.note("CALL SELECTION-SCREEN ... STARTING AT - the dialog is centred, the position is dropped");
-    const { branch, after } = this.tailOf(b);
-    if (!branch.some((x) => kind(x) !== "Comment") && !after) return;
-    const goOn = "the dialog opens when the method returns, and its answer arrives in after_call_selection_screen( dynnr subrc ) - go on there";
-    if (b.ctx.form) {
-      this.todo(s, `CALL SELECTION-SCREEN ${nr} in FORM ${b.ctx.form.name}: the statements after it run before the dialog shows; ${goOn}`);
-      return;
-    }
-    if (after) {
-      this.todo(s, `CALL SELECTION-SCREEN ${nr}: the statements after the block it stands in run before the dialog shows; ${goOn}`);
-      return;
-    }
-    if (b.blocks.some((k) => ["Loop", "Do", "While", "SelectLoop", "LoopAtScreen", "Provide"].includes(k))) {
-      this.todo(s, `CALL SELECTION-SCREEN ${nr} inside a loop: the loop goes on before the dialog shows; ${goOn}`);
-      return;
-    }
-    if (d.continued) {
+    if (d.continued && this.followedByCode(b)) {
       this.refuse(s, `a second CALL SELECTION-SCREEN ${nr} with statements after it - after_call_selection_screen( ) goes on after one call per screen; port it by hand`);
       return;
     }
     d.continued = true;
-    const tail = branch;
     // the IF / CHECK / CASE right after the call read the dialog's sy-subrc -
     // the subrc of the method; a later sy-subrc is the one of a statement
     // in between
+    const { branch } = this.tailOf(b);
     const subrc = new Set();
-    const first = tail.findIndex((x) => kind(x) !== "Comment");
-    if (first >= 0 && ["If", "Check", "Case"].includes(kind(tail[first]))) {
-      subrc.add(tail[first]);
-      if (kind(tail[first]) === "If") {
+    const first = branch.findIndex((x) => kind(x) !== "Comment");
+    if (first >= 0 && ["If", "Check", "Case"].includes(kind(branch[first]))) {
+      subrc.add(branch[first]);
+      if (kind(branch[first]) === "If") {
         let depth = 0;
-        for (const x of tail.slice(first + 1)) {
+        for (const x of branch.slice(first + 1)) {
           const k = kind(x);
           if (OPENERS.has(k)) depth++;
           if (CLOSERS.has(k)) {
@@ -2316,9 +2324,11 @@ class Converter {
         }
       }
     }
-    this.continuations.push({ dynnr: nr, stmts: tail, ctx: { method: "after_call_selection_screen", subrc } });
-    this.map(tail[first >= 0 ? first : 0], `\`after_call_selection_screen( dynnr subrc )\` - WHEN \`${nr}\`: the statements after CALL SELECTION-SCREEN, sy-subrc is subrc`);
-    b.skipTo = b.index + 1 + branch.length;
+    this.continueIn(s, b, {
+      field: nr, method: "after_call_selection_screen", ctx: { method: "after_call_selection_screen", subrc },
+      what: `CALL SELECTION-SCREEN ${nr}`, where: "after_call_selection_screen( dynnr subrc )",
+      note: `\`after_call_selection_screen( dynnr subrc )\` - WHEN \`${nr}\`: the statements after CALL SELECTION-SCREEN, sy-subrc is subrc`,
+    });
   }
 
   /** whether statements of the body still run after the current one - the
@@ -3339,8 +3349,156 @@ class Converter {
 
   // ------------------------------------------------------------- functions
 
+  /**
+   * The synchronous popups: POPUP_TO_CONFIRM, POPUP_TO_CONFIRM_STEP and
+   * POPUP_TO_DECIDE become popup_to_decide( ) with the two buttons as the
+   * options (the answers 1, 2 and A are the classic ones), POPUP_GET_VALUES
+   * becomes popup_get_values_sval( ) with its SVAL table. The popup opens
+   * when the method returns, and the answer arrives in at_user_command( )
+   * with a ucomm of its own - so the statements after the call, in their
+   * branch, go on there: the event block is cut at the call.
+   */
+  popup(s, b, fm) {
+    const out = b.out;
+    const p = functionParams(s);
+    const ov = this.rewrites(s, b.ctx, b);
+    const arg = (name) => (p.has(name) ? this.literalArg(nodeText(p.get(name).node, ov), s) : undefined);
+    const target = (name) => (p.has(name) ? nodeText(p.get(name).node, ov) : undefined);
+    const joined = (...names) => names.map(arg).filter(Boolean).join(" && ` ` && ") || undefined;
+    // an option of popup_to_decide( ) is a string: a text literal becomes
+    // one, a field is put in a template
+    const str = (v) => (/^'(?:[^']|'')*'$/.test(v) ? literal(unquote(v)) : /^`/.test(v) ? v : `|{ ${v} }|`);
+    this.popupCount = (this.popupCount ?? 0) + 1;
+    const ucomm = `POPUP_${this.popupCount}`;
+    const prologue = [];
+    let params;
+    let method = "popup_to_decide";
+    if (fm === "POPUP_TO_CONFIRM") {
+      const question = arg("text_question");
+      if (!question) {
+        this.refuse(s, "POPUP_TO_CONFIRM without TEXT_QUESTION - not understood");
+        return;
+      }
+      params = [{ name: "question", value: question }];
+      params.push({ name: "options", value: `VALUE #( ( ${str(arg("text_button_1") ?? "'Yes'")} ) ( ${str(arg("text_button_2") ?? "'No'")} ) )` });
+      params.push({ name: "ucomm", value: literal(ucomm) });
+      if (arg("titlebar")) params.push({ name: "title", value: arg("titlebar") });
+      if (target("answer")) prologue.push(`${target("answer")} = popup_answer( ).`);
+    } else if (fm === "POPUP_TO_CONFIRM_STEP") {
+      const question = joined("textline1", "textline2");
+      if (!question) {
+        this.refuse(s, "POPUP_TO_CONFIRM_STEP without TEXTLINE1 - not understood");
+        return;
+      }
+      params = [{ name: "question", value: question }, { name: "options", value: "VALUE #( ( `Yes` ) ( `No` ) )" }, { name: "ucomm", value: literal(ucomm) }];
+      if (arg("titel")) params.push({ name: "title", value: arg("titel") });
+      // the classic answers were J, N and A
+      if (target("answer")) prologue.push(`${target("answer")} = SWITCH #( popup_answer( ) WHEN '1' THEN 'J' WHEN '2' THEN 'N' ELSE 'A' ).`);
+    } else if (fm === "POPUP_TO_DECIDE") {
+      const question = joined("textline1", "textline2", "textline3");
+      if (!question || !arg("text_option1") || !arg("text_option2")) {
+        this.refuse(s, "POPUP_TO_DECIDE without TEXTLINE1, TEXT_OPTION1 and TEXT_OPTION2 - not understood");
+        return;
+      }
+      params = [{ name: "question", value: question }];
+      params.push({ name: "options", value: `VALUE #( ( ${str(arg("text_option1"))} ) ( ${str(arg("text_option2"))} ) )` });
+      params.push({ name: "ucomm", value: literal(ucomm) });
+      if (arg("titel")) params.push({ name: "title", value: arg("titel") });
+      if (target("answer")) prologue.push(`${target("answer")} = popup_answer( ).`);
+    } else {
+      // POPUP_GET_VALUES
+      method = "popup_get_values_sval";
+      const fields = target("fields");
+      if (!fields) {
+        this.refuse(s, "POPUP_GET_VALUES without TABLES fields - not understood");
+        return;
+      }
+      params = [{ name: "sval", value: fields }, { name: "ucomm", value: literal(ucomm) }];
+      if (arg("popup_title")) params.push({ name: "title", value: arg("popup_title") });
+      // the classic returncode was A for cancel, else space
+      if (target("returncode")) prologue.push(`${target("returncode")} = SWITCH #( popup_answer( ) WHEN 'A' THEN 'A' ELSE space ).`);
+      prologue.push(`popup_values_sval( CHANGING sval = ${fields} ).`);
+    }
+    if (p.has("display_cancel_button") || p.has("cancel_display")) this.note(`${fm} with DISPLAY_CANCEL_BUTTON / CANCEL_DISPLAY - the popup of the runtime has a Cancel button either way (answer A)`);
+    out.push(renderNamedCall(method, params));
+    // IF sy-subrc <> 0 right after the call checked its EXCEPTIONS - the
+    // popup of the runtime raises none, the block is dropped
+    const { branch } = this.tailOf(b);
+    const first = branch.findIndex((x) => kind(x) !== "Comment");
+    if (first >= 0 && kind(branch[first]) === "If" && /\bsy\s*-\s*subrc\b/i.test(renderTokens(stmtTokens(branch[first])))) {
+      this.skipStmts ??= new Set();
+      let depth = 0;
+      for (const x of branch.slice(first)) {
+        this.skipStmts.add(x);
+        if (OPENERS.has(kind(x))) depth++;
+        if (CLOSERS.has(kind(x))) depth--;
+        if (depth === 0) break;
+      }
+      this.map(branch[first], `dropped - the IF sy-subrc after ${fm} checked its EXCEPTIONS, ${method}( ) raises none`);
+    }
+    this.map(s, `\`${method}( )\` - the answer arrives in \`at_user_command( )\` with ucomm \`${ucomm}\`, where the statements after the call go on`);
+    this.continueIn(s, b, {
+      field: ucomm, method: "at_user_command", ctx: { method: "at_user_command", userCommand: true }, prologue,
+      what: `CALL FUNCTION '${fm}'`, where: `at_user_command( ) with ucomm ${ucomm} (popup_answer( ) is the answer)`,
+    });
+  }
+
+  /**
+   * The statements after the current one, in its branch, go on in another
+   * method: the event block is cut at the call (CALL SELECTION-SCREEN, a
+   * popup). The local data they use is declared anew there - with a TODO,
+   * since a value set before the call is not there any more. Inside a
+   * FORM, a loop, or when statements follow the block the call stands in,
+   * nothing is cut: a TODO says where to go on.
+   */
+  continueIn(s, b, { field, method, ctx, prologue = [], what, where, note }) {
+    const { branch, after } = this.tailOf(b);
+    if (!branch.some((x) => kind(x) !== "Comment") && !after) return;
+    const goOn = `the statements after it run before it shows - its answer arrives in ${where}; go on there`;
+    if (b.ctx.form) {
+      this.todo(s, `${what} in FORM ${b.ctx.form.name}: ${goOn}`);
+      return;
+    }
+    if (after) {
+      this.todo(s, `${what}: statements follow the block it stands in, and ${goOn}`);
+      return;
+    }
+    if (b.blocks.some((k) => ["Loop", "Do", "While", "SelectLoop", "LoopAtScreen", "Provide"].includes(k))) {
+      this.todo(s, `${what} inside a loop: the loop goes on before it shows - its answer arrives in ${where}; go on there`);
+      return;
+    }
+    // the local data of the block the continuation reads
+    const before = b.stmts.slice(0, b.index);
+    const used = new Set(branch.flatMap((x) => stmtTokens(x).map((t) => lc(t.getStr()))));
+    const decls = [];
+    const inline = [];
+    for (const x of before) {
+      const k = kind(x);
+      if (["Data", "FieldSymbol", "Ranges", "Constant", "Type"].includes(k)) {
+        const name = lc(declName(x) ?? "");
+        if (name && used.has(name)) decls.push(x);
+      } else {
+        for (const d of findAll(x, "InlineData")) {
+          const name = lc(d.getTokens()[2]?.getStr() ?? "");
+          if (name && used.has(name)) inline.push(name);
+        }
+      }
+    }
+    const names = decls.filter((x) => kind(x) === "Data").map((x) => lc(declName(x)));
+    if (names.length) this.todo(s, `${what}: ${names.join(", ")} of the block ${names.length > 1 ? "are" : "is"} declared anew in ${method}( ) - a value set before the call is not there; make it global data if the continuation needs it`);
+    if (inline.length) this.todo(s, `${what}: ${inline.join(", ")} ${inline.length > 1 ? "were" : "was"} declared inline before the call - declare ${inline.length > 1 ? "them" : "it"} in ${method}( ) or make ${inline.length > 1 ? "them" : "it"} global data`);
+    this.continuations.push({ method, field, stmts: [...decls, ...branch], ctx: { ...ctx, prologue } });
+    const first = branch.findIndex((x) => kind(x) !== "Comment");
+    if (first >= 0) this.map(branch[first], note ?? `\`${method}( )\` - WHEN \`${field}\`: the statements after ${what}`);
+    b.skipTo = b.index + 1 + branch.length;
+  }
+
   callFunction(s, b) {
     const fm = uc(unquote(nodeText(child(s, "FunctionName")).trim()));
+    if (POPUPS.has(fm)) {
+      this.popup(s, b, fm);
+      return true;
+    }
     if (REFUSED_FUNCTIONS[fm]) {
       this.refuse(s, `CALL FUNCTION '${fm}' - ${REFUSED_FUNCTIONS[fm]}`);
       return true;
