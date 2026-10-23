@@ -33,6 +33,7 @@ import {
   partTokens, renderTokens, stmtTokens, uc, unquote, words,
 } from "./abap.mjs";
 import { classXml, longLines, normalizeAbap } from "./abapgit.mjs";
+import { functionKey } from "./textpool.mjs";
 
 const require = createRequire(import.meta.url);
 const { Indent } = require("@abaplint/core/build/src/pretty_printer/indent");
@@ -60,7 +61,6 @@ const REFUSED = {
   Get: "GET - logical database events have no counterpart; read the data with ABAP SQL",
   Reject: "REJECT - logical database statement",
   Controls: "CONTROLS - table controls and tabstrips belong to dynpros",
-  AtPF: "AT PFnn - the list has no function keys",
   GetCursor: "GET CURSOR - not converted; in at_line_selection( ) get_cursor( ) returns field, value, line and offset - port it by hand",
   ReadLine: "READ LINE - not converted; list( )->read_line( ) / read_value( ) read the list back - port it by hand, or keep the data in an internal table",
   ModifyLine: "MODIFY LINE - not converted; list( )->modify_line( ) changes a written line - port it by hand",
@@ -153,6 +153,10 @@ const ICONS = {
   icon_failure: "sap-icon://error", icon_locked: "sap-icon://locked", icon_unlocked: "sap-icon://unlocked",
   icon_mail: "sap-icon://email", icon_print: "sap-icon://print", icon_refresh: "sap-icon://refresh",
   icon_search: "sap-icon://search", icon_settings: "sap-icon://action-settings",
+  icon_system_save: "sap-icon://save", icon_export: "sap-icon://download", icon_filter: "sap-icon://filter",
+  icon_sort_up: "sap-icon://sort-ascending", icon_sort_down: "sap-icon://sort-descending",
+  icon_detail: "sap-icon://detail-view", icon_insert_row: "sap-icon://add", icon_delete_row: "sap-icon://less",
+  icon_copy_object: "sap-icon://copy", icon_check: "sap-icon://accept",
 };
 
 // the statements that open and close a block
@@ -1101,6 +1105,33 @@ class Converter {
       }
     }
 
+    // AT PFnn: the function key of the standard list status - a WHEN of
+    // at_user_command( ), the key a shortcut and a button of the toolbar
+    {
+      const evs = byKind("AtPF");
+      if (evs.length) {
+        const entries = [];
+        for (const e of evs) {
+          const code = uc(assText(e).replace(/^AT\s+/, ""));
+          const nr = Number(code.slice(2));
+          const key = functionKey(nr);
+          if (!key || entries.some((x) => x.field === code)) {
+            this.refuse(e.stmt, `AT ${code} - ${key ? "a second block for the key" : "no function key of that number"}`);
+            continue;
+          }
+          this.map(e.stmt, `\`at_user_command( ucomm )\` - WHEN \`${code}\`, the key ${key} a shortcut and a button`);
+          entries.push({ field: code, key, body: this.convertBody(e.stmts, { method: "at_user_command", userCommand: true }) });
+        }
+        if (entries.length) {
+          const body = ["\" AT PFnn - the function keys of the list", ...caseBody("ucomm", entries)];
+          const existing = methods.find((m) => m.name === "at_user_command");
+          if (existing) existing.body.push("", ...body);
+          else methods.push({ name: "at_user_command", body });
+          this.atPf = entries;
+        }
+      }
+    }
+
     // AT SELECTION-SCREEN ON VALUE-REQUEST
     if (valueRequest.length) {
       const body = ["CASE field."];
@@ -1127,6 +1158,25 @@ class Converter {
       this.map(f.stmt, `private method \`${f.method}( )\``);
       formMethods.push({ name: f.method, body: this.convertBody(f.body, { method: f.method, form: f }) });
     }
+    // AT PFnn without a status of the report's own: the keys on the toolbar
+    // of the standard list status. With a SET PF-STATUS the report's status
+    // decides - PFnn arrives only when it has the key
+    if (this.atPf?.length) {
+      const sets = this.stmts.some((x) => kind(x) === "SetPFStatus");
+      if (sets) {
+        this.todo(this.atPf.length ? byKind("AtPF")[0].stmt : undefined, "AT PFnn with SET PF-STATUS: the status of the report replaces the standard list status - AT PFnn ran only for the keys the status leaves as PFnn; check that the status has them");
+      } else {
+        const call = renderTableCall("set_pf_status", [
+          { name: "functions", lines: this.atPf.map((e) => `( name = ${literal(e.field)} text = ${literal(e.key)} )`) },
+          { name: "shortcuts", lines: this.atPf.map((e) => `( key = ${literal(e.key)} ucomm = ${literal(e.field)} )`) },
+        ]);
+        const init = methods.find((m) => m.name === "initialization");
+        const lines = ["\" AT PFnn - the function keys of the standard list status", call];
+        if (init) init.body.unshift(...lines, "");
+        else methods.push({ name: "initialization", body: lines });
+      }
+    }
+
     // the continuations - a continuation may hold a call that cuts again
     if (this.continuations.length) {
       const dynnr = [];
@@ -2382,6 +2432,112 @@ class Converter {
     return { branch, after: false };
   }
 
+  /**
+   * SET PF-STATUS 'S' [EXCLUDING f] -> set_pf_status( functions shortcuts
+   * excluding ): the buttons of the application toolbar of status S, with
+   * text, icon and tooltip, and its function keys as keyboard shortcuts -
+   * read from the GUI status abapGit writes into the .prog.xml. Every
+   * function arrives in at_user_command( ) with its code, as sy-ucomm did.
+   */
+  setPfStatus(s, b) {
+    const ov = this.rewrites(s, b.ctx, b);
+    const srcs = findAll(s, "Source").filter((n) => s.getChildren().includes(n));
+    const w = words(s);
+    const nameNode = srcs[0];
+    const name = nameNode ? nodeText(nameNode, ov) : "";
+    const exclAt = s.getChildren().findIndex((c) => isToken(c) && uc(c.get().getStr()) === "EXCLUDING");
+    const excl = exclAt >= 0 ? nodeText(s.getChildren()[exclAt + 1], ov) : undefined;
+    if (w.includes("OF") && w.includes("PROGRAM")) {
+      this.todo(s, `SET PF-STATUS ${name} OF PROGRAM - the status of another program is not part of the input; set_pf_status( functions = ... ) with its functions by hand`);
+      this.map(s, "dropped - SET PF-STATUS OF PROGRAM");
+      return;
+    }
+    // SET PF-STATUS space - back to the standard list status
+    if (/^(space|''|``|' ')$/i.test(name)) {
+      b.out.push("set_pf_status( VALUE #( ) ).");
+      this.map(s, "`set_pf_status( VALUE #( ) )` - the toolbar without functions of the report");
+      return;
+    }
+    if (!/^'[^']*'$/.test(name)) {
+      this.todo(s, `SET PF-STATUS ${name}: the status is named at runtime - set_pf_status( functions = ... ) for each status the field may name`);
+      this.map(s, "dropped - SET PF-STATUS with a field");
+      return;
+    }
+    const code = uc(unquote(name));
+    const cua = this.pool.cua;
+    const status = cua?.statuses.get(code);
+    if (!status) {
+      this.todo(s, cua
+        ? `SET PF-STATUS '${code}' dropped - the .prog.xml has no status ${code}; set_pf_status( functions = ... ) adds the functions to the toolbar of the output, each arrives in at_user_command( )`
+        : `SET PF-STATUS '${code}' dropped - the GUI status is in the .prog.xml (--texts), which was not passed; set_pf_status( functions = ... ) adds the functions to the toolbar of the output, each arrives in at_user_command( )`);
+      this.map(s, "dropped - SET PF-STATUS");
+      return;
+    }
+    const fnLines = status.functions.map((f) => {
+      const parts = [`name = ${literal(f.code)}`];
+      if (f.text) parts.push(`text = ${literal(f.text)}`);
+      const icon = f.icon ? ICONS[lc(f.icon)] : undefined;
+      if (icon) parts.push(`icon = ${literal(icon)}`);
+      const tip = [f.tooltip ?? (f.text || f.code), f.key ? `(${f.key})` : ""].filter(Boolean).join(" ");
+      if (tip) parts.push(`tooltip = ${literal(tip)}`);
+      if (f.icon && !icon) this.note(`SET PF-STATUS: the icon ${uc(f.icon)} has no UI5 icon in the converter's table - the button shows its text${f.text ? "" : " (the function code)"}`);
+      if (f.icon && !icon && !f.text) parts.splice(1, 0, `text = ${literal(f.code)}`);
+      return `( ${parts.join(" ")} )`;
+    });
+    const params = [{ name: "functions", lines: fnLines }];
+    if (status.shortcuts.length) params.push({ name: "shortcuts", lines: status.shortcuts.map((k) => `( key = ${literal(k.key)} ucomm = ${literal(k.code)} )`) });
+    if (excl !== undefined) params.push({ name: "excluding", lines: [/^'[^']*'$/.test(excl) ? `VALUE string_table( ( ${literal(uc(unquote(excl)))} ) )` : excl], raw: true });
+    b.out.push(renderTableCall("set_pf_status", params));
+    if (w.includes("IMMEDIATELY")) this.note("SET PF-STATUS ... IMMEDIATELY - the toolbar shows with the next roundtrip either way");
+    this.map(s, `\`set_pf_status( )\` - ${status.functions.length} function(s) of status ${code} on the toolbar, ${status.shortcuts.length} function key(s) as shortcuts; each arrives in \`at_user_command( )\``);
+    this.statusSet = true;
+  }
+
+  /**
+   * SET TITLEBAR 'T' [WITH a b ...] -> set_title( ): the text of title T
+   * from the .prog.xml, &1 ... &9 (and a bare &, in turn) replaced by the
+   * values in a string template.
+   */
+  setTitlebar(s, b) {
+    const ov = this.rewrites(s, b.ctx, b);
+    const srcs = findAll(s, "Source").filter((n) => s.getChildren().includes(n));
+    const w = words(s);
+    const name = srcs[0] ? nodeText(srcs[0], ov) : "";
+    if (w.includes("OF") && w.includes("PROGRAM")) {
+      this.todo(s, `SET TITLEBAR ${name} OF PROGRAM - the title of another program is not part of the input; call set_title( ) with its text`);
+      this.map(s, "dropped - SET TITLEBAR OF PROGRAM");
+      return;
+    }
+    const withAt = s.getChildren().findIndex((c) => isToken(c) && uc(c.get().getStr()) === "WITH");
+    const values = withAt >= 0 ? s.getChildren().slice(withAt + 1).filter((c) => kind(c) === "Source").map((n) => nodeText(n, ov)) : [];
+    const text = /^'[^']*'$/.test(name) ? this.pool.cua?.titles.get(uc(unquote(name))) : undefined;
+    if (text === undefined) {
+      this.todo(s, /^'[^']*'$/.test(name)
+        ? `SET TITLEBAR ${name} dropped - ${this.pool.cua ? "the .prog.xml has no such title" : "the titles are in the .prog.xml (--texts), which was not passed"}; call set_title( ) with its text`
+        : `SET TITLEBAR ${name}: the title is named at runtime - call set_title( ) with the text of each title the field may name`);
+      this.map(s, "dropped - SET TITLEBAR");
+      return;
+    }
+    let next = 0;
+    const esc = (t) => t.replace(/[\\|{}]/g, (c) => `\\${c}`);
+    let template = "";
+    let rest = text;
+    const re = /&(\d?)/g;
+    let last = 0;
+    let m;
+    while ((m = re.exec(text))) {
+      template += esc(text.slice(last, m.index));
+      const idx = m[1] ? Number(m[1]) - 1 : next++;
+      template += values[idx] !== undefined ? `{ ${values[idx]} }` : "";
+      last = m.index + m[0].length;
+    }
+    rest = text.slice(last);
+    template += esc(rest);
+    const value = last === 0 ? literal(text) : `|${template}|`;
+    b.out.push(`set_title( ${value} ).`);
+    this.map(s, `\`set_title( )\` - the text of title ${uc(unquote(name))}${values.length ? ", the WITH values in a string template" : ""}`);
+  }
+
   /** one statement of a body */
   statement(s, b) {
     const k = kind(s);
@@ -2545,12 +2701,10 @@ class Converter {
         }
         break;
       case "SetPFStatus":
-        this.todo(s, "SET PF-STATUS dropped - the GUI status is not part of the input; set_pf_status( functions = ... ) adds its functions to the toolbar of the output, each arrives in at_user_command( )");
-        this.map(s, "dropped - SET PF-STATUS");
+        this.setPfStatus(s, b);
         return;
       case "SetTitlebar":
-        this.todo(s, "SET TITLEBAR dropped - call set_title( ) with the text of the title");
-        this.map(s, "dropped - SET TITLEBAR");
+        this.setTitlebar(s, b);
         return;
       case "Leave": {
         const t = uc(renderTokens(stmtTokens(s)));
@@ -2873,7 +3027,7 @@ class Converter {
         ov.set(key(toks[i + 1]), null);
         ov.set(key(toks[i + 2]), null);
       }
-      if (t === "sy" && next === "-" && next2 === "ucomm" && !(ctx.userCommand || ctx.ucomm) && !this.ucommTodo?.has(s)) {
+      if (t === "sy" && next === "-" && next2 === "ucomm" && !(ctx.userCommand || ctx.ucomm) && !this.ucommTodo?.has(s) && !DECL.has(kind(s))) {
         this.ucommTodo = new Set([...(this.ucommTodo ?? []), s]);
         this.todo(s, "sy-ucomm is not set by abap-cloud-gui - the user command arrives as ucomm in at_user_command( ); pass it to where it is read");
       }
@@ -3946,6 +4100,31 @@ function functionParams(s) {
     }
   }
   return out;
+}
+
+/** a call with table parameters, one line of VALUE #( ... ) per row:
+ *    set_pf_status( functions = VALUE #( ( ... )
+ *                                        ( ... ) )
+ *                   shortcuts = VALUE #( ( ... ) ) ). */
+function renderTableCall(method, params) {
+  const head = `${method}( `;
+  const width = Math.max(...params.map((p) => p.name.length));
+  const lines = [];
+  params.forEach((p, i) => {
+    const prefix = `${i ? " ".repeat(head.length) : head}${p.name.padEnd(width)} = `;
+    if (p.raw) {
+      lines.push(`${prefix}${p.lines[0]}`);
+      return;
+    }
+    if (!p.lines.length) {
+      lines.push(`${prefix}VALUE #( )`);
+      return;
+    }
+    const pad = " ".repeat(prefix.length + "VALUE #( ".length);
+    p.lines.forEach((l, j) => lines.push(`${j ? pad : `${prefix}VALUE #( `}${l}`));
+    lines[lines.length - 1] += " )";
+  });
+  return `${lines.join("\n")} ).`;
 }
 
 /** CASE field. WHEN `A`. ... ENDCASE. */

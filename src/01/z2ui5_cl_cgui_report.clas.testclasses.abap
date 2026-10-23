@@ -1120,8 +1120,16 @@ CLASS ltcl_test IMPLEMENTATION.
                                         exp = `FC01` ).
 
     mo_report->p_carrid = `LH`.
-    mo_cut->set_pf_status( VALUE #( ( name = `SAVE` text = `Save` ) ) ).
+    mo_cut->set_pf_status( functions = VALUE #( ( name = `SAVE` text = `Save` ) ( name = `DELE` text = `Delete` ) )
+                           shortcuts = VALUE #( ( key = `F5` ucomm = `SAVE` ) ( key = `Shift+F2` ucomm = `DELE` ) )
+                           excluding = VALUE string_table( ( `dele` ) ) ).
+    CLEAR mo_client->mt_action.
     event( z2ui5_cl_cgui_report=>cs_ucomm-execute ).
+
+    " EXCLUDING leaves out the button and the key of DELE
+    cl_abap_unit_assert=>assert_false( xsdbool( mo_client->mv_view CS `EVENT:DELE` ) ).
+    cl_abap_unit_assert=>assert_true( xsdbool( line_exists( mo_client->mt_action[ table_line = `KEYBOARD_SHORTCUT:F5|SAVE|MAIN` ] ) ) ).
+    cl_abap_unit_assert=>assert_false( xsdbool( line_exists( mo_client->mt_action[ table_line = `KEYBOARD_SHORTCUT:Shift+F2|DELE|MAIN` ] ) ) ).
 
     " END-OF-PAGE with the page number, the PF-STATUS and print
     cl_abap_unit_assert=>assert_true( xsdbool( mo_client->mv_view CS `FOOT 1` ) ).

@@ -17,10 +17,11 @@ const tag = (item, name) => {
   return m ? decode(m[1]) : "";
 };
 
-/** { title, symbols: Map("001" -> text), selection: Map("P_CARR" -> text | null) }
- *  - null for a selection text taken from the DDIC. */
+/** { title, symbols: Map("001" -> text), selection: Map("P_CARR" -> text | null), cua }
+ *  - null for a selection text taken from the DDIC; cua the GUI status and
+ *  titles of the program (parseCua), undefined when the file has none. */
 export function parseTextpool(xml) {
-  const pool = { title: "", symbols: new Map(), selection: new Map() };
+  const pool = { title: "", symbols: new Map(), selection: new Map(), cua: parseCua(xml) };
   if (!xml) return pool;
   const tpool = /<TPOOL>([\s\S]*?)<\/TPOOL>/.exec(xml);
   if (!tpool) return pool;
@@ -36,4 +37,99 @@ export function parseTextpool(xml) {
     }
   }
   return pool;
+}
+
+// ---------------------------------------------------------------- the CUA
+//
+// abapGit writes the GUI status of a program (the CUA) into the same
+// .prog.xml, under <CUA>: one element per table of RS_CUA_INTERNAL_FETCH -
+// STA (the statuses: CODE, PFKCODE, BUTCODE), FUN (the functions: CODE,
+// TEXTNO, FUN_TEXT, TEXT_TYPE / TEXT_NAME for an icon, ICON_TEXT,
+// INFO_TEXT), PFK (the function keys of a key setting: CODE, PFNO, FUNCODE,
+// FUNNO), BUT (the application toolbar: PFK_CODE, CODE, NO, PFNO), SET (the
+// functions active in a status: STATUS, FUNCTION) and TIT (the titles:
+// CODE, TEXT). The rows are read whatever their element is called.
+
+const rows = (cua, name) => {
+  const m = new RegExp(`<${name}>([\\s\\S]*?)</${name}>`).exec(cua);
+  if (!m) return [];
+  return [...m[1].matchAll(/<([\w/]+)>([\s\S]*?)<\/\1>/g)].map((r) => r[2]);
+};
+
+// the functions of the SAP GUI frame - Back, Exit, Cancel, Choose, print and
+// find, page up and down; the runtime has its own for them
+export const STANDARD_FUNCTIONS = new Set(["BACK", "%EX", "RW", "PICK", "%PC", "%SC", "%SC+", "PRI", "%PRI",
+  "P--", "P-", "P+", "P++", "%SL", "%ST", "&OUP", "&ODN"]);
+
+/** the key a function key number stands for, as the frontend spells it -
+ *  1..12 F1..F12, 13..24 Shift+F1.., 25..36 Ctrl+F1.., 37..48 Ctrl+Shift+F1.. */
+export function functionKey(pfno) {
+  const n = Number(pfno);
+  if (!(n >= 1 && n <= 48)) return undefined;
+  const mod = ["", "Shift+", "Ctrl+", "Ctrl+Shift+"][Math.floor((n - 1) / 12)];
+  return `${mod}F${((n - 1) % 12) + 1}`;
+}
+
+/**
+ * { statuses: Map(code -> { functions: [{ code, text, icon, tooltip, key }],
+ *   shortcuts: [{ key, code }] }), titles: Map(code -> text) } - functions are
+ * the buttons of the application toolbar in their order, shortcuts every
+ * function key of the status; both without the standard functions and
+ * limited to the functions the status activates.
+ */
+export function parseCua(xml) {
+  const m = xml && /<CUA>([\s\S]*?)<\/CUA>/.exec(xml);
+  if (!m) return undefined;
+  const cua = m[1];
+  const sta = rows(cua, "STA");
+  const fun = rows(cua, "FUN");
+  const pfk = rows(cua, "PFK");
+  const but = rows(cua, "BUT");
+  const set = rows(cua, "SET");
+  const tit = rows(cua, "TIT");
+  const up = (r, n) => tag(r, n).trim().toUpperCase();
+  const fn = (code, textno) => {
+    const all = fun.filter((r) => up(r, "CODE") === code);
+    return all.find((r) => !textno || tag(r, "TEXTNO").trim() === textno) ?? all[0];
+  };
+  const statuses = new Map();
+  for (const st of sta) {
+    const code = up(st, "CODE");
+    const pfkcode = tag(st, "PFKCODE").trim();
+    const butcode = tag(st, "BUTCODE").trim();
+    const active = new Set(set.filter((r) => up(r, "STATUS") === code).map((r) => up(r, "FUNCTION")));
+    const usable = (f) => f && !STANDARD_FUNCTIONS.has(f) && (!active.size || active.has(f));
+    const keys = pfk.filter((r) => tag(r, "CODE").trim() === pfkcode);
+    const shortcuts = [];
+    for (const k of keys) {
+      const f = up(k, "FUNCODE");
+      const key = functionKey(tag(k, "PFNO"));
+      if (usable(f) && key && !shortcuts.some((x) => x.code === f)) shortcuts.push({ key, code: f });
+    }
+    const functions = [];
+    const buttons = but.filter((r) => tag(r, "PFK_CODE").trim() === pfkcode && tag(r, "CODE").trim() === butcode)
+      .sort((a, b) => Number(tag(a, "NO")) - Number(tag(b, "NO")));
+    for (const bt of buttons) {
+      const pfno = tag(bt, "PFNO").trim();
+      const k = keys.find((r) => tag(r, "PFNO").trim() === pfno);
+      const f = k ? up(k, "FUNCODE") : "";
+      if (!usable(f) || functions.some((x) => x.code === f)) continue;
+      const row = fn(f, tag(k, "FUNNO").trim());
+      const iconName = row && up(row, "TEXT_TYPE") === "I" ? tag(row, "TEXT_NAME").trim() : "";
+      const funText = row ? tag(row, "FUN_TEXT").trim() : "";
+      const iconText = row ? tag(row, "ICON_TEXT").trim() : "";
+      const info = row ? tag(row, "INFO_TEXT").trim() : "";
+      functions.push({
+        code: f,
+        text: iconName ? iconText : funText || f,
+        icon: iconName || undefined,
+        // the function text says what an icon button does
+        tooltip: info || (iconName && funText !== iconText ? funText : "") || undefined,
+        key: functionKey(pfno),
+      });
+    }
+    statuses.set(code, { functions, shortcuts });
+  }
+  const titles = new Map(tit.map((r) => [up(r, "CODE"), tag(r, "TEXT").replace(/\s+$/, "")]));
+  return { statuses, titles };
 }

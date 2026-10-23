@@ -396,8 +396,9 @@ Stage 1 - the converter: the constructs that stop the most reports
       call, the rest continued in `at_user_command( )` - the one
       transformation that changes a block's shape, and the one in every
       report that posts something
-- [ ] `SET PF-STATUS`, `SET TITLEBAR`, `AT PFnn` as `set_pf_status( )`,
-      toolbar functions and the keyboard shortcuts of the runtime
+- [x] `SET PF-STATUS`, `SET TITLEBAR`, `AT PFnn` as `set_pf_status( )`,
+      toolbar functions and the keyboard shortcuts of the runtime - the
+      status read from the `<CUA>` of the `.prog.xml`
 - [ ] Secondary lists (`sy-lsind`) and `WRITE AT` positions, in a monospace
       list mode - the evaluations that live by the column
 - [ ] `cl_gui_alv_grid` in a container with its simple handlers (hotspot,
