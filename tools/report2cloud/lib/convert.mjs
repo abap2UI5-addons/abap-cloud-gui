@@ -64,7 +64,6 @@ const REFUSED = {
   GetCursor: "GET CURSOR - not converted; in at_line_selection( ) get_cursor( ) returns field, value, line and offset - port it by hand",
   ReadLine: "READ LINE - not converted; list( )->read_line( ) / read_value( ) read the list back - port it by hand, or keep the data in an internal table",
   ModifyLine: "MODIFY LINE - not converted; list( )->modify_line( ) changes a written line - port it by hand",
-  Window: "WINDOW - not converted; window( ) in at_line_selection( ) shows the secondary list in a dialog box - port it by hand",
   SetUserCommand: "SET USER-COMMAND - triggers no event here",
   PrintControl: "PRINT-CONTROL - printing is not supported",
   CallSubscreen: "CALL SUBSCREEN - dynpro statement",
@@ -114,9 +113,7 @@ const REFUSED_FUNCTIONS = {
 
 // statements that only lay out or decorate a list or screen - dropped, noted
 const LAYOUT_ONLY = {
-  Position: "POSITION - the list has no columns",
   Back: "BACK - the list has no columns",
-  Reserve: "RESERVE - the list has no pages to reserve lines on",
   Summary: "SUMMARY - the list knows no intensified output",
   Detail: "DETAIL - the list knows no intensified output",
   SetLeft: "SET LEFT SCROLL-BOUNDARY - the list does not scroll horizontally",
@@ -845,6 +842,14 @@ class Converter {
 
   generate() {
     const cls = this.className;
+    // the fields a WRITE ... UNDER refers to - their WRITE gets their name
+    this.underTargets = new Set();
+    for (const x of this.stmts) {
+      if (kind(x) !== "Write") continue;
+      const ch = x.getChildren();
+      const at = ch.findIndex((c) => isToken(c) && uc(c.get().getStr()) === "UNDER");
+      if (at >= 0 && ch[at + 1]) this.underTargets.add(underName(nodeText(ch[at + 1])));
+    }
     const pub = [];          // PUBLIC SECTION
     const methods = [];      // { name, def, body: string[] }
     this.methodDefs = [];    // PRIVATE methods
@@ -2595,14 +2600,44 @@ class Converter {
         this.map(s, "string template");
         return;
       }
+      case "Position": {
+        const n = child(s, "Source");
+        this.listCall(b, "position", [{ value: nodeText(n, this.rewrites(s, b.ctx)) }]);
+        this.map(s, "`list( )->position( )` - the next write( ) starts at that column");
+        return;
+      }
+      case "Reserve": {
+        const n = child(s, "Source");
+        this.listCall(b, "reserve", [{ value: nodeText(n, this.rewrites(s, b.ctx)) }]);
+        this.map(s, "`list( )->reserve( )` - a new page when fewer lines are left (LINE-COUNT)");
+        return;
+      }
+      case "Window": {
+        if (!b.ctx.lineSelection) {
+          this.refuse(s, "WINDOW outside of AT LINE-SELECTION - window( ) shows the secondary list a line selection writes in a dialog box");
+          return;
+        }
+        const ov = this.rewrites(s, b.ctx);
+        const src = findAll(s, "Source").filter((n) => s.getChildren().includes(n)).map((n) => nodeText(n, ov));
+        const diff = (a, z) => (/^\d+$/.test(a) && /^\d+$/.test(z) ? String(Number(z) - Number(a)) : `${z} - ${a}`);
+        const params = [];
+        if (src.length >= 4) {
+          params.push({ name: "columns", value: diff(src[0], src[2]) });
+          params.push({ name: "lines", value: diff(src[1], src[3]) });
+        }
+        b.out.push(params.length ? renderNamedCall("window", params) : "window( ).");
+        this.map(s, "`window( )` - the secondary list in a dialog box, ENDING AT minus STARTING AT its size");
+        return;
+      }
       case "NewLine":
         this.listCall(b, "new_line", []);
         this.map(s, "`list( )->new_line( )`");
         return;
       case "Skip": {
         if (words(s).includes("TO")) {
-          this.note("SKIP TO LINE - the list has no line positions");
-          this.map(s, "dropped - SKIP TO LINE");
+          const n = child(s, "Source");
+          this.listCall(b, "skip_to_line", [{ value: nodeText(n, this.rewrites(s, b.ctx)) }]);
+          this.map(s, "`list( )->skip_to_line( )` - empty lines up to that line of the page");
           return;
         }
         const n = child(s, "Source");
@@ -2745,6 +2780,14 @@ class Converter {
         return;
       case "Call": case "CreateObject": case "Move": {
         const t = lc(renderTokens(stmtTokens(s)));
+        // sy-lsind = n: the list the line selection writes becomes level n
+        if (k === "Move" && /^sy\s*-\s*lsind\s*=/.test(t)) {
+          const ov = this.rewrites(s, b.ctx);
+          out.push(`set_lsind( ${nodeText(child(s, "Source"), ov)} ).`);
+          this.map(s, "`set_lsind( )` - the list written becomes that level, Back returns to the one below");
+          if (!b.ctx.lineSelection) this.todo(s, "sy-lsind set outside of AT LINE-SELECTION - set_lsind( ) drops the levels of the secondary lists above it; check that the classic did the same here");
+          return;
+        }
         if (GUI_CONTROL.test(t)) {
           this.refuse(s, "SAP GUI controls (cl_gui_*) need a dynpro container - use alv( ) or an abap2UI5 view");
           return;
@@ -3042,6 +3085,12 @@ class Converter {
           this.note(`sy-repid / sy-cprog are the name of the report, '${uc(this.programName)}' - in a class they name the class pool`);
         }
       }
+      // the column and line the list writes at next, the level of the list
+      if (t === "sy" && next === "-" && ["colno", "linno", "lsind"].includes(next2)) {
+        ov.set(key(toks[i]), { colno: "list( )->current_column( )", linno: "list( )->current_line( )", lsind: "lsind( )" }[next2]);
+        ov.set(key(toks[i + 1]), null);
+        ov.set(key(toks[i + 2]), null);
+      }
       if (ctx.lineSelection && t === "sy" && next === "-" && ["lilli", "curow"].includes(next2)) {
         ov.set(key(toks[i]), "row");
         ov.set(key(toks[i + 1]), null);
@@ -3272,8 +3321,32 @@ class Converter {
         items.push({ method: "new_line", params: [] });
         b.line = [];
       }
-      if (offs && offs.getTokens().some((t) => !t.getStr().startsWith("/") && t.getStr() !== "AT")) {
-        this.note("WRITE at a position or with a length - the list writes item after item");
+      // WRITE AT /pos(len): the column and the width of the item
+      let pos;
+      let len;
+      if (offs) {
+        const toks = offs.getTokens().filter((t) => uc(t.getStr()) !== "AT");
+        let i = 0;
+        const posToks = [];
+        if (toks[i] && toks[i].getStr().startsWith("/")) {
+          const rest = toks[i].getStr().slice(1);
+          if (rest) posToks.push({ text: rest });
+          i++;
+        }
+        while (toks[i] && toks[i].getStr() !== "(") posToks.push(toks[i++]);
+        if (toks[i] && toks[i].getStr() === "(") {
+          const lenToks = [];
+          i++;
+          while (toks[i] && toks[i].getStr() !== ")") lenToks.push(toks[i++]);
+          if (lenToks.length) len = lenToks.map((t) => (t.text !== undefined ? t.text : renderTokens([t], ov))).join("").replace(/\s+/g, "");
+        }
+        if (posToks.length) {
+          pos = posToks.map((t) => t.text ?? (ov.has(key(t)) ? ov.get(key(t)) : t.getStr())).join("");
+        }
+        if (len === "*" || len === "**") {
+          this.note("WRITE ... (*) / (**) - the length the value needs; the list writes it in its own width");
+          len = undefined;
+        }
       }
       const src = child(s, "Source");
       if (!src) continue;
@@ -3301,7 +3374,7 @@ class Converter {
       let hotspot = b.hotspot;
       const hs = w.indexOf("HOTSPOT");
       if (hs >= 0) hotspot = w[hs + 1] !== "OFF";
-      const lost = ["NO-GAP", "UNDER", "CURRENCY", "UNIT", "DECIMALS", "EDIT", "LEFT-JUSTIFIED", "CENTERED",
+      const lost = ["CURRENCY", "UNIT", "DECIMALS", "EDIT", "LEFT-JUSTIFIED", "CENTERED",
         "RIGHT-JUSTIFIED", "NO-ZERO", "NO-SIGN", "EXPONENT", "ROUND", "DD/MM/YY", "MM/DD/YY", "DD/MM/YYYY",
         "MM/DD/YYYY", "DDMMYY", "MMDDYY", "YYMMDD", "QUICKINFO", "INPUT", "INVERSE", "TIME", "ENVIRONMENT"];
       const joined = w.join(" ").replace(/ - /g, "-");
@@ -3309,6 +3382,16 @@ class Converter {
         if (new RegExp(`(^| )${o.replace(/\//g, "\\/")}( |$)`).test(joined)) this.note(`WRITE ... ${o} - the list writes the value in its default format`);
       }
       const item = { method: "write", params: [{ name: "val", value }] };
+      if (pos !== undefined && pos !== "0") item.params.push({ name: "pos", value: lc(pos) });
+      if (len !== undefined) item.params.push({ name: "len", value: lc(len) });
+      if (hasSeq(w, "NO", "-", "GAP")) item.params.push({ name: "no_gap", value: "abap_true" });
+      // UNDER g: the column g was written at - g is written with its name
+      const underAt = s.getChildren().findIndex((c) => isToken(c) && uc(c.get().getStr()) === "UNDER");
+      if (underAt >= 0) {
+        const g = s.getChildren()[underAt + 1];
+        item.params.push({ name: "under", value: literal(underName(nodeText(g))) });
+      }
+      if (this.underTargets?.has(underName(nodeText(src)))) item.params.push({ name: "name", value: literal(underName(nodeText(src))) });
       if (color || !b.runtimeColor) {
         if (c !== "none") item.params.push({ name: "color", value: colorConst(c) });
       } else {
@@ -4125,6 +4208,12 @@ function renderTableCall(method, params) {
     lines[lines.length - 1] += " )";
   });
   return `${lines.join("\n")} ).`;
+}
+
+/** the name WRITE ... UNDER g refers to: the field, or the text of a literal */
+function underName(text) {
+  const t = text.trim();
+  return /^['`]/.test(t) ? unquote(t) : uc(t.replace(/\s+/g, ""));
 }
 
 /** CASE field. WHEN `A`. ... ENDCASE. */

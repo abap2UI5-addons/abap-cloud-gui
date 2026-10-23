@@ -266,11 +266,15 @@ class `ZR2C` must exist in the target system.
 | `AT LINE-SELECTION` | `at_line_selection( row hide )`; `sy-lilli` / `sy-curow` become `row` |
 | `HIDE f` | `hide = f` at the hotspot of the line it follows (the first write of the line becomes the hotspot if it has none); several fields are joined with a tab. `at_line_selection( )` restores them into their fields first, as the classic HIDE does |
 | `AT USER-COMMAND` | `at_user_command( ucomm )`; `sy-ucomm` becomes `ucomm` |
-| `WRITE [/] [pos(len)] f [COLOR c] [HOTSPOT [ON/OFF]]` | `write( val color hotspot )` on the list, `/` is `new_line( )`; a chained `WRITE:` is one call chain. Positions and lengths are dropped |
+| `WRITE [AT] [/][pos][(len)] f [COLOR c] [HOTSPOT [ON/OFF]] [NO-GAP] [UNDER g]` | `write( val pos len no_gap under color hotspot )` on the list, `/` is `new_line( )`; a chained `WRITE:` is one call chain. `pos` and `len` may be fields; `(*)` and `(**)` are dropped with a note. `UNDER g` takes the column `g` was written at - the `WRITE` of `g` gets `name = \`G\`` (the text of a literal). In a line with a position every item stands in a box of its width in characters, so the columns line up whatever the font |
 | `WRITE f AS CHECKBOX`, `WRITE i AS ICON` | `write_as_checkbox( )`, `write_as_icon( )`; `icon_okay`, `icon_red_light`, ... become the UI5 icon (`sap-icon://accept`, ...) |
 | `COLOR COL_HEADING / COL_KEY / COL_TOTAL / COL_POSITIVE / COL_NEGATIVE ...` | `z2ui5_cl_cgui_list=>cs_color-key / total / positive / negative` |
 | `FORMAT COLOR / RESET / HOTSPOT` | applied to the following writes of the method; a `FORMAT COLOR` inside an IF, CASE or loop keeps the color in `lv_color` at runtime and every write passes it |
 | `NEW-LINE`, `SKIP [n]`, `ULINE`, `NEW-PAGE [NO-HEADING] [LINE-COUNT n]` | `list( )->new_line( )`, `skip( n )`, `uline( )`, `new_page( no_heading line_count )` - the runtime repeats the `TOP-OF-PAGE` header on the new page by itself |
+| `POSITION n`, `SKIP TO LINE n`, `RESERVE n LINES` | `list( )->position( n )`, `skip_to_line( n )`, `reserve( n )` |
+| `sy-colno`, `sy-linno`, `sy-lsind` | `list( )->current_column( )`, `list( )->current_line( )`, `lsind( )` |
+| `sy-lsind = n` in `AT LINE-SELECTION` | `set_lsind( n )` - the list written becomes level `n`, the levels above `n - 1` are dropped, so Back returns to level `n - 1`; outside of `AT LINE-SELECTION` a TODO |
+| `WINDOW STARTING AT x1 y1 [ENDING AT x2 y2]` in `AT LINE-SELECTION` | `window( columns = x2 - x1 lines = y2 - y1 )` - the secondary list in a dialog box; outside of `AT LINE-SELECTION` refused |
 | `WRITE f TO g` | `g = \|{ f }\|.` and a TODO (user formats) |
 | `cl_salv_table=>factory( IMPORTING r_salv_table = o CHANGING t_table = t )` ... `o->display( )` | `alv( t )` at the place of `display( )`, with `set_title( )` (`set_list_header`), `set_column_text( )` (`set_long/medium/short_text`, the longest wins), `set_column_hidden( )` (`set_visible( abap_false )`, `set_technical( )`), `set_line_selection( )` (`SET HANDLER ... get_event( )`, with a TODO for the handler's code). The `REF TO cl_salv_*` variables, `get_columns( )` / `get_column( )` assignments and `TRY ... CATCH cx_salv_*` are removed |
 | `REUSE_ALV_GRID_DISPLAY` / `REUSE_ALV_LIST_DISPLAY` with `TABLES t_outtab = t` | `alv( t )`, `i_grid_title` is `set_title( )`, a field catalog built with `wa-fieldname`, `wa-seltext_*`, `wa-no_out`, `APPEND wa TO fcat` or `APPEND VALUE #( ) TO fcat` gives column texts and hidden columns; `REUSE_ALV_FIELDCATALOG_MERGE`, the layout and a FORM that only built them are dropped, as is the `IF sy-subrc` after the call |
@@ -321,7 +325,7 @@ them are collected, so one run lists everything there is to do.
 | `ASSIGN ('(PROG)FIELD')`, `LOOP AT SCREEN ASSIGNING` | field symbols to screen or foreign program fields |
 | `LOOP AT SCREEN` / `MODIFY SCREEN` outside of `AT SELECTION-SCREEN OUTPUT`, `screen-group2`, `screen-intensified`, ... read in a condition | only the screen of `at_selection_screen_output( screen )` and its six fields exist (an assignment to another field is dropped with a TODO) |
 | `TOP-OF-PAGE` / `TOP-OF-PAGE DURING LINE-SELECTION` / `END-OF-PAGE` with more than output | the runtime writes header and footer once and repeats them on every page; only a fixed one is converted |
-| `GET CURSOR`, `READ LINE`, `MODIFY LINE`, `WINDOW` | not converted - abap-cloud-gui has `get_cursor( )`, `list( )->read_line( )` / `modify_line( )` and `window( )`; port them by hand |
+| `GET CURSOR`, `READ LINE`, `MODIFY LINE` | not converted - abap-cloud-gui has `get_cursor( )`, `list( )->read_line( )` / `modify_line( )`; port them by hand |
 | `SCROLL LIST`, `SET USER-COMMAND`, `NEW-PAGE PRINT ON`, `PRINT-CONTROL` | the list has no scroll position or print control |
 | a global of the report named like a method or attribute of `z2ui5_cl_cgui_report` (`tree`, `format`, `window`, ...) | the global becomes an attribute of the class - rename it in the source first |
 | `LEAVE TO LIST-PROCESSING`, `LEAVE PROGRAM`, `LEAVE TO TRANSACTION` | the list is shown after `start_of_selection( )`; there is nothing to leave |
@@ -437,9 +441,11 @@ npm run test:report2cloud:runtime                                          # the
   `AT LINE-SELECTION`, `POPUP_TO_CONFIRM` with its `EXCEPTIONS` check inside
   a `WHEN`, `POPUP_GET_VALUES` in a FORM), the GUI status of a list (`SET
   PF-STATUS` with its buttons and function keys in the `.prog.xml`,
-  `EXCLUDING` a table and a literal, `SET TITLEBAR ... WITH`) - and one with
-  `CALL SCREEN`, batch input, native SQL and dynpro modules that must be
-  refused. A report `zr2c_NN_name` becomes the class
+  `EXCLUDING` a table and a literal, `SET TITLEBAR ... WITH`), an evaluation
+  that lives by the column (`WRITE AT pos(len)`, `UNDER`, `NO-GAP`,
+  `POSITION`, `RESERVE`, `sy-linno` / `sy-colno`) with a drilldown over three
+  levels (`WINDOW`, `sy-lsind` read and set) - and one with `CALL SCREEN`,
+  batch input, native SQL and dynpro modules that must be refused. A report `zr2c_NN_name` becomes the class
   `z2ui5_cl_cgui_r2c_NN`, a name the repository's `object_naming` accepts.
 - `test/convert.test.mjs` - the snapshots of every generated file and
   migration report (`test/snapshots/`), the abapGit format of the files, the

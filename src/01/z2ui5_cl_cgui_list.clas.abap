@@ -1382,10 +1382,18 @@ CLASS z2ui5_cl_cgui_list IMPLEMENTATION.
   METHOD render_items.
 
     " WRITE AT pos(len): a spacer fills up to the column, the value takes
-    " its width - both in characters, so the columns line up line by line
+    " its width - both in characters, so the columns line up line by line.
+    " In a line with a position every item stands in a box of its width in
+    " characters (len, else its text and the gap): the font is not
+    " monospaced, so a spacer counted from the text alone would drift
     DATA lo_line TYPE REF TO z2ui5_cl_ui5_view_builder.
     DATA lv_line TYPE i.
     DATA lv_col  TYPE i.
+    DATA lt_columned TYPE SORTED TABLE OF i WITH UNIQUE KEY table_line.
+
+    LOOP AT items REFERENCE INTO DATA(lr_pos) WHERE pos > 0.
+      INSERT lr_pos->line INTO TABLE lt_columned.
+    ENDLOOP.
 
     LOOP AT items REFERENCE INTO DATA(lr_item).
 
@@ -1413,18 +1421,22 @@ CLASS z2ui5_cl_cgui_list IMPLEMENTATION.
         lv_col = lr_item->pos - 1.
       ENDIF.
 
-      render_item( node   = lo_line
-                   client = client
-                   item   = lr_item->*
-                   inputs = inputs ).
-
-      IF lr_item->len > 0.
-        lv_col = lv_col + lr_item->len.
-      ELSEIF lr_item->no_gap = abap_true.
-        lv_col = lv_col + strlen( lr_item->text ).
+      DATA(lv_width) = COND i( WHEN lr_item->len > 0 THEN lr_item->len
+                               WHEN lr_item->no_gap = abap_true THEN strlen( lr_item->text )
+                               ELSE strlen( lr_item->text ) + 1 ).
+      IF line_exists( lt_columned[ table_line = lr_item->line ] ) AND lv_width > 0.
+        render_item( node   = lo_line->ele( `HBox`
+                                  )->a( n = `width` v = |{ lv_width }ch| )
+                     client = client
+                     item   = lr_item->*
+                     inputs = inputs ).
       ELSE.
-        lv_col = lv_col + strlen( lr_item->text ) + 1.
+        render_item( node   = lo_line
+                     client = client
+                     item   = lr_item->*
+                     inputs = inputs ).
       ENDIF.
+      lv_col = lv_col + lv_width.
     ENDLOOP.
 
   ENDMETHOD.

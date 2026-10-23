@@ -399,8 +399,9 @@ Stage 1 - the converter: the constructs that stop the most reports
 - [x] `SET PF-STATUS`, `SET TITLEBAR`, `AT PFnn` as `set_pf_status( )`,
       toolbar functions and the keyboard shortcuts of the runtime - the
       status read from the `<CUA>` of the `.prog.xml`
-- [ ] Secondary lists (`sy-lsind`) and `WRITE AT` positions, in a monospace
-      list mode - the evaluations that live by the column
+- [x] Secondary lists (`sy-lsind`) and `WRITE AT` positions, in a column
+      mode of the list (every item of a line with a position in a box of
+      its width in characters) - the evaluations that live by the column
 - [ ] `cl_gui_alv_grid` in a container with its simple handlers (hotspot,
       double click, toolbar) as `alv( )` - the ALV every report since 2005
       is written with
