@@ -408,7 +408,9 @@ Stage 1 - the converter: the constructs that stop the most reports
 - [x] `AT SELECTION-SCREEN ON HELP-REQUEST`, `SELECTION-SCREEN FUNCTION KEY`,
       `TABBED BLOCK` and `BEGIN OF SCREEN` (`AS WINDOW` and `AS SUBSCREEN`)
       on the runtime's own counterparts
-- [ ] A documentation page per refusal: why, and the rewrite that unblocks it
+- [x] A documentation page per refusal: why, and the rewrite that unblocks it
+      ([tools/report2cloud/docs/refusals.md](tools/report2cloud/docs/refusals.md),
+      linked from every refusal of the migration report)
 
 Stage 2 - the runtime: what a report's user sees
 

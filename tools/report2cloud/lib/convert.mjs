@@ -34,6 +34,10 @@ import {
 } from "./abap.mjs";
 import { classXml, longLines, normalizeAbap } from "./abapgit.mjs";
 import { functionKey } from "./textpool.mjs";
+import { refusalOf } from "./refusals.mjs";
+
+/** the refusal messages no entry of the catalogue matched - a gap there */
+export const UNCATALOGUED = new Set();
 
 const require = createRequire(import.meta.url);
 const { Indent } = require("@abaplint/core/build/src/pretty_printer/indent");
@@ -245,7 +249,10 @@ class Converter {
 
   refuse(at, message) {
     const tok = at && (at.getFirstToken ? at.getFirstToken() : at);
-    this.refusals.push({ row: tok ? tok.getRow() : 0, col: tok ? tok.getCol() : 0, message });
+    // its entry of the catalogue (lib/refusals.mjs) - why, and the rewrite
+    const entry = refusalOf(message);
+    if (!entry) UNCATALOGUED.add(message);
+    this.refusals.push({ row: tok ? tok.getRow() : 0, col: tok ? tok.getCol() : 0, message, code: entry?.id ?? "other" });
   }
 
   /** "line 12", or "line 12 of zx_top.prog.abap" for a row of an include */
@@ -4899,6 +4906,9 @@ function renderScreenChain(calls) {
 }
 
 /** convert a classic report into an abap-cloud-gui report class */
+/** the messages of the statements and function modules refused as a whole */
+export const REFUSED_MESSAGES = () => [...Object.values(REFUSED), ...Object.entries(REFUSED_FUNCTIONS).map(([fm, m]) => `CALL FUNCTION '${fm}' - ${m}`)];
+
 export function convert(source, opts = {}) {
   return new Converter(source, opts).run();
 }

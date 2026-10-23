@@ -18,6 +18,7 @@ import { basename, dirname, join, resolve } from "node:path";
 import { convert, defaultClassName } from "./lib/convert.mjs";
 import { includesFrom, inlineIncludes } from "./lib/includes.mjs";
 import { parseTextpool } from "./lib/textpool.mjs";
+import { refusalOf } from "./lib/refusals.mjs";
 
 const USAGE = `usage: node tools/report2cloud/coverage.mjs <dir> [<dir> ...] [--includes dir] [--json file]`;
 
@@ -82,7 +83,12 @@ export function coverage(files, { read } = {}) {
     rows.push({
       file,
       ok: result.ok,
-      refusals: result.refusals.map((r) => reasonOf(r.message)),
+      // ranked by the entry of the catalogue - one line per kind of refusal,
+      // with the reason of the first report that has it
+      refusals: result.refusals.map((r) => {
+        const e = refusalOf(r.message);
+        return e ? `${e.title} [${e.id}]` : reasonOf(r.message);
+      }),
       todos: result.todos.map((t) => todoOf(t.message)),
       release: result.release.map((r) => `${r.kind} ${r.name}`),
       mapped: result.mapped.length,

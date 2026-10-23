@@ -96,7 +96,7 @@ test("coverage: the corpus as numbers - converted, refused, the reasons ranked",
   assert.equal(r.status, 0, r.stderr);
   assert.match(r.stdout, /^report2cloud coverage: 20 report\(s\) - 19 converted \(95 %\), 1 refused/);
   assert.match(r.stdout, /includes: 1 report\(s\) with includes inlined/);
-  assert.match(r.stdout, /Refused - the next constructs to map \(reports affected\)\n(.*\n)*.*CALL SCREEN/);
+  assert.match(r.stdout, /Refused - the next constructs to map \(reports affected\)\n(.*\n)*.*Dynpros: CALL SCREEN, MODULE, SET SCREEN, CONTROLS \[dynpro\]/);
   assert.match(r.stdout, /Objects to check for ABAP Cloud/);
   assert.equal(spawnSync(process.execPath, [join(HERE, "..", "coverage.mjs")], { encoding: "utf8" }).status, 1);
 });

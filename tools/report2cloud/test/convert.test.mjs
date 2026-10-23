@@ -6,7 +6,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { convert, defaultClassName, RESERVED_METHODS } from "../lib/convert.mjs";
+import { convert, defaultClassName, RESERVED_METHODS, UNCATALOGUED } from "../lib/convert.mjs";
 import { corpus, convertEntry, SNAPSHOTS } from "./corpus.mjs";
 
 const UPDATE = process.env.UPDATE_SNAPSHOTS === "1";
@@ -568,4 +568,12 @@ test("a global table with a header line is a table and a work area attribute, an
   assert.match(cls, /CLEAR wa_gt_sum\.\n\s+CLEAR gt_sum\./);
   // a FORM's own table: the work area right after it
   assert.match(cls, /DATA lt TYPE STANDARD TABLE OF i WITH DEFAULT KEY\.\n\s+DATA ls_lt LIKE LINE OF lt\.\n\s+ls_lt = 1\.\n\s+APPEND ls_lt TO lt\.\n\s+LOOP AT lt INTO ls_lt\.\n\s+write\( ls_lt \)/);
+});
+
+// ------------------------------------------- the catalogue of refusals
+
+test("every refusal of the corpus and of the cases above has its entry in the catalogue (lib/refusals.mjs)", () => {
+  assert.deepEqual([...UNCATALOGUED], [], "add an entry, or widen the pattern of one");
+  const { result } = converted.get("zr2c_10_refused");
+  assert.ok(result.refusals.every((r) => r.code !== "other"));
 });

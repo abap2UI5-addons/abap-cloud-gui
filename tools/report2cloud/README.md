@@ -315,6 +315,8 @@ class `ZR2C` must exist in the target system.
 
 ## Refused
 
+Every refusal has its section in [docs/refusals.md](docs/refusals.md) - why it has no counterpart, and the rewrite in the classic report that unblocks it; the migration report links each refusal there. The page is written from `lib/refusals.mjs` (`npm run report2cloud:docs`).
+
 Each of these stops the conversion with `file:row:col` and the reason; all of
 them are collected, so one run lists everything there is to do.
 
