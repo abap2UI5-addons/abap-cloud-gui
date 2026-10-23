@@ -331,6 +331,37 @@ test("a popup at the top of an event block: the answer and the SVAL values first
   assert.ok(r.todos.some((t) => /lv_n was declared inline before the call/.test(t.message)));
 });
 
+// ------------------------------------------------------- the GUI status
+
+test("SET PF-STATUS: the buttons and function keys of the status in the .prog.xml, EXCLUDING, SET TITLEBAR WITH", () => {
+  const cls = classOf("zr2c_17_status");
+  const { result } = converted.get("zr2c_17_status");
+  assert.equal(result.ok, true);
+  assert.match(cls, /set_pf_status\( functions = VALUE #\( \( name = `REFRESH` icon = `sap-icon:\/\/refresh` tooltip = `Read the flights again \(F5\)` \)\n\s+\( name = `DELE` text = `Delete` icon = `sap-icon:\/\/delete` tooltip = `Delete empty flights \(Shift\+F2\)` \) \)\n\s+shortcuts = VALUE #\( \( key = `F5` ucomm = `REFRESH` \)\n\s+\( key = `Shift\+F2` ucomm = `DELE` \) \)\n\s+excluding = gt_excl \)\./);
+  assert.match(cls, /excluding = VALUE string_table\( \( `DELE` \) \) \)\./);
+  assert.match(cls, /set_title\( \|Flights of airline \{ p_carrid \}\| \)\./);
+  // Back is the runtime's own
+  assert.ok(!/`BACK`/.test(cls));
+  assert.ok(!result.todos.some((t) => /PF-STATUS|TITLEBAR|sy-ucomm/.test(t.message)), result.todos.map((t) => t.message).join("\n"));
+});
+
+test("SET PF-STATUS without the .prog.xml, of another program, by a field, space; AT PFnn", () => {
+  const conv = (src) => convert(src, { file: "zt.prog.abap", className: "zcl_t" });
+  const r = conv("REPORT zt.\nDATA gv TYPE string.\nSTART-OF-SELECTION.\n  SET PF-STATUS 'MAIN'.\n  SET PF-STATUS gv.\n  SET PF-STATUS 'X' OF PROGRAM 'ZOTHER'.\n  SET PF-STATUS space.\n  SET TITLEBAR 'T01'.\n");
+  assert.deepEqual(r.todos.map((t) => t.message.split(" - ")[0].split(":")[0]), [
+    "SET PF-STATUS 'MAIN' dropped",
+    "SET PF-STATUS gv",
+    "SET PF-STATUS 'X' OF PROGRAM",
+    "SET TITLEBAR 'T01' dropped",
+  ]);
+  assert.match(r.draft["zcl_t.clas.abap"], /set_pf_status\( VALUE #\( \) \)\./);
+  const pf = conv("REPORT zt.\nSTART-OF-SELECTION.\n  WRITE 'x'.\nAT PF05.\n  WRITE sy-ucomm.\nAT PF13.\n  WRITE 'y'.\n");
+  const cls = pf.draft["zcl_t.clas.abap"];
+  assert.equal(pf.ok, true);
+  assert.match(cls, /METHOD initialization\.\n\n\s+" AT PFnn - the function keys of the standard list status\n\s+set_pf_status\( functions = VALUE #\( \( name = `PF05` text = `F5` \)\n\s+\( name = `PF13` text = `Shift\+F1` \) \)\n\s+shortcuts = VALUE #\( \( key = `F5` ucomm = `PF05` \)\n\s+\( key = `Shift\+F1` ucomm = `PF13` \) \) \)\./);
+  assert.match(cls, /CASE ucomm\.\n\s+WHEN `PF05`\.\n\s+write\( ucomm \)\.\n\s+WHEN `PF13`\./);
+});
+
 // ------------------------------------------------ tables with a header line
 
 test("a global table with a header line is a table and a work area attribute, and every short form is written out", () => {

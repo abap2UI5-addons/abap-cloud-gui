@@ -100,6 +100,15 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
     TYPES ty_t_cgui_tab TYPE STANDARD TABLE OF ty_s_cgui_tab WITH EMPTY KEY.
 
     TYPES:
+      "! a keyboard shortcut of set_pf_status( ) - key as the frontend
+      "! spells it (F5, Shift+F2, Ctrl+F1), ucomm the function it raises
+      BEGIN OF ty_s_shortcut,
+        key   TYPE string,
+        ucomm TYPE string,
+      END OF ty_s_shortcut.
+    TYPES ty_t_shortcut TYPE STANDARD TABLE OF ty_s_shortcut WITH EMPTY KEY.
+
+    TYPES:
       "! a message of a run - the result of cgui_run_in_background( )
       BEGIN OF ty_s_cgui_message,
         type TYPE string,
@@ -620,11 +629,14 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
         val TYPE i.
 
     "! SET PF-STATUS - the functions of the toolbar of the output; each
-    "! arrives in at_user_command( ) with its name
+    "! arrives in at_user_command( ) with its name. shortcuts are the
+    "! function keys of the status, excluding the functions left out
+    "! (SET PF-STATUS ... EXCLUDING) - a table of names of any character type
     METHODS set_pf_status
       IMPORTING
         functions TYPE z2ui5_cl_cgui_alv=>ty_t_function
-        excluding TYPE string_table OPTIONAL.
+        excluding TYPE ANY TABLE   OPTIONAL
+        shortcuts TYPE ty_t_shortcut OPTIONAL.
 
     "! the title of the report, the class name when not set
     METHODS set_title
@@ -751,6 +763,7 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
     " the standard functions switched off - selection screen and output
     DATA mt_cgui_excl_sel      TYPE string_table.
     DATA mt_cgui_excl_out      TYPE string_table.
+    DATA mt_cgui_pf_keys       TYPE ty_t_shortcut.
     DATA mv_cgui_line_count    TYPE i.
     DATA mt_cgui_pf            TYPE z2ui5_cl_cgui_alv=>ty_t_function.
     DATA mt_cgui_fkey          TYPE z2ui5_cl_cgui_selscreen=>ty_t_function_key.
@@ -1373,9 +1386,14 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
 
   METHOD set_pf_status.
 
-    mt_cgui_pf = functions.
+    FIELD-SYMBOLS <excl> TYPE any.
 
-    mt_cgui_excl_out = excluding.
+    mt_cgui_pf = functions.
+    mt_cgui_pf_keys = shortcuts.
+    CLEAR mt_cgui_excl_out.
+    LOOP AT excluding ASSIGNING <excl>.
+      INSERT condense( to_upper( CONV string( <excl> ) ) ) INTO TABLE mt_cgui_excl_out.
+    ENDLOOP.
 
   ENDMETHOD.
 
@@ -4358,6 +4376,18 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
     client->follow_up_action( val   = client->cs_event-keyboard_shortcut
                               t_arg = VALUE #( ( `F3` ) ( cs_ucomm-back ) ( client->cs_view-main ) ) ).
 
+    " the function keys of SET PF-STATUS, on the output only
+    IF mv_cgui_screen = cs_screen-selection.
+      RETURN.
+    ENDIF.
+    LOOP AT mt_cgui_pf_keys INTO DATA(ls_key).
+      IF line_exists( mt_cgui_excl_out[ table_line = to_upper( ls_key-ucomm ) ] ).
+        CONTINUE.
+      ENDIF.
+      client->follow_up_action( val   = client->cs_event-keyboard_shortcut
+                                t_arg = VALUE #( ( ls_key-key ) ( ls_key-ucomm ) ( client->cs_view-main ) ) ).
+    ENDLOOP.
+
   ENDMETHOD.
 
   METHOD variant_attributes_apply.
@@ -5030,6 +5060,9 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
       ENDLOOP.
     ELSE.
       LOOP AT mt_cgui_pf INTO DATA(ls_pf).
+        IF line_exists( mt_cgui_excl_out[ table_line = to_upper( ls_pf-name ) ] ).
+          CONTINUE.
+        ENDIF.
         toolbar->tag( `Button`
             )->a( n = `text`    t = ls_pf-text
             )->a( n = `icon`    v = ls_pf-icon

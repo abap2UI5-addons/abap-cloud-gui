@@ -296,7 +296,9 @@ class `ZR2C` must exist in the target system.
 | `x [NOT] IN range` in a condition (`IF`, `CHECK`, `WHILE`, `xsdbool( )`, ...) | `z2ui5_cl_cgui_context=>range_check( val = x range = range ) = abap_true` - the transpiled runtime's `IN` knows `I EQ`, `E EQ` and `I CP` only (AGENTS.md); ABAP SQL keeps its `IN`, a value list `IN ( a, b )` stays |
 | `LOOP AT t INTO wa WHERE ... IN range ...` | `LOOP AT t INTO wa.` with `IF <the condition on wa> = abap_false. CONTINUE. ENDIF.` (also `ASSIGNING` and `REFERENCE INTO`) and a TODO about `sy-subrc` |
 | a FORM parameter `TYPE p` (generic) | `LIKE` the data object every `PERFORM` passes, else kept with a TODO - the transpiled runtime has no generic packed type and fails to describe the class |
-| `SET PF-STATUS`, `SET TITLEBAR` | dropped with a TODO - the GUI status is not part of the input; `set_pf_status( functions = )` and `set_title( )` take them by hand |
+| `SET PF-STATUS 'S' [EXCLUDING f]` | `set_pf_status( functions shortcuts excluding )` - the buttons of the application toolbar of status `S` with their text, icon (the UI5 icon of the `ICON_` name, where the converter knows one) and tooltip, and the function keys of the status as keyboard shortcuts (`F5`, `Shift+F2`, ...), read from the GUI status abapGit writes into the `.prog.xml` (`<CUA>`); Back, Exit, Cancel, Choose, print and the page keys are the runtime's own. Every function arrives in `at_user_command( )` with its code. `EXCLUDING` leaves out a function (a literal or a table of codes); `SET PF-STATUS space` empties the toolbar. Without the `.prog.xml`, for a status named by a field or `OF PROGRAM`, a TODO |
+| `SET TITLEBAR 'T' [WITH a b ...]` | `set_title( )` with the text of title `T` from the `.prog.xml`, `&1` ... `&9` (and a bare `&`, in turn) replaced by the values in a string template; without the `.prog.xml` a TODO |
+| `AT PFnn` | a `WHEN \`PFnn\`` of `at_user_command( )`; without a `SET PF-STATUS` in the report `initialization( )` sets a toolbar with a button per key and the key (`F5`, `Shift+F1` for `PF13`, ...) as a shortcut, as the standard list status had them |
 | local classes and interfaces | `.clas.locals_imp.abap`; their definitions go to `.clas.locals_def.abap` when the class is typed with them |
 | ABAP SQL (`SELECT`, `INSERT`, `UPDATE`, `MODIFY`, `DELETE` on the database) | strict mode, as ABAP Cloud requires: host variables escaped with `@`, the field list, `ORDER BY` and `GROUP BY` separated by commas - syntax only, the parser tells a host variable from a column |
 | everything else | copied as written, comments included (`*` comments become `"` comments) |
@@ -320,7 +322,7 @@ them are collected, so one run lists everything there is to do.
 | `LOOP AT SCREEN` / `MODIFY SCREEN` outside of `AT SELECTION-SCREEN OUTPUT`, `screen-group2`, `screen-intensified`, ... read in a condition | only the screen of `at_selection_screen_output( screen )` and its six fields exist (an assignment to another field is dropped with a TODO) |
 | `TOP-OF-PAGE` / `TOP-OF-PAGE DURING LINE-SELECTION` / `END-OF-PAGE` with more than output | the runtime writes header and footer once and repeats them on every page; only a fixed one is converted |
 | `GET CURSOR`, `READ LINE`, `MODIFY LINE`, `WINDOW` | not converted - abap-cloud-gui has `get_cursor( )`, `list( )->read_line( )` / `modify_line( )` and `window( )`; port them by hand |
-| `AT PFnn`, `SCROLL LIST`, `SET USER-COMMAND`, `NEW-PAGE PRINT ON`, `PRINT-CONTROL` | the list has no function keys, scroll position or print control |
+| `SCROLL LIST`, `SET USER-COMMAND`, `NEW-PAGE PRINT ON`, `PRINT-CONTROL` | the list has no scroll position or print control |
 | a global of the report named like a method or attribute of `z2ui5_cl_cgui_report` (`tree`, `format`, `window`, ...) | the global becomes an attribute of the class - rename it in the source first |
 | `LEAVE TO LIST-PROCESSING`, `LEAVE PROGRAM`, `LEAVE TO TRANSACTION` | the list is shown after `start_of_selection( )`; there is nothing to leave |
 | `NODES`, `GET`, `REJECT` | logical databases |
@@ -433,8 +435,11 @@ npm run test:report2cloud:runtime                                          # the
   as a dialog, `WITH SELECTION-TABLE`, a `SUBMIT` without `AND RETURN`), the
   synchronous popups of a report that posts something (`POPUP_TO_DECIDE` in
   `AT LINE-SELECTION`, `POPUP_TO_CONFIRM` with its `EXCEPTIONS` check inside
-  a `WHEN`, `POPUP_GET_VALUES` in a FORM) - and one with `CALL SCREEN`, batch
-  input, native SQL and dynpro modules that must be refused. A report `zr2c_NN_name` becomes the class
+  a `WHEN`, `POPUP_GET_VALUES` in a FORM), the GUI status of a list (`SET
+  PF-STATUS` with its buttons and function keys in the `.prog.xml`,
+  `EXCLUDING` a table and a literal, `SET TITLEBAR ... WITH`) - and one with
+  `CALL SCREEN`, batch input, native SQL and dynpro modules that must be
+  refused. A report `zr2c_NN_name` becomes the class
   `z2ui5_cl_cgui_r2c_NN`, a name the repository's `object_naming` accepts.
 - `test/convert.test.mjs` - the snapshots of every generated file and
   migration report (`test/snapshots/`), the abapGit format of the files, the
