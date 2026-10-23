@@ -228,6 +228,12 @@ class `ZR2C` must exist in the target system.
 | `... LOWER CASE` | `lower_case = abap_true` - without it the runtime converts the input of a character field to upper case, as the classic screen does |
 | `SELECT-OPTIONS s FOR f` | `DATA s TYPE/LIKE RANGE OF f` and `screen->select_option( )`, with `OBLIGATORY`, `MODIF ID`, `NO-DISPLAY`, `NO INTERVALS`, `NO-EXTENSION`, `LOWER CASE`, `MEMORY ID`, `VISIBLE LENGTH`, `MATCHCODE OBJECT`; `DEFAULT a [TO b] [OPTION o] [SIGN s]` is a `VALUE #( )` in `initialization( )` |
 | the header line of a select-option or `RANGES` (`s-low = ...`, `APPEND s.`, `LOOP AT s.`, `CLEAR s.`, `s[]`) | a work area `ls_s` of the method, `APPEND ls_s TO s`, `LOOP AT s INTO ls_s`, ... |
+| `DATA itab TYPE x OCCURS n [WITH HEADER LINE]`, `TYPE [STANDARD] TABLE OF x WITH HEADER LINE`, `TYPE ty_tab WITH HEADER LINE` | `DATA itab TYPE STANDARD TABLE OF x WITH DEFAULT KEY` and a work area `wa_itab LIKE LINE OF itab` after it - a global attribute, because the header line of a report is global (one FORM fills it, another appends it); `LIKE` a DDIC table becomes `TYPE` |
+| `DATA: BEGIN OF itab OCCURS n, ... END OF itab` | the structure is the work area, `BEGIN OF wa_itab ... END OF wa_itab`, and the table is `DATA itab LIKE STANDARD TABLE OF wa_itab WITH DEFAULT KEY` after it |
+| the header line in a statement: `itab-f`, `APPEND itab.`, `COLLECT itab.`, `INSERT itab [INDEX n].`, `MODIFY itab [INDEX n].`, `LOOP AT itab.`, `READ TABLE itab ...` without `INTO`, `CLEAR itab.`, `REFRESH itab.`, `itab[]` | `wa_itab-f`, `APPEND wa_itab TO itab`, `COLLECT wa_itab INTO itab`, `INSERT wa_itab INTO itab INDEX n` (`INDEX sy-tabix` for the short form in a LOOP), `MODIFY itab FROM wa_itab [INDEX n]`, `LOOP AT itab INTO wa_itab`, `READ TABLE itab ... INTO wa_itab`, `CLEAR wa_itab`, `CLEAR itab`, `itab` |
+| the bare name where it is the header line: a `MOVE` / assignment, `MOVE-CORRESPONDING`, `SELECT ... INTO itab` (not `INTO TABLE`), `INSERT / UPDATE / MODIFY dbtab FROM itab`, `PERFORM ... USING / CHANGING itab`, `WRITE itab`, a condition, `LIKE itab` | the work area; everywhere else - `LOOP AT`, `READ TABLE`, `SORT`, `DESCRIBE TABLE`, `DELETE`, the `TABLES` of a `PERFORM` or a function, `lines( )`, `IN` - the name is the table, as in a class |
+| a table with a header line declared in a FORM | the same, with a work area `ls_itab` declared right after the table |
+| a `TABLES` parameter of a FORM used with its header line (`tt-f`, `LOOP AT tt.`, `APPEND tt.`) | a work area `ls_tt` of the method |
 | `RANGES r FOR f` | `DATA r TYPE/LIKE RANGE OF f` |
 | `SELECTION-SCREEN BEGIN OF BLOCK b [WITH FRAME [TITLE TEXT-001 / field]] [NO INTERVALS]`, `END OF BLOCK` | `screen->block_begin( title )`, `block_end( )`; `name = \`B\`` when an `AT SELECTION-SCREEN ON BLOCK b` names it, `no_intervals` |
 | `SELECTION-SCREEN BEGIN OF LINE`, `END OF LINE` | `line_begin( )`, `line_end( )`; a `COMMENT ... FOR FIELD` that opens the line is its label |
@@ -312,7 +318,8 @@ them are collected, so one run lists everything there is to do.
 | `LEAVE TO LIST-PROCESSING`, `LEAVE PROGRAM`, `LEAVE TO TRANSACTION` | the list is shown after `start_of_selection( )`; there is nothing to leave |
 | `NODES`, `GET`, `REJECT` | logical databases |
 | `INCLUDE` without its file beside the report | the include was not found as `<include>.prog.abap` - put it there, or name its folder with `--includes` |
-| a table with header line (`OCCURS`, `WITH HEADER LINE`), a `TABLES` parameter used as work area, `SELECT` without `INTO` | not allowed in classes |
+| `SELECT` without `INTO` | the short form reads into the `TABLES` work area, which classes do not have |
+| a `TABLES` parameter without a type used with its header line | a work area needs a line type - give the parameter a `STRUCTURE` or a table `TYPE` |
 | `MESSAGE` without message class, `MESSAGE ... RAISING` | |
 | `PERFORM ... IN PROGRAM`, `PERFORM f(prog)`, `IF FOUND`, `ON COMMIT`, a `PERFORM` whose parameters do not match the FORM, a literal passed to a parameter the FORM changes | only FORMs of this report, called as methods |
 | `CALL FUNCTION 'POPUP_TO_CONFIRM'` / `POPUP_TO_DECIDE` / `POPUP_GET_VALUES` | the popup waits for the answer; in abap2UI5 it is asynchronous - `popup_to_confirm( )` / `popup_to_decide( )` / `popup_get_values( )` and `at_user_command( )` |
@@ -408,7 +415,9 @@ npm run test:report2cloud:runtime                                          # the
   pages (`LINE-COUNT`, `TOP-OF-PAGE` with `sy-pagno`, `END-OF-PAGE`,
   `NEW-PAGE NO-HEADING`, `TOP-OF-PAGE DURING LINE-SELECTION`) with the
   `AT SELECTION-SCREEN ON BLOCK / RADIOBUTTON GROUP / END OF / EXIT-COMMAND`
-  events, a report in three pieces (a TOP include with the globals, the
+  events, the tables with a header line of a report of 2003 (`OCCURS`,
+  `WITH HEADER LINE`, `BEGIN OF ... OCCURS`, the short forms, a `TABLES`
+  parameter used with its header line, a FORM's own table), a report in three pieces (a TOP include with the globals, the
   selection screen and a macro, an F01 include with the FORMs, an `IF FOUND`
   include that is not there - the includes lie beside it the way abapGit
   writes them, a `.prog.abap` without a `REPORT` statement is no report of the

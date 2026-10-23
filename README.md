@@ -383,7 +383,7 @@ Stage 0 - release, and the number to move
 
 Stage 1 - the converter: the constructs that stop the most reports
 
-- [ ] Tables with a header line (`OCCURS`, `WITH HEADER LINE`) rewritten
+- [x] Tables with a header line (`OCCURS`, `WITH HEADER LINE`) rewritten
       into a table and a work area - mechanical, and in every report older
       than 7.0
 - [ ] `SUBMIT ... AND RETURN` and `CALL SELECTION-SCREEN`: the called report

@@ -449,6 +449,24 @@ class Converter {
     // select-options and RANGES have a header line in a report - a method
     // reads and writes it through a work area of its own (ls_<name>)
     this.headerTables = new Set(this.decls.filter((s) => ["SelectOption", "Ranges"].includes(kind(s))).map((s) => lc(declName(s))));
+    // A global table with a header line (OCCURS, WITH HEADER LINE) is a
+    // table attribute and a work area attribute wa_<name>, because the
+    // header line is global in the report: a FORM fills it, another one
+    // appends it. BEGIN OF ... OCCURS declares the structure - that
+    // structure IS the work area, and the table is declared LIKE a table
+    // of it.
+    this.globalHeader = new Map();
+    for (const s of this.decls) {
+      const k = kind(s);
+      if (!(k === "Data" || k === "DataBegin") || this.insideBegin(s)) continue;
+      if (!hasHeaderLine(s)) continue;
+      const name = lc(declName(s));
+      const wa = (this.identifiers.has(`wa_${name}`) ? `wa_r2c_${name}` : `wa_${name}`).slice(0, 30);
+      this.globalHeader.set(name, { wa, begin: k === "DataBegin" });
+      this.headerTables.add(name);
+      this.globalData.add(wa);
+      this.identifiers.add(wa);
+    }
     this.methodWa = new Map();
     this.prelude = new Map();
     this.msgDeclared = new Set();
@@ -1364,13 +1382,6 @@ class Converter {
           this.refuse(s, "SAP GUI controls (cl_gui_*) need a dynpro container - use alv( ) or an abap2UI5 view");
           continue;
         }
-        if (k === "Data" || k === "DataBegin") {
-          const t = uc(renderTokens(stmtTokens(s)));
-          if (/\bOCCURS\b|WITH\s+HEADER\s+LINE/.test(t)) {
-            this.refuse(s, "a table with a header line (OCCURS / WITH HEADER LINE) - not allowed in classes; declare the table and a work area of its own");
-            continue;
-          }
-        }
         heading(isType ? "types of the report" : isConst ? "constants of the report" : "global data of the report");
         if ((k === "Data" || k === "DataBegin" || k === "Ranges") && !this.insideBegin(s)) this.resetCandidate(s);
         if (k === "Ranges") {
@@ -1440,6 +1451,8 @@ class Converter {
       if (run.some((x) => words(x).includes("VALUE"))) return;
     }
     this.resetList.push({ name, value, row: s.getFirstToken().getRow() });
+    const header = this.globalHeader?.get(name);
+    if (header) this.resetList.push({ name: header.wa, row: s.getFirstToken().getRow() });
   }
 
   /**
@@ -1662,10 +1675,9 @@ class Converter {
     const ov = this.rewrites(s, {});
     this.likeToType(s, ov);
     this.tableKey(s, ov);
+    const after = this.headerDecl(s, ov);
     const t = renderTokens(stmtTokens(s), ov, s.getColon()).replace(/^(\w+)(\s*):\s*/, "$1 ");
-    const k = kind(s);
-    if (k === "DataBegin" || k === "TypeBegin" || k === "ConstantBegin" || k === "TypeEnumBegin") return `${t}.`;
-    return `${t}.`;
+    return `${t}.${after.map((l) => `\n${l}`).join("")}`;
   }
 
   /** a chained declaration in the house layout:
@@ -1684,6 +1696,7 @@ class Converter {
     if (!group.length) return undefined;
     if (group.length === 1 && !/Begin$|End$/.test(kind(group[0]))) return this.renderDecl(group[0]);
     const lines = [`${keyword}:`];
+    const after = [];
     let depth = 1;
     group.forEach((s, i) => {
       const k = kind(s);
@@ -1691,11 +1704,84 @@ class Converter {
       const ov = this.rewrites(s, {});
       this.likeToType(s, ov);
       this.tableKey(s, ov);
+      after.push(...this.headerDecl(s, ov));
       const part = renderTokens(partTokens(s), ov);
       lines.push(`${"  ".repeat(depth)}${part.replace(/\n/g, `\n${"  ".repeat(depth)}`)}${i === group.length - 1 ? "." : ","}`);
       if (/Begin$/.test(k)) depth++;
     });
-    return lines.join("\n");
+    return [...lines, ...after].join("\n");
+  }
+
+  /**
+   * A declaration with a header line, as a table without one: OCCURS n and
+   * WITH HEADER LINE go, the type becomes a STANDARD TABLE OF the line type
+   * with the default key written out (tableKey( ) says why), and the work
+   * area that stands for the header line is declared after it - LIKE LINE
+   * OF the table, whatever the line type was. BEGIN OF x OCCURS n declares
+   * the work area itself, renamed, and the table LIKE a table of it after
+   * END OF. Answers the lines that follow the declaration. `local` names
+   * the work area of a FORM's own table (declared right after it, where
+   * the table is known); a global one has its name from analyze( ).
+   */
+  headerDecl(s, ov, local) {
+    const k = kind(s);
+    if (!(k === "Data" || k === "DataBegin" || k === "DataEnd" || k === "Type") || !hasHeaderLine(s, this.beginHeader)) return [];
+    const toks = stmtTokens(s);
+    const w = toks.map((t) => uc(t.getStr()));
+    const name = lc(declName(s) ?? "");
+    const header = local ?? this.globalHeader.get(name);
+    const nameIdx = toks.findIndex((t) => lc(t.getStr()) === name);
+    if (k === "DataBegin") {
+      // BEGIN OF itab OCCURS n -> BEGIN OF wa_itab
+      if (!header) return [];
+      ov.set(key(toks[nameIdx]), header.wa);
+      dropWords(toks, w, ov, "OCCURS", 1);
+      this.beginHeader = { name, wa: header.wa };
+      this.map(s, `\`BEGIN OF ${header.wa}\` - the structure is the work area; the table \`${name}\` is declared LIKE a table of it`);
+      return [];
+    }
+    if (k === "DataEnd") {
+      const begin = this.beginHeader;
+      if (!begin || begin.name !== name) return [];
+      this.beginHeader = undefined;
+      ov.set(key(toks[nameIdx]), begin.wa);
+      return [`DATA ${name} LIKE STANDARD TABLE OF ${begin.wa} WITH DEFAULT KEY.`];
+    }
+    // DATA itab TYPE x OCCURS n [WITH HEADER LINE] / TYPE [STANDARD] TABLE OF x WITH HEADER LINE / TYPE ty_tab WITH HEADER LINE
+    const occurs = w.indexOf("OCCURS");
+    const typeAt = w.findIndex((x, i) => i > nameIdx && (x === "TYPE" || x === "LIKE"));
+    if (occurs >= 0 && typeAt >= 0 && !w.slice(typeAt, occurs).includes("TABLE")) {
+      const typeTok = toks[typeAt];
+      // LIKE a DDIC table (allowed in a report, not in a class) becomes TYPE
+      const root = lc(toks[typeAt + 1]?.getStr() ?? "");
+      const isData = this.globalData.has(root) || this.currentLocals?.has(root) || this.currentForm?.params.some((p) => p.name === root);
+      ov.set(key(typeTok), `${w[typeAt] === "LIKE" && !isData ? "TYPE" : ov.get(key(typeTok)) ?? typeTok.getStr()} STANDARD TABLE OF`);
+      const last = toks[occurs - 1];
+      ov.set(key(last), `${ov.has(key(last)) ? ov.get(key(last)) : last.getStr()} WITH DEFAULT KEY`);
+      dropWords(toks, w, ov, "OCCURS", 1);
+    } else if (occurs >= 0) {
+      dropWords(toks, w, ov, "OCCURS", 1);
+      if (!w.includes("KEY")) {
+        const last = toks[occurs - 1];
+        ov.set(key(last), `${ov.has(key(last)) ? ov.get(key(last)) : last.getStr()} WITH DEFAULT KEY`);
+      }
+    }
+    const withAt = w.findIndex((x, i) => x === "WITH" && w[i + 1] === "HEADER" && w[i + 2] === "LINE");
+    if (withAt >= 0) {
+      // TYPE TABLE OF x -> TYPE STANDARD TABLE OF x (fully_type_itabs)
+      const tableAt = w.indexOf("TABLE");
+      if (tableAt > 0 && !["STANDARD", "SORTED", "HASHED", "ANY", "INDEX"].includes(w[tableAt - 1])) {
+        ov.set(key(toks[tableAt]), `STANDARD ${toks[tableAt].getStr()}`);
+      }
+      if (w.includes("TABLE") && !w.includes("KEY")) {
+        const last = toks[withAt - 1];
+        ov.set(key(last), `${ov.has(key(last)) ? ov.get(key(last)) : last.getStr()} WITH DEFAULT KEY`);
+      }
+      for (const t of toks.slice(withAt, withAt + 3)) ov.set(key(t), null);
+    }
+    if (k === "Type" || !header) return [];
+    this.map(s, `\`DATA ${name} ... STANDARD TABLE OF\` and the work area \`${header.wa}\` - the header line is a work area`);
+    return [`DATA ${header.wa} LIKE LINE OF ${name}.`];
   }
 
   /**
@@ -1750,11 +1836,16 @@ class Converter {
           if (!isData && !["line", "range", "ref"].includes(root)) ov.set(key(toks[0]), "TYPE");
         }
         type = renderTokens(toks, ov).replace(/\s+/g, " ");
-        if (p.kind === "tables" && !/TABLE/i.test(type)) {
+        // TABLES p TYPE ty_t names a table type of the report already - TYPE
+        // structure or LIKE itab needs a table type of its own
+        const named = /^TYPE\s+/i.test(type) && this.isTableType(type.replace(/^TYPE\s+/i, ""));
+        if (p.kind === "tables" && !/TABLE/i.test(type) && !named) {
           type = this.tablesType(type.replace(/^(TYPE|LIKE)\s+/i, ""), /^LIKE/i.test(type));
         }
       } else if (structure) {
-        const name = lc(nodeText(structure));
+        let name = lc(nodeText(structure));
+        // STRUCTURE itab of a table with a header line names the line - the work area now
+        if (this.globalHeader.has(name)) name = this.globalHeader.get(name).wa;
         const isData = this.globalData.has(name.split("-")[0]) && (!this.isTables(name) || this.tablesKept.has(name));
         type = p.kind === "tables" ? this.tablesType(name, isData) : `${isData ? "LIKE" : "TYPE"} ${name}`;
       } else {
@@ -1823,6 +1914,12 @@ class Converter {
     return type;
   }
 
+  /** a TYPES of the report that declares a table (TYPES x TYPE ... TABLE OF ...) */
+  isTableType(name) {
+    const n = lc(name);
+    return this.decls.some((s) => kind(s) === "Type" && lc(declName(s)) === n && hasSeq(stmtTokens(s).map((t) => lc(t.getStr())), "table", "of"));
+  }
+
   tablesType(structure, isData) {
     const name = `ty_t_${structure.replace(/[^a-z0-9_]/gi, "_")}`.slice(0, 30);
     if (!this.tablesTypes.has(name)) {
@@ -1831,6 +1928,8 @@ class Converter {
     return `TYPE ${name}`;
   }
 
+  /** a TABLES parameter the FORM uses with its header line (tt-f, LOOP AT
+   *  tt., APPEND tt., READ TABLE tt ...) gets a work area of the method */
   checkHeaderLine(f, p) {
     for (const s of f.body) {
       const toks = stmtTokens(s).map((t) => lc(t.getStr()));
@@ -1841,10 +1940,16 @@ class Converter {
       const prev = toks[idx - 1];
       const headerUse = (next === "-" && prev !== "-" && prev !== "->")
         || (k === "Loop" && !toks.some((t) => ["into", "assigning", "reference", "transporting"].includes(t)))
-        || (k === "Append" && toks.length === 2)
+        || (["Append", "Collect", "InsertInternal", "ModifyInternal", "Clear"].includes(k) && toks.length === 2)
         || (k === "ReadTable" && !toks.some((t) => ["into", "assigning", "reference", "transporting"].includes(t)));
       if (headerUse) {
-        this.refuse(s, `the TABLES parameter ${p.name} of FORM ${f.name} is used with its header line - a method has none; give the FORM a work area of its own first`);
+        if (!child(p.node, "FormParamType") && !after(p.node, "STRUCTURE")) {
+          this.refuse(s, `the TABLES parameter ${p.name} of FORM ${f.name} is used with its header line, and has no type - a work area needs one; give the parameter a STRUCTURE or a table TYPE first`);
+          return;
+        }
+        f.headerParams ??= new Set();
+        f.headerParams.add(p.name);
+        this.map(f.stmt, `the TABLES parameter ${p.name} is used with its header line - a work area ls_${p.name} of the method`);
         return;
       }
     }
@@ -1883,6 +1988,19 @@ class Converter {
     this.currentLocals = new Set(stmts.filter((s) => ["Data", "DataBegin", "Constant", "Type", "Ranges", "FieldSymbol"].includes(kind(s)))
       .map((s) => lc(declName(s) ?? "")));
     if (ctx.form) for (const p of ctx.form.params) this.currentLocals.add(p.name);
+    // the tables with a header line of this body: a FORM's own (their work
+    // area is declared right after them, where the table is known) and the
+    // TABLES parameters the FORM uses with their header line (a work area
+    // of the method, ls_<name>, declared with the prelude)
+    b.localWa = new Map();
+    for (const s of stmts) {
+      if (kind(s) === "Data" && hasHeaderLine(s)) {
+        const name = lc(declName(s) ?? "");
+        b.localWa.set(name, (this.identifiers.has(`ls_${name}`) ? `ls_r2c_${name}` : `ls_${name}`).slice(0, 30));
+      }
+    }
+    b.headerParams = new Set(ctx.form?.headerParams ?? []);
+    this.currentBody = b;
 
     for (let i = 0; i < stmts.length; i++) {
       const s = stmts[i];
@@ -2188,10 +2306,6 @@ class Converter {
           return;
         }
         const t = uc(renderTokens(stmtTokens(s)));
-        if (/\bOCCURS\b|WITH\s+HEADER\s+LINE/.test(t)) {
-          this.refuse(s, "a table with a header line (OCCURS / WITH HEADER LINE) - not allowed in classes; declare the table and a work area of its own");
-          return;
-        }
         if (GUI_CONTROL.test(lc(t))) {
           this.refuse(s, "SAP GUI controls (cl_gui_*) need a dynpro container - use alv( ) or an abap2UI5 view");
           return;
@@ -2199,7 +2313,9 @@ class Converter {
         const ov = this.rewrites(s, b.ctx);
         this.likeToType(s, ov);
         this.tableKey(s, ov);
+        const after = b.localWa.has(name) ? this.headerDecl(s, ov, { wa: b.localWa.get(name) }) : [];
         out.push(`${renderTokens(stmtTokens(s), ov, s.getColon()).replace(/^(\w+)(\s*):\s*/, "$1 ")}.`);
+        out.push(...after);
         return;
       }
       default:
@@ -2233,11 +2349,37 @@ class Converter {
     out.push(`${text}.`);
   }
 
-  /** a statement that names a select-option or RANGES table alone - its
-   *  header line is written by headerLine( ) */
+  /** whether `n` names a table with a header line in the body being written:
+   *  a global one (a select-option, RANGES, a DATA with OCCURS or WITH
+   *  HEADER LINE) not shadowed by a local, a FORM's own, or a TABLES
+   *  parameter used with its header line */
+  hasHeader(n) {
+    const b = this.currentBody;
+    if (b?.localWa?.has(n) || b?.headerParams?.has(n)) return true;
+    return this.headerTables.has(n) && !this.currentLocals?.has(n);
+  }
+
+  /** a DATA table with a header line (not a select-option or RANGES, whose
+   *  bare name stays the range table: `x IN s_id`, `lines( s_id )`) */
+  isDataHeader(n) {
+    const b = this.currentBody;
+    if (b?.localWa?.has(n) || b?.headerParams?.has(n)) return true;
+    return this.globalHeader.has(n) && !this.currentLocals?.has(n);
+  }
+
+  /** the work area that stands for the header line of `tab` in body `b` */
+  headerWa(b, tab) {
+    if (b.localWa?.has(tab)) return b.localWa.get(tab);
+    const global = this.globalHeader.get(tab);
+    if (global && !this.currentLocals?.has(tab)) return global.wa;
+    return this.useWa(b.ctx.method, tab);
+  }
+
+  /** a statement that names a table with a header line alone - its header
+   *  line is written by headerLine( ) */
   headerLineTouches(s) {
     const names = stmtTokens(s).map((t) => lc(t.getStr()));
-    return names.some((n, i) => this.headerTables.has(n) && !this.currentLocals.has(n) && names[i + 1] !== "-"
+    return names.some((n, i) => this.hasHeader(n) && names[i + 1] !== "-"
       && (i === 0 || !["-", "->", "=>", "~"].includes(names[i - 1])));
   }
 
@@ -2258,6 +2400,7 @@ class Converter {
       if (line.length <= 120) return line;
     }
     const lines = [`${prefix}:`];
+    const after = [];
     let depth = 1;
     group.forEach((s, idx) => {
       const k = kind(s);
@@ -2265,11 +2408,13 @@ class Converter {
       const ov = this.rewrites(s, b.ctx, b);
       this.likeToType(s, ov);
       this.tableKey(s, ov);
+      const name = lc(declName(s) ?? "");
+      if (k === "Data" && b.localWa?.has(name)) after.push(...this.headerDecl(s, ov, { wa: b.localWa.get(name) }));
       const pad = "  ".repeat(depth);
       lines.push(`${pad}${renderTokens(partTokens(s), ov).replace(/\n/g, `\n${pad}`)}${idx === group.length - 1 ? "." : ","}`);
       if (/Begin$/.test(k)) depth++;
     });
-    return lines.join("\n");
+    return [...lines, ...after].join("\n");
   }
 
   addPrelude(method, line) {
@@ -2286,20 +2431,22 @@ class Converter {
     return wa;
   }
 
-  /** APPEND s. / CLEAR s. / REFRESH s. / LOOP AT s. / READ TABLE s ... of a
-   *  table with header line - true when the statement was written here */
+  /** APPEND s. / CLEAR s. / REFRESH s. / LOOP AT s. / READ TABLE s ... /
+   *  MODIFY s. / INSERT s. / COLLECT s. of a table with header line - true
+   *  when the statement was written here */
   headerLine(s, b) {
     const k = kind(s);
     const toks = stmtTokens(s);
     const names = toks.map((t) => lc(t.getStr()));
-    const tab = names.find((n, i) => this.headerTables.has(n) && !this.currentLocals.has(n) && (i === 0 || !["-", "->", "=>", "~"].includes(names[i - 1])));
+    const tab = names.find((n, i) => this.hasHeader(n) && (i === 0 || !["-", "->", "=>", "~"].includes(names[i - 1])));
     if (!tab) return false;
     const ov = this.rewrites(s, b.ctx, b);
     const text = () => renderTokens(toks, ov, s.getColon()).replace(/^([\w-]+)(\s*):\s*/, "$1 ");
     const has = (...w) => w.some((x) => names.includes(x));
+    const wa = () => this.headerWa(b, tab);
     if (k === "Append" && names.length === 2 && names[1] === tab) {
-      b.out.push(`APPEND ${this.useWa(b.ctx.method, tab)} TO ${tab}.`);
-      this.map(s, `\`APPEND ls_${tab} TO ${tab}\` - the header line is a work area`);
+      b.out.push(`APPEND ${wa()} TO ${tab}.`);
+      this.map(s, `\`APPEND ${wa()} TO ${tab}\` - the header line is a work area`);
       return true;
     }
     if (k === "Refresh" && names.length === 2 && names[1] === tab) {
@@ -2307,23 +2454,42 @@ class Converter {
       return true;
     }
     if (k === "Clear" && names.length === 2 && names[1] === tab) {
-      b.out.push(`CLEAR ${this.useWa(b.ctx.method, tab)}.`);
-      this.map(s, `\`CLEAR ls_${tab}\` - the header line is a work area`);
+      b.out.push(`CLEAR ${wa()}.`);
+      this.map(s, `\`CLEAR ${wa()}\` - the header line is a work area`);
       return true;
     }
     if ((k === "Loop" || k === "ReadTable") && !has("into", "assigning", "reference", "transporting")) {
       const src = child(s, k === "Loop" ? "LoopSource" : "SimpleSource2");
       if (src && lc(nodeText(src)) === tab) {
         const last = src.getLastToken();
-        const wa = this.useWa(b.ctx.method, tab);
-        if (k === "Loop") ov.set(key(last), `${last.getStr()} INTO ${wa}`);
-        b.out.push(k === "Loop" ? `${text()}.` : `${text()} INTO ${wa}.`);
-        this.map(s, `\`INTO ls_${tab}\` - the header line is a work area`);
+        if (k === "Loop") ov.set(key(last), `${last.getStr()} INTO ${wa()}`);
+        b.out.push(k === "Loop" ? `${text()}.` : `${text()} INTO ${wa()}.`);
+        this.map(s, `\`INTO ${wa()}\` - the header line is a work area`);
         return true;
       }
     }
-    if (["Append", "InsertInternal", "ModifyInternal", "Collect"].includes(k) && names.length === 2) {
-      this.refuse(s, `${uc(names[0])} ${tab} - the header line of ${tab} is not converted here; use a work area`);
+    // COLLECT itab. -> COLLECT wa INTO itab.
+    if (k === "Collect" && names.length === 2 && names[1] === tab) {
+      b.out.push(`COLLECT ${wa()} INTO ${tab}.`);
+      this.map(s, `\`COLLECT ${wa()} INTO ${tab}\` - the header line is a work area`);
+      return true;
+    }
+    // MODIFY itab [INDEX n] [TRANSPORTING ...]. -> MODIFY itab FROM wa ... (the
+    // short form in a LOOP changes the current line, as it did)
+    if (k === "ModifyInternal" && names[1] === tab && !has("from")) {
+      ov.set(key(toks[1]), `${tab} FROM ${wa()}`);
+      b.out.push(`${text()}.`);
+      this.map(s, `\`MODIFY ${tab} FROM ${wa()}\` - the header line is a work area`);
+      return true;
+    }
+    // INSERT itab [INDEX n]. -> INSERT wa INTO itab INDEX n (the short form
+    // in a LOOP inserts before the current line: INDEX sy-tabix; the parser
+    // reads the bare `INSERT itab.` as a database insert)
+    if ((k === "InsertInternal" || (k === "InsertDatabase" && names.length === 2)) && names[1] === tab && !has("into", "lines")) {
+      const at = names.indexOf("index");
+      const index = at >= 0 ? renderTokens(toks.slice(at + 1), ov) : (b.loopDepth > 0 ? "sy-tabix" : undefined);
+      b.out.push(index ? `INSERT ${wa()} INTO ${tab} INDEX ${index}.` : `INSERT ${wa()} INTO TABLE ${tab}.`);
+      this.map(s, `\`INSERT ${wa()} INTO ${tab}\` - the header line is a work area`);
       return true;
     }
     return false;
@@ -2357,7 +2523,10 @@ class Converter {
     for (let i = 0; i < toks.length; i++) {
       const t = lc(toks[i].getStr());
       const prev = i > 0 ? toks[i - 1].getStr() : "";
-      const component = prev === "-" || prev === "->" || prev === "=>" || prev === "~";
+      // a component follows a Dash that touches its neighbours (wa-f); a
+      // subtraction's dash has blanks around it (WDashW) and the name after
+      // it is an operand of its own
+      const component = (prev === "-" && toks[i - 1].constructor.name === "Dash") || prev === "->" || prev === "=>" || prev === "~";
       if (component) continue;
       const next = toks[i + 1]?.getStr();
       const next2 = lc(toks[i + 2]?.getStr() ?? "");
@@ -2400,12 +2569,12 @@ class Converter {
         ov.set(key(toks[i + 1]), null);
         ov.set(key(toks[i + 2]), null);
       }
-      if (b && this.headerTables.has(t) && !this.currentLocals.has(t)) {
-        if (next === "-") ov.set(key(toks[i]), this.useWa(b.ctx.method, t));
-        if (next === "[" && toks[i + 2]?.getStr() === "]") {
+      if (b && this.hasHeader(t)) {
+        if (next === "-") ov.set(key(toks[i]), this.headerWa(b, t));
+        else if (next === "[" && toks[i + 2]?.getStr() === "]") {
           ov.set(key(toks[i + 1]), null);
           ov.set(key(toks[i + 2]), null);
-        }
+        } else if (this.isDataHeader(t) && headerLineContext(s, toks, i)) ov.set(key(toks[i]), this.headerWa(b, t));
       }
       if (b && b.screenLoopDepth >= 0 && t === "screen" && next === "-") {
         ov.set(key(toks[i]), b.screenWa);
@@ -3147,6 +3316,52 @@ const sameColon = (a, b) => {
 };
 
 const findTo = (s) => children(s, "Target").length > 0;
+
+/** whether a DATA / TYPES declaration has OCCURS or WITH HEADER LINE -
+ *  for the END OF of a BEGIN OF ... OCCURS, `begin` says so */
+export function hasHeaderLine(s, begin) {
+  const k = kind(s);
+  if (k === "DataEnd") return begin !== undefined && begin.name === lc(declName(s) ?? "");
+  const w = stmtTokens(s).map((t) => uc(t.getStr()));
+  return w.includes("OCCURS") || w.some((x, i) => x === "WITH" && w[i + 1] === "HEADER" && w[i + 2] === "LINE");
+}
+
+/**
+ * Whether the bare name of a table with a header line at toks[i] means the
+ * header line: as the target or source of a MOVE, in a MOVE-CORRESPONDING,
+ * as the INTO of a SELECT that is not INTO TABLE, as the FROM of a database
+ * INSERT / UPDATE / MODIFY, as a USING or CHANGING of a PERFORM (TABLES
+ * passes the table), in a WRITE, a condition, or LIKE it in a declaration
+ * (LIKE LINE OF names the table). Everywhere else - LOOP AT, READ TABLE,
+ * SORT, DESCRIBE, the TABLES of a PERFORM or a function - the name is the
+ * table, as it is in a class.
+ */
+function headerLineContext(s, toks, i) {
+  const k = kind(s);
+  const w = toks.map((t) => lc(t.getStr()));
+  const prev = w[i - 1];
+  const prev2 = w[i - 2];
+  if (w[i + 1] === "[" || (prev === "of" && prev2 === "line") || prev === "in" || (prev === "(" && prev2 === "lines")) return false;
+  if (["Move", "MoveCorresponding", "Write", "If", "ElseIf", "Check", "While"].includes(k)) return true;
+  if ((k === "Select" || k === "SelectLoop") && (prev === "into" || (prev === "of" && prev2 === "fields")) && w[i - 1] !== "table") return true;
+  if (["InsertDatabase", "UpdateDatabase", "ModifyDatabase"].includes(k) && prev === "from") return true;
+  if (k === "Perform") {
+    for (let j = i - 1; j > 0; j--) {
+      if (w[j] === "tables") return false;
+      if (w[j] === "using" || w[j] === "changing") return true;
+    }
+    return false;
+  }
+  if (["Data", "Type", "Constant", "FieldSymbol", "Static"].includes(k) && prev === "like") return true;
+  return false;
+}
+
+/** drops the word and the n tokens after it from the rendering */
+function dropWords(toks, w, ov, word, n) {
+  const at = w.indexOf(word);
+  if (at < 0) return;
+  for (const t of toks.slice(at, at + 1 + n)) ov.set(key(t), null);
+}
 
 /** the name a declaration declares */
 export function declName(s) {
