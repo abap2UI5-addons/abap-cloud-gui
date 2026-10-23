@@ -39,10 +39,18 @@ export function corpus() {
   });
 }
 
+let known;
+/** the class of every corpus report, by program name - what a SUBMIT starts */
+function classes() {
+  known ??= new Map(corpus().map((e) => [e.name, e.className]));
+  return known;
+}
+
 /** the conversion of a corpus report, and its migration report */
 export function convertEntry(entry) {
   const result = convert(entry.source, {
     file: entry.file, className: entry.className, programName: entry.name, textpool: entry.textpool, origin: entry.includes?.origin,
+    classFor: (program) => classes().get(program),
   });
   const report = migrationReport(result, { source: entry.file, texts: entry.texts, includes: entry.includes });
   return { result, report };

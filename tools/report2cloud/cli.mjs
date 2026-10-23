@@ -15,7 +15,7 @@
 // statements marked). 1: wrong call.
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
-import { convert } from "./lib/convert.mjs";
+import { convert, defaultClassName } from "./lib/convert.mjs";
 import { includesFrom, inlineIncludes } from "./lib/includes.mjs";
 import { parseTextpool } from "./lib/textpool.mjs";
 import { migrationReport } from "./lib/report.mjs";
@@ -72,7 +72,8 @@ async function main() {
     return 1;
   }
   const dirs = [dirname(file), ...(opts.includes ? [resolve(opts.includes)] : [])];
-  const includes = inlineIncludes(readFileSync(file, "utf8"), { file, read: includesFrom(dirs) });
+  const read = includesFrom(dirs);
+  const includes = inlineIncludes(readFileSync(file, "utf8"), { file, read });
   const source = includes.source;
   const sibling = file.replace(/\.abap$/i, ".xml");
   const texts = opts.texts ?? (sibling !== file && existsSync(sibling) ? sibling : undefined);
@@ -84,6 +85,9 @@ async function main() {
     programName: m ? m[1].replace(/#/g, "/") : undefined,
     textpool,
     origin: includes.origin,
+    // a report beside the input (or under --includes) is one to convert as
+    // well - a SUBMIT of it starts the class report2cloud names it
+    classFor: (program) => (read(program) !== undefined ? defaultClassName(program) : undefined),
   });
 
   // a position in an include names the include's file, beside the report
