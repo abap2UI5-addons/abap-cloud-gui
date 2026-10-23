@@ -19,11 +19,11 @@ A refused statement has no counterpart in an abap-cloud-gui report. The converte
 | [LEAVE PROGRAM, LEAVE TO TRANSACTION, LEAVE TO SCREEN](#leave) | `leave` |
 | [PERFORM of another program, dynamic or ON COMMIT](#perform-foreign) | `perform-foreign` |
 | [PERFORM that does not fit its FORM](#perform-mismatch) | `perform-mismatch` |
-| [A name of the runtime: a global named like a component of z2ui5_cl_cgui_report](#reserved-name) | `reserved-name` |
+| [A name of the runtime: a parameter named like a component of z2ui5_cl_cgui_report](#reserved-name) | `reserved-name` |
 | [A local class that writes the list or uses the report's globals](#local-class) | `local-class` |
 | [HIDE that cannot be restored](#hide) | `hide` |
 | [MESSAGE without a message class, MESSAGE ... RAISING](#message) | `message` |
-| [LOOP AT SCREEN outside of AT SELECTION-SCREEN OUTPUT, or with a field symbol](#screen-loop) | `screen-loop` |
+| [LOOP AT SCREEN nested, with a field symbol, or with a screen field the runtime does not know](#screen-loop) | `screen-loop` |
 | [TOP-OF-PAGE and END-OF-PAGE with logic, or twice](#page-events) | `page-events` |
 | [AT SELECTION-SCREEN ON ... of a field, block or group that does not exist](#selscreen-event-field) | `selscreen-event-field` |
 | [An inline declaration of an event block, used in another one, of a type that cannot be told](#inline-global) | `inline-global` |
@@ -259,13 +259,13 @@ Make the PERFORM match its FORM: the same number of parameters in `TABLES`, `USI
 
 <a id="reserved-name"></a>
 
-## A name of the runtime: a global named like a component of z2ui5_cl_cgui_report
+## A name of the runtime: a parameter named like a component of z2ui5_cl_cgui_report
 
-**Why.** Every global of the report becomes an attribute of the class, which inherits from `z2ui5_cl_cgui_report`. A global with the name of one of its methods or attributes (`list`, `message`, `alv`, `client`, ...) would collide.
+**Why.** Every global of the report becomes an attribute of the class, which inherits from `z2ui5_cl_cgui_report`. A global with the name of one of its methods or attributes (`list`, `message`, `alv`, `client`, ...) would collide. A global `DATA` or `CONSTANTS` is renamed by the converter (`message` becomes `gv_message`, the migration report says so); a parameter or select-option is not - the text pool and every `SUBMIT ... WITH` know its name.
 
 **Rewrite.**
 
-Rename the global in the report, then convert again - for example `list` to `gt_list`.
+Rename the parameter in the report and in its selection texts, then convert again - for example `list` to `p_list`.
 
 <a id="local-class"></a>
 
@@ -321,9 +321,9 @@ MESSAGE e001(zflights).
 
 <a id="screen-loop"></a>
 
-## LOOP AT SCREEN outside of AT SELECTION-SCREEN OUTPUT, or with a field symbol
+## LOOP AT SCREEN nested, with a field symbol, or with a screen field the runtime does not know
 
-**Why.** `LOOP AT SCREEN` becomes `screen->loop_at_screen( )` in `at_selection_screen_output( screen )`, the only place the runtime offers the screen. It knows `name`, `group1`, `input`, `invisible`, `active`, `required`, `intensified` and `length`.
+**Why.** `LOOP AT SCREEN` becomes `screen->loop_at_screen( )` in `at_selection_screen_output( screen )` and in the FORMs it performs; in a method of a local class and in other event blocks it is `current_screen( )->loop_at_screen( )` - the screen of AT SELECTION-SCREEN OUTPUT while it runs, elsewhere one built afresh whose changes are not shown. One loop at a time, into a work area. The screen knows `name`, `group1`, `input`, `invisible`, `active`, `required`, `intensified` and `length`.
 
 **Rewrite.**
 
@@ -352,11 +352,11 @@ Compute what the header needs before the list starts, keep it in a global, and w
 
 ## AT SELECTION-SCREEN ON ... of a field, block or group that does not exist
 
-**Why.** The events of the selection screen are methods with a `CASE` on the field, block or group. One that names nothing on the screen has no `WHEN`; a select-option has one F4 and one F1 for LOW and HIGH together.
+**Why.** The events of the selection screen are methods with a `CASE` on the field, block or group. One that names nothing on the screen has no `WHEN`. A select-option has one F4 for `-LOW` and one for `-HIGH` (`value_request_part( )` tells them apart in one `WHEN`), and one F1 for both.
 
 **Rewrite.**
 
-Correct the name, or merge the two blocks of `-LOW` and `-HIGH` into one.
+Correct the name, or merge the blocks of the same field (two F4 of `-LOW`, two F1) into one.
 
 <a id="inline-global"></a>
 
@@ -465,7 +465,7 @@ ENDIF.
 
 ## ALV function modules and SALV calls without a counterpart
 
-**Why.** `REUSE_ALV_GRID_DISPLAY` / `REUSE_ALV_LIST_DISPLAY` with `TABLES t_outtab` and `CL_SALV_TABLE` become `alv( )`. A hierarchical list, the ALV popup, the other `REUSE_ALV_*` and `LVC_*` modules and a USER_COMMAND callback that reads more than the row (`rs_selfield-tabindex`) have no counterpart.
+**Why.** `REUSE_ALV_GRID_DISPLAY` / `REUSE_ALV_LIST_DISPLAY` with `TABLES t_outtab` and `CL_SALV_TABLE` become `alv( )`. A hierarchical list, the ALV popup, the other `REUSE_ALV_*` and `LVC_*` modules and a USER_COMMAND callback that reads more than the row (`rs_selfield-tabindex`), the column of a hotspot (`-fieldname`) and its cell (`-value`) have no counterpart - `-refresh` and the stable flags are dropped, the ALV is drawn anew on every roundtrip.
 
 **Rewrite.**
 
@@ -504,7 +504,7 @@ Read the values into an internal table and call `F4IF_INT_TABLE_VALUE_REQUEST` w
 
 ## Reading and writing dynpro fields: DYNP_VALUES_*, RS_REFRESH_FROM_SELECTOPTIONS
 
-**Why.** On the selection screen of the runtime the fields are the attributes of the class: they hold what the user entered on every roundtrip, so there is nothing to read from the screen.
+**Why.** On the selection screen of the runtime the fields are the attributes of the class: they hold what the user entered on every roundtrip, so there is nothing to read from the screen. `DYNP_VALUES_READ` and `DYNP_VALUES_UPDATE` with `TABLES dynpfields` are converted - every field name of the table is assigned dynamically (`ASSIGN (fieldname)`); without the table, and `RS_REFRESH_FROM_SELECTOPTIONS`, are not.
 
 **Rewrite.**
 

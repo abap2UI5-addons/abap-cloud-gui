@@ -588,6 +588,19 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
     "! LEAVE TO LIST-PROCESSING's way back - show the selection screen again
     METHODS leave_to_selection_screen.
 
+    "! the selection screen LOOP AT SCREEN changes outside of
+    "! at_selection_screen_output( screen ) - in a FORM or a method of a
+    "! local class called from there it is that screen; elsewhere (AT
+    "! SELECTION-SCREEN, START-OF-SELECTION) a screen built afresh, whose
+    "! changes are not shown - as MODIFY SCREEN outside of PBO is not
+    METHODS current_screen
+      RETURNING
+        VALUE(result) TYPE REF TO z2ui5_cl_cgui_selscreen.
+
+    "! the screen of at_selection_screen_output( ) while it runs - cleared
+    "! after it, so no roundtrip carries it
+    DATA mo_cgui_screen TYPE REF TO z2ui5_cl_cgui_selscreen.
+
     "! WINDOW STARTING AT x1 y1 ENDING AT x2 y2 - in at_line_selection( ):
     "! the secondary list is shown in a dialog box above the list it comes
     "! from. columns and lines - ENDING AT minus STARTING AT - size the box,
@@ -4320,6 +4333,17 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
 
   ENDMETHOD.
 
+  METHOD current_screen.
+
+    IF mo_cgui_screen IS BOUND.
+      result = mo_cgui_screen.
+      RETURN.
+    ENDIF.
+    result = z2ui5_cl_cgui_selscreen=>factory( client ).
+    selection_screen( result ).
+
+  ENDMETHOD.
+
   METHOD call_selection_screen.
 
     mv_cgui_dynnr = dynnr.
@@ -5017,7 +5041,9 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
         screen->set_listbox_values( name   = lr_vrm->name
                                     values = lr_vrm->values ).
       ENDLOOP.
+      mo_cgui_screen = screen.
       at_selection_screen_output( screen ).
+      CLEAR mo_cgui_screen.
       variant_attributes_apply( screen ).
       value_state_set( screen ).
       mt_cgui_field = screen->get_fields( ).

@@ -104,8 +104,8 @@ const REFUSED_FUNCTIONS = {
   WS_UPLOAD: "WS_UPLOAD reads from the SAP GUI frontend",
   F4IF_FIELD_VALUE_REQUEST: "F4IF_FIELD_VALUE_REQUEST calls a search help; answer F4 with value_help_popup( ) on a table",
   RS_REFRESH_FROM_SELECTOPTIONS: "RS_REFRESH_FROM_SELECTOPTIONS reads dynpro fields; the attributes hold the values",
-  DYNP_VALUES_READ: "DYNP_VALUES_READ reads dynpro fields; the attributes hold the values",
-  DYNP_VALUES_UPDATE: "DYNP_VALUES_UPDATE writes dynpro fields; set the attributes instead",
+  DYNP_VALUES_READ: "DYNP_VALUES_READ without TABLES dynpfields - the attributes hold the values",
+  DYNP_VALUES_UPDATE: "DYNP_VALUES_UPDATE without TABLES dynpfields - set the attributes instead",
   BDC_OPEN_GROUP: "batch input sessions have no counterpart on ABAP Cloud",
   BDC_INSERT: "batch input sessions have no counterpart on ABAP Cloud",
   BDC_CLOSE_GROUP: "batch input sessions have no counterpart on ABAP Cloud",
@@ -163,6 +163,7 @@ const ICONS = {
 const LVC_TYPES = {
   lvc_t_row: "z2ui5_cl_cgui_alv=>ty_t_lvc_row", lvc_s_row: "z2ui5_cl_cgui_alv=>ty_s_lvc_row",
   lvc_t_roid: "z2ui5_cl_cgui_alv=>ty_t_lvc_roid", lvc_s_roid: "z2ui5_cl_cgui_alv=>ty_s_lvc_roid",
+  lvc_s_col: "z2ui5_cl_cgui_alv=>ty_s_lvc_col",
 };
 
 // the statements that open and close a block
@@ -194,7 +195,8 @@ const BASE_METHODS = ["cgui_run_in_background",
   "message_t100", "messages_from_bapiret", "popup_to_confirm", "popup_to_decide",
   "popup_get_values", "popup_get_values_sval", "popup_values_sval", "popup_answer", "popup_values", "value_help_popup", "vrm_set_values",
   "leave_to_selection_screen", "window", "call_selection_screen", "submit", "set_parameter_id", "get_parameter_id",
-  "set_line_count", "set_pf_status", "set_title", "set_variant", "set_variant_store", "set_layout_store", "get_link"];
+  "set_line_count", "set_pf_status", "set_title", "set_variant", "set_variant_store", "set_layout_store", "get_link",
+  "current_screen"];
 export const RESERVED_METHODS = new Set([...BASE_METHODS, "client", "cs_ucomm", "z2ui5_if_app~main", "main",
   "at_selection_screen_ucomm", "constructor"]);
 
@@ -290,6 +292,63 @@ class Converter {
     this.registry = reg;
   }
 
+  /**
+   * A global DATA or CONSTANTS named like a component of the report class -
+   * MESSAGE, LIST - becomes an attribute of that name, which the class
+   * cannot have. It is renamed in the source before the conversion: the
+   * declaration and every field of that name, not a component (wa-message),
+   * not a keyword. Parameters and select-options keep their names - the
+   * text pool and SUBMIT ... WITH know them - and are refused later.
+   * Returns whether the source was changed.
+   */
+  renameReserved() {
+    const scope = new Set();
+    let depth = 0;
+    for (const s of this.stmts) {
+      const k = kind(s);
+      if (["Form", "MethodImplementation", "FunctionModule", "ClassImplementation", "ClassDefinition", "Interface"].includes(k)) depth++;
+      if (["EndForm", "EndMethod", "EndFunction", "EndClass", "EndInterface"].includes(k)) depth = Math.max(0, depth - 1);
+      if (depth || !["Data", "DataBegin", "Constant", "ConstantBegin"].includes(k)) continue;
+      const name = lc(declName(s) ?? "");
+      if (RESERVED_METHODS.has(name)) scope.add(name);
+    }
+    if (!scope.size) return false;
+    const taken = new Set(this.stmts.flatMap((s) => stmtTokens(s).map((t) => lc(t.getStr()))));
+    const renamed = new Map();
+    for (const n of scope) {
+      let to = `gv_${n}`.slice(0, 30);
+      for (let i = 2; taken.has(to); i++) to = `gv_${n}${i}`.slice(0, 30);
+      taken.add(to);
+      renamed.set(n, to);
+    }
+    const edits = [];
+    for (const s of this.stmts) {
+      const parents = tokenParents(s);
+      const toks = stmtTokens(s);
+      toks.forEach((t, i) => {
+        const to = renamed.get(lc(t.getStr()));
+        if (!to) return;
+        const prev = toks[i - 1];
+        if (prev && (["->", "=>", "~"].includes(prev.getStr()) || (prev.getStr() === "-" && prev.constructor.name === "Dash"))) return;
+        if (!["Field", "DefinitionName", "FieldSub", "SimpleFieldChain", "FieldChain", "Source", "Target"].includes(parents.get(key(t)))) return;
+        edits.push({ row: t.getRow(), col: t.getCol(), len: t.getStr().length, to });
+      });
+    }
+    if (!edits.length) return false;
+    const lines = this.source.split("\n");
+    edits.sort((a, b) => b.row - a.row || b.col - a.col);
+    for (const e of edits) {
+      const l = lines[e.row - 1];
+      lines[e.row - 1] = l.slice(0, e.col - 1) + e.to + l.slice(e.col - 1 + e.len);
+    }
+    this.source = lines.join("\n");
+    this.lines = lines;
+    for (const [from, to] of renamed) {
+      this.note(`the global ${uc(from)} is the name of a component of z2ui5_cl_cgui_report - renamed to ${to}`);
+    }
+    return true;
+  }
+
   /** the types abaplint's syntax check gives the variables of the program
    *  scope (name -> abaplint type) - for the inline declarations of the
    *  event blocks; an unknown dependency gives a void type */
@@ -326,9 +385,18 @@ class Converter {
       for (const s of e.stmts) for (const d of findAll(s, "InlineData")) inEvents.push({ e, s, d, name: lc(d.getTokens()[2]?.getStr() ?? "") });
     }
     if (!inEvents.length) return;
+    // a read of the field - not a keyword of the same name (CLASS, METHODS),
+    // and not in a FORM or local class that declares a field of its own
+    const reads = (x, name) => {
+      const parents = tokenParents(x);
+      return stmtTokens(x).some((t) => lc(t.getStr()) === name && parents.get(key(t)) === "Field");
+    };
+    const declares = (list, name) => list.some((x) => findAll(x, "InlineData").some((d) => lc(d.getTokens()[2]?.getStr() ?? "") === name) ||
+      (kind(x) === "Data" && lc(findAll(x, "DefinitionName")[0]?.getFirstToken().getStr() ?? "") === name));
     const elsewhere = (e, name) => {
-      const units = [...this.events.filter((x) => x !== e).map((x) => x.stmts), ...this.forms.map((f) => f.body), ...this.locals.map((u) => u.stmts)];
-      return units.some((list) => list.some((x) => x.getTokens().some((t) => lc(t.getStr()) === name)));
+      const own = [...this.forms.map((f) => f.body), ...this.locals.map((u) => u.stmts)].filter((list) => !declares(list, name));
+      const units = [...this.events.filter((x) => x !== e).map((x) => x.stmts), ...own];
+      return units.some((list) => list.some((x) => reads(x, name)));
     };
     for (const v of inEvents) {
       if (!v.name || this.hoisted.has(v.name) || this.globalData.has(v.name) || !elsewhere(v.e, v.name)) continue;
@@ -358,7 +426,13 @@ class Converter {
     if (!t) return undefined;
     const cls = t.constructor.name;
     if (["VoidType", "UnknownType", "GenericObjectReferenceType", "AnyType", "DataType", "SimpleType"].includes(cls)) return undefined;
-    const abap = t.toABAP?.();
+    let abap;
+    try {
+      abap = t.toABAP?.();
+    } catch {
+      // a type of an unknown dependency deeper inside - a table of it
+      return undefined;
+    }
     if (!abap || /todo|check_syntax|\bSELECT_/i.test(abap)) return undefined;
     if (cls === "ObjectReferenceType" || cls === "DataReference") return `TYPE ${abap}`;
     return `TYPE ${abap}`;
@@ -366,6 +440,7 @@ class Converter {
 
   run() {
     this.parse();
+    if (this.renameReserved()) this.parse();
     this.segment();
     if (!this.programName && this.header) this.programName = lc(this.header.name);
     this.programName = this.programName ?? "zreport";
@@ -476,7 +551,12 @@ class Converter {
         // global in a report, wherever it stands - a run of BEGIN OF ... END
         // OF is taken as a whole
         const end = this.declEnd(i);
-        for (let j = i; j <= end; j++) this.decls.push(this.stmts[j]);
+        // the same DATA x TYPE t in two event blocks declares the one global
+        // twice - kept once, an attribute can be declared once only
+        const text = (x) => renderTokens(stmtTokens(x)).replace(/\s+/g, " ").toLowerCase();
+        const again = end === i && k === "Data" && this.decls.some((x) => kind(x) === "Data" && text(x) === text(s));
+        if (!again) for (let j = i; j <= end; j++) this.decls.push(this.stmts[j]);
+        else this.note(`DATA ${lc(declName(s) ?? "")} is declared twice the same way - an attribute of the class once`);
         i = end;
         pendingComments = [];
         continue;
@@ -865,6 +945,9 @@ class Converter {
         continue;
       }
       let m = /^([\w/]+)\s*-\s*(\w+)\s*=\s*(.+)$/.exec(toks.join(" "));
+      // MOVE 'X' TO wa-function - the same as wa-function = 'X'
+      const mv = /^MOVE\s+(.+?)\s+TO\s+([\w/]+)\s*-\s*(\w+)$/i.exec(toks.join(" "));
+      if (mv) m = [mv[0], mv[2], mv[3], mv[1]];
       if (k === "Move" && m) {
         const cur = was.get(lc(m[1])) ?? {};
         cur[lc(m[2])] = m[3].trim();
@@ -923,7 +1006,29 @@ class Converter {
       for (const [re, to] of renames) t = t.replace(re, to);
       out.push(t);
     }
-    const left = h.params.filter((p) => p !== "sender" && out.some((l) => new RegExp(`\\b${p}\\b`, "i").test(l)));
+    // the row and column structures of the event, used as a whole (passed
+    // to a FORM, CASE e_column_id): rebuilt from row and column
+    const column = ctx.method === "at_link_click" ? "column" : undefined;
+    const rebuilt = {
+      e_row: `z2ui5_cl_cgui_alv=>ty_s_lvc_row( index = row )`, e_row_id: `z2ui5_cl_cgui_alv=>ty_s_lvc_row( index = row )`,
+      es_row_no: `z2ui5_cl_cgui_alv=>ty_s_lvc_roid( row_id = row )`,
+      ...(ctx.method === "at_user_command" ? {} : {
+        e_column: `z2ui5_cl_cgui_alv=>ty_s_lvc_col( ${column ? `fieldname = ${column} ` : ""})`,
+        e_column_id: `z2ui5_cl_cgui_alv=>ty_s_lvc_col( ${column ? `fieldname = ${column} ` : ""})`,
+      }),
+    };
+    if (ctx.method === "at_user_command") {
+      delete rebuilt.e_row;
+      delete rebuilt.e_row_id;
+      delete rebuilt.es_row_no;
+    }
+    const used = (p) => out.some((l) => new RegExp(`\\b${p}\\b`, "i").test(l));
+    const decls = h.params.filter((p) => rebuilt[p] && used(p)).map((p) => `DATA(${p}) = VALUE ${rebuilt[p]}.`);
+    if (!column && h.params.some((p) => /^e_column(_id)?$/.test(p) && used(p))) {
+      this.todo(h.stmt, `${h.method}: the column of a double click is not known - e_column-fieldname is empty; a HOTSPOT_CLICK handler has it`);
+    }
+    out.unshift(...decls);
+    const left = h.params.filter((p) => p !== "sender" && !rebuilt[p] && used(p));
     if (left.length) this.refuse(h.stmt, `${h.method}: ${left.join(", ")} ${left.length > 1 ? "have" : "has"} no counterpart in ${ctx.method}( ) - it knows ${ctx.method === "at_user_command" ? "ucomm" : ctx.method === "at_link_click" ? "row and column" : "the row"} only`);
     if (h.params.includes("sender") && out.some((l) => /\bsender\b/i.test(l))) this.refuse(h.stmt, `${h.method}: sender - the grid object has no counterpart`);
     return [`" the ${uc(h.event)} handler of the grid - ${h.cls}->${h.method}`, ...out];
@@ -1394,12 +1499,23 @@ class Converter {
           this.refuse(e.stmt, `ON VALUE-REQUEST FOR ${field} - no parameter or select-option of that name`);
           continue;
         }
-        if (valueRequest.some((v) => v.field === field)) {
-          this.refuse(e.stmt, `a second ON VALUE-REQUEST for ${field} - a select-option has one F4 for LOW and HIGH here`);
+        const part = m[2] === "-HIGH" ? "high" : "low";
+        const before = valueRequest.find((v) => v.field === field);
+        // FOR s-low and FOR s-high: one WHEN, value_request_part( ) tells them apart
+        if (before && (before.parts[part] || !this.selectOptions.has(lc(field)))) {
+          this.refuse(e.stmt, `a second ON VALUE-REQUEST for ${field} - a select-option has one F4 for LOW and one for HIGH`);
           continue;
         }
-        this.map(e.stmt, `\`at_value_request( field )\` - WHEN \`${field}\`, the field declared with value_help`);
-        valueRequest.push({ field, body: this.convertBody(e.stmts, { method: "at_value_request", valueRequest: true }) });
+        this.map(e.stmt, `\`at_value_request( field )\` - WHEN \`${field}\`, the field declared with value_help${before ? ", value_request_part( ) is HIGH or LOW" : ""}`);
+        const body = this.convertBody(e.stmts, { method: "at_value_request", valueRequest: true });
+        // s_x-low = value in the F4 of a select-option: the header line was
+        // the line on the screen - here a work area of the method
+        const so = lc(field);
+        if (this.selectOptions.has(so) && body.some((l) => new RegExp(`\\b\\w*${so}\\s*-\\s*(low|high)\\s*=`, "i").test(l))) {
+          this.todo(e.stmt, `ON VALUE-REQUEST FOR ${field}: ${so}-low / -high = ... wrote the line on the screen - here it is a work area of the method; pick the value with value_help_popup( ), which writes the field asked for`);
+        }
+        if (before) before.parts[part] = body;
+        else valueRequest.push({ field, parts: { [part]: body } });
       } else if ((m = /ON\s+BLOCK\s+([\w/]+)$/.exec(t))) {
         const block = m[1];
         if (!this.blocks.has(block)) {
@@ -1655,7 +1771,15 @@ class Converter {
     // AT SELECTION-SCREEN ON VALUE-REQUEST
     if (valueRequest.length) {
       const body = ["CASE field."];
-      for (const v of valueRequest) body.push(`  WHEN ${literal(v.field)}.`, ...v.body.map((l) => indent(l, 4)));
+      for (const v of valueRequest) {
+        body.push(`  WHEN ${literal(v.field)}.`);
+        if (v.parts.low && v.parts.high) {
+          body.push("    IF value_request_part( ) = z2ui5_cl_cgui_selscreen=>cs_part-high.", ...v.parts.high.map((l) => indent(l, 6)),
+            "    ELSE.", ...v.parts.low.map((l) => indent(l, 6)), "    ENDIF.");
+        } else {
+          body.push(...(v.parts.low ?? v.parts.high).map((l) => indent(l, 4)));
+        }
+      }
       body.push("  WHEN OTHERS.", "    super->at_value_request( field ).", "ENDCASE.");
       methods.push({ name: "at_value_request", body });
     }
@@ -1676,7 +1800,7 @@ class Converter {
         continue;
       }
       this.map(f.stmt, `private method \`${f.method}( )\``);
-      formMethods.push({ name: f.method, body: this.convertBody(f.body, { method: f.method, form: f }) });
+      formMethods.push({ name: f.method, body: this.convertBody(f.body, { method: f.method, form: f, screenEvent: this.screenForms().has(f.name) }) });
     }
     // AT PFnn without a status of the report's own: the keys on the toolbar
     // of the standard list status. With a SET PF-STATUS the report's status
@@ -1933,9 +2057,18 @@ class Converter {
         chain.push({ method: "select_option", params });
 
         heading("selection screen");
-        const root = forText.split("-")[0];
+        let forType = forText;
+        // FOR <fs>-comp: the type the field symbol is declared with - an
+        // attribute cannot be typed with a field symbol
+        const fs = /^(<[\w/]+>)(.*)$/.exec(forText);
+        if (fs) {
+          const decl = (this.globalFieldSymbols ?? []).find((x) => lc(declName(x) ?? "") === fs[1]);
+          const m = decl && /\b(TYPE|LIKE)\s+(?:REF\s+TO\s+)?([\w/~=>-]+)/i.exec(renderTokens(stmtTokens(decl)));
+          if (m) forType = `${lc(m[2])}${fs[2]}`;
+        }
+        const root = forType.split("-")[0];
         const like = this.globalData.has(root) && (!this.isTables(root) || this.tablesKept.has(root));
-        push(`DATA ${name} ${like ? "LIKE" : "TYPE"} RANGE OF ${forText}.`);
+        push(`DATA ${name} ${like ? "LIKE" : "TYPE"} RANGE OF ${forType}.`);
 
         const defNode = after(s, "DEFAULT");
         if (defNode) {
@@ -2563,6 +2696,27 @@ class Converter {
 
   // --------------------------------------------------------------- FORMs
 
+  /** the FORMs that loop at the screen - themselves or in a FORM they perform */
+  screenForms() {
+    if (this.screenFormSet) return this.screenFormSet;
+    const set = new Set();
+    const performs = (f) => f.body.filter((x) => kind(x) === "Perform").map((x) => child(x, "FormName")).filter(Boolean).map((n) => lc(nodeText(n)));
+    for (const f of this.forms) {
+      if (f.body.some((x) => kind(x) === "LoopAtScreen" || kind(x) === "ModifyScreen")) set.add(f.name);
+    }
+    for (let grown = true; grown;) {
+      grown = false;
+      for (const f of this.forms) {
+        if (!set.has(f.name) && performs(f).some((n) => set.has(n))) {
+          set.add(f.name);
+          grown = true;
+        }
+      }
+    }
+    this.screenFormSet = set;
+    return set;
+  }
+
   formSignature(f) {
     this.currentForm = f;
     const imp = [];
@@ -2580,6 +2734,10 @@ class Converter {
           const isData = this.globalData.has(root) && (!this.isTables(root) || this.tablesKept.has(root));
           if (!isData && !["line", "range", "ref"].includes(root)) ov.set(key(toks[0]), "TYPE");
         }
+        // the row and column types of the grid - a FORM a handler passes them to
+        toks.forEach((t, i) => {
+          if (i > 0 && LVC_TYPES[lc(t.getStr())]) ov.set(key(t), LVC_TYPES[lc(t.getStr())]);
+        });
         type = renderTokens(toks, ov).replace(/\s+/g, " ");
         // TABLES p TYPE ty_t names a table type of the report already - TYPE
         // structure or LIKE itab needs a table type of its own
@@ -2607,6 +2765,9 @@ class Converter {
       }
       if (p.kind === "tables") this.checkHeaderLine(f, p);
     }
+    // a FORM with LOOP AT SCREEN - called from AT SELECTION-SCREEN OUTPUT -
+    // changes the screen of at_selection_screen_output( screen ): it gets it
+    if (this.screenForms().has(f.name)) imp.unshift("screen TYPE REF TO z2ui5_cl_cgui_selscreen");
     const lines = [`    METHODS ${f.method}`];
     const section = (title, list) => {
       if (!list.length) return;
@@ -3399,9 +3560,16 @@ class Converter {
         this.perform(s, b);
         return;
       case "LoopAtScreen": {
-        if (!b.ctx.screenEvent || b.screenLoopDepth >= 0) {
-          this.refuse(s, "LOOP AT SCREEN outside of AT SELECTION-SCREEN OUTPUT - only the screen of at_selection_screen_output( screen ) can be changed; move the loop there");
+        if (b.screenLoopDepth >= 0) {
+          this.refuse(s, "LOOP AT SCREEN inside of LOOP AT SCREEN - the screen has one loop at a time");
           return;
+        }
+        // in a method of a local class, or an event block other than AT
+        // SELECTION-SCREEN OUTPUT: the screen of that event while it runs -
+        // elsewhere one built afresh, whose changes are not shown
+        b.screenSrc = b.ctx.screenEvent ? "screen" : "current_screen( )";
+        if (!b.ctx.screenEvent && !b.ctx.local) {
+          this.todo(s, "LOOP AT SCREEN outside of AT SELECTION-SCREEN OUTPUT - current_screen( ) is a screen built afresh here, its changes are not shown (as MODIFY SCREEN outside of PBO is not); move the loop to at_selection_screen_output( )");
         }
         const t = lc(renderTokens(stmtTokens(s)));
         const m = /into\s+(?:data\s*\(\s*)?([\w/]+)/.exec(t);
@@ -3421,7 +3589,7 @@ class Converter {
         const again = this.screenTabs.has(`${b.ctx.method}:${tab}`);
         this.screenTabs.add(`${b.ctx.method}:${tab}`);
         // a second LOOP AT SCREEN of the method reuses the table and the work area
-        out.push(again ? `${tab} = screen->loop_at_screen( ).` : `DATA(${tab}) = screen->loop_at_screen( ).`,
+        out.push(again ? `${tab} = ${b.screenSrc}->loop_at_screen( ).` : `DATA(${tab}) = ${b.screenSrc}->loop_at_screen( ).`,
           again ? `LOOP AT ${tab} INTO ${b.screenWa}.` : `LOOP AT ${tab} INTO DATA(${b.screenWa}).`);
         this.map(s, "`LOOP AT screen->loop_at_screen( ) INTO DATA(ls_screen)` - screen-* is ls_screen-*, '0'/'1' are abap_false/abap_true");
         return;
@@ -3433,7 +3601,7 @@ class Converter {
         }
         const t = lc(renderTokens(stmtTokens(s)));
         const m = /from\s+([\w/]+)/.exec(t);
-        out.push(`screen->modify_screen( ${m ? m[1] : b.screenWa} ).`);
+        out.push(`${b.screenSrc ?? "screen"}->modify_screen( ${m ? m[1] : b.screenWa} ).`);
         this.map(s, "`screen->modify_screen( ls_screen )`");
         return;
       }
@@ -3558,7 +3726,9 @@ class Converter {
       case "Select": case "SelectLoop": {
         if (k === "SelectLoop") b.loopDepth++;
         const t = uc(renderTokens(stmtTokens(s)));
-        if (!/\bINTO\b|\bAPPENDING\b/.test(t)) {
+        // SELECT COUNT(*) FROM t WHERE ... is no short form - it sets sy-dbcnt
+        const countOnly = /^SELECT\s+(SINGLE\s+)?COUNT\s*\(\s*\*\s*\)\s+(UP\s+TO\s+\S+\s+ROWS\s+)?FROM\b/.test(t);
+        if (!/\bINTO\b|\bAPPENDING\b/.test(t) && !countOnly) {
           const tabs = findAll(s, "DatabaseTable");
           const tab = tabs.length === 1 ? lc(nodeText(tabs[0])) : undefined;
           if (!tab || !this.tablesKept.has(tab) || findAll(s, "SQLJoin").length) {
@@ -4361,10 +4531,20 @@ class Converter {
     }
     const imp = [];
     const chg = [];
+    if (this.screenForms().has(name)) {
+      // performed elsewhere: the screen of AT SELECTION-SCREEN OUTPUT while
+      // it runs (a method of a local class called from there), else one
+      // built afresh - MODIFY SCREEN outside of PBO is not shown in SAP GUI either
+      if (!b.ctx.screenEvent && !b.ctx.local) {
+        this.todo(s, `PERFORM ${name} outside of AT SELECTION-SCREEN OUTPUT - the FORM loops at the screen; current_screen( ) is a screen built afresh here, its changes are not shown`);
+      }
+      imp.push({ name: "screen", value: b.ctx.screenEvent ? "screen" : "current_screen( )" });
+    }
     const pairs = [...formTables.map((p, i) => [p, tables[i]]), ...formOther.map((p, i) => [p, actualOther[i]])];
     for (const [p, node] of pairs) {
       const value = nodeText(node, ov);
-      const isVar = /^[\w/<>~-]+$/.test(value) && !/^\d+$/.test(value) && !findAll(node, "Constant").length;
+      // itab[] - the body of the table - is a variable as well
+      const isVar = /^[\w/<>~-]+(\[\])?$/.test(value) && !/^\d+$/.test(value) && !findAll(node, "Constant").length;
       const changingParam = p.kind !== "using" || p.promoted;
       if (changingParam && !isVar) {
         this.refuse(s, `PERFORM ${name}: ${value} is passed to ${p.name}, which the FORM changes - a CHANGING parameter of the method needs a variable`);
@@ -4535,6 +4715,29 @@ class Converter {
       this.popup(s, b, fm);
       return true;
     }
+    if (fm === "DYNP_VALUES_READ" || fm === "DYNP_VALUES_UPDATE") {
+      // the fields of the selection screen are attributes, and every event
+      // brings their values along - the table of names reads or writes them
+      const tab = functionParams(s).get("dynpfields");
+      if (tab) {
+        const name = nodeText(tab.node, this.rewrites(s, b.ctx, b));
+        this.dynpCount = (this.dynpCount ?? 0) + 1;
+        const line = `<ls_r2c_dynp${this.dynpCount}>`;
+        const field = `<lv_r2c_dynp${this.dynpCount}>`;
+        const read = fm === "DYNP_VALUES_READ";
+        b.out.push(`LOOP AT ${name} ASSIGNING FIELD-SYMBOL(${line}).`,
+          `  ASSIGN (${line}-fieldname) TO FIELD-SYMBOL(${field}).`,
+          "  IF sy-subrc = 0.",
+          read ? `    ${line}-fieldvalue = ${field}.` : `    ${field} = ${line}-fieldvalue.`,
+          "  ENDIF.",
+          "ENDLOOP.");
+        this.map(s, `${read ? "read from" : "written to"} the attributes the field names name - \`ASSIGN (fieldname)\``);
+        if (/\bEXCEPTIONS\b/i.test(renderTokens(stmtTokens(s)))) {
+          this.todo(s, `${fm}: the EXCEPTIONS are gone - a field name that is no attribute is skipped; sy-subrc is the one of the LOOP`);
+        }
+        return true;
+      }
+    }
     if (REFUSED_FUNCTIONS[fm]) {
       this.refuse(s, `CALL FUNCTION '${fm}' - ${REFUSED_FUNCTIONS[fm]}`);
       return true;
@@ -4630,20 +4833,58 @@ class Converter {
     const body = this.convertBody(f.body, { method: "at_line_selection", lineSelection: true, callback: { ucomm, selfield } });
     const lines = [`" the ALV double click - FORM ${f.name}, the USER_COMMAND callback`];
     if (new RegExp(`\\b${ucomm}\\b`, "i").test(body.join("\n"))) lines.push(`DATA(${ucomm}) = \`&IC1\`.`);
-    // rs_selfield-tabindex -> row
+    // rs_selfield-tabindex -> row, -fieldname -> the column of a hotspot
+    // (hide), -value -> that cell of the output table; refresh and the
+    // stable flags are moot - the ALV is drawn anew on every roundtrip
+    const table = this.alvCallbacks.get(f.name)?.stmt && this.alvPlan?.get(this.alvCallbacks.get(f.name).stmt)?.table?.replace(/\[\]$/, "");
+    const flag = new RegExp(`^\\s*${selfield}\\s*-\\s*(refresh|row_stable|col_stable|exit)\\s*=\\s*[^.]*\\.\\s*(".*)?$`, "i");
+    let column = false;
+    let value = false;
+    const out = [];
     for (const l of body) {
+      const m = flag.exec(l);
+      if (m) {
+        if (lc(m[1]) === "exit") {
+          out.push(`${l.match(/^\s*/)[0]}leave_to_selection_screen( ).`);
+          this.todo(f.stmt, `FORM ${f.name}: ${selfield}-exit leaves the ALV - leave_to_selection_screen( ) shows the selection screen again`);
+        }
+        continue;
+      }
       const re = new RegExp(`\\b${selfield}\\s*-\\s*(\\w+)`, "gi");
       let bad;
-      const out = l.replace(re, (all, comp) => {
-        if (lc(comp) === "tabindex") return "row";
+      out.push(l.replace(re, (all, comp) => {
+        const c = lc(comp);
+        if (c === "tabindex") return "row";
+        if (c === "fieldname") {
+          column = true;
+          return "hide";
+        }
+        if (c === "value" && table) {
+          column = true;
+          value = true;
+          return "lv_r2c_value";
+        }
         bad = comp;
         return all;
-      });
+      }));
       if (bad) {
-        this.refuse(f.stmt, `FORM ${f.name}: ${selfield}-${bad} has no counterpart - at_line_selection( ) has the row only`);
+        this.refuse(f.stmt, `FORM ${f.name}: ${selfield}-${bad} has no counterpart - at_line_selection( ) has the row and the column of a hotspot`);
       }
-      lines.push(out);
     }
+    if (column) {
+      this.todo(f.stmt, `FORM ${f.name}: ${selfield}-fieldname is the column of a hotspot click (hide) - a double click on the row has none; mark the columns that need it as hotspots`);
+    }
+    if (value) {
+      lines.push("DATA lv_r2c_value TYPE string.",
+        `READ TABLE ${table} INDEX row ASSIGNING FIELD-SYMBOL(<ls_r2c_row>).`,
+        "IF sy-subrc = 0 AND hide IS NOT INITIAL.",
+        "  ASSIGN COMPONENT hide OF STRUCTURE <ls_r2c_row> TO FIELD-SYMBOL(<lv_r2c_value>).",
+        "  IF sy-subrc = 0.",
+        "    lv_r2c_value = <lv_r2c_value>.",
+        "  ENDIF.",
+        "ENDIF.");
+    }
+    lines.push(...out);
     return lines;
   }
 
@@ -4737,7 +4978,8 @@ class Converter {
     const isDefUnit = (u) => ["ClassDefinition", "Interface", "ClassDeferred", "InterfaceDeferred"].includes(u.kind);
     const nameOf = (u) => lc(nodeText(child(u.stmts[0], "ClassName") ?? child(u.stmts[0], "InterfaceName") ?? u.stmts[0].getChildren()[1]));
     const REPORT_KINDS = new Set(["Perform", "Write", "Uline", "Skip", "NewLine", "NewPage", "Format", "Hide", "Message",
-      "SetPFStatus", "SetTitlebar", "Submit", "CallSelectionScreen", "Leave", "Position", "Reserve", "Window", "Stop"]);
+      "SetPFStatus", "SetTitlebar", "Submit", "CallSelectionScreen", "Leave", "Position", "Reserve", "Window", "Stop",
+      "LoopAtScreen", "ModifyScreen"]);
     const reportGlobals = new Set([...this.globalData, ...this.globalTypes, ...this.globalConstants]);
     const formMethods = new Set(this.forms.map((f) => f.method).filter(Boolean));
 
@@ -4786,8 +5028,18 @@ class Converter {
       const n = nameOf(u);
       const declared = declaredOf.get(n) ?? new Set();
       const inDef = usedInDecl && isDefUnit(u);
+      // a local class a macro writes: its expansion, a statement per line -
+      // the macro is no part of the class
+      if (u.stmts[0].getFirstToken().getStart() instanceof abaplint.VirtualPosition) {
+        (inDef ? def : imp).push(u.stmts.map((x) => `${renderTokens(stmtTokens(x))}.`).join("\n"));
+        this.note("a local class written by a macro is written out as the macro expands it");
+        continue;
+      }
       const first = u.stmts[0].getFirstToken().getRow();
-      const last = u.stmts[u.stmts.length - 1].getLastToken().getRow();
+      // a chain - CLASS: a DEFINITION DEFERRED, b DEFINITION DEFERRED. - is
+      // a unit per class, all starting at the row of CLASS: copied once, whole
+      const last = u.stmts.length > 1 ? u.stmts[u.stmts.length - 1].getLastToken().getRow()
+        : Math.max(...this.locals.filter((x) => x.stmts.length === 1 && x.stmts[0].getFirstToken().getRow() === first).map((x) => x.stmts[0].getLastToken().getRow()));
       if (copied.has(`${first}:${last}`)) continue;
       copied.add(`${first}:${last}`);
       const text = this.lines.slice(first - 1, last);
@@ -5255,7 +5507,7 @@ const REPORT_CALLS = ["list", "write", "message", "message_t100", "messages_from
   "set_pf_status", "set_line_count", "leave_to_selection_screen", "submit", "call_selection_screen", "window",
   "popup_to_confirm", "popup_to_decide", "popup_get_values", "popup_get_values_sval", "popup_values_sval",
   "popup_answer", "popup_values", "value_help_popup", "lsind", "set_lsind", "get_selected_rows", "get_cursor",
-  "lisel", "set_parameter_id", "get_parameter_id", "set_cursor_field", "vrm_set_values"];
+  "lisel", "set_parameter_id", "get_parameter_id", "set_cursor_field", "vrm_set_values", "current_screen"];
 
 /**
  * A call of a method of the report class written without its instance -

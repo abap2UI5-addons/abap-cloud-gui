@@ -256,8 +256,135 @@ test("refused: MESSAGE of a message class without MESSAGE-ID", () => {
   assert.match(refusalOf("REPORT zt.\nSTART-OF-SELECTION.\n  MESSAGE e001.\n")[0], /^3:3 MESSAGE without a message class/);
 });
 
-test("refused: LOOP AT SCREEN outside of AT SELECTION-SCREEN OUTPUT", () => {
-  assert.match(refusalOf("REPORT zt.\nPARAMETERS p TYPE i.\nAT SELECTION-SCREEN.\n  LOOP AT SCREEN.\n  ENDLOOP.\n")[0], /^4:3 LOOP AT SCREEN outside of AT SELECTION-SCREEN OUTPUT/);
+test("LOOP AT SCREEN outside of AT SELECTION-SCREEN OUTPUT loops at current_screen( ) - with a TODO", () => {
+  const r = convert("REPORT zt.\nPARAMETERS p TYPE i.\nAT SELECTION-SCREEN.\n  LOOP AT SCREEN.\n    screen-input = '0'.\n    MODIFY SCREEN.\n  ENDLOOP.\n", { file: "zt.prog.abap", className: "zcl_t" });
+  assert.deepEqual(r.refusals, []);
+  const cls = r.files["zcl_t.clas.abap"];
+  assert.match(cls, /DATA\(lt_screen\) = current_screen\( \)->loop_at_screen\( \)\./);
+  assert.match(cls, /current_screen\( \)->modify_screen\( ls_screen \)\./);
+  assert.ok(r.todos.some((t) => t.row === 4 && /its changes are not shown/.test(t.message)));
+});
+
+test("LOOP AT SCREEN in a method of a local class: the screen through current_screen( ) of the report", () => {
+  const r = convert("REPORT zt.\nPARAMETERS p TYPE i MODIF ID a.\nCLASS lcl DEFINITION.\n  PUBLIC SECTION.\n    CLASS-METHODS pbo.\nENDCLASS.\nCLASS lcl IMPLEMENTATION.\n  METHOD pbo.\n    LOOP AT SCREEN.\n      IF screen-group1 = 'A'.\n        screen-active = '0'.\n        MODIFY SCREEN.\n      ENDIF.\n    ENDLOOP.\n  ENDMETHOD.\nENDCLASS.\nAT SELECTION-SCREEN OUTPUT.\n  lcl=>pbo( ).\n", { file: "zt.prog.abap", className: "zcl_t" });
+  assert.deepEqual(r.refusals, []);
+  const imp = r.files["zcl_t.clas.locals_imp.abap"];
+  assert.match(imp, /DATA\(lt_screen\) = lcl_r2c=>app->current_screen\( \)->loop_at_screen\( \)\./);
+  assert.match(imp, /IF ls_screen-group1 = 'A'\./);
+  assert.match(imp, /lcl_r2c=>app->current_screen\( \)->modify_screen\( ls_screen \)\./);
+});
+
+test("LOOP AT SCREEN in a FORM of AT SELECTION-SCREEN OUTPUT: the FORM gets the screen", () => {
+  const src = "REPORT zt.\nPARAMETERS: p_a TYPE c AS CHECKBOX, p_b TYPE i MODIF ID b.\nAT SELECTION-SCREEN OUTPUT.\n  PERFORM hide.\nFORM hide.\n  PERFORM inner.\nENDFORM.\nFORM inner.\n  LOOP AT SCREEN.\n    IF screen-group1 = 'B' AND p_a = abap_true.\n      screen-active = '0'.\n      MODIFY SCREEN.\n    ENDIF.\n  ENDLOOP.\nENDFORM.\n";
+  const r = convert(src, { file: "zt.prog.abap", className: "zcl_t" });
+  assert.deepEqual(r.refusals, []);
+  const cls = r.files["zcl_t.clas.abap"];
+  assert.match(cls, /METHODS hide\s+IMPORTING\s+screen TYPE REF TO z2ui5_cl_cgui_selscreen\./);
+  assert.match(cls, /METHODS inner\s+IMPORTING\s+screen TYPE REF TO z2ui5_cl_cgui_selscreen\./);
+  assert.match(cls, /^\s+hide\( screen \)\.$/m);
+  assert.match(cls, /^\s+inner\( screen \)\.$/m);
+  assert.match(cls, /DATA\(lt_screen\) = screen->loop_at_screen\( \)\./);
+  // performed from elsewhere, the FORM changes a screen built afresh
+  const elsewhere = convert(src.replace("AT SELECTION-SCREEN OUTPUT.", "AT SELECTION-SCREEN."), { file: "zt.prog.abap", className: "zcl_t" });
+  assert.deepEqual(elsewhere.refusals, []);
+  assert.match(elsewhere.files["zcl_t.clas.abap"], /^\s+hide\( current_screen\( \) \)\.$/m);
+  assert.ok(elsewhere.todos.some((t) => t.row === 4 && /PERFORM hide outside of AT SELECTION-SCREEN OUTPUT/.test(t.message)));
+});
+
+test("a global named like a component of the report class is renamed - components and keywords are not", () => {
+  const r = convert("REPORT zt.\nTYPES: BEGIN OF ty, message TYPE string, END OF ty.\nDATA message TYPE string.\nDATA ls TYPE ty.\nSTART-OF-SELECTION.\n  message = 'Hello'.\n  ls-message = message.\n  WRITE: / message, ls-message.\n  MESSAGE message TYPE 'S'.\n", { file: "zt.prog.abap", className: "zcl_t" });
+  assert.deepEqual(r.refusals, []);
+  const cls = r.files["zcl_t.clas.abap"];
+  assert.match(cls, /DATA gv_message TYPE string\./);
+  assert.match(cls, /ls-message = gv_message\./);
+  assert.match(cls, /^\s+message TYPE string,$/m);
+  assert.match(cls, /message\( gv_message \)\./);
+  assert.ok(r.notes.some((n) => /renamed to gv_message/.test(n.text)));
+});
+
+test("DYNP_VALUES_READ / _UPDATE: the field names name attributes - ASSIGN (fieldname)", () => {
+  const src = "REPORT zt.\nPARAMETERS: p_dir TYPE string LOWER CASE, p_file TYPE string LOWER CASE.\nAT SELECTION-SCREEN ON VALUE-REQUEST FOR p_file.\n  DATA lt_fields TYPE STANDARD TABLE OF dynpread WITH DEFAULT KEY.\n  lt_fields = VALUE #( ( fieldname = 'P_DIR' ) ).\n  CALL FUNCTION 'DYNP_VALUES_READ'\n    EXPORTING\n      dyname     = sy-repid\n      dynumb     = sy-dynnr\n    TABLES\n      dynpfields = lt_fields\n    EXCEPTIONS\n      OTHERS     = 1.\n  p_file = lt_fields[ 1 ]-fieldvalue && '/a.txt'.\n  CALL FUNCTION 'DYNP_VALUES_UPDATE'\n    EXPORTING\n      dyname     = sy-repid\n      dynumb     = sy-dynnr\n    TABLES\n      dynpfields = lt_fields.\n";
+  const r = convert(src, { file: "zt.prog.abap", className: "zcl_t" });
+  assert.deepEqual(r.refusals, []);
+  const cls = r.files["zcl_t.clas.abap"];
+  assert.match(cls, /LOOP AT lt_fields ASSIGNING FIELD-SYMBOL\(<ls_r2c_dynp1>\)\.\s+ASSIGN \(<ls_r2c_dynp1>-fieldname\) TO FIELD-SYMBOL\(<lv_r2c_dynp1>\)\.\s+IF sy-subrc = 0\.\s+<ls_r2c_dynp1>-fieldvalue = <lv_r2c_dynp1>\./);
+  assert.match(cls, /<lv_r2c_dynp2> = <ls_r2c_dynp2>-fieldvalue\./);
+  assert.ok(r.todos.some((t) => t.row === 6 && /EXCEPTIONS are gone/.test(t.message)));
+  assert.ok(!r.todos.some((t) => t.row === 15));
+});
+
+test("declarations: the same DATA in two event blocks once, SELECT-OPTIONS FOR <fs>-comp typed by the field symbol", () => {
+  const r = convert("REPORT zt.\nTYPES: BEGIN OF ty, d TYPE d, END OF ty.\nFIELD-SYMBOLS <fs> TYPE ty.\nSELECT-OPTIONS s_d FOR <fs>-d.\nAT SELECTION-SCREEN OUTPUT.\n  DATA: lv_key TYPE string,\n        lv_err TYPE string.\n  lv_key = 'a'.\nAT SELECTION-SCREEN.\n  DATA: lv_key TYPE string,\n        lv_err TYPE string.\n  lv_err = lv_key.\n", { file: "zt.prog.abap", className: "zcl_t" });
+  assert.deepEqual(r.refusals, []);
+  const cls = r.files["zcl_t.clas.abap"];
+  assert.equal(cls.match(/^\s+lv_key TYPE string,$/gm).length, 1);
+  assert.match(cls, /DATA s_d TYPE RANGE OF ty-d\./);
+  assert.ok(r.notes.some((n) => /lv_key is declared twice the same way/.test(n.text)));
+});
+
+test("local classes: a chained DEFINITION DEFERRED copied once, a class a macro writes as it expands", () => {
+  const r = convert("REPORT zt.\nDEFINE gen.\n  CLASS lcl_&1 DEFINITION.\n    PUBLIC SECTION.\n      DATA value TYPE &2.\n  ENDCLASS.\nEND-OF-DEFINITION.\ngen: x i, y string.\nCLASS: lcl_a DEFINITION DEFERRED,\n       lcl_b DEFINITION DEFERRED.\nCLASS lcl_a DEFINITION.\n  PUBLIC SECTION.\n    CLASS-METHODS run.\nENDCLASS.\nCLASS lcl_b DEFINITION.\nENDCLASS.\nCLASS lcl_a IMPLEMENTATION.\n  METHOD run.\n    WRITE / 'a'.\n  ENDMETHOD.\nENDCLASS.\nDATA go_x TYPE REF TO lcl_x.\nSTART-OF-SELECTION.\n  lcl_a=>run( ).\n", { file: "zt.prog.abap", className: "zcl_t" });
+  assert.deepEqual(r.refusals, []);
+  const all = `${r.files["zcl_t.clas.locals_def.abap"] ?? ""}\n${r.files["zcl_t.clas.locals_imp.abap"]}`;
+  assert.equal(all.match(/CLASS: lcl_a\s+DEFINITION DEFERRED,\n\s+lcl_b\s+DEFINITION DEFERRED\./g).length, 1);
+  assert.match(all, /CLASS lcl_x DEFINITION\.\n\s+PUBLIC SECTION\.\n\s+DATA value TYPE i\./);
+  assert.match(all, /CLASS lcl_y DEFINITION\.\n\s+PUBLIC SECTION\.\n\s+DATA value TYPE string\./);
+  assert.doesNotMatch(all, /gen:/);
+});
+
+test("the ALV USER_COMMAND callback: fieldname is the hotspot column, value its cell, refresh is moot", () => {
+  const src = "REPORT zt.\nDATA gt_out TYPE STANDARD TABLE OF i WITH DEFAULT KEY.\nSTART-OF-SELECTION.\n  CALL FUNCTION 'REUSE_ALV_GRID_DISPLAY'\n    EXPORTING\n      i_callback_program      = sy-repid\n      i_callback_user_command = 'USER_COMMAND'\n    TABLES\n      t_outtab                = gt_out.\nFORM user_command USING r_ucomm LIKE sy-ucomm rs_selfield TYPE slis_selfield.\n  IF rs_selfield-fieldname = 'CARRID'.\n    WRITE / rs_selfield-value.\n  ENDIF.\n  rs_selfield-refresh = 'X'.\n  rs_selfield-row_stable = abap_true.\nENDFORM.\n";
+  const r = convert(src, { file: "zt.prog.abap", className: "zcl_t" });
+  assert.deepEqual(r.refusals, []);
+  const cls = r.files["zcl_t.clas.abap"];
+  assert.match(cls, /READ TABLE gt_out INDEX row ASSIGNING FIELD-SYMBOL\(<ls_r2c_row>\)\./);
+  assert.match(cls, /ASSIGN COMPONENT hide OF STRUCTURE <ls_r2c_row> TO FIELD-SYMBOL\(<lv_r2c_value>\)\./);
+  assert.match(cls, /IF hide = 'CARRID'\./);
+  assert.match(cls, /write\( lv_r2c_value \)/);
+  assert.doesNotMatch(cls, /refresh|row_stable/);
+  assert.ok(r.todos.some((t) => /column of a hotspot click/.test(t.message)));
+  assert.match(refusalOf(src.replace("rs_selfield-refresh = 'X'.", "WRITE / rs_selfield-sumindex."))[0], /rs_selfield-sumindex has no counterpart/);
+});
+
+test("the toolbar handler of the grid: MOVE ... TO ls_button-function is an assignment like any other", () => {
+  const src = readFileSync(new URL("./corpus/zr2c_19_grid.prog.abap", import.meta.url), "utf8");
+  const moved = src.replace("ls_button-function = 'FULL'.", "MOVE 'FULL' TO ls_button-function.").replace("ls_button-text = 'Full flights'.", "MOVE 'Full flights' TO ls_button-text.");
+  assert.notEqual(moved, src);
+  const a = convert(src, { file: "z.prog.abap", className: "zcl_t" });
+  const b = convert(moved, { file: "z.prog.abap", className: "zcl_t" });
+  assert.deepEqual(b.refusals, []);
+  assert.equal(b.files["zcl_t.clas.abap"], a.files["zcl_t.clas.abap"]);
+});
+
+test("the grid handlers: e_row_id, e_column_id used as a whole are rebuilt from row and column", () => {
+  const src = readFileSync(new URL("./corpus/zr2c_19_grid.prog.abap", import.meta.url), "utf8");
+  const v = src.replace("    READ TABLE gt_flight INDEX e_row_id-index INTO gs_flight.\n    IF e_column_id-fieldname = 'CONNID'.\n      MESSAGE |Connection { gs_flight-connid }| TYPE 'S'.\n    ENDIF.",
+    "    PERFORM show USING e_row_id e_column_id.\n    CASE e_column_id.\n      WHEN 'CONNID'.\n        MESSAGE 'Connection' TYPE 'S'.\n    ENDCASE.") +
+    "\nFORM show USING is_row TYPE lvc_s_row is_col TYPE lvc_s_col.\n  READ TABLE gt_flight INDEX is_row-index INTO gs_flight.\nENDFORM.\n";
+  assert.notEqual(v.indexOf("PERFORM show"), -1);
+  const r = convert(v, { file: "z.prog.abap", className: "zcl_t" });
+  assert.deepEqual(r.refusals, []);
+  const cls = r.files["zcl_t.clas.abap"];
+  assert.match(cls, /DATA\(e_row_id\) = VALUE z2ui5_cl_cgui_alv=>ty_s_lvc_row\( index = row \)\./);
+  assert.match(cls, /DATA\(e_column_id\) = VALUE z2ui5_cl_cgui_alv=>ty_s_lvc_col\( fieldname = column \)\./);
+  assert.match(cls, /is_row TYPE z2ui5_cl_cgui_alv=>ty_s_lvc_row\n\s+is_col TYPE z2ui5_cl_cgui_alv=>ty_s_lvc_col\./);
+});
+
+test("SELECT COUNT(*) without INTO is no short form; itab[] is a variable for a CHANGING parameter", () => {
+  const r = convert("REPORT zt.\nPARAMETERS p TYPE c LENGTH 40.\nDATA lr TYPE RANGE OF i.\nSTART-OF-SELECTION.\n  SELECT COUNT(*) FROM reposrc WHERE progname = p.\n  PERFORM fill CHANGING lr[].\nFORM fill CHANGING ct LIKE lr.\n  CLEAR ct.\nENDFORM.\n", { file: "zt.prog.abap", className: "zcl_t" });
+  assert.deepEqual(r.refusals, []);
+  const cls = r.files["zcl_t.clas.abap"];
+  assert.match(cls, /SELECT COUNT\(\*\) FROM reposrc WHERE progname = @p\./);
+  assert.match(cls, /ct = lr\[\] \)\./);
+});
+
+test("ON VALUE-REQUEST FOR s_x-low and FOR s_x-high: one WHEN, value_request_part( ) tells them apart", () => {
+  const src = "REPORT zt.\nDATA gv TYPE c LENGTH 10.\nSELECT-OPTIONS s_x FOR gv.\nAT SELECTION-SCREEN ON VALUE-REQUEST FOR s_x-low.\n  s_x-low = `A`.\nAT SELECTION-SCREEN ON VALUE-REQUEST FOR s_x-high.\n  s_x-high = `Z`.\n";
+  const r = convert(src, { file: "zt.prog.abap", className: "zcl_t" });
+  assert.deepEqual(r.refusals, []);
+  assert.match(r.files["zcl_t.clas.abap"], /WHEN `S_X`\.\n\s+IF value_request_part\( \) = z2ui5_cl_cgui_selscreen=>cs_part-high\.\n\s+ls_s_x-high = `Z`\.\n\s+ELSE\.\n\s+ls_s_x-low = `A`\.\n\s+ENDIF\./);
+  assert.ok(r.todos.some((t) => t.row === 4 && /wrote the line on the screen/.test(t.message)));
+  assert.match(refusalOf(`${src}AT SELECTION-SCREEN ON VALUE-REQUEST FOR s_x-high.\n  s_x-high = 'Y'.\n`)[0], /^8:1 a second ON VALUE-REQUEST for S_X/);
 });
 
 test("a TABLES parameter used with its header line gets a work area of the method", () => {

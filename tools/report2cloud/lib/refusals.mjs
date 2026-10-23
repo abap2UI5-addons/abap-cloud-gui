@@ -187,10 +187,10 @@ zcl_common=>read_customer( lv_kunnr ).
   },
   {
     id: "reserved-name",
-    title: "A name of the runtime: a global named like a component of z2ui5_cl_cgui_report",
+    title: "A name of the runtime: a parameter named like a component of z2ui5_cl_cgui_report",
     match: /is the name of a component of z2ui5_cl_cgui_report/,
-    why: "Every global of the report becomes an attribute of the class, which inherits from `z2ui5_cl_cgui_report`. A global with the name of one of its methods or attributes (`list`, `message`, `alv`, `client`, ...) would collide.",
-    rewrite: "Rename the global in the report, then convert again - for example `list` to `gt_list`.",
+    why: "Every global of the report becomes an attribute of the class, which inherits from `z2ui5_cl_cgui_report`. A global with the name of one of its methods or attributes (`list`, `message`, `alv`, `client`, ...) would collide. A global `DATA` or `CONSTANTS` is renamed by the converter (`message` becomes `gv_message`, the migration report says so); a parameter or select-option is not - the text pool and every `SUBMIT ... WITH` know its name.",
+    rewrite: "Rename the parameter in the report and in its selection texts, then convert again - for example `list` to `p_list`.",
   },
   {
     id: "local-class",
@@ -237,9 +237,9 @@ MESSAGE e001(zflights).
   },
   {
     id: "screen-loop",
-    title: "LOOP AT SCREEN outside of AT SELECTION-SCREEN OUTPUT, or with a field symbol",
+    title: "LOOP AT SCREEN nested, with a field symbol, or with a screen field the runtime does not know",
     match: /^(LOOP AT SCREEN|MODIFY SCREEN outside|SCREEN-\S+ has no counterpart)/,
-    why: "`LOOP AT SCREEN` becomes `screen->loop_at_screen( )` in `at_selection_screen_output( screen )`, the only place the runtime offers the screen. It knows `name`, `group1`, `input`, `invisible`, `active`, `required`, `intensified` and `length`.",
+    why: "`LOOP AT SCREEN` becomes `screen->loop_at_screen( )` in `at_selection_screen_output( screen )` and in the FORMs it performs; in a method of a local class and in other event blocks it is `current_screen( )->loop_at_screen( )` - the screen of AT SELECTION-SCREEN OUTPUT while it runs, elsewhere one built afresh whose changes are not shown. One loop at a time, into a work area. The screen knows `name`, `group1`, `input`, `invisible`, `active`, `required`, `intensified` and `length`.",
     rewrite: abap(`
 * after - in AT SELECTION-SCREEN OUTPUT, with a work area
 AT SELECTION-SCREEN OUTPUT.
@@ -262,8 +262,8 @@ AT SELECTION-SCREEN OUTPUT.
     id: "selscreen-event-field",
     title: "AT SELECTION-SCREEN ON ... of a field, block or group that does not exist",
     match: /^(ON (VALUE-REQUEST FOR |HELP-REQUEST FOR |BLOCK |END OF |RADIOBUTTON GROUP )?\S+ - no |a second ON (VALUE|HELP)-REQUEST)/,
-    why: "The events of the selection screen are methods with a `CASE` on the field, block or group. One that names nothing on the screen has no `WHEN`; a select-option has one F4 and one F1 for LOW and HIGH together.",
-    rewrite: "Correct the name, or merge the two blocks of `-LOW` and `-HIGH` into one.",
+    why: "The events of the selection screen are methods with a `CASE` on the field, block or group. One that names nothing on the screen has no `WHEN`. A select-option has one F4 for `-LOW` and one for `-HIGH` (`value_request_part( )` tells them apart in one `WHEN`), and one F1 for both.",
+    rewrite: "Correct the name, or merge the blocks of the same field (two F4 of `-LOW`, two F1) into one.",
   },
   {
     id: "inline-global",
@@ -354,7 +354,7 @@ ENDIF.
     id: "alv-classic",
     title: "ALV function modules and SALV calls without a counterpart",
     match: /^(CALL FUNCTION '(REUSE_ALV|LVC_)|\S+ without TABLES t_outtab|cl_salv_table=>factory\( \) without|FORM \S+ is the USER_COMMAND callback|FORM \S+: \S+-\S+ has no counterpart)/,
-    why: "`REUSE_ALV_GRID_DISPLAY` / `REUSE_ALV_LIST_DISPLAY` with `TABLES t_outtab` and `CL_SALV_TABLE` become `alv( )`. A hierarchical list, the ALV popup, the other `REUSE_ALV_*` and `LVC_*` modules and a USER_COMMAND callback that reads more than the row (`rs_selfield-tabindex`) have no counterpart.",
+    why: "`REUSE_ALV_GRID_DISPLAY` / `REUSE_ALV_LIST_DISPLAY` with `TABLES t_outtab` and `CL_SALV_TABLE` become `alv( )`. A hierarchical list, the ALV popup, the other `REUSE_ALV_*` and `LVC_*` modules and a USER_COMMAND callback that reads more than the row (`rs_selfield-tabindex`), the column of a hotspot (`-fieldname`) and its cell (`-value`) have no counterpart - `-refresh` and the stable flags are dropped, the ALV is drawn anew on every roundtrip.",
     rewrite: abap(`
 * before
 CALL FUNCTION 'REUSE_ALV_POPUP_TO_SELECT' EXPORTING i_tabname = 'GT_CARR' ...
@@ -384,7 +384,7 @@ AT SELECTION-SCREEN ON VALUE-REQUEST FOR p_carrid.
     id: "dynpro-fields",
     title: "Reading and writing dynpro fields: DYNP_VALUES_*, RS_REFRESH_FROM_SELECTOPTIONS",
     match: /^CALL FUNCTION '(DYNP_VALUES|RS_REFRESH_FROM_SELECTOPTIONS)/,
-    why: "On the selection screen of the runtime the fields are the attributes of the class: they hold what the user entered on every roundtrip, so there is nothing to read from the screen.",
+    why: "On the selection screen of the runtime the fields are the attributes of the class: they hold what the user entered on every roundtrip, so there is nothing to read from the screen. `DYNP_VALUES_READ` and `DYNP_VALUES_UPDATE` with `TABLES dynpfields` are converted - every field name of the table is assigned dynamically (`ASSIGN (fieldname)`); without the table, and `RS_REFRESH_FROM_SELECTOPTIONS`, are not.",
     rewrite: abap(`
 * before
 CALL FUNCTION 'DYNP_VALUES_READ' ... TABLES dynpfields = lt_fields.

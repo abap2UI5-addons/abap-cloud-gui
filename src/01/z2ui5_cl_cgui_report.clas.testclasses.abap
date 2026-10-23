@@ -156,6 +156,7 @@ CLASS ltcl_test DEFINITION FINAL FOR TESTING
     METHODS select_option_complex FOR TESTING.
     METHODS secondary_list_and_back FOR TESTING.
     METHODS leave_during_the_run FOR TESTING.
+    METHODS current_screen_afresh FOR TESTING.
     METHODS alv_box_copy_selection FOR TESTING.
     METHODS url_values_screen_only FOR TESTING.
     METHODS url_skip_screen FOR TESTING.
@@ -614,6 +615,17 @@ CLASS ltcl_test IMPLEMENTATION.
     " the message of the report, and not the one of an empty list
     cl_abap_unit_assert=>assert_true( xsdbool( line_exists( mo_cut->mt_cgui_msg[ text = `Unknown airline` ] ) ) ).
     cl_abap_unit_assert=>assert_false( xsdbool( line_exists( mo_cut->mt_cgui_msg[ text = `List contains no data` ] ) ) ).
+
+  ENDMETHOD.
+
+  METHOD current_screen_afresh.
+
+    init( ).
+    " outside of at_selection_screen_output( ): a screen built afresh, with
+    " the fields of selection_screen( ) - and none kept in the app
+    DATA(lt_screen) = mo_cut->current_screen( )->loop_at_screen( ).
+    cl_abap_unit_assert=>assert_true( xsdbool( line_exists( lt_screen[ name = `P_CARRID` ] ) ) ).
+    cl_abap_unit_assert=>assert_not_bound( mo_cut->mo_cgui_screen ).
 
   ENDMETHOD.
 
