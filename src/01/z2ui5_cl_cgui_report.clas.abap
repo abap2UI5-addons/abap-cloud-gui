@@ -703,6 +703,9 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
     " returns
     DATA mt_cgui_run_msg       TYPE ty_t_cgui_msg.
     DATA mv_cgui_stop          TYPE abap_bool.
+    " leave_to_selection_screen( ) during the run - LEAVE PROGRAM, LEAVE TO
+    " SCREEN 0: no END-OF-SELECTION, no list
+    DATA mv_cgui_left          TYPE abap_bool.
     DATA mv_cgui_nav           TYPE abap_bool.
     DATA mv_cgui_value_field   TYPE string.
     " F4 on the upper limit of a select-option (HIGH) - and in a cell of
@@ -3141,12 +3144,13 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
     CLEAR: mo_cgui_list, mo_cgui_alv, mr_cgui_alv, mr_cgui_alv_box, mv_cgui_alv_name, mt_cgui_level,
            mr_cgui_alv_page, mt_cgui_alv_index, mo_cgui_tree, mt_cgui_tree_view,
            mv_cgui_window, mv_cgui_window_title, mv_cgui_window_cols, mv_cgui_window_lines.
+    mv_cgui_left = abap_false.
     start_of_selection( ).
-    IF mv_cgui_stop = abap_true.
+    IF mv_cgui_stop = abap_true OR mv_cgui_left = abap_true.
       RETURN.
     ENDIF.
     end_of_selection( ).
-    IF mv_cgui_stop = abap_true.
+    IF mv_cgui_stop = abap_true OR mv_cgui_left = abap_true.
       RETURN.
     ENDIF.
     IF mo_cgui_list IS BOUND.
@@ -4311,6 +4315,7 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
   METHOD leave_to_selection_screen.
 
     mv_cgui_screen = cs_screen-selection.
+    mv_cgui_left = abap_true.
     CLEAR: mt_cgui_level, mv_cgui_window.
 
   ENDMETHOD.

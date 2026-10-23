@@ -26,6 +26,8 @@ A refused statement has no counterpart in an abap-cloud-gui report. The converte
 | [LOOP AT SCREEN outside of AT SELECTION-SCREEN OUTPUT, or with a field symbol](#screen-loop) | `screen-loop` |
 | [TOP-OF-PAGE and END-OF-PAGE with logic, or twice](#page-events) | `page-events` |
 | [AT SELECTION-SCREEN ON ... of a field, block or group that does not exist](#selscreen-event-field) | `selscreen-event-field` |
+| [An inline declaration of an event block, used in another one, of a type that cannot be told](#inline-global) | `inline-global` |
+| [A field of the selection screen typed at runtime: TYPE (name), FOR (name)](#dynamic-screen-type) | `dynamic-screen-type` |
 | [SELECTION-SCREEN INCLUDE and other screen statements](#selscreen) | `selscreen` |
 | [CALL SELECTION-SCREEN of a screen the report does not have, or twice](#call-selection-screen) | `call-selection-screen` |
 | [SUBMIT forms without a counterpart](#submit) | `submit` |
@@ -355,6 +357,45 @@ Compute what the header needs before the list starts, keep it in a global, and w
 **Rewrite.**
 
 Correct the name, or merge the two blocks of `-LOW` and `-HIGH` into one.
+
+<a id="inline-global"></a>
+
+## An inline declaration of an event block, used in another one, of a type that cannot be told
+
+**Why.** Event blocks open no scope: `DATA(x) = ...` in `INITIALIZATION` is a global of the report, and `START-OF-SELECTION` may use it. In the class it becomes an attribute, which needs its type. The converter takes it from a constructor expression (`NEW lcl( )`, `VALUE ty( )`) or from abaplint's syntax check - not from a method of a class that is not part of the input.
+
+**Rewrite.**
+
+```abap
+* before
+INITIALIZATION.
+  DATA(go_app) = zcl_app=>create( ).
+START-OF-SELECTION.
+  go_app->run( ).
+
+* after
+DATA go_app TYPE REF TO zcl_app.
+INITIALIZATION.
+  go_app = zcl_app=>create( ).
+```
+
+<a id="dynamic-screen-type"></a>
+
+## A field of the selection screen typed at runtime: TYPE (name), FOR (name)
+
+**Why.** Every field of the selection screen becomes an attribute of the class - typed when the class is written. A type taken from a variable at runtime has nothing to type it with.
+
+**Rewrite.**
+
+```abap
+* before
+PARAMETERS p_value TYPE (p_type).
+SELECT-OPTIONS s_vbeln FOR (gv_name).
+
+* after - the type the report really asks for
+PARAMETERS p_value TYPE string.
+SELECT-OPTIONS s_vbeln FOR vbak-vbeln.
+```
 
 <a id="selscreen"></a>
 

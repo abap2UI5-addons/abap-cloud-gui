@@ -71,7 +71,6 @@ const REFUSED = {
   SetUserCommand: "SET USER-COMMAND - triggers no event here",
   PrintControl: "PRINT-CONTROL - printing is not supported",
   CallSubscreen: "CALL SUBSCREEN - dynpro statement",
-  SetCursor: "SET CURSOR - not converted; set_cursor_field( ) sets the cursor on the selection screen - port it by hand",
   Local: "LOCAL - not available in methods",
   ScrollList: "SCROLL LIST - the list has no scroll position",
   Communication: "COMMUNICATION - CPI-C is obsolete",
@@ -112,7 +111,6 @@ const REFUSED_FUNCTIONS = {
   BDC_CLOSE_GROUP: "batch input sessions have no counterpart on ABAP Cloud",
   REUSE_ALV_HIERSEQ_LIST_DISPLAY: "a hierarchical sequential list is not supported by the ALV of abap-cloud-gui",
   REUSE_ALV_POPUP_TO_SELECT: "the ALV popup waits for the selection; use value_help_popup( ) or z2ui5_cl_popup_to_select",
-  SAPGUI_PROGRESS_INDICATOR: "SAPGUI_PROGRESS_INDICATOR shows progress in SAP GUI - drop it",
 };
 
 // statements that only lay out or decorate a list or screen - dropped, noted
@@ -289,6 +287,81 @@ class Converter {
     reg.parse();
     const file = reg.getFirstObject().getABAPFiles()[0];
     this.stmts = file.getStatements().filter((s) => kind(s) !== "Empty");
+    this.registry = reg;
+  }
+
+  /** the types abaplint's syntax check gives the variables of the program
+   *  scope (name -> abaplint type) - for the inline declarations of the
+   *  event blocks; an unknown dependency gives a void type */
+  programTypes() {
+    if (this.progTypes) return this.progTypes;
+    this.progTypes = new Map();
+    try {
+      const res = new abaplint.SyntaxLogic(this.registry, this.registry.getFirstObject()).run();
+      const visit = (n) => {
+        if (n.getIdentifier().stype === "program" || n.getIdentifier().stype === "Program" || /program/i.test(String(n.getIdentifier().stype))) {
+          for (const [name, v] of Object.entries(n.getData().vars)) this.progTypes.set(lc(name), v.getType());
+        }
+        for (const c of n.getChildren()) visit(c);
+      };
+      visit(res.spaghetti.getTop());
+    } catch {
+      // no types - the inline declarations stay where they are
+    }
+    return this.progTypes;
+  }
+
+  /**
+   * An inline declaration in an event block - DATA(x) = ... in
+   * INITIALIZATION - is a global of the report: event blocks open no scope.
+   * Where another event block, a FORM or a local class reads it, it becomes
+   * an attribute of the class, typed as abaplint's syntax check types it
+   * (or as the constructor expression names it); the event block assigns
+   * it. A type that cannot be told is refused - the class would not compile.
+   */
+  hoistInlineData() {
+    this.hoisted = new Map();          // name -> { decl, tokens: Set of keys }
+    const inEvents = [];
+    for (const e of this.events) {
+      for (const s of e.stmts) for (const d of findAll(s, "InlineData")) inEvents.push({ e, s, d, name: lc(d.getTokens()[2]?.getStr() ?? "") });
+    }
+    if (!inEvents.length) return;
+    const elsewhere = (e, name) => {
+      const units = [...this.events.filter((x) => x !== e).map((x) => x.stmts), ...this.forms.map((f) => f.body), ...this.locals.map((u) => u.stmts)];
+      return units.some((list) => list.some((x) => x.getTokens().some((t) => lc(t.getStr()) === name)));
+    };
+    for (const v of inEvents) {
+      if (!v.name || this.hoisted.has(v.name) || this.globalData.has(v.name) || !elsewhere(v.e, v.name)) continue;
+      let type = this.inlineType(v);
+      if (!type) {
+        this.refuse(v.d, `${v.name} is declared inline in an event block and used in another one - event blocks open no scope, so it is a global of the report; its type cannot be told here (a dependency of the report): declare it with DATA in the report`);
+        continue;
+      }
+      this.hoisted.set(v.name, { decl: `DATA ${v.name} ${type}.`, stmt: v.s, keys: new Set(v.d.getTokens().map(key)) });
+      this.globalData.add(v.name);
+    }
+  }
+
+  /** the type of an inline declaration: from the constructor expression,
+   *  else from abaplint's syntax check */
+  inlineType(v) {
+    const text = renderTokens(stmtTokens(v.s)).replace(/\s+/g, " ");
+    const name = v.d.getTokens()[2]?.getStr() ?? "";
+    const esc = name.replace(/[<>]/g, "\\$&");
+    let m = new RegExp(`^DATA\\(\\s*${esc}\\s*\\)\\s*=\\s*NEW\\s+([\\w/]+)\\s*\\(`, "i").exec(text);
+    if (m) return `TYPE REF TO ${lc(m[1])}`;
+    m = new RegExp(`^DATA\\(\\s*${esc}\\s*\\)\\s*=\\s*(VALUE|CONV|CORRESPONDING|EXACT)\\s+([\\w/]+(?:-[\\w/]+|=>[\\w/]+)*)\\s*\\(`, "i").exec(text);
+    if (m) return `TYPE ${lc(m[2])}`;
+    m = new RegExp(`^DATA\\(\\s*${esc}\\s*\\)\\s*=\\s*CAST\\s+([\\w/]+)\\s*\\(`, "i").exec(text);
+    if (m) return `TYPE REF TO ${lc(m[1])}`;
+    const t = this.programTypes().get(lc(name));
+    if (!t) return undefined;
+    const cls = t.constructor.name;
+    if (["VoidType", "UnknownType", "GenericObjectReferenceType", "AnyType", "DataType", "SimpleType"].includes(cls)) return undefined;
+    const abap = t.toABAP?.();
+    if (!abap || /todo|check_syntax|\bSELECT_/i.test(abap)) return undefined;
+    if (cls === "ObjectReferenceType" || cls === "DataReference") return `TYPE ${abap}`;
+    return `TYPE ${abap}`;
   }
 
   run() {
@@ -464,13 +537,19 @@ class Converter {
       }
       if (["Type", "TypeBegin"].includes(k) && !this.insideBegin(s)) this.globalTypes.add(lc(name));
     }
+    this.globalConstants = new Set(this.decls.filter((s) => ["Constant", "ConstantBegin"].includes(kind(s)) && !this.insideBegin(s))
+      .map((s) => lc(declName(s) ?? "")));
     this.localNames = new Set(this.locals.flatMap((u) => u.stmts)
       .filter((s) => ["ClassDefinition", "Interface", "ClassDeferred", "InterfaceDeferred"].includes(kind(s)))
       .map((s) => lc(nodeText(child(s, "ClassName") ?? child(s, "InterfaceName") ?? s.getChildren()[1]))));
+    this.hoistInlineData();
+    this.planLocalTypes();
 
     // every identifier of the report - generated names must not collide
     this.identifiers = new Set(this.stmts.flatMap((s) => s.getTokens().map((t) => lc(t.getStr()))));
     this.msgVar = this.identifiers.has("lv_message") ? "lv_r2c_message" : "lv_message";
+    this.appClass = this.identifiers.has("lcl_r2c") ? "lcl_r2c_report" : "lcl_r2c";
+    this.appRef = `${this.appClass}=>app`;
 
     // select-options and RANGES have a header line in a report - a method
     // reads and writes it through a work area of its own (ls_<name>)
@@ -552,6 +631,10 @@ class Converter {
     const body = [...this.events.flatMap((e) => e.stmts), ...this.forms.flatMap((f) => f.body)];
     for (const s of body) {
       if (kind(s) === "Comment") continue;
+      if (["Select", "SelectLoop"].includes(kind(s)) && !/\b(INTO|APPENDING)\b/i.test(renderTokens(stmtTokens(s)))) {
+        const tabs = findAll(s, "DatabaseTable");
+        if (tabs.length === 1 && tables.includes(lc(nodeText(tabs[0])))) this.tablesKept.add(lc(nodeText(tabs[0])));
+      }
       const dbTokens = new Set(findAll(s, "DatabaseTable").flatMap((n) => n.getTokens().map(key)));
       for (const t of s.getTokens()) {
         if (dbTokens.has(key(t))) continue;
@@ -1219,6 +1302,7 @@ class Converter {
 
   generate() {
     const cls = this.className;
+    this.continuations = [];
     // the fields a WRITE ... UNDER refers to - their WRITE gets their name
     this.underTargets = new Set();
     for (const x of this.stmts) {
@@ -1274,9 +1358,9 @@ class Converter {
       body.push("ENDCASE.");
       methods.push({ name: "selection_screen_dynnr", body });
     }
-    // the statements after a CALL SELECTION-SCREEN go on in
-    // after_call_selection_screen( dynnr subrc ), once the dialog is answered
-    this.continuations = [];
+    // the statements after a CALL SELECTION-SCREEN or a popup go on in
+    // after_call_selection_screen( dynnr subrc ) / at_user_command( ucomm )
+    // (this.continuations, set up at the start of generate( ))
 
     // AT SELECTION-SCREEN OUTPUT
     {
@@ -1629,6 +1713,8 @@ class Converter {
         else methods.push({ name: "at_user_command", body });
       }
     }
+    // the local classes - their methods may PERFORM a FORM as well
+    const locals = this.localsSource();
     for (const f of this.forms) {
       if (!this.alvCallbacks.has(f.name) && !this.emptyForms.has(f.name) && !f.performed) this.todo(f.stmt, `FORM ${f.name} is not PERFORMed in this report - the private method ${f.method}( ) is unused (abaplint unused_methods)`);
     }
@@ -1662,6 +1748,9 @@ class Converter {
     for (const m of methods) lines.push(`    METHODS ${m.name} REDEFINITION.`);
     lines.push("");
     lines.push("  PRIVATE SECTION.");
+    if (this.privateDataLines.length) {
+      lines.push("    \" global data of the report typed with its local classes - local types", "    \" can type the private section only", ...this.privateDataLines.map((l) => indent(l, 4)), "");
+    }
     for (const t of this.tablesTypes.values()) lines.push(`    ${t}`);
     if (this.tablesTypes.size && this.methodDefs.length) lines.push("");
     this.methodDefs.forEach((d, i) => {
@@ -1678,7 +1767,9 @@ class Converter {
       lines.push(`  METHOD ${m.name}.`);
       lines.push("");
       const was = [...(this.methodWa.get(m.name) ?? new Map())].map(([tab, wa]) => `DATA ${wa} LIKE LINE OF ${tab}.`);
-      const globalFs = [...was, ...(this.prelude.get(m.name) ?? []), ...this.fieldSymbolDecls(m.body)];
+      // the local classes reach the report through the instance of the event
+      const app = locals.app && methods.includes(m) ? [`${this.appRef} = me.`] : [];
+      const globalFs = [...was, ...(this.prelude.get(m.name) ?? []), ...this.fieldSymbolDecls(m.body), ...app];
       for (const l of [...globalFs, ...(globalFs.length ? [""] : []), ...trimBlank(m.body)]) lines.push(indent(l, 4));
       lines.push("");
       lines.push("  ENDMETHOD.");
@@ -1689,10 +1780,10 @@ class Converter {
     let abap = normalizeAbap(this.reindent(lines.join("\n"), `${cls}.clas.abap`));
     const files = { [`${cls}.clas.abap`]: abap };
 
-    // local classes and interfaces
-    const locals = this.localsSource();
-    if (locals.def) files[`${cls}.clas.locals_def.abap`] = normalizeAbap(locals.def);
-    if (locals.imp) files[`${cls}.clas.locals_imp.abap`] = normalizeAbap(locals.imp);
+    // local classes and interfaces - indented as the house style does, the
+    // converted method bodies with them
+    if (locals.def) files[`${cls}.clas.locals_def.abap`] = normalizeAbap(this.reindent(locals.def, "zr2c_locals_def.prog.abap"));
+    if (locals.imp) files[`${cls}.clas.locals_imp.abap`] = normalizeAbap(this.reindent(locals.imp, "zr2c_locals_imp.prog.abap"));
 
     files[`${cls}.clas.xml`] = classXml(cls, this.pool.title || `report2cloud - ${this.programName}`);
 
@@ -1742,9 +1833,20 @@ class Converter {
     this.screenFields = new Set();
     // three groups, in this order: what a declaration may refer to comes first
     const sections = { types: [], data: [], screen: [] };
+    // the types moved to locals_def and the globals typed with local types
+    this.localTypeLines = [];
+    this.privateDataLines = [];
     let target = sections.data;
+    let sticky;                  // a BEGIN OF ... END OF run going elsewhere
+    let stickyDepth = 0;
     const heading = (h) => {
       target = h === "selection screen" ? sections.screen : /types|constants/.test(h) ? sections.types : sections.data;
+    };
+    const destOf = (s, names) => {
+      if (sticky) return sticky;
+      if (["Type", "TypeBegin", "Constant", "ConstantBegin", "TypeEnum", "TypeEnumBegin"].includes(kind(s)) && names.some((n) => this.movedTypes.has(n))) return this.localTypeLines;
+      if (["Data", "DataBegin"].includes(kind(s)) && names.some((n) => this.privateGlobals.has(n))) return this.privateDataLines;
+      return undefined;
     };
     const push = (line) => target.push(line);
     for (let i = 0; i < this.decls.length; i++) {
@@ -1752,6 +1854,10 @@ class Converter {
       const k = kind(s);
       const w = words(s);
 
+      if ((k === "Parameter" || k === "SelectOption") && (child(s, "Dynamic") || /\b(TYPE|FOR)\s*\(/i.test(renderTokens(stmtTokens(s))))) {
+        this.refuse(s, `${uc(declName(s) ?? "")} is typed at runtime (TYPE (name) / FOR (name)) - a field of the selection screen is an attribute of the class, typed when the class is written; give it its type`);
+        continue;
+      }
       if (k === "Parameter") {
         const name = lc(nodeText(child(s, "FieldSub")));
         this.screenFields.add(name);
@@ -1943,6 +2049,23 @@ class Converter {
           continue;
         }
         heading(isType ? "types of the report" : isConst ? "constants of the report" : "global data of the report");
+        // a type moved to locals_def, a global typed with a local type
+        {
+          const names = [lc(declName(s) ?? "")];
+          if (s.getColon()) for (let j = i + 1; this.decls[j] && sameColon(this.decls[j], s); j++) names.push(lc(declName(this.decls[j]) ?? ""));
+          const dest = destOf(s, names);
+          if (dest) {
+            target = dest;
+            if (!sticky && /Begin$/.test(k) && !s.getColon()) {
+              sticky = dest;
+              stickyDepth = 0;
+            }
+          }
+          if (sticky) {
+            if (/Begin$/.test(k)) stickyDepth++;
+            if (/End$/.test(k)) stickyDepth--;
+          }
+        }
         if ((k === "Data" || k === "DataBegin" || k === "Ranges") && !this.insideBegin(s)) this.resetCandidate(s);
         if (k === "Ranges") {
           const forNode = child(s, "SimpleFieldChain2");
@@ -1964,6 +2087,7 @@ class Converter {
         } else {
           push(this.renderDecl(s));
         }
+        if (sticky && stickyDepth === 0) sticky = undefined;
         continue;
       }
 
@@ -1981,6 +2105,16 @@ class Converter {
       this.todos.push({ row: 0, col: 0, message: `no selection text in the text pool for ${fieldTexts.join(", ")} - the label is the DDIC label of the type or the field name; pass the .prog.xml (--texts) or set text = in selection_screen( )` });
     }
 
+    // the inline declarations of the event blocks that other blocks read
+    for (const [name, h] of this.hoisted ?? []) {
+      const local = [...this.localNames].some((n) => new RegExp(`\\b${n}\\b`, "i").test(h.decl));
+      if (local) this.privateDataLines.push(h.decl);
+      else {
+        if (!sections.data.length || !sections.data.some((l) => /^"/.test(l))) { /* the heading is added below */ }
+        sections.data.push(h.decl);
+      }
+      this.map(h.stmt, `the inline declaration of ${name} - an attribute of the class (event blocks open no scope), assigned here`);
+    }
     for (const list of Object.values(sections)) alignData(list);
     const blocks = [["types and constants of the report", sections.types], ["global data of the report", sections.data],
       ["selection screen", sections.screen]];
@@ -2255,10 +2389,14 @@ class Converter {
       this.openTabbed = [...(this.openTabbed ?? []), uc(nodeText(child(s, "BlockName")))];
       this.map(s, "`screen->tabbed_block_begin( )` - the tabs that follow");
     } else if (w.includes("TAB")) {
-      const field = lc(nodeText(child(s, "InlineField")));
-      const len = nodeText(child(s, "Integer"));
-      heading("selection screen");
-      push(`DATA ${field} TYPE c LENGTH ${len}.`);
+      // the text of the tab: a field the report sets, or a text symbol
+      const te = child(s, "TextElement");
+      const field = te ? this.textSymbol(nodeText(child(te, "TextElementKey")), undefined, s) : lc(nodeText(child(s, "InlineField")));
+      if (!te) {
+        const len = nodeText(child(s, "Integer"));
+        heading("selection screen");
+        push(`DATA ${field} TYPE c LENGTH ${len}.`);
+      }
       chain.push({ method: "tab", params: [{ value: field }], positional: true });
       const ints = s.getChildren().filter((c) => kind(c) === "Integer");
       if (w.includes("DEFAULT") && w.includes("SCREEN") && !w.includes("PROGRAM") && ints.length > 1) {
@@ -2622,6 +2760,7 @@ class Converter {
       const first = s.getFirstToken().getRow();
       if (b.lastRow !== undefined && first > b.lastRow + 1 && b.out.length && b.out[b.out.length - 1] !== "") b.out.push("");
       const k = kind(s);
+      if (k === "MacroCall" || k === "MacroContent") continue;
       if (this.skipStmts?.has(s)) {
         b.lastRow = s.getLastToken().getRow();
         continue;
@@ -3278,7 +3417,12 @@ class Converter {
         b.screenLoopDepth = b.loopDepth;
         b.loopDepth++;
         const tab = this.identifiers.has("lt_screen") ? "lt_r2c_screen" : "lt_screen";
-        out.push(`DATA(${tab}) = screen->loop_at_screen( ).`, `LOOP AT ${tab} INTO DATA(${b.screenWa}).`);
+        this.screenTabs ??= new Set();
+        const again = this.screenTabs.has(`${b.ctx.method}:${tab}`);
+        this.screenTabs.add(`${b.ctx.method}:${tab}`);
+        // a second LOOP AT SCREEN of the method reuses the table and the work area
+        out.push(again ? `${tab} = screen->loop_at_screen( ).` : `DATA(${tab}) = screen->loop_at_screen( ).`,
+          again ? `LOOP AT ${tab} INTO ${b.screenWa}.` : `LOOP AT ${tab} INTO DATA(${b.screenWa}).`);
         this.map(s, "`LOOP AT screen->loop_at_screen( ) INTO DATA(ls_screen)` - screen-* is ls_screen-*, '0'/'1' are abap_false/abap_true");
         return;
       }
@@ -3329,6 +3473,17 @@ class Converter {
           return;
         }
         if (/^LEAVE$/.test(t)) break;
+        // the report is left - here the user is back on the selection screen
+        if (/^LEAVE\s+(PROGRAM|TO\s+SCREEN\s+0+)$/.test(t)) {
+          out.push("leave_to_selection_screen( ).", "RETURN.");
+          this.map(s, "`leave_to_selection_screen( )` and `RETURN` - the user is back on the selection screen");
+          if (b.ctx.form) this.todo(s, `${t} in FORM ${b.ctx.form.name}: RETURN only leaves ${b.ctx.form.method}( ) - the classic ended the report; the caller goes on, but the list it writes is not shown`);
+          return;
+        }
+        if (/^LEAVE\s+SCREEN$/.test(t)) {
+          this.map(s, "dropped - LEAVE SCREEN; the screen is left by the runtime");
+          return;
+        }
         this.refuse(s, `${t} - the app has no screens or transactions to leave; RETURN ends the event block, leave_to_selection_screen( ) goes back`);
         return;
       }
@@ -3354,8 +3509,26 @@ class Converter {
       case "CallSelectionScreen":
         this.callSelectionScreen(s, b);
         return;
+      case "SetCursor": {
+        const w = words(s);
+        const src = child(s, "Source");
+        if (w.includes("FIELD") && src) {
+          out.push(`set_cursor_field( ${nodeText(src, this.rewrites(s, b.ctx))} ).`);
+          this.map(s, "`set_cursor_field( )` - the selection screen opens with the cursor in that field");
+          if (w.includes("OFFSET") || w.includes("LINE")) this.note("SET CURSOR FIELD ... OFFSET / LINE - the cursor goes into the field, the offset and the line are dropped");
+        } else {
+          this.note("SET CURSOR LINE / at a position - dropped, the list has no cursor the program sets");
+          this.map(s, "dropped - SET CURSOR without FIELD");
+        }
+        return;
+      }
       case "Call": case "CreateObject": case "Move": {
         const t = lc(renderTokens(stmtTokens(s)));
+        if (/^(call\s+method\s+)?cl_progress_indicator\s*=>/.test(t)) {
+          this.note("SAPGUI_PROGRESS_INDICATOR / cl_progress_indicator - dropped, the browser shows a busy indicator while the server works");
+          this.map(s, "dropped - the progress indicator of SAP GUI");
+          return;
+        }
         // sy-lsind = n: the list the line selection writes becomes level n
         if (k === "Move" && /^sy\s*-\s*lsind\s*=/.test(t)) {
           const ov = this.rewrites(s, b.ctx);
@@ -3386,8 +3559,16 @@ class Converter {
         if (k === "SelectLoop") b.loopDepth++;
         const t = uc(renderTokens(stmtTokens(s)));
         if (!/\bINTO\b|\bAPPENDING\b/.test(t)) {
-          this.refuse(s, "SELECT without INTO - the short form reads into the TABLES work area, which classes do not have; add INTO");
-          return;
+          const tabs = findAll(s, "DatabaseTable");
+          const tab = tabs.length === 1 ? lc(nodeText(tabs[0])) : undefined;
+          if (!tab || !this.tablesKept.has(tab) || findAll(s, "SQLJoin").length) {
+            this.refuse(s, "SELECT without INTO - the short form reads into the TABLES work area, which classes do not have; add INTO");
+            return;
+          }
+          // the TABLES work area is an attribute of the class: INTO it
+          this.shortForm ??= new Map();
+          this.shortForm.set(s, { tab, star: !findAll(s, "SQLField").length });
+          this.map(s, `\`SELECT ... INTO @${tab}\` - the short form read into the TABLES work area, an attribute of the class now`);
         }
         break;
       }
@@ -3625,6 +3806,7 @@ class Converter {
       for (const t of toks.slice(1)) ov.set(key(t), null);
     }
     const toks = stmtTokens(s);
+    let parents;
     for (let i = 0; i < toks.length; i++) {
       const t = lc(toks[i].getStr());
       const prev = i > 0 ? toks[i - 1].getStr() : "";
@@ -3643,6 +3825,24 @@ class Converter {
         }
       }
       if (ctx.pai && this.okVars.has(t)) ov.set(key(toks[i]), "ucomm");
+      // DATA( x ) of an inline declaration that became an attribute
+      if (t === "data" && toks[i + 1]?.getStr() === "(" && this.hoisted?.size) {
+        const h = this.hoisted.get(lc(toks[i + 2]?.getStr() ?? ""));
+        if (h && h.keys.has(key(toks[i]))) {
+          ov.set(key(toks[i]), null);
+          ov.set(key(toks[i + 1]), null);
+          ov.set(key(toks[i + 3]), null);
+        }
+      }
+      // in a method of a local class: the report's data through the
+      // instance, its constants and types through the class
+      if (ctx.local && !ctx.local.declared.has(t) && !this.currentLocals?.has(t) && !ov.has(key(toks[i])) && !this.movedTypes.has(t)) {
+        parents ??= tokenParents(s);
+        const parent = parents.get(key(toks[i]));
+        if (parent === "TypeName" && this.globalTypes.has(t)) ov.set(key(toks[i]), `${this.className}=>${toks[i].getStr()}`);
+        else if (parent === "Field" && this.globalConstants.has(t)) ov.set(key(toks[i]), `${this.className}=>${toks[i].getStr()}`);
+        else if (parent === "Field" && this.globalData.has(t)) ov.set(key(toks[i]), `${this.appRef}->${toks[i].getStr()}`);
+      }
       if (ctx.subrc?.has(s) && t === "sy" && next === "-" && next2 === "subrc") {
         ov.set(key(toks[i]), "subrc");
         ov.set(key(toks[i + 1]), null);
@@ -3816,6 +4016,13 @@ class Converter {
    *  n ROWS` to 7.02. */
   strictSql(s, ov) {
     if (!["Select", "SelectLoop", "UpdateDatabase", "ModifyDatabase", "InsertDatabase", "DeleteDatabase", "OpenCursor"].includes(kind(s))) return;
+    const short = this.shortForm?.get(s);
+    if (short) {
+      // INTO the work area right after FROM dbtab; a field list goes into
+      // its components of the same name, as the short form did
+      const last = findAll(s, "DatabaseTable")[0].getLastToken();
+      ov.set(key(last), `${ov.has(key(last)) ? ov.get(key(last)) : last.getStr()} INTO ${short.star ? "" : "CORRESPONDING FIELDS OF "}@${short.tab}`);
+    }
     if (s.getTokens().some((t) => t.getStr().startsWith("@"))) return;
     const escape = (tok) => {
       const k = key(tok);
@@ -3837,6 +4044,7 @@ class Converter {
       escape(t.getFirstToken());
       changed = true;
     }
+    if (short) changed = true;
     if (!changed) return;
     const comma = (tok) => {
       const k = key(tok);
@@ -4317,6 +4525,12 @@ class Converter {
 
   callFunction(s, b) {
     const fm = uc(unquote(nodeText(child(s, "FunctionName")).trim()));
+    // the progress of SAP GUI's status bar - the browser shows its own busy indicator
+    if (fm === "SAPGUI_PROGRESS_INDICATOR") {
+      this.note("SAPGUI_PROGRESS_INDICATOR / cl_progress_indicator - dropped, the browser shows a busy indicator while the server works");
+      this.map(s, "dropped - the progress indicator of SAP GUI");
+      return true;
+    }
     if (POPUPS.has(fm)) {
       this.popup(s, b, fm);
       return true;
@@ -4330,7 +4544,10 @@ class Converter {
       return true;
     }
     if (fm === "F4IF_INT_TABLE_VALUE_REQUEST") {
-      if (!b.ctx.valueRequest) {
+      // in a FORM: called from AT SELECTION-SCREEN ON VALUE-REQUEST, its
+      // value_help_popup( ) writes into the field of that event
+      if (b.ctx.form && !b.ctx.valueRequest) this.todo(s, `F4IF_INT_TABLE_VALUE_REQUEST in FORM ${b.ctx.form.name}: value_help_popup( ) writes the picked value into the field of the AT SELECTION-SCREEN ON VALUE-REQUEST the FORM is called from - call it from there only`);
+      if (!b.ctx.valueRequest && !b.ctx.form) {
         this.refuse(s, "F4IF_INT_TABLE_VALUE_REQUEST outside of AT SELECTION-SCREEN ON VALUE-REQUEST - only an F4 of the selection screen is converted");
         return true;
       }
@@ -4432,51 +4649,282 @@ class Converter {
 
   // --------------------------------------------------------------- locals
 
-  localsSource() {
-    if (!this.locals.length) return {};
-    const globals = new Set([...this.globalData, ...this.globalTypes]);
-    const usedInDecl = [...this.decls, ...this.forms.map((f) => f.stmt)].some((s) => s.getTokens().some((t) => this.localNames.has(lc(t.getStr()))));
-    const def = [];
-    const imp = [];
-    for (const u of this.locals) {
-      const declared = new Set();
-      for (const s of u.stmts) {
-        if (["Data", "ClassData", "Constant", "Type", "MethodDef", "FieldSymbol"].includes(kind(s))) declared.add(lc(declName(s) ?? ""));
-        for (const p of findAll(s, "MethodParamName")) declared.add(lc(nodeText(p)));
-        for (const p of findAll(s, "InlineData")) declared.add(lc(p.getTokens()[2]?.getStr() ?? ""));
+  /** whether a declaration of the class - a global, an inline declaration
+   *  that became an attribute, a FORM's parameter - is typed with a local
+   *  class or interface: then their definitions go to locals_def */
+  localsInDecl() {
+    const viaDecl = [...this.decls, ...this.forms.map((f) => f.stmt)].some((s) => s.getTokens().some((t) => this.localNames.has(lc(t.getStr()))));
+    const viaHoisted = [...(this.hoisted ?? new Map()).values()].some((h) => [...this.localNames].some((n) => new RegExp(`\\b${n}\\b`, "i").test(h.decl)));
+    return viaDecl || viaHoisted;
+  }
+
+  /**
+   * Where the declarations go that local classes are typed with. The local
+   * types of a class pool (locals_def) can only be used in the PRIVATE
+   * SECTION of the class, and they are read before it. So: a global typed
+   * with a local class or interface is a private attribute, and when local
+   * definitions are needed by the class (locals_def) and use types or
+   * constants of the report, those go to locals_def ahead of them - with
+   * every type of the report they build on, and every one built on them.
+   */
+  planLocalTypes() {
+    this.movedTypes = new Set();
+    this.privateGlobals = new Set();
+    if (!this.locals.length) return;
+    const tokensOf = (list) => new Set(list.flatMap((x) => stmtTokens(x).map((t) => lc(t.getStr()))));
+    // the top-level TYPES / CONSTANTS of the report with the statements of their run
+    const runs = new Map();
+    for (let i = 0; i < this.decls.length; i++) {
+      const s = this.decls[i];
+      const k = kind(s);
+      if (!["Type", "TypeBegin", "Constant", "ConstantBegin", "TypeEnum", "TypeEnumBegin"].includes(k) || this.insideBegin(s)) continue;
+      const at = this.stmts.indexOf(s);
+      const end = this.declEnd(at);
+      runs.set(lc(declName(s) ?? ""), this.stmts.slice(at, end + 1));
+    }
+    const usedInDecl = this.localsInDecl();
+    if (usedInDecl) {
+      const defs = this.locals.filter((u) => ["ClassDefinition", "Interface"].includes(u.kind));
+      const queue = [...tokensOf(defs.flatMap((u) => u.stmts))].filter((t) => runs.has(t));
+      while (queue.length) {
+        const t = queue.pop();
+        if (this.movedTypes.has(t)) continue;
+        this.movedTypes.add(t);
+        for (const r of tokensOf(runs.get(t))) if (runs.has(r) && !this.movedTypes.has(r)) queue.push(r);
       }
-      for (const s of u.stmts) {
-        const k = kind(s);
-        if (["Perform", "Write", "Uline", "Skip", "NewLine", "Format", "Hide"].includes(k)) {
-          this.refuse(s, `${uc(renderTokens(stmtTokens(s)).split(/\s/)[0])} in a local class - the class has no list and no FORMs of the report; move the statement into the report's methods`);
-          continue;
-        }
-        const toks = stmtTokens(s);
-        for (let i = 0; i < toks.length; i++) {
-          const t = lc(toks[i].getStr());
-          const prev = i > 0 ? toks[i - 1].getStr() : "";
-          if (["-", "->", "=>", "~"].includes(prev)) continue;
-          if (globals.has(t) && !declared.has(t)) {
-            this.refuse(toks[i], `the local class uses ${t}, a global of the report - a local class of the generated class cannot reach the report's attributes; pass it as a parameter`);
-            break;
+      // a type of the report that builds on a moved one moves as well
+      let grew = true;
+      while (grew) {
+        grew = false;
+        for (const [name, run] of runs) {
+          if (this.movedTypes.has(name)) continue;
+          if ([...tokensOf(run)].some((t) => this.movedTypes.has(t) && t !== name)) {
+            this.movedTypes.add(name);
+            grew = true;
           }
         }
       }
+    }
+    const local = new Set([...this.localNames, ...this.movedTypes]);
+    for (const s of this.decls) {
+      const k = kind(s);
+      if (!["Data", "DataBegin", "Parameter", "SelectOption"].includes(k) || this.insideBegin(s)) continue;
+      const at = this.stmts.indexOf(s);
+      const run = k === "DataBegin" ? this.stmts.slice(at, this.declEnd(at) + 1) : [s];
+      if (![...tokensOf(run)].some((t) => local.has(t))) continue;
+      if (k === "Parameter" || k === "SelectOption") {
+        this.refuse(s, `${uc(declName(s))} is typed with a local type of the report - a field of the selection screen is a public attribute, which a local type cannot type; give it a type of the dictionary or a built-in one`);
+        continue;
+      }
+      this.privateGlobals.add(lc(declName(s) ?? ""));
+    }
+  }
+
+  /**
+   * The local classes and interfaces of the report, as the local types of
+   * the class. A method of a local class that writes the list, calls a FORM
+   * or uses a global of the report is converted like an event block: the
+   * report's data is reached through the instance of the class
+   * (lcl_r2c=>app->gv, set at the start of every event method), its
+   * constants and types through the class (zcl_x=>c_pi), the methods of the
+   * runtime and the FORMs through the instance - the class declares the
+   * local class a LOCAL FRIEND for that. Everything else is copied as it is.
+   */
+  localsSource() {
+    if (!this.locals.length) return {};
+    const cls = this.className;
+    const usedInDecl = this.localsInDecl();
+    const isDefUnit = (u) => ["ClassDefinition", "Interface", "ClassDeferred", "InterfaceDeferred"].includes(u.kind);
+    const nameOf = (u) => lc(nodeText(child(u.stmts[0], "ClassName") ?? child(u.stmts[0], "InterfaceName") ?? u.stmts[0].getChildren()[1]));
+    const REPORT_KINDS = new Set(["Perform", "Write", "Uline", "Skip", "NewLine", "NewPage", "Format", "Hide", "Message",
+      "SetPFStatus", "SetTitlebar", "Submit", "CallSelectionScreen", "Leave", "Position", "Reserve", "Window", "Stop"]);
+    const reportGlobals = new Set([...this.globalData, ...this.globalTypes, ...this.globalConstants]);
+    const formMethods = new Set(this.forms.map((f) => f.method).filter(Boolean));
+
+    // what a local class declares itself: attributes, types, constants,
+    // methods and their parameters - those names are its own
+    const declaredOf = new Map();
+    const methodsOf = new Map();
+    for (const u of this.locals) {
+      const n = nameOf(u);
+      if (!declaredOf.has(n)) declaredOf.set(n, new Set());
+      if (!methodsOf.has(n)) methodsOf.set(n, new Set());
+      for (const s of u.stmts) {
+        if (["Data", "ClassData", "Constant", "Type", "TypeBegin", "ConstantBegin", "MethodDef", "FieldSymbol", "Events", "ClassDataBegin", "DataBegin"].includes(kind(s))) declaredOf.get(n).add(lc(declName(s) ?? ""));
+        if (kind(s) === "MethodDef") methodsOf.get(n).add(lc(nodeText(child(s, "MethodName"))));
+        for (const p of findAll(s, "MethodParamName")) declaredOf.get(n).add(lc(nodeText(p)));
+      }
+    }
+    // a subclass inherits what its local superclass declares
+    for (const u of this.locals.filter((x) => x.kind === "ClassDefinition")) {
+      const sup = child(u.stmts[0], "SuperClassName");
+      const parent = sup && lc(nodeText(sup));
+      if (parent && declaredOf.has(parent)) {
+        for (const d of declaredOf.get(parent)) declaredOf.get(nameOf(u)).add(d);
+        for (const d of methodsOf.get(parent)) methodsOf.get(nameOf(u)).add(d);
+      }
+    }
+    const usesReport = (s, declared) => {
+      const parents = tokenParents(s);
+      return stmtTokens(s).some((t) => {
+        const v = lc(t.getStr());
+        if (!reportGlobals.has(v) || declared.has(v) || this.movedTypes.has(v)) return false;
+        const parent = parents.get(key(t));
+        return parent === "Field" || (parent === "TypeName" && this.globalTypes.has(v));
+      });
+    };
+
+    const def = [];
+    const imp = [];
+    const friends = new Set();
+    const persisted = new Set([...this.decls.map((s) => renderTokens(stmtTokens(s))), ...[...(this.hoisted ?? new Map()).values()].map((h) => h.decl)].flatMap((text) => {
+      const m = /type\s+ref\s+to\s+([\w/]+)/i.exec(text);
+      return m ? [lc(m[1])] : [];
+    }));
+    const copied = new Set();   // rows a chained statement (CLASS: a DEFINITION DEFERRED, b ...) was copied with
+    for (const u of this.locals) {
+      const n = nameOf(u);
+      const declared = declaredOf.get(n) ?? new Set();
+      const inDef = usedInDecl && isDefUnit(u);
       const first = u.stmts[0].getFirstToken().getRow();
       const last = u.stmts[u.stmts.length - 1].getLastToken().getRow();
-      const text = this.lines.slice(first - 1, last).join("\n");
-      if (usedInDecl && ["ClassDefinition", "Interface", "ClassDeferred", "InterfaceDeferred"].includes(u.kind)) def.push(text);
-      else imp.push(text);
-      this.mapped.push({ row: first, col: 1, classic: renderTokens(stmtTokens(u.stmts[0])).split("\n")[0], target: usedInDecl && u.kind !== "ClassImplementation" ? "locals_def" : "locals_imp" });
+      if (copied.has(`${first}:${last}`)) continue;
+      copied.add(`${first}:${last}`);
+      const text = this.lines.slice(first - 1, last);
+      const replace = [];   // { from, to (rows of the source), lines }
+      const subst = [];     // { row, col, len, text } - a token replaced in place
+      // a macro call outside of a converted body: its expansion, written out
+      u.stmts.forEach((s, i) => {
+        if (kind(s) !== "MacroCall") return;
+        const expanded = [];
+        for (let j = i + 1; u.stmts[j] && u.stmts[j].getFirstToken().getStart() instanceof abaplint.VirtualPosition; j++) expanded.push(u.stmts[j]);
+        const row = s.getFirstToken().getRow();
+        const pad = this.lines[row - 1].match(/^\s*/)[0];
+        replace.push({ from: row, to: s.getLastToken().getRow(), lines: expanded.map((x) => `${pad}${renderTokens(stmtTokens(x))}.`), macro: true });
+      });
+      if (u.kind === "ClassImplementation") {
+        // the method bodies
+        let cur;
+        const bodies = [];
+        for (const s of u.stmts.slice(1)) {
+          const k = kind(s);
+          if (k === "MethodImplementation") cur = { name: lc(nodeText(child(s, "MethodName"))), stmt: s, body: [] };
+          else if (k === "EndMethod" && cur) {
+            cur.end = s;
+            bodies.push(cur);
+            cur = undefined;
+          } else if (cur) cur.body.push(s);
+        }
+        for (const b of bodies) {
+          const params = new Set(this.locals.filter((x) => nameOf(x) === n).flatMap((x) => x.stmts)
+            .filter((x) => kind(x) === "MethodDef" && lc(nodeText(child(x, "MethodName"))) === b.name.split("~").pop())
+            .flatMap((x) => findAll(x, "MethodParamName").map((p) => lc(nodeText(p)))));
+          const own = new Set([...declared, ...params]);
+          const needs = b.body.some((x) => REPORT_KINDS.has(kind(x)) || usesReport(x, own)
+            || (kind(x) === "CallFunction" && /^'?(POPUP_|REUSE_ALV_)/i.test(nodeText(child(x, "FunctionName")))));
+          if (!needs || !b.body.length) continue;
+          const key = `${n}~${b.name}`;
+          const body = this.convertBody(b.body, { method: key, local: { cls: n, declared: own } });
+          const was = [...(this.methodWa.get(key) ?? new Map())].map(([tab, wa]) => `DATA ${wa} LIKE LINE OF ${tab}.`);
+          const pre = [...was, ...(this.prelude.get(key) ?? []), ...this.fieldSymbolDecls(body)];
+          const calls = new Set([...BASE_METHODS, ...REPORT_CALLS, ...formMethods].filter((x) => !(methodsOf.get(n) ?? new Set()).has(x)));
+          const lines = [...pre, ...trimBlank(body)].map((l) => prefixCalls(l, calls, this.appRef));
+          const pad = (this.lines[b.stmt.getFirstToken().getRow() - 1].match(/^\s*/)[0]) + "  ";
+          replace.push({ from: b.stmt.getLastToken().getRow() + 1, to: b.end.getFirstToken().getRow() - 1, lines: lines.map((l) => indent(l, pad.length)) });
+          friends.add(n);
+        }
+      } else {
+        // the definition: a type or constant of the report through the class
+        for (const s of u.stmts) {
+          const toks = stmtTokens(s);
+          const parents = tokenParents(s);
+          toks.forEach((t, i) => {
+            const v = lc(t.getStr());
+            const prev = i > 0 ? toks[i - 1].getStr() : "";
+            if (!reportGlobals.has(v) || declared.has(v) || this.movedTypes.has(v) || ["-", "->", "=>", "~"].includes(prev)) return;
+            // only a type or a variable of the statement - not a parameter, a
+            // component or a dictionary type that shares the name
+            const parent = parents.get(key(t));
+            if (parent === "TypeName" ? !this.globalTypes.has(v) : parent !== "Field") return;
+            if (this.globalData.has(v) && !this.globalConstants.has(v)) {
+              this.refuse(t, `the local class uses ${v}, a global of the report - a local class of the generated class cannot reach the report's attributes; pass it as a parameter`);
+              return;
+            }
+            if (inDef) {
+              this.refuse(t, `the local class uses ${v}, a global of the report - a local class of the generated class cannot reach the report's attributes; pass it as a parameter`);
+              return;
+            }
+            subst.push({ row: t.getRow(), col: t.getCol(), len: t.getStr().length, text: `${cls}=>${t.getStr()}` });
+          });
+        }
+      }
+
+      // the copy, with the converted bodies and the replaced tokens
+      const out = [];
+      let row = first;
+      const repl = replace.sort((a, b) => a.from - b.from);
+      while (row <= last) {
+        const r = repl.find((x) => x.from === row);
+        if (r) {
+          out.push(...r.lines);
+          row = Math.max(r.to, row - 1) + 1;
+          continue;
+        }
+        let line = this.lines[row - 1];
+        for (const sb of subst.filter((x) => x.row === row).sort((a, b) => b.col - a.col)) {
+          line = line.slice(0, sb.col - 1) + sb.text + line.slice(sb.col - 1 + sb.len);
+        }
+        out.push(line);
+        row++;
+      }
+      // an instance of a local class the report keeps survives the
+      // roundtrip with the app - its class must be serializable
+      if (u.kind === "ClassDefinition" && persisted.has(n) && !child(u.stmts[0], "SuperClassName")
+        && !u.stmts.some((s) => kind(s) === "InterfaceDef" || /if_serializable_object/i.test(renderTokens(stmtTokens(s))))) {
+        const at = out.findIndex((l) => /^\s*PUBLIC\s+SECTION\s*\./i.test(l));
+        if (at >= 0) {
+          out.splice(at + 1, 0, `${out[at].match(/^\s*/)[0]}  INTERFACES if_serializable_object.`);
+          this.note("a local class whose instance the report keeps implements if_serializable_object - the app is serialized between two roundtrips, its attributes with it");
+        }
+      }
+      (inDef ? def : imp).push(out.join("\n"));
+      void text;
+      this.mapped.push({ row: first, col: 1, classic: renderTokens(stmtTokens(u.stmts[0])).split("\n")[0], target: inDef ? "locals_def" : "locals_imp" });
     }
-    return { def: def.join("\n\n"), imp: imp.join("\n\n") };
+
+    // the helper that hands the instance to the local classes, and their friendship
+    if (friends.size) {
+      const deferred = [...friends].filter((f) => !(usedInDecl && this.locals.some((u) => u.kind === "ClassDefinition" && nameOf(u) === f)));
+      const head = [
+        `" the instance of the report for its local classes - set at the start of`,
+        `" every event method; the local classes reach the report's data through it`,
+        `CLASS ${this.appClass} DEFINITION FINAL.`,
+        "  PUBLIC SECTION.",
+        `    CLASS-DATA app TYPE REF TO ${cls}.`,
+        "ENDCLASS.",
+        "",
+        `CLASS ${this.appClass} IMPLEMENTATION.`,
+        "ENDCLASS.",
+        "",
+        ...deferred.map((f) => `CLASS ${f} DEFINITION DEFERRED.`),
+        `CLASS ${cls} DEFINITION LOCAL FRIENDS ${[...friends].join(" ")}.`,
+      ];
+      imp.unshift(head.join("\n"));
+      this.note("local classes that write the list, call a FORM or use a global of the report reach the report through lcl_r2c=>app, the instance of the class - LOCAL FRIENDS of the class, so the FORMs and the methods of the runtime are theirs to call");
+    }
+    if (this.localTypeLines.length) {
+      def.unshift(["\" the types and constants of the report the local classes are typed with", ...this.localTypeLines].join("\n"));
+    }
+    return { def: def.join("\n\n"), imp: imp.join("\n\n"), app: friends.size > 0 };
   }
 
   fieldSymbolDecls(body) {
     if (!this.globalFieldSymbols) return [];
     const text = body.join("\n").toLowerCase();
+    // a field symbol the method declares itself shadows the global one
+    const own = (name) => new RegExp(`${name.replace(/[<>]/g, "\\$&")}\\s+(type|like|structure)\\b`).test(text);
     return this.globalFieldSymbols
-      .filter((s) => text.includes(lc(declName(s))))
+      .filter((s) => text.includes(lc(declName(s))) && !own(lc(declName(s))))
       .map((s) => `${renderTokens(stmtTokens(s), new Map(), s.getColon()).replace(/^([\w-]+)(\s*):\s*/, "$1 ")}.`);
   }
 
@@ -4496,6 +4944,8 @@ class Converter {
     for (let i = 0; i < statements.length; i++) {
       const s = statements[i];
       let exp = expected[i];
+      // a full-line comment with * lives in the first column - never moved
+      if (kind(s) === "Comment" && s.getFirstToken().getStr().startsWith("*")) continue;
       // a comment stands where the statement after it stands - the
       // pretty printer's indent would put one right after a WHEN or ELSE
       // at the level of the CASE or IF
@@ -4798,6 +5248,83 @@ function renderTableCall(method, params) {
     lines[lines.length - 1] += " )";
   });
   return `${lines.join("\n")} ).`;
+}
+
+// the methods of the runtime the converted code calls, besides BASE_METHODS
+const REPORT_CALLS = ["list", "write", "message", "message_t100", "messages_from_bapiret", "alv", "tree", "set_title",
+  "set_pf_status", "set_line_count", "leave_to_selection_screen", "submit", "call_selection_screen", "window",
+  "popup_to_confirm", "popup_to_decide", "popup_get_values", "popup_get_values_sval", "popup_values_sval",
+  "popup_answer", "popup_values", "value_help_popup", "lsind", "set_lsind", "get_selected_rows", "get_cursor",
+  "lisel", "set_parameter_id", "get_parameter_id", "set_cursor_field", "vrm_set_values"];
+
+/**
+ * A call of a method of the report class written without its instance -
+ * list( ), message( ), a FORM - prefixed with ref-> in a line of converted
+ * code of a local class; strings and the text of templates are left alone.
+ */
+function prefixCalls(line, names, ref) {
+  let out = "";
+  let i = 0;
+  const code = (seg) => seg.replace(/(^|[^\w>~=-])([a-z_][\w]*)\(/gi, (all, pre, name) => (names.has(name.toLowerCase()) ? `${pre}${ref}->${name}(` : all));
+  while (i < line.length) {
+    const c = line[i];
+    if (c === "'" || c === "`") {
+      const j = line.indexOf(c, i + 1);
+      const end = j < 0 ? line.length : j + 1;
+      out += line.slice(i, end);
+      i = end;
+      continue;
+    }
+    if (c === '"') {
+      out += line.slice(i);
+      break;
+    }
+    if (c === "|") {
+      // a string template: the text stays, the expressions in { } are code
+      let j = i + 1;
+      out += c;
+      while (j < line.length && line[j] !== "|") {
+        if (line[j] === "\\") {
+          out += line.slice(j, j + 2);
+          j += 2;
+          continue;
+        }
+        if (line[j] === "{") {
+          const close = line.indexOf("}", j);
+          const e = close < 0 ? line.length : close + 1;
+          out += code(line.slice(j, e));
+          j = e;
+          continue;
+        }
+        out += line[j++];
+      }
+      if (j < line.length) out += "|";
+      i = j + 1;
+      continue;
+    }
+    let j = i;
+    while (j < line.length && !["'", "`", '"', "|"].includes(line[j])) j++;
+    out += code(line.slice(i, j));
+    i = j;
+  }
+  return out;
+}
+
+/** the kind of the node each token of a statement hangs from - a variable
+ *  hangs from Field, a type from TypeName; a column, a table, a formal
+ *  parameter or a component from a node of its own */
+function tokenParents(s) {
+  const out = new Map();
+  const walk = (n, parent) => {
+    if (n.getChildren().length === 0) {
+      const t = n.getFirstToken();
+      if (t) out.set(key(t), parent);
+      return;
+    }
+    for (const c of n.getChildren()) walk(c, kind(n));
+  };
+  walk(s, kind(s));
+  return out;
 }
 
 /** the name WRITE ... UNDER g refers to: the field, or the text of a literal */

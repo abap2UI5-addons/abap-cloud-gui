@@ -266,6 +266,39 @@ AT SELECTION-SCREEN OUTPUT.
     rewrite: "Correct the name, or merge the two blocks of `-LOW` and `-HIGH` into one.",
   },
   {
+    id: "inline-global",
+    title: "An inline declaration of an event block, used in another one, of a type that cannot be told",
+    match: /is declared inline in an event block and used in another one/,
+    why: "Event blocks open no scope: `DATA(x) = ...` in `INITIALIZATION` is a global of the report, and `START-OF-SELECTION` may use it. In the class it becomes an attribute, which needs its type. The converter takes it from a constructor expression (`NEW lcl( )`, `VALUE ty( )`) or from abaplint's syntax check - not from a method of a class that is not part of the input.",
+    rewrite: abap(`
+* before
+INITIALIZATION.
+  DATA(go_app) = zcl_app=>create( ).
+START-OF-SELECTION.
+  go_app->run( ).
+
+* after
+DATA go_app TYPE REF TO zcl_app.
+INITIALIZATION.
+  go_app = zcl_app=>create( ).
+`),
+  },
+  {
+    id: "dynamic-screen-type",
+    title: "A field of the selection screen typed at runtime: TYPE (name), FOR (name)",
+    match: /is typed at runtime \(TYPE \(name\) \/ FOR \(name\)\)/,
+    why: "Every field of the selection screen becomes an attribute of the class - typed when the class is written. A type taken from a variable at runtime has nothing to type it with.",
+    rewrite: abap(`
+* before
+PARAMETERS p_value TYPE (p_type).
+SELECT-OPTIONS s_vbeln FOR (gv_name).
+
+* after - the type the report really asks for
+PARAMETERS p_value TYPE string.
+SELECT-OPTIONS s_vbeln FOR vbak-vbeln.
+`),
+  },
+  {
     id: "selscreen",
     title: "SELECTION-SCREEN INCLUDE and other screen statements",
     match: /^(SELECTION-SCREEN INCLUDE|this SELECTION-SCREEN statement|SELECTION-SCREEN TAB)/,

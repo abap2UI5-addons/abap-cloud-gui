@@ -88,6 +88,7 @@ CLASS ltcl_report DEFINITION INHERITING FROM z2ui5_cl_cgui_report FINAL.
     DATA p_check     TYPE xsdboolean.
     DATA mv_block    TYPE string.
     DATA mv_window   TYPE abap_bool.
+    DATA mv_leave    TYPE abap_bool.
     DATA mv_replace TYPE abap_bool.
     DATA mv_exit     TYPE string.
     DATA mv_exit_err TYPE abap_bool.
@@ -154,6 +155,7 @@ CLASS ltcl_test DEFINITION FINAL FOR TESTING
     METHODS select_option_buffer FOR TESTING.
     METHODS select_option_complex FOR TESTING.
     METHODS secondary_list_and_back FOR TESTING.
+    METHODS leave_during_the_run FOR TESTING.
     METHODS alv_box_copy_selection FOR TESTING.
     METHODS url_values_screen_only FOR TESTING.
     METHODS url_skip_screen FOR TESTING.
@@ -251,6 +253,13 @@ CLASS ltcl_report IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD start_of_selection.
+
+    " LEAVE PROGRAM after a message - back on the selection screen
+    IF mv_leave = abap_true.
+      message( `Unknown airline` ).
+      leave_to_selection_screen( ).
+      RETURN.
+    ENDIF.
 
     IF mv_tree = abap_true.
       DATA(lo_tree) = tree( ).
@@ -591,6 +600,20 @@ CLASS ltcl_test IMPLEMENTATION.
     event( `SOME_COMMAND` ).
     cl_abap_unit_assert=>assert_equals( act = lines( mo_report->s_code )
                                         exp = 2 ).
+
+  ENDMETHOD.
+
+  METHOD leave_during_the_run.
+
+    init( ).
+    mo_report->p_carrid = `LH`.
+    mo_report->mv_leave = abap_true.
+    event( z2ui5_cl_cgui_report=>cs_ucomm-execute ).
+    cl_abap_unit_assert=>assert_equals( act = mo_cut->mv_cgui_screen
+                                        exp = `SELECTION` ).
+    " the message of the report, and not the one of an empty list
+    cl_abap_unit_assert=>assert_true( xsdbool( line_exists( mo_cut->mt_cgui_msg[ text = `Unknown airline` ] ) ) ).
+    cl_abap_unit_assert=>assert_false( xsdbool( line_exists( mo_cut->mt_cgui_msg[ text = `List contains no data` ] ) ) ).
 
   ENDMETHOD.
 

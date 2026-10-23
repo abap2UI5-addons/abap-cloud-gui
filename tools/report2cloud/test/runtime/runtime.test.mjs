@@ -206,6 +206,30 @@ test("zr2c_19_grid: cl_gui_alv_grid on a screen - the grid, its toolbar, the dou
   assert.ok(s.fields.some((f) => f.name === "P_CARRID"), "the selection screen");
 });
 
+test("zr2c_21_lclreport: a local report class that reads the selection screen, writes the list and calls a FORM", { skip }, async () => {
+  let s = await d.start("z2ui5_cl_cgui_r2c_21");
+  s = await d.act(s.session, { event: "CGUI_EXECUTE" });
+  // SELECT SINGLE into the TABLES work area, the local class's list, gc_max
+  // of its constants, the FORM it PERFORMs with the total it summed up
+  assert.deepEqual(d.lines(), [
+    "Airline: Lufthansa",
+    "Flights",
+    "0400 300",
+    "0400 120",
+    "0402 385",
+    "Seats occupied in the first 3 flights: 805",
+  ]);
+  // the instance kept from INITIALIZATION runs again, the total starts afresh
+  s = await d.act(s.session, { event: "CGUI_BACK" });
+  s = await d.act(s.session, { event: "CGUI_EXECUTE" });
+  assert.deepEqual(d.lines().slice(-1), ["Seats occupied in the first 3 flights: 805"]);
+  // an unknown airline: LEAVE PROGRAM is the selection screen again
+  s = await d.act(s.session, { event: "CGUI_BACK" });
+  s = await d.act(s.session, { values: { P_CARRID: "XX" }, event: "CGUI_EXECUTE" });
+  assert.ok(s.fields.some((f) => f.name === "P_CARRID"), "back on the selection screen");
+  assert.deepEqual(toasts(s), ["Unknown airline"]);
+});
+
 test("zr2c_06_dynamic: radio buttons and checkbox with USER-COMMAND, MODIF ID, LOOP AT SCREEN, a push button, an own F4", { skip }, async () => {
   let s = await d.start("z2ui5_cl_cgui_r2c_06");
   assert.equal(s.title, "Dynamic Selection Screen");
