@@ -44,6 +44,8 @@ node tools/report2cloud/cli.mjs <report.prog.abap> [options]
   --class <name>   name of the generated class (default: zcl_ + the report name)
   --out <dir>      output folder (default: the current folder)
   --texts <file>   the report's .prog.xml with its text pool (default: beside the source)
+  --includes <dir> where the report's INCLUDEs are, as abapGit writes them: <include>.prog.abap
+                   (default: beside the source; the includes are inlined before the conversion)
   --report <file>  where to write the migration report (default: <out>/<class>.migration.md)
   --check          lint the class with abaplint - v750 and ABAP Cloud, in a scratch
                    copy of this repository (needs git and network for the dependencies)
@@ -71,6 +73,32 @@ The selection texts, text symbols and the title live in the text pool, not in
 the source. abapGit serializes them into `<report>.prog.xml`; when that file
 lies beside the source (or is given with `--texts`) the class gets the real
 texts, otherwise placeholders and a TODO each.
+
+A grown report is a main program and its includes - the TOP include with the
+globals and the selection screen, F01 with the FORMs - and abapGit writes each
+include as a `.prog.abap` of its own. The converter reads them from beside the
+source (or from `--includes`) and inlines them before the parse, recursively,
+so the class holds the whole report; a position in a refusal, a TODO or the
+mapping table names the include and its own line. `INCLUDE x IF FOUND.`
+without a file is dropped, as the compiler drops it; a plain `INCLUDE` without
+a file is refused, naming the file it looked for. Macros (`DEFINE`) are
+expanded at every call, wherever they are defined.
+
+### Measuring a code base
+
+```
+node tools/report2cloud/coverage.mjs <dir> [<dir> ...] [--includes dir] [--json file]
+```
+
+converts every report under the folders in memory - a `.prog.abap` with a
+`REPORT` or `PROGRAM` statement; the rest are includes - and prints how many
+convert, how many are refused and for which reasons, which objects the
+migration reports name as unreleased on ABAP Cloud and what the TODOs are
+about, each ranked by the number of reports it touches. Run it on an abapGit
+export of the Z reports: the top line of the refusals is the next construct
+to map, and the converted share is the number to move. `--json` writes a line
+per report for a diff between two runs. A measurement, not a gate - the exit
+code is 0 whatever the numbers.
 
 ## An example
 
@@ -188,6 +216,8 @@ class `ZR2C` must exist in the target system.
 
 | Classic | abap-cloud-gui |
 |---|---|
+| `INCLUDE x` | the include's source, inlined before the parse from `x.prog.abap` beside the report (or `--includes`), recursively; `IF FOUND` without a file is dropped |
+| `DEFINE` ... `END-OF-DEFINITION`, a macro call | the statements of the macro at every call, with the spacing of its body; the definition and the call are not carried over |
 | `REPORT` / `PROGRAM` | the class, `INHERITING FROM z2ui5_cl_cgui_report`; `MESSAGE-ID` is the class of every short `MESSAGE e001`; the title of the text pool is `set_title( )`; `LINE-COUNT n` is `set_line_count( n )` in `initialization( )` - the runtime counts the lines of the list without header and footer, the classic `n` counted them too (noted) |
 | `PARAMETERS p TYPE/LIKE ...` | a PUBLIC attribute and `screen->parameter( )`; `LIKE` a DDIC field becomes `TYPE`, `p(10)` / `TYPE c LENGTH 10` / `DECIMALS` are kept |
 | `... DEFAULT v` | `p = v.` at the top of `initialization( )` |
@@ -281,7 +311,7 @@ them are collected, so one run lists everything there is to do.
 | a global of the report named like a method or attribute of `z2ui5_cl_cgui_report` (`tree`, `format`, `window`, ...) | the global becomes an attribute of the class - rename it in the source first |
 | `LEAVE TO LIST-PROCESSING`, `LEAVE PROGRAM`, `LEAVE TO TRANSACTION` | the list is shown after `start_of_selection( )`; there is nothing to leave |
 | `NODES`, `GET`, `REJECT` | logical databases |
-| `INCLUDE`, `DEFINE` / macro calls | the include is not part of the input, macros are not expanded - inline them first |
+| `INCLUDE` without its file beside the report | the include was not found as `<include>.prog.abap` - put it there, or name its folder with `--includes` |
 | a table with header line (`OCCURS`, `WITH HEADER LINE`), a `TABLES` parameter used as work area, `SELECT` without `INTO` | not allowed in classes |
 | `MESSAGE` without message class, `MESSAGE ... RAISING` | |
 | `PERFORM ... IN PROGRAM`, `PERFORM f(prog)`, `IF FOUND`, `ON COMMIT`, a `PERFORM` whose parameters do not match the FORM, a literal passed to a parameter the FORM changes | only FORMs of this report, called as methods |
@@ -352,7 +382,9 @@ of the samples: one call per line, the parameters aligned.
 | File | |
 |---|---|
 | `cli.mjs` | the command line |
+| `coverage.mjs` | the measurement over a folder of reports |
 | `lib/convert.mjs` | the converter |
+| `lib/includes.mjs` | the INCLUDEs of a report, inlined from the files beside it, with where every line came from |
 | `lib/abap.mjs` | helpers over the syntax tree, the token renderer |
 | `lib/textpool.mjs` | the text pool of a `.prog.xml` |
 | `lib/abapgit.mjs` | the `.clas.xml` and the abapGit format of the source |
@@ -376,13 +408,18 @@ npm run test:report2cloud:runtime                                          # the
   pages (`LINE-COUNT`, `TOP-OF-PAGE` with `sy-pagno`, `END-OF-PAGE`,
   `NEW-PAGE NO-HEADING`, `TOP-OF-PAGE DURING LINE-SELECTION`) with the
   `AT SELECTION-SCREEN ON BLOCK / RADIOBUTTON GROUP / END OF / EXIT-COMMAND`
-  events - and one with `CALL SCREEN`, batch input, `SUBMIT`, native SQL and dynpro
+  events, a report in three pieces (a TOP include with the globals, the
+  selection screen and a macro, an F01 include with the FORMs, an `IF FOUND`
+  include that is not there - the includes lie beside it the way abapGit
+  writes them, a `.prog.abap` without a `REPORT` statement is no report of the
+  corpus) - and one with `CALL SCREEN`, batch input, `SUBMIT`, native SQL and dynpro
   modules that must be refused. A report `zr2c_NN_name` becomes the class
   `z2ui5_cl_cgui_r2c_NN`, a name the repository's `object_naming` accepts.
 - `test/convert.test.mjs` - the snapshots of every generated file and
   migration report (`test/snapshots/`), the abapGit format of the files, the
   determinism, and the mapping table and the refusals construct by construct.
-- `test/cli.test.mjs` - the command line, its files and exit codes.
+- `test/cli.test.mjs` - the command line, its files and exit codes, `--includes`,
+  and the coverage script over the corpus.
 - `test/abaplint.test.mjs` - **every generated class must compile**: the
   classes are linted in a scratch copy of this repository with its own
   configs. With `abaplint.jsonc` (v750, every rule the repository enforces)

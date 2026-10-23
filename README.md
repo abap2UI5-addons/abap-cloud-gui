@@ -289,9 +289,13 @@ npm ci
 npm run report2cloud -- zflights.prog.abap --out src/02
 ```
 
-It is deterministic and refuses rather than guesses: what has no counterpart
-in a browser app (`CALL SCREEN`, dynpro modules, batch input, `SUBMIT`, native
-SQL) is reported with file, line and column. Next to the class it writes a
+The includes of a report are read from beside it, as abapGit writes them,
+and macros are expanded at their calls. It is deterministic and refuses
+rather than guesses: what has no counterpart in a browser app (`CALL SCREEN`,
+dynpro modules, batch input, `SUBMIT`, native SQL) is reported with file,
+line and column. `npm run report2cloud:coverage -- <dir>` converts a whole
+folder of reports in memory and says how many convert and what stops the
+rest - the measurement the roadmap below is ordered by. Next to the class it writes a
 migration report - the TODOs, and the tables and APIs that are not released on
 ABAP Cloud, with their successors as hints: the work list for a person or an
 AI model, checked with abaplint's ABAP Cloud rules, the abap2UI5 linter and
@@ -362,6 +366,46 @@ Known limitations:
 
 **Next**
 
+The order is the measurement's: `report2cloud:coverage` over a corpus of
+real reports says which construct stops the most of them, and that construct
+is next. Every stage is a release of its own.
+
+Stage 0 - release, and the number to move
+
+- [ ] A release of this addon with report2cloud and the MCP server's
+      `migrate_report`; the documentation's preview note goes
+- [ ] A corpus of real reports (own, and open-source ABAP), converted on
+      every change and weekly: the share that converts without a refusal,
+      and the share that starts in the transpiled runtime, as a line in the
+      job summary - the number every stage below is measured by
+- [x] `report2cloud:coverage` - the measurement over a folder of reports
+- [x] Includes inlined from beside the report, macros expanded
+
+Stage 1 - the converter: the constructs that stop the most reports
+
+- [ ] Tables with a header line (`OCCURS`, `WITH HEADER LINE`) rewritten
+      into a table and a work area - mechanical, and in every report older
+      than 7.0
+- [ ] `SUBMIT ... AND RETURN` and `CALL SELECTION-SCREEN`: the called report
+      converted with the caller and reached through `nav_app_call( )`, its
+      `WITH` parameters handed over - reports call reports
+- [ ] The synchronous popups (`POPUP_TO_CONFIRM`, `POPUP_TO_DECIDE`): the
+      event block cut at the call, the rest continued in
+      `at_user_command( )` - the one transformation that changes a block's
+      shape, and the one in every report that posts something
+- [ ] `SET PF-STATUS`, `SET TITLEBAR`, `AT PFnn` as `set_pf_status( )`,
+      toolbar functions and the keyboard shortcuts of the runtime
+- [ ] Secondary lists (`sy-lsind`) and `WRITE AT` positions, in a monospace
+      list mode - the evaluations that live by the column
+- [ ] `cl_gui_alv_grid` in a container with its simple handlers (hotspot,
+      double click, toolbar) as `alv( )` - the ALV every report since 2005
+      is written with
+- [ ] `AT SELECTION-SCREEN ON HELP-REQUEST`, `SELECTION-SCREEN FUNCTION KEY`,
+      `TABBED BLOCK` and `BEGIN OF SCREEN` on the runtime's own counterparts
+- [ ] A documentation page per refusal: why, and the rewrite that unblocks it
+
+Stage 2 - the runtime: what a report's user sees
+
 Selection screen
 
 - [ ] Value helps: CDS value helps (`@Consumption.valueHelpDefinition`),
@@ -369,9 +413,23 @@ Selection screen
       popup of a select-option
 - [ ] `AT SELECTION-SCREEN ON BLOCK`, `ON RADIOBUTTON GROUP`, `AS LISTBOX`
 - [ ] `MEMORY ID`
+- [ ] A phone layout of the selection screen
 - [x] Selection variants on the server (table `Z2UI5_CGUI_VAR`): shared
       and protected variants, a pluggable store beside the browser's local
       storage, dynamic date values
+
+Output
+
+- [x] ALV: Excel export (Office Open XML), layouts on the server (table
+      `Z2UI5_CGUI_LAY`, shared, protected, a default per user)
+- [ ] ALV: user-formatted dates, times and amounts, totals and subtotals,
+      hotspot per column, toolbar with own functions, editable cells
+- [ ] ALV: a chart over the grid - the columns as series, the layout's
+      sort and filter applied
+- [ ] List: `WRITE AT` positions and `UNDER`, monospace columns,
+      secondary lists (`sy-lsind`)
+- [ ] Print as PDF; "Execute in background" as an application job with the
+      list as a file or a mail
 
 Messages and logging
 
@@ -389,6 +447,7 @@ Dialogs and screens
 
 Navigation and transactions
 
+- [ ] Launchpad tiles and intent navigation for a converted class
 - [ ] Command field instead of a plain input: transaction codes, `/n`, `/o`
 - [ ] Command palette (`Cmd+K` / `Ctrl+K`) to search and start reports
 - [ ] Input history: the last entries of a field, opened with the space bar
@@ -398,25 +457,43 @@ Navigation and transactions
 - [ ] `SET` / `GET PARAMETER ID` with user parameters (like SU3), system
       parameters and customizing parameters
 
-Output
+Stage 3 - clean core at the scale of a code base
 
-- [x] ALV: Excel export (Office Open XML), layouts on the server (table
-      `Z2UI5_CGUI_LAY`, shared, protected, a default per user)
-- [ ] ALV: user-formatted dates, times and amounts, totals and subtotals,
-      hotspot per column, toolbar with own functions, editable cells
-- [ ] List: `WRITE AT` positions and `UNDER`, monospace columns,
-      `TOP-OF-PAGE`, secondary lists (`sy-lsind`)
+- [ ] A `SELECT` from a table with a known released successor rewritten,
+      field names included, where the mapping is certain; a typed wrapper
+      stub for an unreleased function module, for a person to fill
+- [ ] ATC findings in the migration report
+- [ ] A whole package or transport converted in one run: the dependency
+      graph over `SUBMIT` and `PERFORM ... IN PROGRAM`, one coverage table
+      for the estate, the refusals ranked across it
 
-Quality
+Stage 4 - in the browser, and with an agent
+
+- [ ] The converter in the abap2UI5 playground: drop a `.prog.abap` into the
+      AI Studio, the class runs on the stage, the refusals are the model's
+      work list - nothing to install
+- [ ] `migrate_report` in the MCP server with the class deployed into the
+      sandbox and its first screen answered
+- [ ] An evaluation harness for the AI loop: a model works the migration
+      reports of the corpus, and the share that ends clean is measured
+
+Stage 5 - research
+
+- [ ] Simple dynpros: a module pool with one screen of fields, PBO / PAI
+      and a few function codes mapped onto `selection_screen( )` forms,
+      everything else still refused
+
+Quality, through every stage
 
 - [ ] Tests for the report runtime and the ALV with a client test double
       (the selection screen has them), samples in the abap2UI5 playground,
       documentation page
+- [ ] Semantic tests: the classic report and its class driven against the
+      same seeded rows in the transpiled runtime, their lists compared
 
 Later
 
-- [ ] Background execution (application jobs on ABAP Cloud), print / PDF,
-      tree lists
+- [ ] Tree lists
 
 ## Development
 

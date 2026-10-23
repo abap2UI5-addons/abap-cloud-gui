@@ -57,8 +57,7 @@ const REFUSED = {
   Submit: "SUBMIT - the report is not part of the input; convert it as well and start its class with submit( report = ... values = ... )",
   ExecSQL: "EXEC SQL - native SQL is not available on ABAP Cloud; use ABAP SQL on a released CDS view",
   Module: "MODULE - dynpro modules have no counterpart",
-  Include: "INCLUDE - the include is not part of the input; inline its source into the report and convert again",
-  Define: "DEFINE - macros are not converted; expand them in the source first",
+  Include: "INCLUDE - no such include beside the report (as <include>.prog.abap, the name abapGit writes); put it there, or name its folder with --includes",
   Nodes: "NODES - logical databases have no counterpart; read the data with ABAP SQL",
   Get: "GET - logical database events have no counterpart; read the data with ABAP SQL",
   Reject: "REJECT - logical database statement",
@@ -218,6 +217,9 @@ class Converter {
     this.source = source.replace(/\r\n?/g, "\n");
     this.lines = this.source.split("\n");
     this.file = opts.file ?? "zreport.prog.abap";
+    // where a row of the source came from - an include inlined before the
+    // parse (lib/includes.mjs), or the report itself
+    this.origin = opts.origin ?? ((row) => ({ file: this.file, row }));
     this.pool = opts.textpool ?? { title: "", symbols: new Map(), selection: new Map() };
     this.programName = opts.programName;
     this.className = opts.className;
@@ -232,6 +234,12 @@ class Converter {
   refuse(at, message) {
     const tok = at && (at.getFirstToken ? at.getFirstToken() : at);
     this.refusals.push({ row: tok ? tok.getRow() : 0, col: tok ? tok.getCol() : 0, message });
+  }
+
+  /** "line 12", or "line 12 of zx_top.prog.abap" for a row of an include */
+  where(row) {
+    const o = this.origin(row);
+    return o.file !== this.file && o.file !== this.file.split("/").pop() ? `line ${o.row} of ${o.file}` : `line ${o.row}`;
   }
 
   map(s, target) {
@@ -298,10 +306,15 @@ class Converter {
         this.refuse(s, `the parser does not understand this statement - a syntax error, or a statement of a newer release: ${shortText(s)}`);
         continue;
       }
-      if (k === "MacroCall" || k === "MacroContent") {
-        this.refuse(s, "a macro call - macros are not converted; expand them in the source first");
+      // The parser expands a macro at every call: the statements of the
+      // call follow it here, at the call's position, and are converted like
+      // any other. The definition and the call themselves are not carried
+      // over - a class has no macros.
+      if (k === "MacroCall") {
+        this.map(s, "the statements of the macro, expanded at the call");
         continue;
       }
+      if (k === "MacroContent") continue;
       if (k === "Comment") {
         // a comment belongs to the statement after it - trailing comments
         // of a block (the banner of the next FORM) are dropped
@@ -331,8 +344,9 @@ class Converter {
         continue;
       }
       if (k === "Define") {
-        this.refuse(s, REFUSED.Define);
+        this.map(s, "nothing - the macro is expanded at every call");
         i = this.findEnd(i, "EndOfDefinition");
+        pendingComments = [];
         continue;
       }
       if (k === "Form") {
@@ -1918,7 +1932,7 @@ class Converter {
       const refused = this.refusals.length;
       this.statement(s, b);
       // a refused statement leaves a mark in the draft (--partial)
-      if (this.refusals.length > refused) b.out.push(`" report2cloud refused (line ${first}): ${shortText(s).replace(/"/g, "'")}`);
+      if (this.refusals.length > refused) b.out.push(`" report2cloud refused (${this.where(first)}): ${shortText(s).replace(/"/g, "'")}`);
       b.lastRow = s.getLastToken().getRow();
     }
     this.currentForm = undefined;

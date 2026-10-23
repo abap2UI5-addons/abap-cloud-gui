@@ -492,3 +492,55 @@ test("REPORT LINE-COUNT n(m) and END-OF-PAGE; NEW-PAGE NO-HEADING LINE-COUNT", (
   assert.doesNotMatch(none.abap, /end_of_page/);
   assert.ok(none.result.todos.some((t) => /END-OF-PAGE dropped/.test(t.message)));
 });
+
+// ------------------------------------------------- includes and macros
+
+test("a macro is expanded at every call, with the spacing of its body and a blank where a parameter grew", () => {
+  const src = [
+    "REPORT zt.",
+    "DATA: gv_total TYPE i, gs_line TYPE string.",
+    "DEFINE add_to.",
+    "  &1 = &1 + &2.",
+    "  WRITE: / &2.",
+    "END-OF-DEFINITION.",
+    "START-OF-SELECTION.",
+    "  add_to gv_total 2.",
+    "  add_to gv_total gs_line-qty.",
+  ].join("\n");
+  const r = convert(src, { file: "zt.prog.abap", className: "zcl_t" });
+  assert.deepEqual(r.refusals, []);
+  const cls = r.draft["zcl_t.clas.abap"];
+  assert.match(cls, /gv_total = gv_total \+ 2\./);
+  assert.match(cls, /gv_total = gv_total \+ gs_line-qty\./);
+  assert.match(cls, /write\( gs_line-qty \)/);
+  assert.ok(!cls.includes("DEFINE"), "the definition is not carried over");
+  assert.ok(r.mapped.some((m) => m.classic.startsWith("DEFINE add_to")));
+  assert.ok(r.mapped.some((m) => m.classic.startsWith("add_to gv_total 2") && /expanded/.test(m.target)));
+});
+
+test("an INCLUDE without its file is refused and names the file it looked for", () => {
+  const r = refusalOf("REPORT zt.\nINCLUDE zt_top.\nSTART-OF-SELECTION.\n  WRITE 'x'.\n");
+  assert.match(r[0], /^2:1 INCLUDE - no such include beside the report \(as <include>\.prog\.abap/);
+});
+
+test("the corpus report with includes: the includes are inlined, the positions name the include", () => {
+  const e = entries.find((x) => x.name === "zr2c_13_includes");
+  assert.ok(e, "zr2c_13_includes is in the corpus");
+  assert.deepEqual(e.includes.included, ["ZR2C_13_INCLUDES_TOP", "ZR2C_13_INCLUDES_F01"]);
+  assert.deepEqual(e.includes.missing, []);
+  // the include that is not there, dropped as IF FOUND says
+  assert.match(e.source, /" INCLUDE ZR2C_13_INCLUDES_NIX IF FOUND - no such include/);
+  const { result, report } = converted.get(e.name);
+  assert.ok(result.ok, result.refusals.map((r) => r.message).join("\n"));
+  // the PARAMETERS of the TOP include is a row of the include in the report
+  assert.match(report, /\| zr2c_13_includes_top\.prog\.abap:13 \| `PARAMETERS p_count TYPE i DEFAULT 3`/);
+  assert.match(report, /\| Includes \| inlined: `ZR2C_13_INCLUDES_TOP`, `ZR2C_13_INCLUDES_F01` \|/);
+  // the FORM of F01 is a method, the macro of TOP is expanded in the main program's loop
+  const cls = result.draft["z2ui5_cl_cgui_r2c_13.clas.abap"];
+  assert.match(cls, /METHOD fill_lines\./);
+  assert.match(cls, /gv_total = gv_total \+ gs_line-qty\./);
+});
+
+test("the include files beside the corpus are not reports of their own", () => {
+  assert.ok(!entries.some((x) => x.name.startsWith("zr2c_13_includes_")));
+});
