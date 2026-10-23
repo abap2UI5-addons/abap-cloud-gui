@@ -405,8 +405,9 @@ Stage 1 - the converter: the constructs that stop the most reports
 - [x] `cl_gui_alv_grid` in a container with its simple handlers (hotspot,
       double click, toolbar, user command) as `alv( )`, the screen's PBO and
       PAI modules resolved - the ALV every report since 2005 is written with
-- [ ] `AT SELECTION-SCREEN ON HELP-REQUEST`, `SELECTION-SCREEN FUNCTION KEY`,
-      `TABBED BLOCK` and `BEGIN OF SCREEN` on the runtime's own counterparts
+- [x] `AT SELECTION-SCREEN ON HELP-REQUEST`, `SELECTION-SCREEN FUNCTION KEY`,
+      `TABBED BLOCK` and `BEGIN OF SCREEN` (`AS WINDOW` and `AS SUBSCREEN`)
+      on the runtime's own counterparts
 - [ ] A documentation page per refusal: why, and the rewrite that unblocks it
 
 Stage 2 - the runtime: what a report's user sees
@@ -431,8 +432,9 @@ Output
       hotspot per column, toolbar with own functions, editable cells
 - [ ] ALV: a chart over the grid - the columns as series, the layout's
       sort and filter applied
-- [ ] List: `WRITE AT` positions and `UNDER`, monospace columns,
-      secondary lists (`sy-lsind`)
+- [x] List: `WRITE AT` positions and `UNDER`, columns that line up
+      (every item of a positioned line in a box of its width), secondary
+      lists (`sy-lsind`, `set_lsind( )`)
 - [ ] Print as PDF; "Execute in background" as an application job with the
       list as a file or a mail
 
@@ -456,7 +458,8 @@ Navigation and transactions
 - [ ] Command field instead of a plain input: transaction codes, `/n`, `/o`
 - [ ] Command palette (`Cmd+K` / `Ctrl+K`) to search and start reports
 - [ ] Input history: the last entries of a field, opened with the space bar
-- [ ] Keyboard shortcuts: F8 Execute, F3 Back, `AT PFnn`
+- [x] Keyboard shortcuts: F8 Execute, F3 Back, `AT PFnn` and the function
+      keys of a GUI status (`set_pf_status( shortcuts = )`)
 - [ ] Transaction logic: start with a variant, prefill the last entries,
       create a draft
 - [ ] `SET` / `GET PARAMETER ID` with user parameters (like SU3), system

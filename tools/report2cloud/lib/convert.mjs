@@ -1134,12 +1134,53 @@ class Converter {
   /** the selection screen: fields, value requests, user commands, HIDE */
   analyzeScreen() {
     this.valueRequest = new Set();
+    this.helpRequest = new Set();
     for (const e of this.events) {
       if (e.kind !== "AtSelectionScreen") continue;
       const t = uc(renderTokens(stmtTokens(e.stmt)));
       const m = /ON\s+VALUE-REQUEST\s+FOR\s+([\w/]+)(-LOW|-HIGH)?/.exec(t);
       if (m) this.valueRequest.add(lc(m[1]));
+      const h = /ON\s+HELP-REQUEST\s+FOR\s+([\w/]+)(-LOW|-HIGH)?/.exec(t);
+      if (h) this.helpRequest.add(lc(h[1]));
     }
+    // SELECTION-SCREEN FUNCTION KEY n: its text is set in sscrfields-functxt_0n,
+    // a text or an SMP_DYNTXT structure with icon_id / icon_text / text
+    this.functionKeys = new Map();     // n -> { text, icon }
+    this.screenDrops = new Map();      // statement -> why it is dropped
+    this.fkeyVars = new Set();
+    const body = [...this.events.flatMap((e) => e.stmts), ...this.forms.flatMap((f) => f.body)];
+    const dyntxt = new Map();          // variable -> { text, icon }
+    for (const x of [...this.decls, ...body]) {
+      if (kind(x) === "Data" && /type\s+smp_dyntxt\b/i.test(renderTokens(stmtTokens(x)))) this.fkeyVars.add(lc(declName(x)));
+    }
+    for (const x of body) {
+      if (kind(x) !== "Move" && kind(x) !== "Clear") continue;
+      const flat = renderTokens(stmtTokens(x));
+      if (kind(x) === "Clear" && [...this.fkeyVars].some((v) => new RegExp(`\\b${v}\\b`, "i").test(flat))) {
+        this.screenDrops.set(x, "the text of a function key - function_key( ) in selection_screen( )");
+        continue;
+      }
+      let m = /^([\w/]+)\s*-\s*(icon_id|icon_text|text|quickinfo|path)\s*=\s*(.+)$/i.exec(flat);
+      if (m && this.fkeyVars.has(lc(m[1]))) {
+        const cur = dyntxt.get(lc(m[1])) ?? {};
+        cur[lc(m[2])] = m[3].trim();
+        dyntxt.set(lc(m[1]), cur);
+        this.screenDrops.set(x, "the text of a function key - function_key( ) in selection_screen( )");
+        continue;
+      }
+      m = /^sscrfields\s*-\s*functxt_0([1-5])\s*=\s*(.+)$/i.exec(flat);
+      if (m) {
+        const v = m[2].trim();
+        const d = dyntxt.get(lc(v));
+        const icon = d?.icon_id ? ICONS[lc(d.icon_id)] : undefined;
+        this.functionKeys.set(Number(m[1]), d ? { text: d.icon_text ?? d.text, icon, quickinfo: d.quickinfo } : { text: v });
+        this.screenDrops.set(x, `the text of FUNCTION KEY ${m[1]} - function_key( ) in selection_screen( )`);
+      }
+    }
+    // SELECTION-SCREEN BEGIN OF TABBED BLOCK tb - a program that selects
+    // the tab itself (tb-activetab, tb-dynnr) has no counterpart
+    this.tabbedBlocks = new Set(this.decls.filter((x) => kind(x) === "SelectionScreen" && hasSeq(words(x), "BEGIN", "OF", "TABBED", "BLOCK"))
+      .map((x) => lc(nodeText(child(x, "BlockName")))));
     // AT SELECTION-SCREEN ON BLOCK b - the runtime knows a block by the name
     // block_begin( ) is given, so the blocks named there get one
     this.onBlocks = new Set(this.events.filter((e) => e.kind === "AtSelectionScreen")
@@ -1251,6 +1292,7 @@ class Converter {
     const onEndOf = [];
     const onExit = [];
     const valueRequest = [];
+    const onHelp = [];
     for (const e of byKind("AtSelectionScreen")) {
       const t = assText(e);
       if (/^AT\s+SELECTION-SCREEN(\s+OUTPUT)?$/.test(t)) continue;
@@ -1298,8 +1340,18 @@ class Converter {
           this.todo(e.stmt, "ON EXIT-COMMAND: ucomm is `CGUI_BACK` (cs_ucomm-back) here, not BACK, %EX or RW - check the codes the block compares");
         }
         onExit.push(...this.convertBody(e.stmts, { method: "at_selection_screen_on_exit", ucomm: true }));
-      } else if (/ON\s+HELP-REQUEST/.test(t)) {
-        this.refuse(e.stmt, "AT SELECTION-SCREEN ON HELP-REQUEST - at_selection_screen_on_help( ) runs from the F1 button, which a field only has when its data element has documentation; the block would never run for the other fields - port it by hand");
+      } else if ((m = /ON\s+HELP-REQUEST\s+FOR\s+([\w/]+)(-LOW|-HIGH)?$/.exec(t))) {
+        const field = m[1];
+        if (!this.screenField(field)) {
+          this.refuse(e.stmt, `ON HELP-REQUEST FOR ${field} - no parameter or select-option of that name`);
+          continue;
+        }
+        if (onHelp.some((v) => v.field === field)) {
+          this.refuse(e.stmt, `a second ON HELP-REQUEST for ${field} - a select-option has one F1 for LOW and HIGH here`);
+          continue;
+        }
+        this.map(e.stmt, `\`at_selection_screen_on_help( field )\` - WHEN \`${field}\`, the field declared with help_request (an F1 button either way)`);
+        onHelp.push({ field, body: this.convertBody(e.stmts, { method: "at_selection_screen_on_help" }) });
       } else if ((m = /ON\s+([\w/]+)$/.exec(t))) {
         const field = m[1];
         if (!this.screenField(field)) {
@@ -1317,6 +1369,12 @@ class Converter {
     if (onRadio.length) methods.push({ name: "at_selection_screen_on_radio", body: caseBody("group", onRadio) });
     if (onEndOf.length) methods.push({ name: "at_selection_screen_on_end_of", body: caseBody("field", onEndOf) });
     if (onExit.length) methods.push({ name: "at_selection_screen_on_exit", body: onExit });
+    if (onHelp.length) {
+      const body = ["CASE field."];
+      for (const v of onHelp) body.push(`  WHEN ${literal(v.field)}.`, ...v.body.map((l) => indent(l, 4)));
+      body.push("  WHEN OTHERS.", "    super->at_selection_screen_on_help( field ).", "ENDCASE.");
+      methods.push({ name: "at_selection_screen_on_help", body });
+    }
 
     // AT SELECTION-SCREEN
     const ass = byKind("AtSelectionScreen", (e) => /^AT\s+SELECTION-SCREEN$/.test(assText(e)));
@@ -1590,7 +1648,7 @@ class Converter {
     lines.push("  PROTECTED SECTION.");
     const order = ["initialization", "selection_screen", "selection_screen_dynnr", "at_selection_screen_output", "at_selection_screen_on",
       "at_selection_screen_on_block", "at_selection_screen_on_radio", "at_selection_screen_on_end_of",
-      "at_selection_screen_on_exit", "at_selection_screen", "start_of_selection", "end_of_selection", "top_of_page",
+      "at_selection_screen_on_exit", "at_selection_screen_on_help", "at_selection_screen", "start_of_selection", "end_of_selection", "top_of_page",
       "top_of_page_line_selection", "end_of_page", "at_line_selection", "at_link_click", "at_user_command", "at_value_request",
       "after_call_selection_screen"];
     methods.sort((a, b) => order.indexOf(a.name) - order.indexOf(b.name));
@@ -1668,6 +1726,7 @@ class Converter {
     // SELECTION-SCREEN BEGIN OF SCREEN nnnn: the fields between BEGIN and
     // END are the chain of selection_screen_dynnr( ) for that number
     this.dynnrScreens = new Map();
+    this.subscreens = new Map();
     const defaults = [];
     const radioGroups = new Map();
     this.radioGroups = radioGroups;
@@ -1708,6 +1767,7 @@ class Converter {
         const listbox = hasSeq(w, "AS", "LISTBOX");
         if (w.includes("OBLIGATORY") && method === "parameter") params.push({ name: "obligatory", value: "abap_true" });
         if (this.valueRequest.has(name) && method === "parameter") params.push({ name: "value_help", value: "abap_true" });
+        if (this.helpRequest.has(name) && method === "parameter") params.push({ name: "help_request", value: "abap_true" });
         if (modif) params.push({ name: "modif_id", value: literal(uc(nodeText(modif))) });
         if (listbox && method === "parameter") params.push({ name: "as_listbox", value: "abap_true" });
         if (ucomm && (method !== "parameter" || listbox)) params.push({ name: "user_command", value: literal(ucomm) });
@@ -1750,6 +1810,7 @@ class Converter {
         if (text) params.push({ name: "text", value: text });
         if (w.includes("OBLIGATORY")) params.push({ name: "obligatory", value: "abap_true" });
         if (this.valueRequest.has(name)) params.push({ name: "value_help", value: "abap_true" });
+        if (this.helpRequest.has(name)) params.push({ name: "help_request", value: "abap_true" });
         const modif = child(s, "Modif");
         if (modif) params.push({ name: "modif_id", value: literal(uc(nodeText(modif))) });
         if (hasSeq(w, "NO", "-", "DISPLAY")) params.push({ name: "no_display", value: "abap_true" });
@@ -1798,10 +1859,13 @@ class Converter {
             push(`DATA ${title} TYPE string.`);
           }
         }
-        const d = { nr, title, chain: [], stmt: s };
-        this.dynnrScreens.set(nr, d);
+        const d = { nr, title, chain: [], stmt: s, subscreen: w.includes("SUBSCREEN") };
+        if (d.subscreen) this.subscreens.set(nr, d);
+        else this.dynnrScreens.set(nr, d);
         chain = d.chain;
-        this.map(s, `\`selection_screen_dynnr( dynnr screen )\` - WHEN \`${nr}\`${w.includes("WINDOW") ? "" : ", shown as a dialog like AS WINDOW"}`);
+        this.map(s, d.subscreen
+          ? `the fields of subscreen ${nr} - on the tab that names it as DEFAULT SCREEN`
+          : `\`selection_screen_dynnr( dynnr screen )\` - WHEN \`${nr}\`${w.includes("WINDOW") ? "" : ", shown as a dialog like AS WINDOW"}`);
         continue;
       }
       if (k === "SelectionScreen" && hasSeq(w, "END", "OF", "SCREEN")) {
@@ -1859,6 +1923,10 @@ class Converter {
           this.map(s, "dropped - the ALV object, field catalog or layout is the alv( ) chain now");
           continue;
         }
+        if (k === "Data" && this.fkeyVars?.has(name)) {
+          this.map(s, "dropped - the text of a function key is function_key( ) in selection_screen( )");
+          continue;
+        }
         if (k === "Data" && (this.isGridObject(name) || this.okDropped?.has(name))) {
           this.map(s, "dropped - the grid, its container and the handler object are the alv( ) chain now");
           continue;
@@ -1914,7 +1982,30 @@ class Converter {
       if (pub.length) pub.push("");
       pub.push(`" ${title}`, ...list);
     }
-    return { chain: renderScreenChain(mainChain), defaults };
+    // the subscreens of the tabs: their fields in place of the tab's placeholder
+    const splice = (list) => {
+      const out = [];
+      for (const c of list) {
+        if (!c.subscreen) {
+          out.push(c);
+          continue;
+        }
+        const d = this.subscreens.get(c.subscreen);
+        if (!d) {
+          this.refuse(c.stmt, `SELECTION-SCREEN TAB ... DEFAULT SCREEN ${c.subscreen} - no SELECTION-SCREEN BEGIN OF SCREEN ${c.subscreen} AS SUBSCREEN in the report`);
+          continue;
+        }
+        d.used = true;
+        out.push(...splice(d.chain));
+      }
+      return out;
+    };
+    const resolved = splice(mainChain);
+    for (const d of this.dynnrScreens.values()) d.chain = splice(d.chain);
+    for (const [nr, d] of this.subscreens) {
+      if (!d.used) this.todo(d.stmt, `subscreen ${nr} is on no tab of the report - SELECTION-SCREEN INCLUDE and CALL SUBSCREEN are not converted; its fields are not on the screen`);
+    }
+    return { chain: renderScreenChain(resolved), defaults };
   }
 
   /** a global data object start_of_selection( ) may reset (resetGlobals) -
@@ -2105,6 +2196,10 @@ class Converter {
         last.params.push({ name: "no_intervals", value: "abap_true" });
       }
       this.map(s, "`screen->block_begin( )`");
+    } else if (hasSeq(w, "END", "OF", "BLOCK") && this.openTabbed?.length && uc(nodeText(child(s, "BlockName"))) === this.openTabbed[this.openTabbed.length - 1]) {
+      this.openTabbed.pop();
+      chain.push({ method: "tabbed_block_end", params: [] });
+      this.map(s, "`screen->tabbed_block_end( )`");
     } else if (hasSeq(w, "END", "OF", "BLOCK")) {
       chain.push({ method: "block_end", params: [] });
       this.map(s, "`screen->block_end( )`");
@@ -2141,9 +2236,31 @@ class Converter {
       this.map(s, "dropped - the selection screen has no blank lines, lines or positions");
       this.note("SELECTION-SCREEN SKIP / ULINE / POSITION - the form lays out the fields by itself");
     } else if (hasSeq(w, "FUNCTION", "KEY")) {
-      this.refuse(s, "SELECTION-SCREEN FUNCTION KEY - not converted; screen->function_key( ) adds the button to the toolbar - port it by hand");
-    } else if (w.includes("TABBED") || w.includes("TAB")) {
-      this.refuse(s, "SELECTION-SCREEN TABBED BLOCK / TAB - tabstrips are not converted; the selection screen of abap-cloud-gui has tabbed blocks - port them by hand");
+      const n = Number(nodeText(child(s, "Integer")));
+      const fk = this.functionKeys.get(n);
+      const params = [{ name: "number", value: String(n) }, { name: "text", value: fk ? this.literalArg(fk.text ?? `'FC0${n}'`, s) : literal(`FC0${n}`) }];
+      if (fk?.icon) params.push({ name: "icon", value: literal(fk.icon) });
+      chain.push({ method: "function_key", params });
+      if (!fk) this.todo(s, `SELECTION-SCREEN FUNCTION KEY ${n}: no sscrfields-functxt_0${n} = ... in the report - the button reads FC0${n}; give it its text in function_key( )`);
+      this.map(s, `\`screen->function_key( )\` - a button of the toolbar raising FC0${n}, which arrives in \`at_user_command( )\` (and AT SELECTION-SCREEN as sscrfields-ucomm)`);
+    } else if (hasSeq(w, "BEGIN", "OF", "TABBED", "BLOCK")) {
+      chain.push({ method: "tabbed_block_begin", params: [] });
+      this.openTabbed = [...(this.openTabbed ?? []), uc(nodeText(child(s, "BlockName")))];
+      this.map(s, "`screen->tabbed_block_begin( )` - the tabs that follow");
+    } else if (w.includes("TAB")) {
+      const field = lc(nodeText(child(s, "InlineField")));
+      const len = nodeText(child(s, "Integer"));
+      heading("selection screen");
+      push(`DATA ${field} TYPE c LENGTH ${len}.`);
+      chain.push({ method: "tab", params: [{ value: field }], positional: true });
+      const ints = s.getChildren().filter((c) => kind(c) === "Integer");
+      if (w.includes("DEFAULT") && w.includes("SCREEN") && !w.includes("PROGRAM") && ints.length > 1) {
+        chain.push({ subscreen: nodeText(ints[ints.length - 1]).padStart(4, "0"), stmt: s });
+      } else {
+        this.refuse(s, `SELECTION-SCREEN TAB ${field}${w.includes("PROGRAM") ? " ... DEFAULT PROGRAM" : " without DEFAULT SCREEN"} - the subscreen of the tab is set at runtime or in another program; give the tab a DEFAULT SCREEN of this report`);
+      }
+      if (child(s, "Field")) this.note("SELECTION-SCREEN TAB ... USER-COMMAND - a click on a tab raises no user command here; the tabs switch in the browser");
+      this.map(s, `\`screen->tab( ${field} )\` - its text is the field ${field}, set in initialization( ); the fields of its subscreen follow`);
     } else if (w.includes("INCLUDE")) {
       this.refuse(s, "SELECTION-SCREEN INCLUDE - the included selection screen is not part of the input");
     } else if (w.includes("DYNAMIC")) {
@@ -2932,6 +3049,19 @@ class Converter {
   statement(s, b) {
     const k = kind(s);
     const out = b.out;
+    if (this.screenDrops?.has(s)) {
+      this.map(s, `dropped - ${this.screenDrops.get(s)}`);
+      return;
+    }
+    if (this.tabbedBlocks?.size) {
+      const toks = stmtTokens(s).map((t) => lc(t.getStr()));
+      const tb = toks.find((t, i) => this.tabbedBlocks.has(t) && toks[i + 1] === "-" && (i === 0 || !["-", "->", "=>"].includes(toks[i - 1])));
+      if (tb) {
+        this.todo(s, `${tb}-activetab / -dynnr: the program selects the tab of the tabbed block ${tb} - the user selects it here; dropped`);
+        this.map(s, "dropped - the tab of a tabbed block is the user's");
+        return;
+      }
+    }
     const plan = this.alvPlan.get(s);
     if (plan) {
       if (plan.action === "skip") return;
@@ -3269,7 +3399,7 @@ class Converter {
       case "Data": {
         const name = lc(declName(s) ?? "");
         if (this.salvVars.has(name) || this.fcatVars.has(name) || this.layoutVars.has(name)
-          || this.gridVars.has(name) || this.contVars.has(name) || this.handlerVars.has(name)) {
+          || this.gridVars.has(name) || this.contVars.has(name) || this.handlerVars.has(name) || this.fkeyVars?.has(name)) {
           this.map(s, "dropped - the ALV object, field catalog or layout is the alv( ) chain now");
           return;
         }

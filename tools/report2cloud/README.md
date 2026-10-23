@@ -239,6 +239,8 @@ class `ZR2C` must exist in the target system.
 | `SELECTION-SCREEN BEGIN OF LINE`, `END OF LINE` | `line_begin( )`, `line_end( )`; a `COMMENT ... FOR FIELD` that opens the line is its label |
 | `SELECTION-SCREEN COMMENT ... TEXT-001 / field [MODIF ID m]` | `screen->comment( )` - a field name declares that field (`TYPE c LENGTH n`), set in `initialization( )` as before |
 | `SELECTION-SCREEN PUSHBUTTON ... USER-COMMAND u` | `screen->button( text event = )` |
+| `SELECTION-SCREEN FUNCTION KEY n` and `sscrfields-functxt_0n = ...` | `screen->function_key( number text icon )` - the text from the assignment (a text, or an `SMP_DYNTXT` with `icon_id`, `icon_text`, `text`), which goes with the `SMP_DYNTXT` variable; the button raises `FC0n`, which arrives in `at_user_command( )` and, when `AT SELECTION-SCREEN` reads `sscrfields-ucomm`, there. Without an assignment the button reads `FC0n` and a TODO says so |
+| `SELECTION-SCREEN BEGIN OF TABBED BLOCK tb`, `TAB (n) t USER-COMMAND u DEFAULT SCREEN s`, `END OF BLOCK tb`, `BEGIN OF SCREEN s AS SUBSCREEN` | `screen->tabbed_block_begin( )`, `tab( t )` with the fields of subscreen `s` after it, `tabbed_block_end( )`; `t` is a field (`TYPE c LENGTH n`) set in `initialization( )` as before. The tabs switch in the browser: a click raises no `u`, and `tb-activetab` / `tb-dynnr` are dropped with a TODO |
 | `SELECTION-SCREEN SKIP / ULINE / POSITION` | dropped (the form lays out the fields) |
 | text symbols `TEXT-001`, `'text'(001)` | the text of the text pool as a literal; a TODO when it is unknown |
 | selection texts | `text =` of the field; none for a text taken from the DDIC (the screen shows the DDIC label as well) |
@@ -256,6 +258,7 @@ class `ZR2C` must exist in the target system.
 | `AT SELECTION-SCREEN ON END OF s` | `at_selection_screen_on_end_of( field )`, `CASE field. WHEN \`S\`.` - the multiple selection left with OK; an error opens it again |
 | `AT SELECTION-SCREEN ON EXIT-COMMAND` | `at_selection_screen_on_exit( ucomm )`, `sy-ucomm` is `ucomm` - `CGUI_BACK`, not `BACK` / `%EX` / `RW` (a TODO when the block reads it) |
 | `AT SELECTION-SCREEN ON VALUE-REQUEST FOR p` (or `s-low`/`s-high`) | `at_value_request( field )`, `WHEN OTHERS. super->at_value_request( field ).`; the field gets `value_help = abap_true` |
+| `AT SELECTION-SCREEN ON HELP-REQUEST FOR p` (or `s-low`/`s-high`) | `at_selection_screen_on_help( field )`, `WHEN OTHERS. super->at_selection_screen_on_help( field ).`; the field gets `help_request = abap_true`, so it has the F1 button whether its data element has documentation or not |
 | `F4IF_INT_TABLE_VALUE_REQUEST` with `retfield` and `value_tab` | `value_help_popup( tab = col = )` - the popup writes the picked value into the field |
 | `AT SELECTION-SCREEN` | `at_selection_screen( )`. When it reads `sy-ucomm` / `sscrfields-ucomm`, its body becomes `at_selection_screen_ucomm( ucomm )`, called by `at_selection_screen( )` with `ONLI` and by `at_user_command( )` with the user command - a push button or `USER-COMMAND` runs it as in the classic report |
 | `START-OF-SELECTION`, statements before the first event | `start_of_selection( )` |
@@ -318,10 +321,9 @@ them are collected, so one run lists everything there is to do.
 | Construct | Why |
 |---|---|
 | `CALL SCREEN`, `MODULE`, `SET SCREEN`, `LEAVE TO SCREEN`, `CALL SUBSCREEN`, `CONTROLS` - but for the screen of one `cl_gui_alv_grid` | dynpros have no counterpart in a browser app |
-| `SELECTION-SCREEN TABBED BLOCK / INCLUDE / FUNCTION KEY`, `SET CURSOR` | not converted; abap-cloud-gui has tabbed blocks, `function_key( )` and `set_cursor_field( )` - port them by hand |
+| `SELECTION-SCREEN INCLUDE`, `SET CURSOR`, a `TAB` without `DEFAULT SCREEN` of this report | not converted; abap-cloud-gui has `set_cursor_field( )` - port them by hand. A tab whose subscreen the program sets at runtime (`tb-dynnr`) has no counterpart |
 | `CALL SELECTION-SCREEN n` of a screen the report does not declare, a second call of the same screen with statements after it | the class calls the screens of `selection_screen_dynnr( )`, and `after_call_selection_screen( )` goes on after one call per screen |
 | `SUBMIT ... EXPORTING LIST TO MEMORY`, `TO SAP-SPOOL`, `VIA JOB`, `WITH-FREE SELECTIONS`, `USING SELECTION-SCREEN n` / `SELECTION-SETS OF PROGRAM` | the list of the called report is not in memory, there is no spool and no job from a browser app; the class has its standard selection screen and its own variants only |
-| `AT SELECTION-SCREEN ON HELP-REQUEST` | `at_selection_screen_on_help( )` runs from the F1 button, which a field only has when its data element has documentation - the block would not run for the other fields |
 | `AT SELECTION-SCREEN ON BLOCK b` / `ON RADIOBUTTON GROUP g` / `ON END OF s` of a block, group or select-option the report does not declare | |
 | `CALL TRANSACTION` (with or without `USING` - batch input) | no SAP GUI transaction can be started; call the released API instead |
 | `EXEC SQL` | native SQL is not available on ABAP Cloud |
@@ -451,8 +453,10 @@ npm run test:report2cloud:runtime                                          # the
   levels (`WINDOW`, `sy-lsind` read and set), a `cl_gui_alv_grid` in a
   custom container on screen 100 with an LVC field catalog, a handler class
   for `DOUBLE_CLICK`, `HOTSPOT_CLICK`, `TOOLBAR` and `USER_COMMAND` and the
-  PBO and PAI modules - and one with `CALL SCREEN`, batch input, native SQL
-  and dynpro modules that must be refused. A report `zr2c_NN_name` becomes the class
+  PBO and PAI modules, the selection screen of a grown report (a tabbed
+  block on two subscreens, two function keys - one with an icon - and an
+  own F1) - and one with `CALL SCREEN`, batch input, native SQL and dynpro
+  modules that must be refused. A report `zr2c_NN_name` becomes the class
   `z2ui5_cl_cgui_r2c_NN`, a name the repository's `object_naming` accepts.
 - `test/convert.test.mjs` - the snapshots of every generated file and
   migration report (`test/snapshots/`), the abapGit format of the files, the

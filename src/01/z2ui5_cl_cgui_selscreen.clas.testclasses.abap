@@ -494,6 +494,15 @@ CLASS ltcl_test IMPLEMENTATION.
       cl_abap_unit_assert=>assert_false( xsdbool( lv_view CS `EVENT:CGUI_HELP_REQUEST` ) ).
     ENDIF.
 
+    " AT SELECTION-SCREEN ON HELP-REQUEST: the report answers F1 - the
+    " button is there without documentation of the data element
+    DATA(lo_own) = z2ui5_cl_cgui_selscreen=>factory( mo_client ).
+    lo_own->parameter( val          = mo_app->mv_char
+                       help_request = abap_true ).
+    DATA(lt_own) = lo_own->get_fields( ).
+    cl_abap_unit_assert=>assert_true( lt_own[ name = `MV_CHAR` ]-help ).
+    cl_abap_unit_assert=>assert_true( xsdbool( lo_own->stringify( ) CS `EVENT:CGUI_HELP_REQUEST` ) ).
+
   ENDMETHOD.
 
   METHOD screen_attributes_r10.

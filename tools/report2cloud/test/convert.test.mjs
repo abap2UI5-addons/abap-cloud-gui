@@ -272,7 +272,7 @@ test("a TABLES parameter used with its header line gets a work area of the metho
   assert.match(cls, /APPEND ls_tt TO tt\./);
 });
 
-test("refused: GUI_DOWNLOAD, PERFORM IN PROGRAM, FUNCTION KEY - a table with a header line and a popup no longer", () => {
+test("refused: GUI_DOWNLOAD, PERFORM IN PROGRAM - a table with a header line, a popup and a function key no longer", () => {
   const r = refusalOf([
     "REPORT zt.",
     "DATA gt TYPE i OCCURS 0.",
@@ -282,10 +282,41 @@ test("refused: GUI_DOWNLOAD, PERFORM IN PROGRAM, FUNCTION KEY - a table with a h
     "  PERFORM x IN PROGRAM zother.",
   ].join("\n"));
   assert.deepEqual(r.map((x) => x.split(" - ")[0]), [
-    "3:1 SELECTION-SCREEN FUNCTION KEY",
     "5:3 CALL FUNCTION 'GUI_DOWNLOAD'",
     "6:3 PERFORM of a FORM of another program, dynamic or ON COMMIT",
   ]);
+});
+
+test("the selection screen of a grown report: tabs on subscreens, function keys with text and icon, an own F1", () => {
+  const cls = classOf("zr2c_20_tabs");
+  const { result } = converted.get("zr2c_20_tabs");
+  assert.equal(result.ok, true, result.refusals.map((x) => x.message).join("\n"));
+  assert.match(cls, /screen->function_key\( number = 1\n\s+text   = 'Today'\n\s+\)->function_key\( number = 2\n\s+text   = 'Reset'\n\s+icon   = `sap-icon:\/\/refresh`/);
+  assert.match(cls, /\)->tabbed_block_begin\(\n\s+\)->tab\( tab_main\n\s+\)->parameter\( val  = p_carrid\n(.*\n)*?\s+\)->tab\( tab_opt\n\s+\)->parameter\( val          = p_max\n\s+text         = `Maximum flights`\n\s+help_request = abap_true\n(.*\n)*?\s+\)->tabbed_block_end\( \)\./);
+  assert.match(cls, /DATA tab_main TYPE c LENGTH 20\./);
+  assert.match(cls, /tab_main = 'Flights'\./);
+  assert.match(cls, /METHOD at_selection_screen_on_help\.\n\n\s+CASE field\.\n\s+WHEN `P_MAX`\.\n(.*\n)*?\s+WHEN OTHERS\.\n\s+super->at_selection_screen_on_help\( field \)\./);
+  // FC01 / FC02 arrive as user commands, AT SELECTION-SCREEN reads them as ucomm
+  assert.match(cls, /at_selection_screen_ucomm\( ucomm \)\./);
+  assert.match(cls, /WHEN 'FC02'\./);
+  assert.ok(!/sscrfields|smp_dyntxt|ls_text|tabs-activetab/i.test(cls));
+  assert.ok(result.todos.some((t) => /tabs-activetab/.test(t.message)));
+});
+
+test("a tab without DEFAULT SCREEN, a subscreen on no tab, a FUNCTION KEY without text", () => {
+  const r = convert([
+    "REPORT zt.",
+    "SELECTION-SCREEN FUNCTION KEY 3.",
+    "SELECTION-SCREEN BEGIN OF TABBED BLOCK tb FOR 5 LINES.",
+    "SELECTION-SCREEN TAB (10) t1 USER-COMMAND u1.",
+    "SELECTION-SCREEN END OF BLOCK tb.",
+    "SELECTION-SCREEN BEGIN OF SCREEN 300 AS SUBSCREEN.",
+    "PARAMETERS p_x TYPE i.",
+    "SELECTION-SCREEN END OF SCREEN 300.",
+  ].join("\n"), { file: "zt.prog.abap", className: "zcl_t" });
+  assert.deepEqual(r.refusals.map((x) => x.message.split(" - ")[0]), ["SELECTION-SCREEN TAB t1 without DEFAULT SCREEN"]);
+  assert.ok(r.todos.some((t) => /FUNCTION KEY 3: no sscrfields-functxt_03/.test(t.message)));
+  assert.ok(r.todos.some((t) => /subscreen 0300 is on no tab/.test(t.message)));
 });
 
 test("the synchronous popups: popup_to_decide( ) / popup_get_values_sval( ), the block cut at the call and continued in at_user_command( )", () => {
