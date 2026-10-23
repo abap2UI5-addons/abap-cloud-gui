@@ -94,7 +94,7 @@ test("--includes names the folder of the includes; a refusal in an include names
 test("coverage: the corpus as numbers - converted, refused, the reasons ranked", () => {
   const r = spawnSync(process.execPath, [join(HERE, "..", "coverage.mjs"), CORPUS], { encoding: "utf8" });
   assert.equal(r.status, 0, r.stderr);
-  assert.match(r.stdout, /^report2cloud coverage: 18 report\(s\) - 17 converted \(94 %\), 1 refused/);
+  assert.match(r.stdout, /^report2cloud coverage: 19 report\(s\) - 18 converted \(95 %\), 1 refused/);
   assert.match(r.stdout, /includes: 1 report\(s\) with includes inlined/);
   assert.match(r.stdout, /Refused - the next constructs to map \(reports affected\)\n(.*\n)*.*CALL SCREEN/);
   assert.match(r.stdout, /Objects to check for ABAP Cloud/);

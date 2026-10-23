@@ -402,9 +402,9 @@ Stage 1 - the converter: the constructs that stop the most reports
 - [x] Secondary lists (`sy-lsind`) and `WRITE AT` positions, in a column
       mode of the list (every item of a line with a position in a box of
       its width in characters) - the evaluations that live by the column
-- [ ] `cl_gui_alv_grid` in a container with its simple handlers (hotspot,
-      double click, toolbar) as `alv( )` - the ALV every report since 2005
-      is written with
+- [x] `cl_gui_alv_grid` in a container with its simple handlers (hotspot,
+      double click, toolbar, user command) as `alv( )`, the screen's PBO and
+      PAI modules resolved - the ALV every report since 2005 is written with
 - [ ] `AT SELECTION-SCREEN ON HELP-REQUEST`, `SELECTION-SCREEN FUNCTION KEY`,
       `TABBED BLOCK` and `BEGIN OF SCREEN` on the runtime's own counterparts
 - [ ] A documentation page per refusal: why, and the rewrite that unblocks it

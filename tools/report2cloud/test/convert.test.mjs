@@ -224,8 +224,8 @@ test("refusals: every statement without a counterpart, with file, row and column
 
 test("SUBMIT ... AND RETURN starts the class of the called report with the values, CALL SELECTION-SCREEN goes on in after_call_selection_screen( )", () => {
   const cls = classOf("zr2c_15_submit");
-  assert.match(cls, /submit\( report = `Z2UI5_CL_CGUI_R2C_02`\n\s+values = VALUE #\( \( name = `P_CARRID` kind = z2ui5_cl_cgui_variant=>cs_kind-parameter low = p_carrid \)\n\s+\( LINES OF z2ui5_cl_cgui_variant=>range_lines_get\( name = `S_FLDATE` range = s_fldate \) \)\n\s+\( name = `P_MAX` kind = z2ui5_cl_cgui_variant=>cs_kind-select_option sign = 'E' option = `NE` low = p_max \) \) \)\./);
-  assert.match(cls, /submit\( report\s+= `Z2UI5_CL_CGUI_R2C_01`\n\s+values\s+= VALUE #\( \( LINES OF z2ui5_cl_cgui_variant=>selection_table_get\( gt_rspar \) \) \)\n\s+via_selection_screen = abap_true\n\s+using_variant\s+= 'DEFAULT' \)\./);
+  assert.match(cls, /DATA lt_r2c_submit_1 TYPE z2ui5_cl_cgui_variant=>ty_t_value\.\n\s+DATA lt_r2c_lines_1 TYPE z2ui5_cl_cgui_variant=>ty_t_value\.\n\s+CLEAR lt_r2c_submit_1\.\n\s+INSERT VALUE #\( name = `P_CARRID` kind = z2ui5_cl_cgui_variant=>cs_kind-parameter low = p_carrid \) INTO TABLE lt_r2c_submit_1\.\n\s+lt_r2c_lines_1 = z2ui5_cl_cgui_variant=>range_lines_get\( name = `S_FLDATE` range = s_fldate \)\.\n\s+APPEND LINES OF lt_r2c_lines_1 TO lt_r2c_submit_1\.\n\s+INSERT VALUE #\( name = `P_MAX` kind = z2ui5_cl_cgui_variant=>cs_kind-select_option sign = 'E' option = `NE` low = p_max \) INTO TABLE lt_r2c_submit_1\.\n\s+submit\( report = `Z2UI5_CL_CGUI_R2C_02`\n\s+values = lt_r2c_submit_1 \)\./);
+  assert.match(cls, /lt_r2c_lines_2 = z2ui5_cl_cgui_variant=>selection_table_get\( gt_rspar \)\.\n\s+APPEND LINES OF lt_r2c_lines_2 TO lt_r2c_submit_2\.\n\s+submit\( report\s+= `Z2UI5_CL_CGUI_R2C_01`\n\s+values\s+= lt_r2c_submit_2\n\s+via_selection_screen = abap_true\n\s+using_variant\s+= 'DEFAULT' \)\./);
   // without AND RETURN the classic ended the caller
   assert.match(cls, /submit\( report = `Z2UI5_CL_CGUI_R2C_01`\n\s+values = VALUE #\( \( name = `P_NAME` kind = z2ui5_cl_cgui_variant=>cs_kind-parameter low = 'Bye' \) \) \)\.\n\s+RETURN\./);
   // the screen of its own, and the dialog
@@ -329,6 +329,75 @@ test("a popup at the top of an event block: the answer and the SVAL values first
   // the second popup is cut out of the first continuation
   assert.match(cls, /WHEN `POPUP_2`\.\n\s+lv_rc = SWITCH #\( popup_answer\( \) WHEN '1' THEN 'J' WHEN '2' THEN 'N' ELSE 'A' \)\.\n\s+IF lv_rc = 'J'\./);
   assert.ok(r.todos.some((t) => /lv_n was declared inline before the call/.test(t.message)));
+});
+
+// ------------------------------------------------------- cl_gui_alv_grid
+
+test("cl_gui_alv_grid on a screen: alv( ) with the field catalog, the handlers as methods, the PAI module as at_user_command( )", () => {
+  const cls = classOf("zr2c_19_grid");
+  const { result } = converted.get("zr2c_19_grid");
+  assert.equal(result.ok, true, result.refusals.map((r) => r.message).join("\n"));
+  assert.ok(!/cl_gui_|TYPE REF TO lcl_handler|go_grid|go_cont|ok_code|save_ok|\blvc_[ts]_/i.test(cls), "no grid, container, handler, OK code or LVC type is left");
+  assert.equal(result.draft["z2ui5_cl_cgui_r2c_19.clas.locals_imp.abap"], undefined, "the handler class is gone");
+  // the PBO module in place of CALL SCREEN, the chain from the field catalog, the layout and the toolbar handler
+  assert.match(cls, /ORDER BY PRIMARY KEY\.\n\n\s+set_pf_status\( functions = VALUE #\( \( name = `REFRESH`/);
+  assert.match(cls, /alv\( gt_flight\n\s+\)->set_title\( 'Flights'\n\s+\)->set_column_text\( name = `CONNID`\n\s+text = 'Flight'/);
+  assert.match(cls, /\)->set_column_hidden\( `MANDT`\n\s+\)->set_column_hotspot\( `CONNID`\n\s+\)->set_column_sum\( `SEATSOCC`\n\s+\)->add_function\( name    = `FULL`\n\s+text    = 'Full flights'\n\s+icon    = `sap-icon:\/\/accept`\n\s+tooltip = 'Count the full flights'\n\s+\)->add_function\( name = `ALL`\n\s+text = 'All flights'\n\s+\)->set_line_selection\( \)\./);
+  // the handlers
+  assert.match(cls, /METHOD at_line_selection\.\n\n\s+" the DOUBLE_CLICK handler of the grid - lcl_handler->on_double_click\n\s+READ TABLE gt_flight INDEX row INTO gs_flight\./);
+  assert.match(cls, /METHOD at_link_click\.\n\n(.*\n)*?\s+IF column = 'CONNID'\./);
+  // the PAI module: the OK code is ucomm, LEAVE TO SCREEN 0 the selection screen; then the USER_COMMAND handler
+  assert.match(cls, /" the PAI module of the screen - the OK code is ucomm\n\s+CASE ucomm\.\n\s+WHEN 'BACK' OR 'EXIT' OR 'CANCEL'\.\n\s+leave_to_selection_screen\( \)\./);
+  assert.equal(result.todos.length, 0, result.todos.map((t) => t.message).join("\n"));
+});
+
+test("cl_gui_alv_grid: get_selected_rows( ) - the selection column, LVC_T_ROW the row type of the runtime", () => {
+  const r = convert([
+    "REPORT zt.",
+    "DATA gt TYPE STANDARD TABLE OF i WITH DEFAULT KEY.",
+    "DATA gt_rows TYPE lvc_t_row.",
+    "DATA gt_ids TYPE lvc_t_roid.",
+    "DATA go_grid TYPE REF TO cl_gui_alv_grid.",
+    "START-OF-SELECTION.",
+    "  CREATE OBJECT go_grid EXPORTING i_parent = cl_gui_container=>default_screen.",
+    "  go_grid->set_table_for_first_display( CHANGING it_outtab = gt ).",
+    "  go_grid->get_selected_rows( IMPORTING et_index_rows = gt_rows et_row_no = gt_ids ).",
+  ].join("\n"), { file: "zt.prog.abap", className: "zcl_t" });
+  const cls = r.draft["zcl_t.clas.abap"];
+  assert.equal(r.ok, true, r.refusals.map((x) => x.message).join("\n"));
+  assert.match(cls, /gt_rows TYPE z2ui5_cl_cgui_alv=>ty_t_lvc_row/);
+  assert.match(cls, /gt_ids\s+TYPE z2ui5_cl_cgui_alv=>ty_t_lvc_roid/);
+  assert.match(cls, /alv\( gt\n\s+\)->set_selection_mode\( \)\./);
+  assert.match(cls, /gt_rows = VALUE #\( FOR lv_r2c_row IN get_selected_rows\( \) \( index = lv_r2c_row \) \)\.\n\s+gt_ids = VALUE #\( FOR lv_r2c_row IN get_selected_rows\( \) \( row_id = lv_r2c_row \) \)\./);
+  assert.ok(!/go_grid|cl_gui_/.test(cls));
+});
+
+test("cl_gui_alv_grid: what has no counterpart is refused", () => {
+  const head = [
+    "REPORT zt.",
+    "DATA gt TYPE STANDARD TABLE OF i WITH DEFAULT KEY.",
+    "DATA go_grid TYPE REF TO cl_gui_alv_grid.",
+  ];
+  const r = refusalOf([...head,
+    "CLASS lcl_h DEFINITION.",
+    "  PUBLIC SECTION.",
+    "    METHODS on_changed FOR EVENT data_changed OF cl_gui_alv_grid IMPORTING er_data_changed.",
+    "ENDCLASS.",
+    "CLASS lcl_h IMPLEMENTATION.",
+    "  METHOD on_changed.",
+    "  ENDMETHOD.",
+    "ENDCLASS.",
+    "START-OF-SELECTION.",
+    "  CREATE OBJECT go_grid EXPORTING i_parent = cl_gui_container=>default_screen.",
+    "  go_grid->set_table_for_first_display( CHANGING it_outtab = gt ).",
+    "  go_grid->set_drop_down_table( it_drop_down = gt ).",
+    "  WRITE space.",
+  ].join("\n")).map((x) => x.split(" - ")[0]);
+  assert.deepEqual(r, ["6:5 the DATA_CHANGED handler of the grid", "15:3 set_drop_down_table( ) of cl_gui_alv_grid"]);
+  // two screens: the modules stay refused
+  const two = refusalOf([...head, "START-OF-SELECTION.", "  CALL SCREEN 100.", "  CALL SCREEN 200.", "MODULE pbo OUTPUT.", "ENDMODULE."].join("\n"));
+  assert.ok(two.some((x) => /MODULE - the report calls more than one screen/.test(x)));
+  assert.ok(two.some((x) => /CALL SCREEN/.test(x)));
 });
 
 // ------------------------------------------- columns and secondary lists

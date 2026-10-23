@@ -174,6 +174,38 @@ test("zr2c_05_reuse: REUSE_ALV_GRID_DISPLAY with a field catalog and the USER_CO
   assert.deepEqual(boxes(s), ["Lufthansa: http://www.lufthansa.com"]);
 });
 
+test("zr2c_19_grid: cl_gui_alv_grid on a screen - the grid, its toolbar, the double click, the hotspot, the PAI module", { skip }, async () => {
+  let s = await d.start("z2ui5_cl_cgui_r2c_19");
+  s = await d.act(s.session, { event: "CGUI_EXECUTE" });
+  const [t] = s.tables;
+  assert.equal(t.label, "Flights (4)");
+  const cols = t.columns.map((c) => `${c.name}:${c.label}`);
+  assert.ok(cols.includes("CONNID:Flight") && cols.includes("SEATSOCC:Occupied"), cols.join(" "));
+  assert.ok(!t.columns.some((c) => c.name === "MANDT"), "the field catalog hides MANDT");
+  assert.deepEqual(t.rows.map((r) => r.CONNID), ["0400", "0400", "0402", "2402"]);
+  assert.ok(s.texts.includes("Total Occupied 815"), "the total of the do_sum column: 120 + 385 + 300 + 10");
+  // the buttons of the TOOLBAR handler and of the status MAIN, the hotspot and the double click
+  for (const f of ["FULL", "ALL", "REFRESH", "CGUI_ALV_HOTSPOT", "CGUI_ALV_LINE_SELECTION"]) assert.ok(actionsOf(s, f).length >= 1, `an action ${f}`);
+
+  // USER_COMMAND handler: one flight is full
+  s = await d.act(s.session, { event: "FULL" });
+  assert.deepEqual(toasts(s), ["1 full flights"]);
+  // HOTSPOT_CLICK on CONNID of the third row
+  s = await d.act(s.session, { event: "CGUI_ALV_HOTSPOT", args: ["/GT_FLIGHT/2", "CONNID"] });
+  assert.deepEqual(toasts(s), ["Connection 0402"]);
+  // DOUBLE_CLICK on the last row
+  s = await d.act(s.session, { event: "CGUI_ALV_LINE_SELECTION", args: ["/GT_FLIGHT/3"] });
+  assert.equal(boxes(s).length, 1);
+  assert.match(boxes(s)[0], /^Flight 2402 on /);
+  // the PAI module: REFRESH reads the flights again; Back is the selection screen
+  s = await d.act(s.session, { event: "ALL" });
+  assert.deepEqual(toasts(s), ["4 flights"]);
+  s = await d.act(s.session, { event: "REFRESH" });
+  assert.equal(s.tables[0].rows.length, 4);
+  s = await d.act(s.session, { event: "CGUI_BACK" });
+  assert.ok(s.fields.some((f) => f.name === "P_CARRID"), "the selection screen");
+});
+
 test("zr2c_06_dynamic: radio buttons and checkbox with USER-COMMAND, MODIF ID, LOOP AT SCREEN, a push button, an own F4", { skip }, async () => {
   let s = await d.start("z2ui5_cl_cgui_r2c_06");
   assert.equal(s.title, "Dynamic Selection Screen");

@@ -226,6 +226,24 @@ CLASS z2ui5_cl_cgui_alv DEFINITION PUBLIC FINAL CREATE PUBLIC.
     TYPES ty_t_row TYPE STANDARD TABLE OF i WITH EMPTY KEY.
 
     TYPES:
+      "! a line of LVC_T_ROW, the rows of the classic grid (cl_gui_alv_grid,
+      "! get_selected_rows( ) et_index_rows) - without the DDIC type, which
+      "! ABAP Cloud does not have
+      BEGIN OF ty_s_lvc_row,
+        index   TYPE i,
+        rowtype TYPE c LENGTH 30,
+      END OF ty_s_lvc_row.
+    TYPES ty_t_lvc_row TYPE STANDARD TABLE OF ty_s_lvc_row WITH EMPTY KEY ##NEEDED.
+
+    TYPES:
+      "! a line of LVC_T_ROID - et_row_no of get_selected_rows( )
+      BEGIN OF ty_s_lvc_roid,
+        row_id     TYPE i,
+        sub_row_id TYPE i,
+      END OF ty_s_lvc_roid.
+    TYPES ty_t_lvc_roid TYPE STANDARD TABLE OF ty_s_lvc_roid WITH EMPTY KEY ##NEEDED.
+
+    TYPES:
       BEGIN OF ty_s_hotspot,
         row    TYPE i,
         column TYPE string,

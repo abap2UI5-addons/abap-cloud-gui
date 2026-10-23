@@ -156,6 +156,13 @@ const ICONS = {
   icon_copy_object: "sap-icon://copy", icon_check: "sap-icon://accept",
 };
 
+// the row types of the classic grid - ABAP Cloud has no LVC types; the ALV
+// of the runtime has the same lines
+const LVC_TYPES = {
+  lvc_t_row: "z2ui5_cl_cgui_alv=>ty_t_lvc_row", lvc_s_row: "z2ui5_cl_cgui_alv=>ty_s_lvc_row",
+  lvc_t_roid: "z2ui5_cl_cgui_alv=>ty_t_lvc_roid", lvc_s_roid: "z2ui5_cl_cgui_alv=>ty_s_lvc_roid",
+};
+
 // the statements that open and close a block
 const OPENERS = new Set(["If", "Case", "Loop", "Do", "While", "SelectLoop", "Try", "At", "AtFirst", "AtLast", "OnChange", "Provide", "LoopAtScreen"]);
 const CLOSERS = new Set(["EndIf", "EndCase", "EndLoop", "EndDo", "EndWhile", "EndSelect", "EndTry", "EndAt", "EndOn", "EndProvide"]);
@@ -294,6 +301,7 @@ class Converter {
    *  FORMs and the local classes, each with its statements */
   segment() {
     this.decls = [];
+    this.modules = [];      // MODULE ... OUTPUT / INPUT - the dynpro of a grid
     this.events = [];
     this.forms = [];
     this.locals = [];
@@ -342,10 +350,15 @@ class Converter {
         continue;
       }
       if (k === "Module") {
-        this.refuse(s, REFUSED.Module);
+        // kept for the screen of a cl_gui_alv_grid (resolveGridScreen), else refused
         const end = this.findEnd(i, "EndModule");
+        this.modules.push({
+          stmt: s, name: lc(nodeText(child(s, "FormName"))), io: words(s).includes("OUTPUT") ? "OUTPUT" : "INPUT",
+          body: this.stmts.slice(i + 1, end).filter((x) => kind(x) !== "Empty"),
+        });
         i = end;
         current = undefined;
+        pendingComments = [];
         continue;
       }
       if (k === "Define") {
@@ -427,6 +440,7 @@ class Converter {
   // ---------------------------------------------------------------- analyze
 
   analyze() {
+    this.resolveGridScreen();
     // the names of the report's global data objects and types
     this.globalData = new Set();
     this.globalTypes = new Set();
@@ -540,6 +554,291 @@ class Converter {
     }
   }
 
+  /**
+   * cl_gui_alv_grid: the grid of a report written since 2005 - a container
+   * on a dynpro (or the default screen), the grid in it, a local class with
+   * the handlers of its events, CALL SCREEN and the modules of the screen.
+   * Here the grid is alv( ) of the runtime: the PBO modules are inlined at
+   * CALL SCREEN (the grid shows after the event block), the PAI modules are
+   * at_user_command( ) with the OK code as ucomm, and the handler class goes
+   * - its methods become at_line_selection( ), at_link_click( ),
+   * at_user_command( ) and the functions of the grid's toolbar.
+   */
+  resolveGridScreen() {
+    this.gridVars = new Set();
+    this.contVars = new Set();
+    this.handlerVars = new Set();
+    this.gridHandlers = [];
+    this.okVars = new Set();
+    const text = (x) => lc(renderTokens(stmtTokens(x)));
+    const all = [...this.decls, ...this.events.flatMap((e) => e.stmts), ...this.forms.flatMap((f) => f.body), ...this.modules.flatMap((m) => m.body)];
+    for (const x of all) {
+      if (!["Data", "Static"].includes(kind(x))) continue;
+      const t = text(x);
+      const name = lc(declName(x) ?? "");
+      if (/type\s+ref\s+to\s+cl_gui_alv_grid\b/.test(t)) this.gridVars.add(name);
+      else if (/type\s+ref\s+to\s+cl_gui_(custom_container|docking_container|container|dialogbox_container|splitter_container|easy_splitter_container)\b/.test(t)) this.contVars.add(name);
+    }
+    if (!this.gridVars.size) {
+      for (const m of this.modules) this.refuse(m.stmt, REFUSED.Module);
+      return;
+    }
+
+    // the handler class: every method a handler of an event of the grid
+    const nameOf = (u) => lc(nodeText(child(u.stmts[0], "ClassName") ?? u.stmts[0].getChildren()[1]));
+    const handlerClasses = new Set();
+    for (const u of this.locals) {
+      if (u.kind !== "ClassDefinition") continue;
+      const defs = u.stmts.filter((x) => kind(x) === "MethodDef");
+      const handlers = defs.filter((x) => /^cl_gui_alv_grid$/i.test(nodeText(child(child(x, "EventHandler") ?? x, "ClassName") ?? x).trim()) && child(x, "EventHandler"));
+      if (!handlers.length) continue;
+      const cls = nameOf(u);
+      if (handlers.length !== defs.length || u.stmts.some((x) => ["Data", "ClassData", "Constant", "Type", "TypeBegin"].includes(kind(x)))) {
+        this.refuse(u.stmts[0], `the local class ${cls} handles events of cl_gui_alv_grid and has other methods or attributes - its handlers become methods of the report class; move the rest into a class of its own`);
+        continue;
+      }
+      handlerClasses.add(cls);
+      for (const d of handlers) {
+        const eh = child(d, "EventHandler");
+        this.gridHandlers.push({
+          cls, method: lc(nodeText(child(d, "MethodName"))), event: lc(nodeText(child(eh, "EventName"))),
+          params: findAll(eh, "MethodParamName").map((x) => lc(nodeText(x))), stmt: d, body: [],
+        });
+      }
+    }
+    for (const u of this.locals) {
+      if (u.kind !== "ClassImplementation" || !handlerClasses.has(nameOf(u))) continue;
+      let cur;
+      for (const x of u.stmts.slice(1)) {
+        const k = kind(x);
+        if (k === "MethodImplementation") {
+          const name = lc(nodeText(child(x, "MethodName")));
+          cur = this.gridHandlers.find((h) => h.cls === nameOf(u) && h.method === name);
+        } else if (k === "EndMethod") cur = undefined;
+        else if (cur && k !== "EndClass") cur.body.push(x);
+      }
+    }
+    for (const u of this.locals.filter((x) => handlerClasses.has(nameOf(x)))) {
+      this.mapped.push({ row: u.stmts[0].getFirstToken().getRow(), col: 1, classic: renderTokens(stmtTokens(u.stmts[0])), target: "dropped - the handlers of the grid are methods of the report class" });
+    }
+    this.locals = this.locals.filter((u) => !handlerClasses.has(nameOf(u)));
+    for (const x of all) {
+      if (!["Data", "Static"].includes(kind(x))) continue;
+      const m = /type\s+ref\s+to\s+([\w/]+)/.exec(text(x));
+      if (m && handlerClasses.has(m[1])) this.handlerVars.add(lc(declName(x)));
+      const name = lc(declName(x) ?? "");
+      if (/(type|like)\s+sy\s*-\s*ucomm\b|type\s+syucomm\b/.test(text(x)) || /^(g[vd]?_)?(save_)?ok_?code$|^save_ok$/.test(name)) this.okVars.add(name);
+    }
+
+    // CALL SCREEN: the PBO modules in its place, the PAI modules a user command
+    if (!this.modules.length) return;
+    const calls = [];
+    for (const unit of [...this.events.map((e) => e.stmts), ...this.forms.map((f) => f.body)]) {
+      unit.forEach((x, i) => { if (kind(x) === "CallScreen") calls.push({ unit, i }); });
+    }
+    if (calls.length !== 1) {
+      for (const m of this.modules) this.refuse(m.stmt, calls.length ? "MODULE - the report calls more than one screen; the screen of one grid is converted" : REFUSED.Module);
+      return;
+    }
+    const { unit, i } = calls[0];
+    const call = unit[i];
+    const pbo = this.modules.filter((m) => m.io === "OUTPUT");
+    unit.splice(i, 1, ...pbo.flatMap((m) => m.body));
+    this.map(call, `the PBO module${pbo.length === 1 ? "" : "s"} of the screen, in its place - the grid shows when the event block is done`);
+    const after = unit.slice(i + pbo.flatMap((m) => m.body).length).filter((x) => !["Comment", ...CLOSERS].includes(kind(x)));
+    if (after.length) this.todo(call, "statements follow CALL SCREEN - they ran when the screen was left; here they run before the grid shows");
+    for (const m of this.modules) {
+      if (m.io === "OUTPUT") {
+        this.map(m.stmt, `inlined at CALL SCREEN - the PBO module ${m.name}, once (the grid is not created anew on every roundtrip)`);
+      } else {
+        this.map(m.stmt, `\`at_user_command( ucomm )\` - the PAI module ${m.name}, the OK code is ucomm; Back, Exit and Cancel are the runtime's`);
+        this.events.push({ stmt: m.stmt, kind: "AtUserCommand", stmts: m.body, pai: true });
+      }
+    }
+    // the OK code fields the PAI module alone reads are ucomm now - gone
+    const outside = [...this.events.filter((e) => !e.pai).flatMap((e) => e.stmts), ...this.forms.flatMap((f) => f.body), ...this.gridHandlers.flatMap((h) => h.body)]
+      .flatMap((x) => x.getTokens().map((t) => lc(t.getStr())));
+    this.okDropped = new Set([...this.okVars].filter((v) => !outside.includes(v)));
+  }
+
+  /** the grid, its container or its handler object - dropped */
+  isGridObject(name) {
+    return !!(this.gridVars?.has(name) || this.contVars?.has(name) || this.handlerVars?.has(name) || this.okDropped?.has(name));
+  }
+
+  /** a statement of the grid, its container or its handler - its plan, or
+   *  undefined when it is none of them */
+  gridPlan(s, k, flat, seq, si) {
+    const objs = new Set([...this.gridVars, ...this.contVars, ...this.handlerVars]);
+    const target = child(s, "Target") ? lc(nodeText(child(s, "Target"))) : undefined;
+    if ((k === "CreateObject" || (k === "Move" && /=\s*(new|cast)\b/.test(flat))) && objs.has(target)) {
+      return { action: "drop", reason: "the grid, its container or the handler object - alv( ) needs none" };
+    }
+    if (k === "SetHandler") {
+      const form = /\bfor\s+([\w/]+)/.exec(flat);
+      if (form && this.gridVars.has(form[1])) return { action: "drop", reason: "SET HANDLER of the grid - its handlers are methods of the class" };
+    }
+    // IF go_container IS INITIAL - the grid is created once: the branch stays
+    if (k === "If") {
+      const m = /^if\s+(not\s+)?([\w/]+)\s+is\s+(not\s+)?(initial|bound)$/.exec(flat);
+      if (m && objs.has(m[2])) {
+        const created = (!!m[1] !== !!m[3]) === (m[4] === "bound");   // the branch for the first time
+        let depth = 0;
+        let elseAt;
+        let endAt;
+        for (let j = si; j < seq.length; j++) {
+          const kj = kind(seq[j]);
+          if (OPENERS.has(kj)) depth++;
+          if (CLOSERS.has(kj)) depth--;
+          if (depth === 1 && kj === "ElseIf") return undefined;
+          if (depth === 1 && kj === "Else") elseAt = j;
+          if (depth === 0) {
+            endAt = j;
+            break;
+          }
+        }
+        if (endAt === undefined) return undefined;
+        const skip = (a, z) => { for (let j = a; j <= z; j++) this.alvPlan.set(seq[j], { action: "skip" }); };
+        if (created) {
+          if (elseAt !== undefined) skip(elseAt, endAt - 1);
+        } else {
+          skip(si + 1, elseAt ?? endAt - 1);
+        }
+        this.alvPlan.set(seq[endAt], { action: "skip" });
+        return { action: "drop", reason: "IF on the grid object - the grid is created once, the branch that creates it stays" };
+      }
+    }
+    if (k === "Call" || k === "Free" || k === "Clear") {
+      const m = /^(?:call\s+method\s+)?([\w/]+)\s*->\s*(\w+)/.exec(flat);
+      if (k !== "Call" && [...objs].some((o) => new RegExp(`\\b${o}\\b`).test(flat))) return { action: "drop", reason: "FREE / CLEAR of the grid object" };
+      if (m && (this.contVars.has(m[1]) || this.handlerVars.has(m[1]))) return { action: "drop", reason: "a method of the container - alv( ) needs none" };
+      if (m && this.gridVars.has(m[1])) {
+        const p = functionParams(s);
+        switch (m[2]) {
+          case "set_table_for_first_display": {
+            const table = p.get("it_outtab");
+            if (!table) {
+              this.refuse(s, "set_table_for_first_display( ) without CHANGING it_outtab - not understood");
+              return { action: "skip" };
+            }
+            const plan = { action: "grid", table: nodeText(table.node), tableNode: table.node, todos: [] };
+            const fc = p.get("it_fieldcatalog");
+            plan.fieldcatVar = fc ? lc(nodeText(fc.node)) : undefined;
+            const lay = p.get("is_layout");
+            plan.layoutVar = lay ? lc(nodeText(lay.node)) : undefined;
+            for (const ignored of ["it_toolbar_excluding", "is_variant", "i_save", "it_sort", "it_filter", "is_print", "i_default", "it_special_groups", "it_hyperlink", "it_except_qinfo"]) {
+              if (p.has(ignored)) plan.todos.push(`set_table_for_first_display( ): ${uc(ignored)} has no counterpart in the alv( ) chain and is dropped`);
+            }
+            return plan;
+          }
+          case "refresh_table_display": case "check_changed_data": case "set_toolbar_interactive": case "register_edit_event":
+          case "set_ready_for_input": case "free": case "set_frontend_layout": case "set_scroll_info_via_id": case "set_current_cell_via_id":
+            this.note("the methods of cl_gui_alv_grid that refresh or tune the grid (refresh_table_display, check_changed_data, set_toolbar_interactive, ...) - alv( ) shows the table attribute as it is on every roundtrip");
+            return { action: "drop", reason: `${m[2]}( ) of the grid - no counterpart needed` };
+          case "get_selected_rows": {
+            const rows = p.get("et_index_rows");
+            const nos = p.get("et_row_no");
+            const lines = [];
+            if (rows) lines.push(`${nodeText(rows.node)} = VALUE #( FOR lv_r2c_row IN get_selected_rows( ) ( index = lv_r2c_row ) ).`);
+            if (nos) lines.push(`${nodeText(nos.node)} = VALUE #( FOR lv_r2c_row IN get_selected_rows( ) ( row_id = lv_r2c_row ) ).`);
+            this.gridSelection = true;
+            return { action: "code", lines, reason: "`get_selected_rows( )` - the rows ticked in the selection column of the grid" };
+          }
+          default:
+            this.refuse(s, `${m[2]}( ) of cl_gui_alv_grid - no counterpart in alv( ); port it by hand`);
+            return { action: "skip" };
+        }
+      }
+    }
+    // any other use of the grid objects has nothing to refer to any more
+    const toks = stmtTokens(s).map((t) => lc(t.getStr()));
+    const used = toks.find((t, i) => objs.has(t) && (i === 0 || !["-", "->", "=>", "~"].includes(toks[i - 1])));
+    if (used && !["Data", "Static"].includes(k)) {
+      this.refuse(s, `${used}, the grid object, is used here - alv( ) has no object to refer to; port the statement by hand`);
+      return { action: "skip" };
+    }
+    return undefined;
+  }
+
+  /** the functions the toolbar handler of the grid adds to e_object->mt_toolbar */
+  gridToolbar(h) {
+    const obj = h.params.find((x) => x === "e_object") ?? "e_object";
+    const functions = [];
+    const was = new Map();
+    for (const x of h.body) {
+      const k = kind(x);
+      const toks = stmtTokens(x).map((t) => t.getStr());
+      const flat = lc(toks.join(" "));
+      if (k === "Comment" || k === "Data") continue;
+      if (k === "Clear") {
+        for (const t of toks.slice(1)) was.set(lc(t), {});
+        continue;
+      }
+      let m = /^([\w/]+)\s*-\s*(\w+)\s*=\s*(.+)$/.exec(toks.join(" "));
+      if (k === "Move" && m) {
+        const cur = was.get(lc(m[1])) ?? {};
+        cur[lc(m[2])] = m[3].trim();
+        was.set(lc(m[1]), cur);
+        continue;
+      }
+      const onToolbar = new RegExp(`to\\s+${obj}\\s*->\\s*mt_toolbar\\b`).test(flat);
+      if (k === "Append" && onToolbar) {
+        m = /^append\s+([\w/]+)\s+to\s+/.exec(flat);
+        const v = /^APPEND\s+VALUE\s+#\s*\((.*)\)\s+TO\s+/i.exec(toks.join(" "));
+        let cur;
+        if (v) {
+          cur = {};
+          for (const pv of v[1].matchAll(/(\w+)\s*=\s*('(?:[^']|'')*'|`(?:[^`]|``)*`|[\w-]+(?:\s*\(\s*\w+\s*\))?)/g)) cur[lc(pv[1])] = pv[2];
+        } else if (m) cur = { ...(was.get(m[1]) ?? {}) };
+        if (!cur) {
+          this.refuse(x, `the toolbar handler ${h.method}: this APPEND is not understood`);
+          continue;
+        }
+        if (/^3$|^'3'$|cntb_btype_sep/.test(lc(cur.butn_type ?? ""))) continue;
+        if (!cur.function) {
+          this.refuse(x, `the toolbar handler ${h.method}: a button without FUNCTION`);
+          continue;
+        }
+        functions.push(cur);
+        continue;
+      }
+      if ((k === "DeleteInternal" || k === "Modify" || k === "ModifyInternal") && new RegExp(`${obj}\\s*->\\s*mt_toolbar`).test(flat)) {
+        this.note("the toolbar handler removes or changes the standard functions of the grid - the grid of the runtime has its own (sort, filter, export)");
+        continue;
+      }
+      this.refuse(x, `the toolbar handler ${h.method}: only buttons appended to ${obj}->mt_toolbar are converted - port this statement by hand`);
+    }
+    return functions.map((f) => {
+      const params = [{ name: "name", value: literal(uc(unquote(f.function))) }];
+      if (f.text) params.push({ name: "text", value: this.literalArg(f.text, h.stmt) });
+      const icon = f.icon ? ICONS[lc(f.icon)] : undefined;
+      if (icon) params.push({ name: "icon", value: literal(icon) });
+      else if (f.icon) this.note(`the toolbar of the grid: the icon ${uc(f.icon)} has no UI5 icon in the converter's table - the button shows its text`);
+      if (f.quickinfo) params.push({ name: "tooltip", value: this.literalArg(f.quickinfo, h.stmt) });
+      return { m: "add_function", params };
+    });
+  }
+
+  /** the body of a handler of the grid as the body of a method of the
+   *  report class: the event parameters renamed after the method's */
+  gridHandlerBody(h, ctx, renames) {
+    if (h.body.some((x) => /\bme\s*->/i.test(renderTokens(stmtTokens(x))))) {
+      this.refuse(h.stmt, `${h.method}: the handler uses me-> - in the report class me is the report; port it by hand`);
+      return [];
+    }
+    const body = this.convertBody(h.body, ctx);
+    const out = [];
+    for (const l of body) {
+      let t = l;
+      for (const [re, to] of renames) t = t.replace(re, to);
+      out.push(t);
+    }
+    const left = h.params.filter((p) => p !== "sender" && out.some((l) => new RegExp(`\\b${p}\\b`, "i").test(l)));
+    if (left.length) this.refuse(h.stmt, `${h.method}: ${left.join(", ")} ${left.length > 1 ? "have" : "has"} no counterpart in ${ctx.method}( ) - it knows ${ctx.method === "at_user_command" ? "ucomm" : ctx.method === "at_link_click" ? "row and column" : "the row"} only`);
+    if (h.params.includes("sender") && out.some((l) => /\bsender\b/i.test(l))) this.refuse(h.stmt, `${h.method}: sender - the grid object has no counterpart`);
+    return [`" the ${uc(h.event)} handler of the grid - ${h.cls}->${h.method}`, ...out];
+  }
+
   /** CL_SALV_TABLE and REUSE_ALV_*: what each statement becomes - looked at
    *  over the whole report first, because the settings of a grid are often
    *  made in another FORM than the one that displays it */
@@ -555,6 +854,7 @@ class Converter {
     this.layoutVars = new Set();
     this.alvCallbacks = new Map(); // FORM name -> callback kind
     this.fcat = fcat;
+    this.layoutTitle = new Map();  // layout variable -> the title it sets (grid_title)
 
     // the variables: REF TO cl_salv_*, the field catalog and layout types
     const allStmts = [...this.decls, ...this.events.flatMap((e) => e.stmts), ...this.forms.flatMap((f) => f.body)];
@@ -568,7 +868,7 @@ class Converter {
     }
 
     const tryStack = [];
-    const seq = [...this.events.flatMap((e) => e.stmts), ...this.forms.flatMap((f) => f.body)];
+    const seq = [...this.events.flatMap((e) => e.stmts), ...this.forms.flatMap((f) => f.body), ...this.gridHandlers.flatMap((h) => h.body)];
     for (let si = 0; si < seq.length; si++) {
       const s = seq[si];
       const k = kind(s);
@@ -603,6 +903,14 @@ class Converter {
       if (tryStack.length) {
         const t = tryStack[tryStack.length - 1];
         if (t.clauses.length) t.clauses[t.clauses.length - 1].body.push(s);
+      }
+
+      if (this.gridVars.size && !this.alvPlan.has(s)) {
+        const plan = this.gridPlan(s, k, flat, seq, si);
+        if (plan) {
+          this.alvPlan.set(s, plan);
+          continue;
+        }
       }
 
       // cl_salv_table=>factory( IMPORTING r_salv_table = x CHANGING t_table = itab )
@@ -761,6 +1069,8 @@ class Converter {
           if (m[2] === "fieldname") cur.name = uc(unquote(orig[1].trim()));
           else if (/^(seltext_[lms]|reptext_ddic|scrtext_[lms]|coltext)$/.test(m[2])) cur.text = orig[1].trim();
           else if ((m[2] === "no_out" || m[2] === "tech") && /'x'|abap_true/.test(m[3])) cur.hidden = true;
+          else if (m[2] === "hotspot" && /'x'|abap_true/.test(m[3])) cur.hotspot = true;
+          else if (m[2] === "do_sum" && /'x'|abap_true/.test(m[3])) cur.sum = true;
           else this.note("field catalog settings without a counterpart (output length, key, sums, column position) - the grid takes columns and widths from the table");
           fcatWa.set(m[1], cur);
         } else if (k === "Append") {
@@ -776,6 +1086,8 @@ class Converter {
               if (comp === "fieldname") cur.name = uc(unquote(p[2]));
               else if (/^(seltext_[lms]|reptext_ddic|scrtext_[lms]|coltext)$/.test(comp)) cur.text = p[2];
               else if ((comp === "no_out" || comp === "tech") && /'x'|abap_true/i.test(p[2])) cur.hidden = true;
+              else if (comp === "hotspot" && /'x'|abap_true/i.test(p[2])) cur.hotspot = true;
+              else if (comp === "do_sum" && /'x'|abap_true/i.test(p[2])) cur.sum = true;
             }
             if (!fcat.has(lc(v[2]))) fcat.set(lc(v[2]), []);
             fcat.get(lc(v[2])).push(cur);
@@ -785,6 +1097,23 @@ class Converter {
         }
         this.alvPlan.set(s, { action: "drop", reason: "field catalog - set_column_text( ) / set_column_hidden( ) in the alv( ) chain" });
         continue;
+      }
+      // the layout of the grid: its title; zebra and optimized widths are the runtime's
+      {
+        const m = /^([\w/]+)\s*-\s*(\w+)\s*=\s*(.+)$/.exec(toks.join(" "));
+        if (k === "Move" && m && this.layoutVars.has(lc(m[1]))) {
+          const comp = lc(m[2]);
+          if (comp === "grid_title" || comp === "window_titlebar") {
+            this.layoutTitle.set(lc(m[1]), m[3].trim());
+            this.alvPlan.set(s, { action: "drop", reason: "the title of the grid - set_title( ) in the alv( ) chain" });
+            continue;
+          }
+          if (["zebra", "cwidth_opt", "col_opt", "colwidth_optimize", "zebra_pattern", "no_rowmark"].includes(comp)) {
+            this.note("ALV layout: zebra stripes and optimized column widths - the grid of the runtime lays itself out");
+            this.alvPlan.set(s, { action: "drop", reason: "ALV layout - the grid lays itself out" });
+            continue;
+          }
+        }
       }
       if (toks.some((t, i) => this.layoutVars.has(lc(t)) && (i === 0 || !["-", "->", "=>"].includes(toks[i - 1]))) && k !== "CallFunction") {
         this.alvPlan.set(s, { action: "drop", reason: "ALV layout", todo: `ALV layout, sort or event setting without a counterpart, dropped: ${shortText(s)}` });
@@ -1080,7 +1409,8 @@ class Converter {
     {
       const evs = byKind("AtLineSelection");
       const callback = this.forms.find((f) => this.alvCallbacks.get(f.name)?.kind === "user_command");
-      if (evs.length || callback) {
+      const dbl = this.gridHandlers.filter((h) => h.event === "double_click");
+      if (evs.length || callback || dbl.length) {
         const body = [];
         const deferred = () => this.hideRestore();
         for (const e of evs) {
@@ -1090,21 +1420,57 @@ class Converter {
         if (callback) {
           body.push(...this.alvCallbackBody(callback));
         }
+        for (const h of dbl) {
+          this.map(h.stmt, "`at_line_selection( row hide )` - the DOUBLE_CLICK handler of the grid, e_row-index is row");
+          if (body.length) body.push("");
+          body.push(...this.gridHandlerBody(h, { method: "at_line_selection", lineSelection: true }, [
+            [/\b(e_row|e_row_id)\s*-\s*index\b/gi, "row"], [/\bes_row_no\s*-\s*row_id\b/gi, "row"],
+          ]));
+        }
         methods.push({ name: "at_line_selection", body, prelude: deferred });
+      }
+      const hot = this.gridHandlers.filter((h) => h.event === "hotspot_click");
+      if (hot.length) {
+        const body = [];
+        for (const h of hot) {
+          this.map(h.stmt, "`at_link_click( row column )` - the HOTSPOT_CLICK handler of the grid, e_row_id-index is row, e_column_id-fieldname column");
+          if (body.length) body.push("");
+          body.push(...this.gridHandlerBody(h, { method: "at_link_click", lineSelection: true }, [
+            [/\b(e_row_id|e_row)\s*-\s*index\b/gi, "row"], [/\bes_row_no\s*-\s*row_id\b/gi, "row"],
+            [/\b(e_column_id|e_column)\s*-\s*fieldname\b/gi, "column"],
+          ]));
+        }
+        methods.push({ name: "at_link_click", body });
+      }
+      for (const h of this.gridHandlers) {
+        if (!["double_click", "hotspot_click", "toolbar", "user_command"].includes(h.event)) {
+          this.refuse(h.stmt, h.event === "data_changed" || h.event === "data_changed_finished"
+            ? `the ${uc(h.event)} handler of the grid - an edited cell arrives in at_data_changed( row column ); port the handler by hand`
+            : `the ${uc(h.event)} handler of the grid - no counterpart in alv( )`);
+        } else if (h.event === "toolbar") {
+          this.map(h.stmt, "`add_function( )` in the alv( ) chain - the buttons of the TOOLBAR handler; they arrive in `at_user_command( )`");
+        }
       }
     }
 
     // AT USER-COMMAND
     {
       const evs = byKind("AtUserCommand");
-      if (evs.length || this.assUcomm) {
+      const ucommHandlers = this.gridHandlers.filter((h) => h.event === "user_command");
+      if (evs.length || this.assUcomm || ucommHandlers.length) {
         const body = [];
         if (this.assUcomm) body.push("\" a button or USER-COMMAND of the selection screen - the classic AT SELECTION-SCREEN", "at_selection_screen_ucomm( ucomm ).");
         for (const e of evs) {
-          this.map(e.stmt, "`at_user_command( ucomm )` - sy-ucomm becomes ucomm");
+          if (!e.pai) this.map(e.stmt, "`at_user_command( ucomm )` - sy-ucomm becomes ucomm");
           if (this.assUcomm) this.todo(e.stmt, "AT USER-COMMAND and the user commands of the selection screen both arrive in at_user_command( ) - check that the codes do not overlap");
           if (body.length) body.push("");
-          body.push(...this.convertBody(e.stmts, { method: "at_user_command", userCommand: true }));
+          if (e.pai) body.push("\" the PAI module of the screen - the OK code is ucomm");
+          body.push(...this.convertBody(e.stmts, { method: "at_user_command", userCommand: true, pai: e.pai }));
+        }
+        for (const h of ucommHandlers) {
+          this.map(h.stmt, "`at_user_command( ucomm )` - the USER_COMMAND handler of the grid, e_ucomm is ucomm");
+          if (body.length) body.push("");
+          body.push(...this.gridHandlerBody(h, { method: "at_user_command", userCommand: true }, [[/\be_ucomm\b/gi, "ucomm"]]));
         }
         methods.push({ name: "at_user_command", body });
       }
@@ -1225,7 +1591,7 @@ class Converter {
     const order = ["initialization", "selection_screen", "selection_screen_dynnr", "at_selection_screen_output", "at_selection_screen_on",
       "at_selection_screen_on_block", "at_selection_screen_on_radio", "at_selection_screen_on_end_of",
       "at_selection_screen_on_exit", "at_selection_screen", "start_of_selection", "end_of_selection", "top_of_page",
-      "top_of_page_line_selection", "end_of_page", "at_line_selection", "at_user_command", "at_value_request",
+      "top_of_page_line_selection", "end_of_page", "at_line_selection", "at_link_click", "at_user_command", "at_value_request",
       "after_call_selection_screen"];
     methods.sort((a, b) => order.indexOf(a.name) - order.indexOf(b.name));
     for (const m of methods) lines.push(`    METHODS ${m.name} REDEFINITION.`);
@@ -1493,6 +1859,10 @@ class Converter {
           this.map(s, "dropped - the ALV object, field catalog or layout is the alv( ) chain now");
           continue;
         }
+        if (k === "Data" && (this.isGridObject(name) || this.okDropped?.has(name))) {
+          this.map(s, "dropped - the grid, its container and the handler object are the alv( ) chain now");
+          continue;
+        }
         if (k === "Data" && GUI_CONTROL.test(lc(renderTokens(stmtTokens(s))))) {
           this.refuse(s, "SAP GUI controls (cl_gui_*) need a dynpro container - use alv( ) or an abap2UI5 view");
           continue;
@@ -1553,7 +1923,7 @@ class Converter {
   resetCandidate(s) {
     this.resetList ??= [];
     const name = lc(declName(s) ?? "");
-    if (!name || this.salvVars.has(name) || this.fcatVars.has(name) || this.layoutVars.has(name)) return;
+    if (!name || this.salvVars.has(name) || this.fcatVars.has(name) || this.layoutVars.has(name) || this.isGridObject(name)) return;
     let value;
     const v = kind(s) === "Data" ? findAll(s, "Value")[0] : undefined;
     if (v) {
@@ -1802,7 +2172,7 @@ class Converter {
     const keyword = uc(all[0].getFirstToken().getStr());
     const group = all.filter((s) => {
       const name = lc(declName(s) ?? "");
-      const alv = kind(s) === "Data" && (this.salvVars.has(name) || this.fcatVars.has(name) || this.layoutVars.has(name));
+      const alv = kind(s) === "Data" && (this.salvVars.has(name) || this.fcatVars.has(name) || this.layoutVars.has(name) || this.isGridObject(name));
       if (alv) this.map(s, "dropped - the ALV object, field catalog or layout is the alv( ) chain now");
       return !alv;
     });
@@ -2278,7 +2648,7 @@ class Converter {
             this.refuse(s, `SUBMIT ... WITH ${uc(nodeText(nx))} NOT IN - a range cannot be handed over negated`);
             return;
           }
-          values.push(`( LINES OF z2ui5_cl_cgui_variant=>range_lines_get( name = ${name} range = ${text(low)} ) )`);
+          values.push({ lines: `z2ui5_cl_cgui_variant=>range_lines_get( name = ${name} range = ${text(low)} )` });
           continue;
         }
         let option = OPTION[op];
@@ -2293,11 +2663,26 @@ class Converter {
           values.push(`( name = ${name} kind = z2ui5_cl_cgui_variant=>cs_kind-select_option sign = ${sign ?? "`I`"} option = ${literal(option)} low = ${text(low)}${high ? ` high = ${text(high)}` : ""} )`);
         }
       } else if (wordAt(i + 1) === "SELECTION" && wordAt(i + 3) === "TABLE") {
-        values.push(`( LINES OF z2ui5_cl_cgui_variant=>selection_table_get( ${text(ch[i + 4])} ) )`);
+        values.push({ lines: `z2ui5_cl_cgui_variant=>selection_table_get( ${text(ch[i + 4])} )` });
         this.note("SUBMIT ... WITH SELECTION-TABLE: selection_table_get( ) reads selname, kind, sign, option, low and high of the lines, as RSPARAMS has them");
       }
     }
-    if (values.length) params.push({ name: "values", value: values.length === 1 ? `VALUE #( ${values[0]} )` : "VALUE #(" });
+    // a range or a selection table is many values: the values are collected
+    // in a table first - VALUE #( ( LINES OF ... ) ) does not transpile
+    const prologue = [];
+    if (values.some((v) => typeof v !== "string")) {
+      this.submitCount = (this.submitCount ?? 0) + 1;
+      const tab = `lt_r2c_submit_${this.submitCount}`;
+      const part = `lt_r2c_lines_${this.submitCount}`;
+      prologue.push(`DATA ${tab} TYPE z2ui5_cl_cgui_variant=>ty_t_value.`, `DATA ${part} TYPE z2ui5_cl_cgui_variant=>ty_t_value.`, `CLEAR ${tab}.`);
+      for (const v of values) {
+        // v is the line in parentheses: ( name = ... )
+        if (typeof v === "string") prologue.push(`INSERT VALUE #${v} INTO TABLE ${tab}.`);
+        else prologue.push(`${part} = ${v.lines}.`, `APPEND LINES OF ${part} TO ${tab}.`);
+      }
+      values.length = 0;
+      params.push({ name: "values", value: tab });
+    } else if (values.length) params.push({ name: "values", value: values.length === 1 ? `VALUE #( ${values[0]} )` : "VALUE #(" });
     if (hasSeq(w, "VIA", "SELECTION", "-", "SCREEN")) params.push({ name: "via_selection_screen", value: "abap_true" });
     const setAt = ch.findIndex((c, i) => isToken(c) && uc(c.get().getStr()) === "SET" && wordAt(i - 1) === "-" && wordAt(i - 2) === "SELECTION");
     if (setAt >= 0 && ch[setAt + 1]) params.push({ name: "using_variant", value: text(ch[setAt + 1]) });
@@ -2318,7 +2703,7 @@ class Converter {
       }
       lines.push(`${prefix}${p.value}`);
     });
-    out.push(`${lines.join("\n")} ).`);
+    out.push(...prologue, `${lines.join("\n")} ).`);
     const andReturn = child(s, "AndReturn");
     this.map(s, andReturn
       ? "`submit( report values )` - the class of the called report starts with the values, Back returns here"
@@ -2565,12 +2950,41 @@ class Converter {
         this.map(s, `\`alv( ${salv.table} )\`${salv.settings.length ? " with the column settings" : ""}`);
         return;
       }
+      if (plan.action === "code") {
+        out.push(...plan.lines);
+        this.map(s, plan.reason);
+        return;
+      }
+      if (plan.action === "grid") {
+        const settings = [];
+        const title = plan.layoutVar && this.layoutTitle.get(plan.layoutVar);
+        if (title) settings.push({ m: "set_title", arg: title });
+        for (const c of this.fcat.get(plan.fieldcatVar) ?? []) {
+          if (!c.name) continue;
+          if (c.text) settings.push({ m: "set_column_text", name: c.name, arg: c.text });
+          if (c.hidden) settings.push({ m: "set_column_hidden", name: c.name });
+          if (c.hotspot) settings.push({ m: "set_column_hotspot", name: c.name });
+          if (c.sum) settings.push({ m: "set_column_sum", name: c.name });
+        }
+        for (const h of this.gridHandlers.filter((x) => x.event === "toolbar")) settings.push(...this.gridToolbar(h));
+        if (this.gridSelection) settings.push({ m: "set_selection_mode" });
+        const lineSelection = this.gridHandlers.some((x) => x.event === "double_click");
+        if (this.gridHandlers.some((x) => x.event === "hotspot_click") && !settings.some((x) => x.m === "set_column_hotspot")) {
+          this.todo(s, "the grid has a HOTSPOT_CLICK handler, and the field catalog marks no column as hotspot - set_column_hotspot( ) for the columns it is meant for");
+        }
+        out.push(...this.alvChain(plan.table, plan.tableNode.getFirstToken(), settings, lineSelection, s));
+        for (const t of plan.todos ?? []) this.todo(s, t);
+        this.map(s, `\`alv( ${plan.table} )\` - set_table_for_first_display( ) of the grid${settings.length ? ", the field catalog, the title and the toolbar in the chain" : ""}`);
+        return;
+      }
       if (plan.action === "reuse") {
         const settings = [...plan.settings];
         for (const c of this.fcat.get(plan.fieldcatVar) ?? []) {
           if (!c.name) continue;
           if (c.text) settings.push({ m: "set_column_text", name: c.name, arg: c.text });
           if (c.hidden) settings.push({ m: "set_column_hidden", name: c.name });
+          if (c.hotspot) settings.push({ m: "set_column_hotspot", name: c.name });
+          if (c.sum) settings.push({ m: "set_column_sum", name: c.name });
         }
         out.push(...this.alvChain(plan.table, plan.tableNode.getFirstToken(), settings, plan.lineSelection, s));
         for (const t of plan.todos ?? []) this.todo(s, t);
@@ -2580,6 +2994,31 @@ class Converter {
       }
     }
 
+    if (b.ctx.pai) {
+      const t = lc(renderTokens(stmtTokens(s)));
+      const toks = stmtTokens(s).map((x) => lc(x.getStr())).filter((x) => x !== "," && x !== ":");
+      if (k === "Clear" && toks.slice(1).every((x) => this.okVars.has(x))) {
+        this.map(s, "dropped - the OK code is ucomm, a parameter");
+        return;
+      }
+      if (k === "Move" && toks.length === 3 && this.okVars.has(toks[0]) && (this.okVars.has(toks[2]) || toks[2] === "sy-ucomm")) {
+        this.map(s, "dropped - the OK code is ucomm, a parameter");
+        return;
+      }
+      if (k === "SetScreen" || (k === "Leave" && /^leave\s+(to\s+screen\s+0|program|to\s+list-processing)$/.test(t))) {
+        if (k === "SetScreen" && !/^set\s+screen\s+0+$/.test(t)) {
+          this.refuse(s, "SET SCREEN of another screen - one screen is converted");
+          return;
+        }
+        out.push("leave_to_selection_screen( ).");
+        this.map(s, "`leave_to_selection_screen( )` - the screen of the grid is left");
+        return;
+      }
+      if (k === "Leave" && /^leave\s+screen$/.test(t)) {
+        this.map(s, "dropped - the screen is left by leave_to_selection_screen( )");
+        return;
+      }
+    }
     if (REFUSED[k]) {
       this.refuse(s, REFUSED[k]);
       return;
@@ -2829,7 +3268,8 @@ class Converter {
       }
       case "Data": {
         const name = lc(declName(s) ?? "");
-        if (this.salvVars.has(name) || this.fcatVars.has(name) || this.layoutVars.has(name)) {
+        if (this.salvVars.has(name) || this.fcatVars.has(name) || this.layoutVars.has(name)
+          || this.gridVars.has(name) || this.contVars.has(name) || this.handlerVars.has(name)) {
           this.map(s, "dropped - the ALV object, field catalog or layout is the alv( ) chain now");
           return;
         }
@@ -2916,7 +3356,7 @@ class Converter {
     const colon = all[0].getColon();
     const group = all.filter((s) => {
       const name = lc(declName(s) ?? "");
-      const alv = kind(s) === "Data" && (this.salvVars.has(name) || this.fcatVars.has(name) || this.layoutVars.has(name));
+      const alv = kind(s) === "Data" && (this.salvVars.has(name) || this.fcatVars.has(name) || this.layoutVars.has(name) || this.isGridObject(name));
       if (alv) this.map(s, "dropped - the ALV object, field catalog or layout is the alv( ) chain now");
       return !alv;
     });
@@ -3065,6 +3505,7 @@ class Converter {
           ov.set(key(toks[i + 2]), null);
         }
       }
+      if (ctx.pai && this.okVars.has(t)) ov.set(key(toks[i]), "ucomm");
       if (ctx.subrc?.has(s) && t === "sy" && next === "-" && next2 === "subrc") {
         ov.set(key(toks[i]), "subrc");
         ov.set(key(toks[i + 1]), null);
@@ -3128,6 +3569,13 @@ class Converter {
         }
         if (field === "name" && op && val && /^'[\w/]+-(LOW|HIGH)'$/i.test(val.getStr())) {
           ov.set(key(val), `'${uc(val.getStr().slice(1, -1).replace(/-(LOW|HIGH)$/i, ""))}'`);
+        }
+      }
+      if (LVC_TYPES[t] && ["type", "of", "like"].includes(lc(prev))) {
+        ov.set(key(toks[i]), LVC_TYPES[t]);
+        if (!this.lvcNoted) {
+          this.lvcNoted = true;
+          this.note("LVC_T_ROW / LVC_S_ROW / LVC_T_ROID - the row types of the classic grid are the types of z2ui5_cl_cgui_alv, with index and row_id as before");
         }
       }
       if (ICONS[t] && !this.globalData.has(t) && !this.currentLocals?.has(t)) {
@@ -3797,6 +4245,11 @@ class Converter {
       items.push({ method: "set_column_text", params: [{ name: "name", value: literal(name) }, { name: "text", value: this.literalArg(st.arg, s) }] });
     }
     for (const name of hidden) items.push({ method: "set_column_hidden", params: [{ value: literal(name) }] });
+    for (const st of settings.filter((x) => x.m === "set_column_hotspot" || x.m === "set_column_sum")) {
+      items.push({ method: st.m, params: [{ value: literal(st.name) }] });
+    }
+    for (const st of settings.filter((x) => x.m === "add_function")) items.push({ method: "add_function", params: st.params });
+    if (settings.some((x) => x.m === "set_selection_mode")) items.push({ method: "set_selection_mode", params: [] });
     if (lineSelection) items.push({ method: "set_line_selection", params: [] });
     return renderChain({ items, head: "" });
   }

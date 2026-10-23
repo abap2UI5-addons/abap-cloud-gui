@@ -61,11 +61,14 @@ export async function createDriver({ mcp, url }) {
       if (n.local === "Icon") return `<${n.attrs.src}>`;
       return resolve(n.attrs.text ?? "");
     };
+    // a line with a position: its items stand in boxes of their width, the
+    // gaps are empty boxes - the texts are the leaves
+    const leaves = (n) => (n.local === "HBox" ? n.children.flatMap(leaves) : [n]);
     return list.children.map((n) => {
       if (n.local === "Toolbar") return "---";
       if (n.local === "Title") return `# ${resolve(n.attrs.text)}`.trim();
       if (n.local === "HBox" && n.attrs.height) return "";
-      return n.children.map(item).join(" ").replace(/\s+$/, "");
+      return n.children.flatMap(leaves).map(item).join(" ").replace(/\s+$/, "");
     });
   }
 
