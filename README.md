@@ -386,9 +386,11 @@ Stage 1 - the converter: the constructs that stop the most reports
 - [x] Tables with a header line (`OCCURS`, `WITH HEADER LINE`) rewritten
       into a table and a work area - mechanical, and in every report older
       than 7.0
-- [ ] `SUBMIT ... AND RETURN` and `CALL SELECTION-SCREEN`: the called report
-      converted with the caller and reached through `nav_app_call( )`, its
-      `WITH` parameters handed over - reports call reports
+- [x] `SUBMIT ... AND RETURN` and `CALL SELECTION-SCREEN`: the called report
+      converted with the caller and started with `submit( )`, its `WITH`
+      values handed over; a screen of the report's own as a dialog, the
+      statements after the call continued in `after_call_selection_screen( )`
+      - reports call reports
 - [ ] The synchronous popups (`POPUP_TO_CONFIRM`, `POPUP_TO_DECIDE`): the
       event block cut at the call, the rest continued in
       `at_user_command( )` - the one transformation that changes a block's

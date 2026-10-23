@@ -214,13 +214,38 @@ test("refusals: every statement without a counterpart, with file, row and column
   assert.deepEqual(result.refusals.map((r) => `${r.row}:${r.col} ${r.message.split(" - ")[0]}`), [
     "26:3 ASSIGN of a field of another program ('(PROG)FIELD')",
     "28:3 CALL TRANSACTION",
-    "30:3 SUBMIT",
     "32:3 EXEC SQL",
     "36:3 CALL SCREEN",
     "38:1 MODULE",
     "42:1 MODULE",
   ]);
   assert.match(result.draft["z2ui5_cl_cgui_r2c_10.clas.abap"], /" report2cloud refused \(line 36\): CALL SCREEN 100/);
+});
+
+test("SUBMIT ... AND RETURN starts the class of the called report with the values, CALL SELECTION-SCREEN goes on in after_call_selection_screen( )", () => {
+  const cls = classOf("zr2c_15_submit");
+  assert.match(cls, /submit\( report = `Z2UI5_CL_CGUI_R2C_02`\n\s+values = VALUE #\( \( name = `P_CARRID` kind = z2ui5_cl_cgui_variant=>cs_kind-parameter low = p_carrid \)\n\s+\( LINES OF z2ui5_cl_cgui_variant=>range_lines_get\( name = `S_FLDATE` range = s_fldate \) \)\n\s+\( name = `P_MAX` kind = z2ui5_cl_cgui_variant=>cs_kind-select_option sign = 'E' option = `NE` low = p_max \) \) \)\./);
+  assert.match(cls, /submit\( report\s+= `Z2UI5_CL_CGUI_R2C_01`\n\s+values\s+= VALUE #\( \( LINES OF z2ui5_cl_cgui_variant=>selection_table_get\( gt_rspar \) \) \)\n\s+via_selection_screen = abap_true\n\s+using_variant\s+= 'DEFAULT' \)\./);
+  // without AND RETURN the classic ended the caller
+  assert.match(cls, /submit\( report = `Z2UI5_CL_CGUI_R2C_01`\n\s+values = VALUE #\( \( name = `P_NAME` kind = z2ui5_cl_cgui_variant=>cs_kind-parameter low = 'Bye' \) \) \)\.\n\s+RETURN\./);
+  // the screen of its own, and the dialog
+  assert.match(cls, /METHOD selection_screen_dynnr\.\n\n\s+CASE dynnr\.\n\s+WHEN `0100`\.\n\s+screen->parameter\( val\s+= p_seats\n\s+text\s+= `Seats`\n\s+obligatory = abap_true \)\.\n\s+ENDCASE\./);
+  assert.match(cls, /WHEN 'BOOK'\.\n\s+call_selection_screen\( dynnr = `0100`\n\s+title = `Booking` \)\.\n\s+WHEN 'HELLO'\./);
+  assert.match(cls, /METHOD after_call_selection_screen\.\n\n\s+CASE dynnr\.\n\s+WHEN `0100`\.\n\s+IF subrc = 0\.\n\s+gv_seats = p_seats\./);
+  assert.ok(!/sy-subrc/.test(cls));
+});
+
+test("SUBMIT: a report that is not part of the input, a dynamic name, the forms without a counterpart", () => {
+  const src = (stmt) => `REPORT zt.\nDATA gv TYPE string.\nDATA gt TYPE STANDARD TABLE OF string WITH DEFAULT KEY.\nSTART-OF-SELECTION.\n  ${stmt}\n`;
+  const r = convert(src("SUBMIT zother WITH p_a = 'X' AND RETURN."), { file: "zt.prog.abap", className: "zcl_t" });
+  assert.match(r.draft["zcl_t.clas.abap"], /submit\( report = `ZCL_OTHER`/);
+  assert.ok(r.todos.some((t) => /SUBMIT ZOTHER: the report is not part of the input/.test(t.message)));
+  const d = convert(src("SUBMIT (gv) AND RETURN."), { file: "zt.prog.abap", className: "zcl_t" });
+  assert.match(d.draft["zcl_t.clas.abap"], /submit\( report = gv \)\./);
+  assert.ok(d.todos.some((t) => /SUBMIT \(name\)/.test(t.message)));
+  assert.deepEqual(refusalOf(src("SUBMIT zother EXPORTING LIST TO MEMORY AND RETURN.")).map((x) => x.split(" - ")[0]), ["5:3 SUBMIT ... EXPORTING LIST TO MEMORY"]);
+  assert.deepEqual(refusalOf(src("SUBMIT zother VIA JOB 'X' NUMBER gv AND RETURN.")).map((x) => x.split(" - ")[0]), ["5:3 SUBMIT ... VIA JOB"]);
+  assert.deepEqual(refusalOf(src("CALL SELECTION-SCREEN 200.")).map((x) => x.split(" - ")[0]), ["5:3 CALL SELECTION-SCREEN 0200"]);
 });
 
 // --------------------------------------------------- refusals, one at a time

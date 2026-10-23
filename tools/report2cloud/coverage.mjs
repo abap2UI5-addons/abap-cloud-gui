@@ -15,7 +15,7 @@
 // not a gate.
 import { readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
-import { convert } from "./lib/convert.mjs";
+import { convert, defaultClassName } from "./lib/convert.mjs";
 import { includesFrom, inlineIncludes } from "./lib/includes.mjs";
 import { parseTextpool } from "./lib/textpool.mjs";
 
@@ -70,7 +70,11 @@ export function coverage(files, { read } = {}) {
     const m = /^(.+)\.prog\.abap$/i.exec(basename(file));
     let result;
     try {
-      result = convert(includes.source, { file, programName: m ? m[1].replace(/#/g, "/") : undefined, textpool, origin: includes.origin });
+      const reader = read ?? includesFrom([dir]);
+      result = convert(includes.source, {
+        file, programName: m ? m[1].replace(/#/g, "/") : undefined, textpool, origin: includes.origin,
+        classFor: (program) => (reader(program) !== undefined ? defaultClassName(program) : undefined),
+      });
     } catch (e) {
       rows.push({ file, crashed: String(e?.message ?? e) });
       continue;

@@ -303,7 +303,9 @@ them are collected, so one run lists everything there is to do.
 | Construct | Why |
 |---|---|
 | `CALL SCREEN`, `MODULE`, `SET SCREEN`, `LEAVE TO SCREEN`, `CALL SUBSCREEN`, `CONTROLS` | dynpros have no counterpart in a browser app |
-| `CALL SELECTION-SCREEN`, `SELECTION-SCREEN BEGIN OF SCREEN / TABBED BLOCK / INCLUDE / FUNCTION KEY`, `SET CURSOR` | only the standard selection screen is converted; abap-cloud-gui has `call_selection_screen( )` with `selection_screen_dynnr( )`, tabbed blocks, `function_key( )` and `set_cursor_field( )` - port them by hand |
+| `SELECTION-SCREEN TABBED BLOCK / INCLUDE / FUNCTION KEY`, `SET CURSOR` | not converted; abap-cloud-gui has tabbed blocks, `function_key( )` and `set_cursor_field( )` - port them by hand |
+| `CALL SELECTION-SCREEN n` of a screen the report does not declare, a second call of the same screen with statements after it | the class calls the screens of `selection_screen_dynnr( )`, and `after_call_selection_screen( )` goes on after one call per screen |
+| `SUBMIT ... EXPORTING LIST TO MEMORY`, `TO SAP-SPOOL`, `VIA JOB`, `WITH-FREE SELECTIONS`, `USING SELECTION-SCREEN n` / `SELECTION-SETS OF PROGRAM` | the list of the called report is not in memory, there is no spool and no job from a browser app; the class has its standard selection screen and its own variants only |
 | `AT SELECTION-SCREEN ON HELP-REQUEST` | `at_selection_screen_on_help( )` runs from the F1 button, which a field only has when its data element has documentation - the block would not run for the other fields |
 | `AT SELECTION-SCREEN ON BLOCK b` / `ON RADIOBUTTON GROUP g` / `ON END OF s` of a block, group or select-option the report does not declare | |
 | `CALL TRANSACTION` (with or without `USING` - batch input) | no SAP GUI transaction can be started; call the released API instead |
@@ -421,8 +423,11 @@ npm run test:report2cloud:runtime                                          # the
   selection screen and a macro, an F01 include with the FORMs, an `IF FOUND`
   include that is not there - the includes lie beside it the way abapGit
   writes them, a `.prog.abap` without a `REPORT` statement is no report of the
-  corpus) - and one with `CALL SCREEN`, batch input, `SUBMIT`, native SQL and dynpro
-  modules that must be refused. A report `zr2c_NN_name` becomes the class
+  corpus), reports that call reports (`SUBMIT ... WITH ... AND RETURN` of
+  another report of the corpus, a selection screen of the report's own called
+  as a dialog, `WITH SELECTION-TABLE`, a `SUBMIT` without `AND RETURN`) - and
+  one with `CALL SCREEN`, batch input, native SQL and dynpro modules that
+  must be refused. A report `zr2c_NN_name` becomes the class
   `z2ui5_cl_cgui_r2c_NN`, a name the repository's `object_naming` accepts.
 - `test/convert.test.mjs` - the snapshots of every generated file and
   migration report (`test/snapshots/`), the abapGit format of the files, the

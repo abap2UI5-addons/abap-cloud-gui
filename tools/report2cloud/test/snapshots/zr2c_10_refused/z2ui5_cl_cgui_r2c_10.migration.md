@@ -4,9 +4,9 @@
 |---|---|
 | Source | `zr2c_10_refused.prog.abap` |
 | Text pool | none - texts are placeholders, see the TODOs |
-| Result | **refused** - 7 statement(s) cannot be mapped, no class written |
-| Mapped | 5 construct(s) |
-| TODO | 1 |
+| Result | **refused** - 6 statement(s) cannot be mapped, no class written |
+| Mapped | 6 construct(s) |
+| TODO | 2 |
 | Release state to check | 0 object(s) |
 
 ## Refused
@@ -15,7 +15,6 @@ These statements have no counterpart in an abap-cloud-gui report. Rewrite them i
 
 - `zr2c_10_refused.prog.abap:26:3` - ASSIGN of a field of another program ('(PROG)FIELD') - field symbols to screen or foreign program fields are not available in a class or on ABAP Cloud
 - `zr2c_10_refused.prog.abap:28:3` - CALL TRANSACTION - no SAP GUI transaction can be started from a browser app (batch input with USING is no API on ABAP Cloud either); call the released API of the application instead
-- `zr2c_10_refused.prog.abap:30:3` - SUBMIT - the report is not part of the input; convert it as well and start its class with submit( report = ... values = ... )
 - `zr2c_10_refused.prog.abap:32:3` - EXEC SQL - native SQL is not available on ABAP Cloud; use ABAP SQL on a released CDS view
 - `zr2c_10_refused.prog.abap:36:3` - CALL SCREEN - a dynpro has no counterpart in a browser app; build the screen as an abap2UI5 view or a popup
 - `zr2c_10_refused.prog.abap:38:1` - MODULE - dynpro modules have no counterpart
@@ -24,6 +23,7 @@ These statements have no counterpart in an abap-cloud-gui report. Rewrite them i
 ## TODO
 
 - no selection text in the text pool for P_VBELN - the label is the DDIC label of the type or the field name; pass the .prog.xml (--texts) or set text = in selection_screen( )
+- `zr2c_10_refused.prog.abap:30:3` - the statements after SUBMIT ... AND RETURN ran when the called report came back - here they run before it starts (submit( ) navigates when the method returns); move them to where they belong
 
 ## Release state on ABAP Cloud
 
@@ -38,6 +38,7 @@ The class uses no database table, DDIC type, function module, class or message c
 | 21 | `FIELD-SYMBOLS <gv_vbeln> TYPE any` | declared in each method that uses it |
 | 23 | `PARAMETERS p_vbeln TYPE c LENGTH 10` | attribute `p_vbeln`, `screen->parameter( )` |
 | 25 | `START-OF-SELECTION` | `start_of_selection( )` |
+| 30 | `SUBMIT zr2c_01_hello AND RETURN` | `submit( report values )` - the class of the called report starts with the values, Back returns here |
 
 ## Next steps
 

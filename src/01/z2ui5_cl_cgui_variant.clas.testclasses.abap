@@ -29,6 +29,8 @@ CLASS ltcl_test DEFINITION FINAL FOR TESTING
     METHODS storage_json FOR TESTING.
     METHODS dynamic_dates FOR TESTING.
     METHODS dynamic_value_set FOR TESTING.
+    METHODS kind_of_the_attribute FOR TESTING.
+    METHODS selection_table FOR TESTING.
 
 ENDCLASS.
 
@@ -87,6 +89,60 @@ CLASS ltcl_test IMPLEMENTATION.
                                        values = lt_value ).
 
     cl_abap_unit_assert=>assert_initial( lo_to->s_text ).
+
+  ENDMETHOD.
+
+  METHOD kind_of_the_attribute.
+
+    " SUBMIT ... WITH s_date = '20260101' WITH p_max NE 3: the caller names
+    " a select-option like a parameter, and a parameter with an option
+    DATA(lo_to) = NEW ltcl_app( ).
+    z2ui5_cl_cgui_variant=>values_set(
+        app    = lo_to
+        values = VALUE #( ( name = `S_DATE` kind = z2ui5_cl_cgui_variant=>cs_kind-parameter low = `20260101` )
+                          ( name = `P_MAX` kind = z2ui5_cl_cgui_variant=>cs_kind-select_option sign = `I` option = `NE` low = `3` ) ) ).
+
+    DATA lt_exp LIKE lo_to->s_date.
+    lt_exp = VALUE #( ( sign = `I` option = `EQ` low = `20260101` ) ).
+    cl_abap_unit_assert=>assert_equals( exp = lt_exp
+                                        act = lo_to->s_date ).
+    cl_abap_unit_assert=>assert_equals( exp = 3
+                                        act = lo_to->p_max ).
+
+  ENDMETHOD.
+
+  METHOD selection_table.
+
+    TYPES:
+      BEGIN OF ty_s_rspar,
+        selname TYPE c LENGTH 8,
+        kind    TYPE c LENGTH 1,
+        sign    TYPE c LENGTH 1,
+        option  TYPE c LENGTH 2,
+        low     TYPE c LENGTH 45,
+        high    TYPE c LENGTH 45,
+      END OF ty_s_rspar.
+    DATA lt_rspar TYPE STANDARD TABLE OF ty_s_rspar WITH DEFAULT KEY.
+
+    lt_rspar = VALUE #( ( selname = 'P_CARRID' kind = 'P' sign = 'I' option = 'EQ' low = 'LH' )
+                        ( selname = 'S_DATE' kind = 'S' sign = 'I' option = 'BT' low = '20260101' high = '20260131' )
+                        ( selname = 's_date' kind = 'S' sign = 'E' option = 'EQ' low = '20260115' )
+                        ( kind = 'P' low = 'skipped' ) ).
+
+    DATA(lt_value) = z2ui5_cl_cgui_variant=>selection_table_get( lt_rspar ).
+    cl_abap_unit_assert=>assert_equals( exp = 3
+                                        act = lines( lt_value ) ).
+
+    DATA(lo_to) = NEW ltcl_app( ).
+    z2ui5_cl_cgui_variant=>values_set( app    = lo_to
+                                       values = lt_value ).
+    cl_abap_unit_assert=>assert_equals( exp = `LH`
+                                        act = lo_to->p_carrid ).
+    DATA lt_exp LIKE lo_to->s_date.
+    lt_exp = VALUE #( ( sign = `I` option = `BT` low = `20260101` high = `20260131` )
+                      ( sign = `E` option = `EQ` low = `20260115` ) ).
+    cl_abap_unit_assert=>assert_equals( exp = lt_exp
+                                        act = lo_to->s_date ).
 
   ENDMETHOD.
 

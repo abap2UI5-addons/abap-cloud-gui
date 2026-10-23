@@ -91,6 +91,25 @@ CLASS z2ui5_cl_cgui_variant DEFINITION PUBLIC FINAL CREATE PUBLIC.
         app    TYPE REF TO object
         values TYPE ty_t_value.
 
+    "! the lines of a range as the values of the select-option name - one
+    "! line per range line, one without sign when the range is empty (so
+    "! that values_set( ) clears it); what SUBMIT ... WITH s IN range hands over
+    CLASS-METHODS range_lines_get
+      IMPORTING
+        name          TYPE string
+        range         TYPE ANY TABLE
+      RETURNING
+        VALUE(result) TYPE ty_t_value.
+
+    "! the values of a selection table as SUBMIT ... WITH SELECTION-TABLE
+    "! takes it - lines with selname, kind, sign, option, low and high
+    "! (RSPARAMS); the lines without a selname are skipped
+    CLASS-METHODS selection_table_get
+      IMPORTING
+        table         TYPE ANY TABLE
+      RETURNING
+        VALUE(result) TYPE ty_t_value.
+
     "! a one-line summary of the filled values - the text of a variant.
     "! fields gives the labels to show instead of the attribute names
     CLASS-METHODS values_to_text
@@ -131,16 +150,6 @@ CLASS z2ui5_cl_cgui_variant DEFINITION PUBLIC FINAL CREATE PUBLIC.
         val           TYPE string
       RETURNING
         VALUE(result) TYPE string.
-
-  PROTECTED SECTION.
-  PRIVATE SECTION.
-
-    CLASS-METHODS range_lines_get
-      IMPORTING
-        name          TYPE string
-        range         TYPE ANY TABLE
-      RETURNING
-        VALUE(result) TYPE ty_t_value.
 
 ENDCLASS.
 
@@ -238,21 +247,29 @@ CLASS z2ui5_cl_cgui_variant IMPLEMENTATION.
       ENDIF.
 
       TRY.
-          IF lr_value->kind = cs_kind-parameter.
-            IF cl_abap_typedescr=>describe_by_data( <attri> )->kind <> cl_abap_typedescr=>kind_table.
+          " the attribute decides whether the value is a parameter or a
+          " range line - SUBMIT ... WITH p = v names a select-option like a
+          " parameter, and a caller does not know the called report
+          IF cl_abap_typedescr=>describe_by_data( <attri> )->kind <> cl_abap_typedescr=>kind_table.
+            IF lr_value->kind = cs_kind-parameter OR lr_value->sign IS NOT INITIAL.
               <attri> = lr_value->low.
             ENDIF.
             CONTINUE.
           ENDIF.
 
-          IF cl_abap_typedescr=>describe_by_data( <attri> )->kind <> cl_abap_typedescr=>kind_table.
-            CONTINUE.
-          ENDIF.
           ASSIGN <attri> TO <range>.
           " the first line of a select-option clears it
           IF lr_value->name <> lv_last.
             CLEAR <range>.
             lv_last = lr_value->name.
+          ENDIF.
+          IF lr_value->kind = cs_kind-parameter.
+            IF lr_value->sign IS INITIAL.
+              lr_value->sign = `I`.
+            ENDIF.
+            IF lr_value->option IS INITIAL.
+              lr_value->option = `EQ`.
+            ENDIF.
           ENDIF.
           IF lr_value->sign IS INITIAL.
             CONTINUE.
@@ -271,6 +288,51 @@ CLASS z2ui5_cl_cgui_variant IMPLEMENTATION.
           INSERT <line> INTO TABLE <range>.
         CATCH cx_root ##NO_HANDLER.
       ENDTRY.
+    ENDLOOP.
+
+  ENDMETHOD.
+
+  METHOD selection_table_get.
+
+    FIELD-SYMBOLS <line> TYPE any.
+    FIELD-SYMBOLS <comp> TYPE any.
+    DATA ls_value TYPE ty_s_value.
+
+    LOOP AT table ASSIGNING <line>.
+      CLEAR ls_value.
+      ASSIGN COMPONENT `SELNAME` OF STRUCTURE <line> TO <comp>.
+      IF <comp> IS NOT ASSIGNED OR <comp> IS INITIAL.
+        UNASSIGN <comp>.
+        CONTINUE.
+      ENDIF.
+      ls_value-name = to_upper( <comp> ).
+      UNASSIGN <comp>.
+      ASSIGN COMPONENT `KIND` OF STRUCTURE <line> TO <comp>.
+      IF <comp> IS ASSIGNED.
+        ls_value-kind = COND #( WHEN <comp> = cs_kind-parameter THEN cs_kind-parameter ELSE cs_kind-select_option ).
+      ENDIF.
+      UNASSIGN <comp>.
+      ASSIGN COMPONENT `SIGN` OF STRUCTURE <line> TO <comp>.
+      IF <comp> IS ASSIGNED.
+        ls_value-sign = <comp>.
+      ENDIF.
+      UNASSIGN <comp>.
+      ASSIGN COMPONENT `OPTION` OF STRUCTURE <line> TO <comp>.
+      IF <comp> IS ASSIGNED.
+        ls_value-option = <comp>.
+      ENDIF.
+      UNASSIGN <comp>.
+      ASSIGN COMPONENT `LOW` OF STRUCTURE <line> TO <comp>.
+      IF <comp> IS ASSIGNED.
+        ls_value-low = <comp>.
+      ENDIF.
+      UNASSIGN <comp>.
+      ASSIGN COMPONENT `HIGH` OF STRUCTURE <line> TO <comp>.
+      IF <comp> IS ASSIGNED.
+        ls_value-high = <comp>.
+      ENDIF.
+      UNASSIGN <comp>.
+      INSERT ls_value INTO TABLE result.
     ENDLOOP.
 
   ENDMETHOD.
