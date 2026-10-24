@@ -248,11 +248,13 @@ export const GUI = {
     cl_gui_easy_splitter_container: "z2ui5_cl_cgui_gui_easy_split",
     cl_gui_textedit: "z2ui5_cl_cgui_gui_textedit",
     cl_gui_html_viewer: "z2ui5_cl_cgui_gui_html_viewer",
+    cl_gui_toolbar: "z2ui5_cl_cgui_gui_toolbar",
   },
   members: {
     z2ui5_cl_cgui_gui: {
       constants: ["true", "false"],
       attributes: [],
+      events: [],
       methods: {
         set_report: { params: ["report"],
           exceptions: [] },
@@ -264,12 +266,17 @@ export const GUI = {
           exceptions: ["cntl_error", "cntl_system_error"] },
         get_id: { params: [],
           exceptions: [] },
+        set_handler: { params: ["event", "method", "handler", "class", "activation"],
+          exceptions: [] },
+        dispatch: { params: ["event", "value"],
+          exceptions: [] },
       },
     },
     z2ui5_cl_cgui_gui_container: {
       parent: "z2ui5_cl_cgui_gui",
       constants: ["dock_at_left", "dock_at_top", "dock_at_right", "dock_at_bottom", "mode_absolute", "mode_relative", "type_movable", "type_sashvisible", "orientation_vertical", "orientation_horizontal", "lifetime_imode", "lifetime_dynpro", "lifetime_default"],
       attributes: ["default_screen", "screen0", "top_left_container", "bottom_right_container"],
+      events: ["close"],
       methods: {
         constructor: { params: ["parent", "container_name", "style", "lifetime", "repid", "dynnr", "no_autodef_progid_dynnr", "side", "extension", "ratio", "metric", "caption", "name", "rows", "columns", "align", "link_dynnr", "link_repid", "orientation", "sash_position", "with_border", "width", "height", "top", "left"],
           exceptions: ["cntl_error", "cntl_system_error", "create_error", "lifetime_error", "lifetime_dynpro_dynpro_link", "cntl_install_error", "illegal_event_combination"] },
@@ -299,6 +306,7 @@ export const GUI = {
       parent: "z2ui5_cl_cgui_gui_container",
       constants: [],
       attributes: [],
+      events: [],
       methods: {
         constructor: { params: ["parent", "orientation", "sash_position", "with_border", "lifetime", "name"],
           exceptions: ["cntl_error", "cntl_system_error"] },
@@ -308,6 +316,7 @@ export const GUI = {
       parent: "z2ui5_cl_cgui_gui",
       constants: ["wordwrap_off", "wordwrap_at_windowborder", "wordwrap_at_fixed_position", "dropfile_event_off", "dropfile_event_single", "dropfile_event_multiple"],
       attributes: [],
+      events: [],
       methods: {
         constructor: { params: ["max_number_chars", "style", "wordwrap_mode", "wordwrap_position", "wordwrap_to_linebreak_mode", "filedrop_mode", "parent", "lifetime", "name"],
           exceptions: ["error_cntl_create", "error_cntl_init", "error_cntl_link", "error_dp_create", "gui_type_not_supported"] },
@@ -345,6 +354,7 @@ export const GUI = {
       parent: "z2ui5_cl_cgui_gui",
       constants: ["m_id_sapevent"],
       attributes: [],
+      events: ["sapevent"],
       methods: {
         constructor: { params: ["shellstyle", "parent", "lifetime", "saphtmlp", "uiflag", "end_session_with_browser", "name", "saphttp", "query_table_disabled"],
           exceptions: ["cntl_error", "cntl_install_error", "dp_install_error", "dp_error"] },
@@ -354,6 +364,7 @@ export const GUI = {
           exceptions: ["cntl_error", "cnht_error_not_allowed", "cnht_error_parameter", "dp_error_general"] },
         show_data: { params: ["url", "frame", "in_place"],
           exceptions: ["cntl_error", "cnht_error_not_allowed", "cnht_error_parameter", "dp_error_general"] },
+        sapevent_links: { params: ["html"], exceptions: [] },
         set_registered_events: { params: ["events"],
           exceptions: ["cntl_error", "cntl_system_error", "illegal_event_combination"] },
         close_document: { params: [],
@@ -364,6 +375,34 @@ export const GUI = {
           exceptions: ["cntl_error"] },
         detach_url_in_browser: { params: ["url"],
           exceptions: ["cntl_error"] },
+        dispatch: { params: [],
+          exceptions: [] },
+      },
+    },
+    z2ui5_cl_cgui_gui_toolbar: {
+      parent: "z2ui5_cl_cgui_gui",
+      constants: ["cntb_btype_button", "cntb_btype_dropdown", "cntb_btype_menu", "cntb_btype_sep", "cntb_btype_group", "cntb_btype_check", "m_id_function_selected", "m_id_dropdown_clicked"],
+      attributes: [],
+      events: ["function_selected", "dropdown_clicked"],
+      methods: {
+        constructor: { params: ["parent", "shellstyle", "lifetime", "display_mode", "align_right", "name"],
+          exceptions: ["cntl_install_error", "cntl_error", "cntb_wrong_version"] },
+        add_button: { params: ["fcode", "icon", "is_disabled", "butn_type", "text", "quickinfo", "is_checked"],
+          exceptions: ["cntl_error", "cntb_btype_error", "cntb_error_fcode"] },
+        add_button_group: { params: ["data_table"],
+          exceptions: ["dp_error", "cntb_error_fcode"] },
+        set_button_state: { params: ["enabled", "checked", "fcode"],
+          exceptions: ["cntl_error", "cntb_error_fcode"] },
+        set_button_info: { params: ["fcode", "icon", "text", "quickinfo"],
+          exceptions: ["cntl_error", "cntb_error_fcode"] },
+        delete_button: { params: ["fcode"],
+          exceptions: ["cntl_error", "cntb_error_fcode"] },
+        delete_all_buttons: { params: [],
+          exceptions: ["cntl_error"] },
+        set_registered_events: { params: ["events"],
+          exceptions: ["cntl_error", "cntl_system_error", "illegal_event_combination"] },
+        dispatch: { params: [],
+          exceptions: [] },
       },
     },
   },
@@ -372,6 +411,12 @@ export const GUI = {
 /** the stand-in of a SAP GUI class - undefined for any other name (also
  *  constructor or toString, which every object has) */
 const guiClass = (name) => (Object.hasOwn(GUI.classes, name) ? GUI.classes[name] : undefined);
+
+/** whether a stand-in or one of its parents raises the event */
+function guiEvent(cls, name) {
+  for (let c = cls; c; c = GUI.members[c]?.parent) if (GUI.members[c]?.events.includes(name)) return true;
+  return false;
+}
 
 /** the member of a stand-in or of one of its parents - undefined if none has it */
 function guiMember(cls, name) {
@@ -886,11 +931,16 @@ class Converter {
       const hit = text.match(GUI_CONTROL);
       if (!hit) continue;
       const missing = [...new Set([...text.matchAll(/\bcl_gui_\w+/g)].map((m) => m[0]))].filter((c) => !guiClass(c) && !["cl_gui_cfw", "cl_gui_frontend_services"].includes(c));
-      const event = /\bfor\s+event\s+\w+\s+of\s+(cl_gui_\w+)/.exec(text);
       if (!this.guiVars?.size || missing.length) {
         this.refuse(u.stmts[0], `SAP GUI controls: the local class uses ${missing.length ? missing.join(", ") : `cl_gui_${hit[1]}`} - a local class is copied as it is, its controls have no stand-in there; make them global data of the report or move the class into a class of its own`);
-      } else if (event && guiClass(event[1])) {
-        this.refuse(u.stmts[0], `SAP GUI controls: the local class handles an event of ${event[1]} - the events of the text editor and the HTML viewer have no counterpart yet`);
+      } else {
+        // a handler of an event its stand-in does not raise
+        for (const m of text.matchAll(/\bfor\s+event\s+(\w+)\s+of\s+(cl_gui_\w+)/g)) {
+          if (guiClass(m[2]) && !guiEvent(guiClass(m[2]), m[1])) {
+            this.refuse(u.stmts[0], `SAP GUI controls: the local class handles the event ${m[1]} of ${m[2]} - its stand-in ${guiClass(m[2])} does not raise it`);
+            break;
+          }
+        }
       }
     }
   }
@@ -1204,6 +1254,71 @@ class Converter {
     }
   }
 
+  /** the event handlers of the local classes: method -> [{ cls, event, of }] */
+  guiHandlers() {
+    if (this.guiHandlerMap) return this.guiHandlerMap;
+    this.guiHandlerMap = new Map();
+    for (const u of this.locals.filter((x) => x.kind === "ClassDefinition")) {
+      const cls = lc(nodeText(child(u.stmts[0], "ClassName") ?? u.stmts[0].getChildren()[1]));
+      for (const x of u.stmts.filter((y) => kind(y) === "MethodDef" && child(y, "EventHandler"))) {
+        const eh = child(x, "EventHandler");
+        const name = lc(nodeText(child(x, "MethodName")));
+        if (!this.guiHandlerMap.has(name)) this.guiHandlerMap.set(name, []);
+        this.guiHandlerMap.get(name).push({ cls, event: lc(nodeText(child(eh, "EventName"))), of: lc(nodeText(child(eh, "ClassName"))) });
+      }
+    }
+    return this.guiHandlerMap;
+  }
+
+  /** SET HANDLER h->m FOR go_x [ACTIVATION a] - go_x->set_handler( ): the
+   *  stand-in keeps the handler, the classic registration would not
+   *  survive the roundtrip */
+  guiSetHandler(s, b) {
+    const ov = this.rewrites(s, b.ctx, b);
+    const render = (node) => nodeText(node, ov);
+    const sources = children(s, "Source");
+    const target = sources[0] && render(sources[0]);
+    const activation = sources[1] && render(sources[1]);
+    if (/^all\s+instances$/i.test(target ?? "") || words(s).includes("ALL")) {
+      this.refuse(s, "SAP GUI controls: SET HANDLER ... FOR ALL INSTANCES - the stand-ins keep the handlers of one control; name the control");
+      return;
+    }
+    const control = lc(target.replace(/^me\s*->\s*/i, "").replace(/^.*->/, ""));
+    const cls = this.guiVars.get(control) ?? this.guiVars.get(lc(target));
+    const lines = [];
+    for (const m of children(s, "MethodSource")) {
+      const text = render(m);
+      const arrow = /^(.*?)\s*(->|=>)\s*([\w/]+)$/.exec(text);
+      if (arrow?.[2] === "=>") {
+        this.refuse(s, "SAP GUI controls: SET HANDLER of a static method - the stand-ins call the handler of an object; make it an instance method");
+        return;
+      }
+      const handler = arrow ? arrow[1] : "me";
+      const method = lc(arrow ? arrow[3] : text);
+      if (!cls) {
+        this.refuse(s, `SAP GUI controls: SET HANDLER ${method} FOR ${target} - no SAP GUI control of the report; port this statement by hand`);
+        return;
+      }
+      const candidates = (this.guiHandlers().get(method) ?? []).filter((h) => guiClass(h.of) && guiEvent(cls, h.event));
+      if (!candidates.length) {
+        this.refuse(s, `SAP GUI controls: SET HANDLER ${method} - no handler FOR EVENT of the control in a local class, or an event its stand-in ${cls} does not raise`);
+        return;
+      }
+      if (handler === "me" && !b.ctx.local) {
+        this.refuse(s, `SAP GUI controls: SET HANDLER ${method} outside of a local class - the handler is an object; name it`);
+        return;
+      }
+      lines.push(renderNamedCall(`${target}->set_handler`, [
+        { name: "handler", value: handler },
+        { name: "method", value: literal(uc(method)) },
+        { name: "event", value: literal(uc(candidates[0].event)) },
+        ...(activation ? [{ name: "activation", value: activation }] : []),
+      ]));
+    }
+    b.out.push(...lines);
+    this.map(s, `\`${target}->set_handler( )\` - the stand-in keeps the handler and calls it for the event of the browser`);
+  }
+
   /** the SAP GUI control classes of a statement that have no stand-in -
    *  the refusal, undefined when every one has */
   guiRefusal(text) {
@@ -1212,7 +1327,7 @@ class Converter {
     const missing = [...new Set([...t.matchAll(/\bcl_gui_\w+/g)].map((m) => m[0]))]
       .filter((c) => !guiClass(c) && !["cl_gui_cfw", "cl_gui_frontend_services"].includes(c));
     if (this.guiVars?.size && !missing.length) return undefined;
-    if (this.guiVars?.size) return `SAP GUI controls: ${missing.join(", ")} ${missing.length > 1 ? "have" : "has"} no counterpart - the containers, cl_gui_textedit and cl_gui_html_viewer have (z2ui5_cl_cgui_gui*)`;
+    if (this.guiVars?.size) return `SAP GUI controls: ${missing.join(", ")} ${missing.length > 1 ? "have" : "has"} no counterpart - the containers, cl_gui_textedit, cl_gui_html_viewer and cl_gui_toolbar have (z2ui5_cl_cgui_gui*)`;
     return "SAP GUI controls (cl_gui_*) need a dynpro container - use alv( ) or an abap2UI5 view";
   }
 
@@ -2495,6 +2610,9 @@ class Converter {
     }
     // the local classes - their methods may PERFORM a FORM as well
     const locals = this.localsSource();
+    // the handlers of the controls are methods of local classes: the event
+    // of a control hands them the instance like every event method
+    if (locals.app && [...this.guiHandlers().values()].flat().some((h) => guiClass(h.of))) methods.push({ name: "at_gui_event", body: [] });
     for (const f of this.forms) {
       if (!this.alvCallbacks.has(f.name) && !this.emptyForms.has(f.name) && !f.performed) this.todo(f.stmt, `FORM ${f.name} is not PERFORMed in this report - the private method ${f.method}( ) is unused (abaplint unused_methods)`);
     }
@@ -2523,7 +2641,7 @@ class Converter {
       "at_selection_screen_on_block", "at_selection_screen_on_radio", "at_selection_screen_on_end_of",
       "at_selection_screen_on_exit", "at_selection_screen_on_help", "at_selection_screen", "start_of_selection", "end_of_selection", "top_of_page",
       "top_of_page_line_selection", "end_of_page", "at_line_selection", "at_link_click", "at_user_command", "at_value_request",
-      "after_call_selection_screen", "dynpro_screen", "dynpro_pbo", "dynpro_pai", "after_call_screen"];
+      "after_call_selection_screen", "dynpro_screen", "dynpro_pbo", "dynpro_pai", "at_gui_event", "after_call_screen"];
     methods.sort((a, b) => order.indexOf(a.name) - order.indexOf(b.name));
     for (const m of methods) lines.push(`    METHODS ${m.name} REDEFINITION.`);
     lines.push("");
@@ -4116,8 +4234,11 @@ class Converter {
     if (this.dynpro && this.dynproStatement(s, b, k)) return;
     if (this.guiVars?.size) {
       const t = lc(renderTokens(stmtTokens(s)));
-      if (k === "SetHandler" && [...this.guiVars.keys()].some((v) => new RegExp(`\\bfor\\s+${v}\\b`).test(t))) {
-        this.refuse(s, "SAP GUI controls: the events of the text editor and the HTML viewer (SET HANDLER) have no counterpart yet - the controls show and keep their text, their events are not raised");
+      // FOR ALL INSTANCES of a handler of a control event too - it must not stay and never fire
+      const allOfGui = /\bfor\s+all\s+instances\b/.test(t)
+        && children(s, "MethodSource").some((m) => (this.guiHandlers().get(lc(nodeText(m)).replace(/^.*(->|=>)\s*/, "")) ?? []).some((h) => guiClass(h.of)));
+      if (k === "SetHandler" && (allOfGui || [...this.guiVars.keys()].some((v) => new RegExp(`\\bfor\\s+(me\\s*->\\s*)?${v}\\b`).test(t)))) {
+        this.guiSetHandler(s, b);
         return;
       }
       const bad = !DECL.has(k) && this.guiCheck(s);
@@ -4127,17 +4248,6 @@ class Converter {
       }
       if (/^(call\s+method\s+)?cl_gui_cfw\s*=>\s*(flush|update_view)\b/.test(t)) {
         this.map(s, "dropped - cl_gui_cfw=>flush( ): the controls of SAP GUI, nothing to flush in the browser");
-        return;
-      }
-      // CREATE OBJECT go_x EXPORTING ... - NEW #( ... ), the writing of the house;
-      // with EXCEPTIONS or TYPE it stays as it is
-      const target = child(s, "Target");
-      if (k === "CreateObject" && target && this.guiVars.has(lc(nodeText(target))) && !/\b(exceptions|type)\b/.test(t)) {
-        const ov = this.rewrites(s, b.ctx, b);
-        const params = findAll(s, "ParameterS").map((p) => ({ name: lc(nodeText(child(p, "ParameterName"))), value: nodeText(child(p, "Source"), ov) }));
-        const name = nodeText(target, ov);
-        out.push(params.length ? renderNamedCall(`${name} = NEW #`, params) : `${name} = NEW #( ).`);
-        this.map(s, `\`${name} = NEW #( )\` - the stand-in ${this.guiVars.get(lc(nodeText(target)))}`);
         return;
       }
     }
@@ -4424,6 +4534,21 @@ class Converter {
             return;
           }
         }
+        // CREATE OBJECT go_x EXPORTING ... - NEW #( ... ), the writing of the
+        // house (use_new); with EXCEPTIONS, TYPE or AREA HANDLE, or into a
+        // field symbol, it stays as it is
+        const target = child(s, "Target");
+        if (k === "CreateObject" && target && !/\b(exceptions|type|area)\b/.test(t) && !nodeText(target).startsWith("<")) {
+          const ov = this.rewrites(s, b.ctx, b);
+          // the parameters of the constructor only - not those of a call in a value
+          const list = child(s, "ParameterListS");
+          const params = (list ? children(list, "ParameterS") : []).map((p) => ({ name: lc(nodeText(child(p, "ParameterName"))), value: nodeText(child(p, "Source"), ov) }));
+          const name = nodeText(target, ov);
+          out.push(params.length ? renderNamedCall(`${name} = NEW #`, params) : `${name} = NEW #( ).`);
+          const stand = this.guiVars?.get(lc(nodeText(target)));
+          this.map(s, `\`${name} = NEW #( )\`${stand ? ` - the stand-in ${stand}` : ""}`);
+          return;
+        }
         break;
       }
       case "Assign": {
@@ -4699,6 +4824,11 @@ class Converter {
       // cl_gui_textedit, cl_gui_custom_container, ... - their stand-ins
       if (this.guiVars?.size && guiClass(t)) {
         ov.set(key(toks[i]), guiClass(t));
+        continue;
+      }
+      // cntb_btype_sep of type pool CNTB - the constant of the toolbar's stand-in
+      if (this.guiVars?.size && /^cntb_btype_\w+$/.test(t) && guiMember("z2ui5_cl_cgui_gui_toolbar", t)) {
+        ov.set(key(toks[i]), `z2ui5_cl_cgui_gui_toolbar=>${t}`);
         continue;
       }
       // cl_gui_frontend_services=>gui_upload, =>action_ok - the frontend
@@ -5827,6 +5957,8 @@ class Converter {
       const m = /type\s+ref\s+to\s+([\w/]+)/i.exec(text);
       return m ? [lc(m[1])] : [];
     }));
+    // a handler of a SAP GUI control: the stand-in keeps its instance
+    for (const list of this.guiVars?.size ? this.guiHandlers().values() : []) for (const h of list) if (guiClass(h.of)) persisted.add(h.cls);
     const copied = new Set();   // rows a chained statement (CLASS: a DEFINITION DEFERRED, b ...) was copied with
     for (const u of this.locals) {
       const n = nameOf(u);

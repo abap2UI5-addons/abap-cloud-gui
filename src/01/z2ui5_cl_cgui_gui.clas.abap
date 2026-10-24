@@ -45,10 +45,35 @@ CLASS z2ui5_cl_cgui_gui DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
       RETURNING
         VALUE(result) TYPE i.
 
+    "! SET HANDLER handler->method FOR control - the handler of event: an
+    "! object, or the class of a static method (class); kept with the
+    "! control, so it is there on the next roundtrip (a SET HANDLER is not)
+    METHODS set_handler
+      IMPORTING
+        event      TYPE clike
+        method     TYPE clike
+        handler    TYPE REF TO object OPTIONAL
+        class      TYPE clike         OPTIONAL
+        activation TYPE abap_bool     DEFAULT abap_true.
+
+    "! an event of the browser for this control - the report passes it on;
+    "! value is what the browser sent with it (a function code, an action)
+    METHODS dispatch
+      IMPORTING
+        event TYPE string
+        value TYPE string OPTIONAL.
+
   PROTECTED SECTION.
     CLASS-DATA go_report TYPE REF TO z2ui5_if_cgui_gui.
 
     DATA mv_id TYPE i.
+
+    "! RAISE EVENT event - the handlers set for it, each with the
+    "! parameters its method has of params, and sender
+    METHODS raise_event
+      IMPORTING
+        event  TYPE string
+        params TYPE abap_parmbind_tab OPTIONAL.
 
     "! the control in the report - abap_false when there is no report
     METHODS add
@@ -122,12 +147,90 @@ CLASS z2ui5_cl_cgui_gui IMPLEMENTATION.
 
   ENDMETHOD.
 
+  METHOD set_handler.
+
+    DATA(lv_event) = to_upper( condense( event ) ).
+    DATA(lv_method) = to_upper( condense( method ) ).
+    DATA(lv_class) = to_upper( condense( class ) ).
+    IF go_report IS NOT BOUND.
+      RETURN.
+    ENDIF.
+    DATA(lt_handler) = go_report->handlers_get( ).
+    DELETE lt_handler WHERE id = mv_id AND event = lv_event AND method = lv_method AND handler = handler AND class = lv_class.
+    IF activation = abap_true.
+      INSERT VALUE #( id      = mv_id
+                      event   = lv_event
+                      handler = handler
+                      class   = lv_class
+                      method  = lv_method ) INTO TABLE lt_handler.
+    ENDIF.
+    go_report->handlers_set( lt_handler ).
+
+  ENDMETHOD.
+
+  METHOD dispatch.
+
+    raise_event( to_upper( event ) ).
+
+  ENDMETHOD.
+
+  METHOD raise_event.
+
+    DATA lt_param TYPE abap_parmbind_tab.
+    DATA lr_sender TYPE REF TO data.
+    FIELD-SYMBOLS <sender> TYPE any.
+
+    " sender typed as the class of the control - the handler's parameter is
+    " typed with the class of the event (the stand-in or a parent of it)
+    DATA(lv_class) = cl_abap_typedescr=>describe_by_object_ref( me )->get_relative_name( ).
+    CREATE DATA lr_sender TYPE REF TO (lv_class).
+    ASSIGN lr_sender->* TO <sender>.
+    <sender> ?= me.
+    IF go_report IS NOT BOUND.
+      RETURN.
+    ENDIF.
+    DATA(lt_handler) = go_report->handlers_get( ).
+    LOOP AT lt_handler INTO DATA(ls_handler) WHERE id = mv_id AND event = event.
+      " the parameters the handler method takes - an event handler names a
+      " part of the event's parameters
+      DATA(lo_type) = COND #( WHEN ls_handler-handler IS BOUND
+                              THEN CAST cl_abap_objectdescr( cl_abap_typedescr=>describe_by_object_ref( ls_handler-handler ) )
+                              ELSE CAST cl_abap_objectdescr( cl_abap_typedescr=>describe_by_name( ls_handler-class ) ) ).
+      READ TABLE lo_type->methods INTO DATA(ls_method) WITH KEY name = ls_handler-method.
+      IF sy-subrc <> 0.
+        CONTINUE.
+      ENDIF.
+      CLEAR lt_param.
+      LOOP AT ls_method-parameters INTO DATA(ls_parameter).
+        IF ls_parameter-name = `SENDER`.
+          INSERT VALUE #( name  = `SENDER`
+                          kind  = cl_abap_objectdescr=>exporting
+                          value = lr_sender ) INTO TABLE lt_param.
+          CONTINUE.
+        ENDIF.
+        READ TABLE params INTO DATA(ls_param) WITH TABLE KEY name = ls_parameter-name.
+        IF sy-subrc = 0.
+          INSERT ls_param INTO TABLE lt_param.
+        ENDIF.
+      ENDLOOP.
+      IF ls_handler-handler IS BOUND.
+        CALL METHOD ls_handler-handler->(ls_handler-method)
+          PARAMETER-TABLE lt_param.
+      ELSE.
+        CALL METHOD (ls_handler-class)=>(ls_handler-method)
+          PARAMETER-TABLE lt_param.
+      ENDIF.
+    ENDLOOP.
+
+  ENDMETHOD.
+
   METHOD add.
 
     IF go_report IS NOT BOUND.
       RETURN.
     ENDIF.
-    mv_id = go_report->control_add( control ).
+    mv_id = go_report->control_add( control = control
+                                    object  = me ).
     result = abap_true.
 
   ENDMETHOD.

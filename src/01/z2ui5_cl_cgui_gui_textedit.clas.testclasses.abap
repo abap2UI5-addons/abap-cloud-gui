@@ -4,6 +4,8 @@ CLASS ltcl_gui DEFINITION FINAL FOR TESTING.
   PUBLIC SECTION.
     INTERFACES z2ui5_if_cgui_gui.
     DATA mt_control TYPE z2ui5_if_cgui_gui=>ty_t_control.
+    DATA mt_object TYPE STANDARD TABLE OF REF TO object WITH EMPTY KEY.
+    DATA mt_handler TYPE z2ui5_if_cgui_gui=>ty_t_handler.
 
 ENDCLASS.
 
@@ -15,6 +17,7 @@ CLASS ltcl_gui IMPLEMENTATION.
     DATA(ls_control) = control.
     ls_control-id = lines( mt_control ) + 1.
     INSERT ls_control INTO TABLE mt_control.
+    INSERT object INTO TABLE mt_object.
     result = ls_control-id.
 
   ENDMETHOD.
@@ -31,7 +34,63 @@ CLASS ltcl_gui IMPLEMENTATION.
 
   ENDMETHOD.
 
+  METHOD z2ui5_if_cgui_gui~handlers_get.
+
+    result = mt_handler.
+
+  ENDMETHOD.
+
+  METHOD z2ui5_if_cgui_gui~handlers_set.
+
+    mt_handler = handlers.
+
+  ENDMETHOD.
+
   METHOD z2ui5_if_cgui_gui~custom_render ##NEEDED.
+  ENDMETHOD.
+
+ENDCLASS.
+
+
+"! the handlers a report sets for the events of its controls
+CLASS ltcl_handler DEFINITION FINAL FOR TESTING.
+
+  PUBLIC SECTION.
+    DATA mv_log TYPE string.
+
+    METHODS on_close FOR EVENT close OF z2ui5_cl_cgui_gui_container
+      IMPORTING sender.
+    METHODS on_function FOR EVENT function_selected OF z2ui5_cl_cgui_gui_toolbar
+      IMPORTING fcode.
+    METHODS on_sapevent FOR EVENT sapevent OF z2ui5_cl_cgui_gui_html_viewer
+      IMPORTING action query_table.
+
+ENDCLASS.
+
+
+CLASS ltcl_handler IMPLEMENTATION.
+
+  METHOD on_close.
+
+    mv_log = |{ mv_log }CLOSE { sender->get_id( ) };|.
+    sender->free( ).
+
+  ENDMETHOD.
+
+  METHOD on_function.
+
+    mv_log = |{ mv_log }FUNCTION { fcode };|.
+
+  ENDMETHOD.
+
+  METHOD on_sapevent.
+
+    mv_log = |{ mv_log }SAPEVENT { action }|.
+    LOOP AT query_table INTO DATA(ls_query).
+      mv_log = |{ mv_log } { ls_query-name }={ ls_query-value }|.
+    ENDLOOP.
+    mv_log = |{ mv_log };|.
+
   ENDMETHOD.
 
 ENDCLASS.
@@ -53,6 +112,9 @@ CLASS ltcl_test DEFINITION FINAL
     METHODS modified_and_modes FOR TESTING.
     METHODS splitter_cells FOR TESTING.
     METHODS html_document FOR TESTING.
+    METHODS events FOR TESTING.
+    METHODS toolbar_buttons FOR TESTING.
+    METHODS sapevent_links FOR TESTING.
 
 ENDCLASS.
 
@@ -175,6 +237,92 @@ CLASS ltcl_test IMPLEMENTATION.
 
   ENDMETHOD.
 
+  METHOD events.
+
+    DATA(lo_handler) = NEW ltcl_handler( ).
+    DATA(lo_dialog) = NEW z2ui5_cl_cgui_gui_container( caption = 'Details'
+                                                       width   = 400
+                                                       height  = 300 ).
+    cl_abap_unit_assert=>assert_true( mo_gui->mt_control[ lo_dialog->get_id( ) ]-dialog ).
+    lo_dialog->set_handler( handler = lo_handler
+                            method  = 'ON_CLOSE'
+                            event   = 'CLOSE' ).
+    " the browser's event, passed on by the report: the handler with sender
+    lo_dialog->dispatch( `CLOSE` ).
+    cl_abap_unit_assert=>assert_equals( act = lo_handler->mv_log
+                                        exp = |CLOSE { lo_dialog->get_id( ) };| ).
+    cl_abap_unit_assert=>assert_true( mo_gui->mt_control[ lo_dialog->get_id( ) ]-freed ).
+
+    DATA(lo_html) = NEW z2ui5_cl_cgui_gui_html_viewer( parent = mo_cont ).
+    lo_html->set_handler( handler = lo_handler
+                          method  = 'on_sapevent'
+                          event   = 'sapevent' ).
+    lo_html->dispatch( event = `SAPEVENT`
+                       value = `SHOW?carrid=LH&connid=0400` ).
+    cl_abap_unit_assert=>assert_equals( act = lo_handler->mv_log
+                                        exp = |CLOSE { lo_dialog->get_id( ) };SAPEVENT SHOW CARRID=LH CONNID=0400;| ).
+
+    " ACTIVATION space: no handler any more
+    CLEAR lo_handler->mv_log.
+    lo_html->set_handler( handler    = lo_handler
+                          method     = 'ON_SAPEVENT'
+                          event      = 'SAPEVENT'
+                          activation = abap_false ).
+    lo_html->dispatch( event = `SAPEVENT`
+                       value = `SHOW` ).
+    cl_abap_unit_assert=>assert_initial( lo_handler->mv_log ).
+
+  ENDMETHOD.
+
+  METHOD toolbar_buttons.
+
+    TYPES:
+      BEGIN OF ty_s_button,
+        function  TYPE c LENGTH 70,
+        icon      TYPE c LENGTH 40,
+        butn_type TYPE c LENGTH 1,
+        text      TYPE c LENGTH 40,
+        quickinfo TYPE c LENGTH 40,
+        disabled  TYPE c LENGTH 1,
+      END OF ty_s_button.
+    DATA lt_group TYPE STANDARD TABLE OF ty_s_button WITH EMPTY KEY.
+
+    DATA(lo_handler) = NEW ltcl_handler( ).
+    DATA(lo_bar) = NEW z2ui5_cl_cgui_gui_toolbar( parent = mo_cont ).
+    lo_bar->add_button( fcode     = 'refresh'
+                        icon      = 'sap-icon://refresh'
+                        butn_type = z2ui5_cl_cgui_gui_toolbar=>cntb_btype_button
+                        quickinfo = 'Read again' ).
+    lt_group = VALUE #( ( butn_type = '3' )
+                        ( function = 'SAVE' text = 'Save' disabled = 'X' ) ).
+    lo_bar->add_button_group( lt_group ).
+    DATA(lt_button) = mo_gui->mt_control[ lo_bar->get_id( ) ]-buttons.
+    cl_abap_unit_assert=>assert_equals( act = lines( lt_button )
+                                        exp = 3 ).
+    cl_abap_unit_assert=>assert_equals( act = lt_button[ 1 ]-fcode
+                                        exp = `REFRESH` ).
+    cl_abap_unit_assert=>assert_equals( act = lt_button[ 2 ]-type
+                                        exp = z2ui5_cl_cgui_gui_toolbar=>cntb_btype_sep ).
+    cl_abap_unit_assert=>assert_true( lt_button[ 3 ]-disabled ).
+
+    lo_bar->set_button_state( fcode   = 'SAVE'
+                              enabled = abap_true ).
+    cl_abap_unit_assert=>assert_false( mo_gui->mt_control[ lo_bar->get_id( ) ]-buttons[ 3 ]-disabled ).
+
+    lo_bar->set_handler( handler = lo_handler
+                         method  = 'ON_FUNCTION'
+                         event   = 'FUNCTION_SELECTED' ).
+    lo_bar->dispatch( event = `FUNCTION_SELECTED`
+                      value = `REFRESH` ).
+    cl_abap_unit_assert=>assert_equals( act = lo_handler->mv_log
+                                        exp = `FUNCTION REFRESH;` ).
+
+    lo_bar->delete_button( 'REFRESH' ).
+    lo_bar->delete_all_buttons( ).
+    cl_abap_unit_assert=>assert_initial( mo_gui->mt_control[ lo_bar->get_id( ) ]-buttons ).
+
+  ENDMETHOD.
+
   METHOD html_document.
 
     TYPES ty_html TYPE c LENGTH 10.
@@ -202,6 +350,18 @@ CLASS ltcl_test IMPLEMENTATION.
 
     lo_html->show_data( ).
     cl_abap_unit_assert=>assert_not_initial( mo_gui->mt_control[ 2 ]-html ).
+
+  ENDMETHOD.
+
+  METHOD sapevent_links.
+
+    DATA(lt_link) = z2ui5_cl_cgui_gui_html_viewer=>sapevent_links(
+      `<p>x</p><a href="SAPEVENT:SHOW?CONNID=0400">Flight 0400</a> <A HREF='sapevent:back'> Back </A><a href="sapevent:open` ).
+    cl_abap_unit_assert=>assert_equals( act = lines( lt_link ) exp = 2 ).
+    cl_abap_unit_assert=>assert_equals( act = lt_link[ 1 ]-action exp = `SHOW?CONNID=0400` ).
+    cl_abap_unit_assert=>assert_equals( act = lt_link[ 1 ]-text exp = `Flight 0400` ).
+    cl_abap_unit_assert=>assert_equals( act = lt_link[ 2 ]-action exp = `back` ).
+    cl_abap_unit_assert=>assert_equals( act = lt_link[ 2 ]-text exp = `Back` ).
 
   ENDMETHOD.
 

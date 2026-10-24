@@ -11,6 +11,31 @@ CLASS z2ui5_cl_cgui_gui_html_viewer DEFINITION PUBLIC
   PUBLIC SECTION.
     CONSTANTS m_id_sapevent TYPE i VALUE 1.
 
+    TYPES ty_c255 TYPE c LENGTH 255.
+    TYPES ty_t_post TYPE STANDARD TABLE OF ty_c255 WITH DEFAULT KEY.
+    TYPES:
+      "! a parameter of the query of a SAPEVENT link - as w3query
+      BEGIN OF ty_s_query,
+        name  TYPE c LENGTH 30,
+        value TYPE c LENGTH 255,
+      END OF ty_s_query,
+      ty_t_query TYPE STANDARD TABLE OF ty_s_query WITH DEFAULT KEY,
+      BEGIN OF ty_s_link,
+        action TYPE string,
+        text   TYPE string,
+      END OF ty_s_link,
+      ty_t_link TYPE STANDARD TABLE OF ty_s_link WITH DEFAULT KEY.
+
+    "! a link SAPEVENT:action?query of the document - shown as a link below
+    "! it (the document is sanitized), a click raises the event
+    EVENTS sapevent
+      EXPORTING
+        VALUE(action)      TYPE c OPTIONAL
+        VALUE(frame)       TYPE c OPTIONAL
+        VALUE(getdata)     TYPE c OPTIONAL
+        VALUE(postdata)    TYPE ty_t_post OPTIONAL
+        VALUE(query_table) TYPE ty_t_query OPTIONAL.
+
     METHODS constructor
       IMPORTING
         shellstyle               TYPE i OPTIONAL
@@ -105,6 +130,16 @@ CLASS z2ui5_cl_cgui_gui_html_viewer DEFINITION PUBLIC
       EXCEPTIONS
         cntl_error.
 
+    METHODS dispatch REDEFINITION.
+
+    "! the SAPEVENT links of a document - href="sapevent:action">text</a>,
+    "! found with string operations
+    CLASS-METHODS sapevent_links
+      IMPORTING
+        html          TYPE string
+      RETURNING
+        VALUE(result) TYPE ty_t_link.
+
   PROTECTED SECTION.
   PRIVATE SECTION.
     TYPES:
@@ -185,6 +220,34 @@ CLASS z2ui5_cl_cgui_gui_html_viewer IMPLEMENTATION.
 
   ENDMETHOD.
 
+  METHOD dispatch.
+
+    DATA lv_action TYPE c LENGTH 255.
+    DATA lv_getdata TYPE c LENGTH 1024.
+    DATA lt_query TYPE ty_t_query.
+
+    IF to_upper( event ) <> `SAPEVENT`.
+      super->dispatch( event = event
+                       value = value ).
+      RETURN.
+    ENDIF.
+    " action?name=value&name=value
+    SPLIT value AT `?` INTO DATA(lv_head) DATA(lv_query).
+    lv_action = lv_head.
+    lv_getdata = lv_query.
+    SPLIT lv_query AT `&` INTO TABLE DATA(lt_pair).
+    LOOP AT lt_pair INTO DATA(lv_pair) WHERE table_line IS NOT INITIAL.
+      SPLIT lv_pair AT `=` INTO DATA(lv_name) DATA(lv_value).
+      INSERT VALUE #( name  = to_upper( lv_name )
+                      value = lv_value ) INTO TABLE lt_query.
+    ENDLOOP.
+    raise_event( event  = `SAPEVENT`
+                 params = VALUE #( ( name = `ACTION`      kind = cl_abap_objectdescr=>exporting value = REF #( lv_action ) )
+                                   ( name = `GETDATA`     kind = cl_abap_objectdescr=>exporting value = REF #( lv_getdata ) )
+                                   ( name = `QUERY_TABLE` kind = cl_abap_objectdescr=>exporting value = REF #( lt_query ) ) ) ).
+
+  ENDMETHOD.
+
   METHOD enable_sapsso ##NEEDED.
   ENDMETHOD.
 
@@ -223,6 +286,46 @@ CLASS z2ui5_cl_cgui_gui_html_viewer IMPLEMENTATION.
                        THEN result && lv_text
                        ELSE |{ result }{ lv_text }\n| ).
     ENDLOOP.
+
+  ENDMETHOD.
+
+  METHOD sapevent_links.
+
+    DATA lv_from TYPE i.
+    DATA lv_pos  TYPE i.
+    DATA lv_end  TYPE i.
+    DATA lv_gt   TYPE i.
+    DATA lv_lt   TYPE i.
+
+    DATA(lv_lower) = to_lower( html ).
+    DO.
+      lv_pos = find( val = lv_lower sub = `sapevent:` off = lv_from ).
+      IF lv_pos < 0.
+        EXIT.
+      ENDIF.
+      lv_pos = lv_pos + 9.
+      " the action ends at the quote of the attribute
+      DATA(lv_dq) = find( val = html sub = `"` off = lv_pos ).
+      DATA(lv_sq) = find( val = html sub = `'` off = lv_pos ).
+      IF lv_sq < 0 OR ( lv_dq >= 0 AND lv_dq < lv_sq ).
+        lv_end = lv_dq.
+      ELSE.
+        lv_end = lv_sq.
+      ENDIF.
+      IF lv_end < 0.
+        EXIT.
+      ENDIF.
+      DATA(ls_link) = VALUE ty_s_link( action = substring( val = html off = lv_pos len = lv_end - lv_pos ) ).
+      lv_gt = find( val = html sub = `>` off = lv_end ).
+      IF lv_gt >= 0.
+        lv_lt = find( val = html sub = `<` off = lv_gt ).
+        IF lv_lt > lv_gt.
+          ls_link-text = condense( substring( val = html off = lv_gt + 1 len = lv_lt - lv_gt - 1 ) ).
+        ENDIF.
+      ENDIF.
+      INSERT ls_link INTO TABLE result.
+      lv_from = lv_end + 1.
+    ENDDO.
 
   ENDMETHOD.
 

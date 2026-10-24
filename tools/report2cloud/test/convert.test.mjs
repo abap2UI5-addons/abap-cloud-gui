@@ -869,7 +869,8 @@ test("the table of the SAP GUI stand-ins in the converter is the classes - their
     const parent = (/INHERITING FROM\s+(\w+)/i.exec(text) ?? [])[1]?.toLowerCase();
     const constants = [...def.matchAll(/^\s*CONSTANTS\s+(\w+)\s/gim)].map((m) => m[1].toLowerCase());
     const attributes = [...def.matchAll(/^\s*(?:CLASS-)?DATA\s+(\w+)\s/gim)].map((m) => m[1].toLowerCase());
-    assert.deepEqual({ ...(parent ? { parent } : {}), constants, attributes, methods }, members, cls);
+    const events = [...def.matchAll(/^\s*EVENTS\s+(\w+)\s*(?:\.|\n\s*EXPORTING)/gm)].map((m) => m[1].toLowerCase());
+    assert.deepEqual({ ...(parent ? { parent } : {}), constants, attributes, events, methods }, members, cls);
   }
   for (const standin of Object.values(GUI.classes)) assert.ok(GUI.members[standin], standin);
 });
@@ -896,8 +897,26 @@ test("SAP GUI controls: a member, a parameter or an event the stand-ins do not h
   assert.deepEqual(refused("  CREATE OBJECT go_e EXPORTING parent = go_c.\n  go_e->set_textstream( 'x' ).\n"), []);
   assert.deepEqual(refused("  go_e->set_comments_string( ).\n"), ["SAP GUI controls: go_e->set_comments_string has no counterpart in z2ui5_cl_cgui_gui_textedit - port this statement by hand"]);
   assert.deepEqual(refused("  go_e->set_textstream( text = 'x' colour = 1 ).\n"), ["SAP GUI controls: colour is no parameter of the method called in the stand-in - port this statement by hand"]);
-  assert.deepEqual(refused("  SET HANDLER lcl=>on_f1 FOR go_e.\n").map((x) => x.split(" - ")[0]), ["SAP GUI controls: the events of the text editor and the HTML viewer (SET HANDLER) have no counterpart yet"]);
-  assert.deepEqual(refusalOf(`${head}DATA go_p TYPE REF TO cl_gui_picture.\n`).map((x) => x.replace(/^\d+:\d+ /, "")), ["SAP GUI controls: cl_gui_picture has no counterpart - the containers, cl_gui_textedit and cl_gui_html_viewer have (z2ui5_cl_cgui_gui*)"]);
+  assert.deepEqual(refusalOf(`${head}DATA go_p TYPE REF TO cl_gui_picture.\n`).map((x) => x.replace(/^\d+:\d+ /, "")), ["SAP GUI controls: cl_gui_picture has no counterpart - the containers, cl_gui_textedit, cl_gui_html_viewer and cl_gui_toolbar have (z2ui5_cl_cgui_gui*)"]);
+});
+
+test("SAP GUI controls: SET HANDLER of a local class's method is set_handler( ) of the stand-in; what it cannot call is refused", () => {
+  const cls = (decl, body) => `REPORT zt.\nCLASS lcl DEFINITION.\n  PUBLIC SECTION.\n    DATA mo_t TYPE REF TO cl_gui_toolbar.\n    DATA mo_c TYPE REF TO cl_gui_custom_container.\n    METHODS run.\n${decl}ENDCLASS.\nCLASS lcl IMPLEMENTATION.\n  METHOD run.\n    CREATE OBJECT mo_c EXPORTING container_name = 'CC'.\n    CREATE OBJECT mo_t EXPORTING parent = mo_c.\n${body}  ENDMETHOD.\n  METHOD on_f.\n  ENDMETHOD.\nENDCLASS.\nSTART-OF-SELECTION.\n  NEW lcl( )->run( ).\n`;
+  const handler = "    METHODS on_f FOR EVENT function_selected OF cl_gui_toolbar IMPORTING fcode.\n";
+  const r = convert(cls(handler, "    SET HANDLER me->on_f FOR mo_t.\n    SET HANDLER on_f FOR mo_t ACTIVATION abap_false.\n"), { file: "zt.prog.abap", className: "zcl_t" });
+  assert.deepEqual(r.refusals.map((x) => x.message), []);
+  const text = Object.values(r.files).join("\n");
+  assert.match(text, /mo_t->set_handler\( handler = me\n\s+method {2}= `ON_F`\n\s+event {3}= `FUNCTION_SELECTED` \)\./);
+  assert.match(text, /activation = abap_false \)\./);
+  // the handler object is in the session: serializable
+  assert.match(text, /CLASS lcl DEFINITION[^.]*\.\n\s+PUBLIC SECTION\.\n\s+INTERFACES if_serializable_object\./);
+  assert.match(text, /METHODS on_f FOR EVENT function_selected OF z2ui5_cl_cgui_gui_toolbar/);
+
+  const refused = (decl, body) => convert(cls(decl, body), { file: "zt.prog.abap", className: "zcl_t" }).refusals.map((x) => x.message.split(" - ")[0]);
+  assert.deepEqual(refused(handler, "    SET HANDLER on_f FOR ALL INSTANCES.\n"), ["SAP GUI controls: SET HANDLER ... FOR ALL INSTANCES"]);
+  assert.deepEqual(refused(handler, "    SET HANDLER lcl=>on_f FOR mo_t.\n"), ["SAP GUI controls: SET HANDLER of a static method"]);
+  // an event the stand-in does not raise
+  assert.deepEqual(refused("    METHODS on_f FOR EVENT dropdown_clicked OF cl_gui_toolbar IMPORTING fcode.\n", "    SET HANDLER on_f FOR mo_c.\n"), ["SAP GUI controls: SET HANDLER on_f"]);
 });
 
 test("MESSAGE of an exception object is its text; MODULE x OUTPUT and MODULE x INPUT are two methods", () => {

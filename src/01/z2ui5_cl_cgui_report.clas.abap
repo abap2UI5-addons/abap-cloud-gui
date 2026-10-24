@@ -68,6 +68,7 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
         variant_saved     TYPE string VALUE `CGUI_VARIANT_SAVED`,
         print             TYPE string VALUE `CGUI_PRINT`,
         enter             TYPE string VALUE `CGUI_ENTER`,
+        gui               TYPE string VALUE `CGUI_GUI`,
       END OF cs_ucomm.
 
     "! the prefix of the browser's local storage the variants are kept
@@ -96,6 +97,18 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
         high TYPE string,
       END OF ty_s_cgui_so.
     TYPES ty_t_cgui_so TYPE STANDARD TABLE OF ty_s_cgui_so WITH EMPTY KEY.
+
+    TYPES:
+      "! a handler of mt_cgui_handler - its object a line of
+      "! mt_cgui_handler_obj, each object there once
+      BEGIN OF ty_s_cgui_handler,
+        id      TYPE i,
+        event   TYPE string,
+        object  TYPE i,
+        class   TYPE string,
+        method  TYPE string,
+      END OF ty_s_cgui_handler.
+    TYPES ty_t_cgui_handler TYPE STANDARD TABLE OF ty_s_cgui_handler WITH EMPTY KEY.
 
     TYPES:
       "! the selected tab of each tabbed block
@@ -150,6 +163,14 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
     "! the SAP GUI controls of the report (z2ui5_if_cgui_gui) - a text
     "! editor is bound to its line
     DATA mt_cgui_gui TYPE z2ui5_if_cgui_gui=>ty_t_control.
+    "! the controls themselves, line by line of mt_cgui_gui - the events of
+    "! the browser go to them
+    DATA mt_cgui_gui_obj TYPE STANDARD TABLE OF REF TO object WITH EMPTY KEY.
+    "! the handlers SET HANDLER set for the events of the controls, and
+    "! their objects - once each: the handler of two events stays one object
+    "! wherever the app is restored from its serialized form
+    DATA mt_cgui_handler TYPE ty_t_cgui_handler.
+    DATA mt_cgui_handler_obj TYPE STANDARD TABLE OF REF TO object WITH EMPTY KEY.
     "! the rows of the ALV tree the browser shows - bound to the tree table
     DATA mt_cgui_tree_view TYPE z2ui5_cl_cgui_tree=>ty_t_view.
 
@@ -410,6 +431,9 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
       IMPORTING
         dynnr TYPE string
         ucomm TYPE string.
+
+    "! an event of a SAP GUI control, before its handlers run (SET HANDLER)
+    METHODS at_gui_event.
 
     "! after call_screen( ) - when the dynpro was left with
     "! leave_to_screen( `0` ): what followed CALL SCREEN in the report;
@@ -887,6 +911,13 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
       IMPORTING
         id   TYPE i
         node TYPE REF TO z2ui5_cl_ui5_view_builder.
+
+    "! an event of the browser for the control id
+    METHODS gui_event
+      IMPORTING
+        id    TYPE i
+        event TYPE string
+        value TYPE string.
 
     "! the docking containers of the screen dynnr
     METHODS gui_docked
@@ -1440,6 +1471,7 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
       ENDLOOP.
     ENDIF.
     INSERT ls_control INTO TABLE mt_cgui_gui.
+    INSERT object INTO TABLE mt_cgui_gui_obj.
     result = ls_control-id.
 
   ENDMETHOD.
@@ -1456,6 +1488,44 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
 
   ENDMETHOD.
 
+  METHOD z2ui5_if_cgui_gui~handlers_get.
+
+    LOOP AT mt_cgui_handler INTO DATA(ls_handler).
+      DATA(ls_result) = VALUE z2ui5_if_cgui_gui=>ty_s_handler( id     = ls_handler-id
+                                                                event  = ls_handler-event
+                                                                class  = ls_handler-class
+                                                                method = ls_handler-method ).
+      IF ls_handler-object IS NOT INITIAL.
+        READ TABLE mt_cgui_handler_obj INTO ls_result-handler INDEX ls_handler-object.
+      ENDIF.
+      INSERT ls_result INTO TABLE result.
+    ENDLOOP.
+
+  ENDMETHOD.
+
+  METHOD z2ui5_if_cgui_gui~handlers_set.
+
+    CLEAR mt_cgui_handler.
+    CLEAR mt_cgui_handler_obj.
+    LOOP AT handlers INTO DATA(ls_handler).
+      DATA(ls_line) = VALUE ty_s_cgui_handler( id     = ls_handler-id
+                                               event  = ls_handler-event
+                                               class  = ls_handler-class
+                                               method = ls_handler-method ).
+      IF ls_handler-handler IS BOUND.
+        READ TABLE mt_cgui_handler_obj TRANSPORTING NO FIELDS WITH KEY table_line = ls_handler-handler.
+        IF sy-subrc = 0.
+          ls_line-object = sy-tabix.
+        ELSE.
+          INSERT ls_handler-handler INTO TABLE mt_cgui_handler_obj.
+          ls_line-object = lines( mt_cgui_handler_obj ).
+        ENDIF.
+      ENDIF.
+      INSERT ls_line INTO TABLE mt_cgui_handler.
+    ENDLOOP.
+
+  ENDMETHOD.
+
   METHOD z2ui5_if_cgui_gui~custom_render.
 
     LOOP AT mt_cgui_gui INTO DATA(ls_control)
@@ -1463,6 +1533,18 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
       gui_render( id   = ls_control-id
                   node = node ).
     ENDLOOP.
+
+  ENDMETHOD.
+
+  METHOD gui_event.
+
+    READ TABLE mt_cgui_gui_obj INTO DATA(lo_object) INDEX id.
+    IF sy-subrc <> 0 OR lo_object IS NOT BOUND OR mt_cgui_gui[ id ]-freed = abap_true.
+      RETURN.
+    ENDIF.
+    at_gui_event( ).
+    CAST z2ui5_cl_cgui_gui( lo_object )->dispatch( event = event
+                                                   value = value ).
 
   ENDMETHOD.
 
@@ -1497,7 +1579,18 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
       WHEN z2ui5_if_cgui_gui=>cs_kind-container.
         DATA(lo_box) = node->ele( `VBox`
             )->a( n = `width` v = `100%` ).
-        IF <control>-caption IS NOT INITIAL.
+        IF <control>-dialog = abap_true.
+          " a dialog box container: its caption and Close (the event close)
+          lo_box->ele( `Toolbar`
+              )->tag( `Title`
+                  )->a( n = `text` t = <control>-caption
+              )->tag( `ToolbarSpacer`
+              )->tag( `Button`
+                  )->a( n = `icon`    v = `sap-icon://decline`
+                  )->a( n = `tooltip` t = CONV string( 'Close'(047) )
+                  )->a( n = `press`   v = client->_event( val   = cs_ucomm-gui
+                                                          t_arg = VALUE #( ( |{ id }| ) ( `CLOSE` ) ) ) ).
+        ELSEIF <control>-caption IS NOT INITIAL.
           lo_box->tag( `Title`
               )->a( n = `text` t = <control>-caption ).
         ENDIF.
@@ -1533,12 +1626,44 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
                                                              tab_index = id )
               )->a( n = `sanitizeContent` b = abap_true
               )->a( n = `preferDOM`       b = abap_false ).
+          " the SAPEVENT links of the document - the sanitized HTML has none
+          DATA(lo_links) = node->ele( `HBox`
+              )->a( n = `wrap`  v = `Wrap`
+              )->a( n = `class` v = `sapUiTinyMarginTop` ).
+          LOOP AT z2ui5_cl_cgui_gui_html_viewer=>sapevent_links( CONV #( <control>-html ) ) INTO DATA(ls_link).
+            lo_links->tag( `Link`
+                )->a( n = `text`  t = COND #( WHEN ls_link-text IS NOT INITIAL THEN ls_link-text ELSE ls_link-action )
+                )->a( n = `class` v = `sapUiSmallMarginEnd`
+                )->a( n = `press` v = client->_event( val   = cs_ucomm-gui
+                                                      t_arg = VALUE #( ( |{ id }| ) ( `SAPEVENT` ) ( ls_link-action ) ) ) ).
+          ENDLOOP.
         ELSEIF <control>-url IS NOT INITIAL.
           node->tag( `Link`
               )->a( n = `text`   t = <control>-url
               )->a( n = `href`   t = <control>-url
               )->a( n = `target` v = `_blank` ).
         ENDIF.
+
+      WHEN z2ui5_if_cgui_gui=>cs_kind-toolbar.
+        DATA(lo_bar) = node->ele( `OverflowToolbar` ).
+        LOOP AT <control>-buttons INTO DATA(ls_button).
+          IF ls_button-type = 3.
+            lo_bar->tag( `ToolbarSeparator` ).
+            CONTINUE.
+          ENDIF.
+          " a dropdown and a menu button raise dropdown_clicked, the others function_selected
+          lo_bar->tag( `Button`
+              )->a( n = `text`    t = ls_button-text
+              )->a( n = `icon`    v = COND #( WHEN ls_button-icon CP `sap-icon://*` THEN ls_button-icon )
+              )->a( n = `tooltip` t = ls_button-quickinfo
+              )->a( n = `enabled` b = xsdbool( ls_button-disabled = abap_false )
+              )->a( n = `type`    v = COND #( WHEN ls_button-checked = abap_true THEN `Emphasized` ELSE `Default` )
+              )->a( n = `press`   v = client->_event( val   = cs_ucomm-gui
+                                                      t_arg = VALUE #( ( |{ id }| )
+                                                                       ( COND #( WHEN ls_button-type = 1 OR ls_button-type = 2
+                                                                                 THEN `DROPDOWN_CLICKED` ELSE `FUNCTION_SELECTED` ) )
+                                                                       ( ls_button-fcode ) ) ) ).
+        ENDLOOP.
     ENDCASE.
 
   ENDMETHOD.
@@ -1725,6 +1850,9 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD dynpro_pai ##NEEDED.
+  ENDMETHOD.
+
+  METHOD at_gui_event ##NEEDED.
   ENDMETHOD.
 
   METHOD after_call_screen ##NEEDED.
@@ -2355,6 +2483,12 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
                            hide   = ls_hotspot-column
                            column = ls_hotspot-column
                            link   = abap_true ).
+
+      WHEN cs_ucomm-gui.
+        " an event of a SAP GUI control: id, event, value
+        gui_event( id    = CONV #( client->get_event_arg( 1 ) )
+                   event = client->get_event_arg( 2 )
+                   value = client->get_event_arg( 3 ) ).
 
       WHEN cs_ucomm-enter.
         IF mv_cgui_screen = cs_screen-dynpro.

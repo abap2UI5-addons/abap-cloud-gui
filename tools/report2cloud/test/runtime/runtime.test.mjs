@@ -295,6 +295,36 @@ test("zr2c_25_textedit: a text editor and an HTML viewer in the custom control a
   assert.deepEqual(d.lines(), ["Nothing saved"]);
 });
 
+test("zr2c_26_events: a toolbar, the links of an HTML viewer and a dialog box - their events reach the handler methods of a local class", { skip }, async () => {
+  const gui = () => d.state().models.MAIN.data.MT_CGUI_GUI;
+  const html = () => gui().filter((c) => c.KIND === "HTML" && !c.FREED).map((c) => c.HTML).join("");
+  const boxes = () => gui().filter((c) => c.DIALOG && !c.FREED).length;
+  const press = (s, fcode) => {
+    const a = actionsOf(s, "CGUI_GUI").find((x) => x.args.includes(fcode));
+    assert.ok(a, `a button ${fcode}: ${JSON.stringify(actionsOf(s, "CGUI_GUI").map((x) => x.args))}`);
+    // by its id: the arguments are static - the control, the event, the function code
+    return d.act(s.session, { event: a.id });
+  };
+  // no selection screen: START-OF-SELECTION calls the screen at once
+  let s = await d.start("z2ui5_cl_cgui_r2c_26");
+  assert.match(html(), /Shown 1 time\(s\)/);
+  // FUNCTION_SELECTED: Refresh shows the document again
+  s = await press(s, "REFRESH");
+  assert.match(html(), /Shown 2 time\(s\)/);
+  // SAPEVENT: the action and the query table of the link
+  s = await press(s, "SHOW?CONNID=0402");
+  assert.deepEqual(toasts(s), ["SHOW 0402"]);
+  // Details opens the dialog box once; its CLOSE frees it, a new one after that
+  s = await press(s, "DETAILS");
+  assert.equal(boxes(), 1);
+  s = await press(s, "DETAILS");
+  assert.equal(boxes(), 1, "mo_box is set - no second box");
+  s = await press(s, "CLOSE");
+  assert.equal(boxes(), 0, "on_close freed the sender");
+  s = await press(s, "DETAILS");
+  assert.equal(boxes(), 1);
+});
+
 test("zr2c_21_lclreport: a local report class that reads the selection screen, writes the list and calls a FORM", { skip }, async () => {
   let s = await d.start("z2ui5_cl_cgui_r2c_21");
   s = await d.act(s.session, { event: "CGUI_EXECUTE" });
