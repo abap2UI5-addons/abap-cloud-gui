@@ -17,6 +17,7 @@ import { readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
 import { convert, defaultClassName } from "./lib/convert.mjs";
 import { includesFrom, inlineIncludes } from "./lib/includes.mjs";
+import { dependenciesOf } from "./lib/deps.mjs";
 import { parseTextpool } from "./lib/textpool.mjs";
 import { refusalOf } from "./lib/refusals.mjs";
 
@@ -55,9 +56,10 @@ const reasonOf = (message) => message.split(" - ")[0].replace(/'[^']*'/g, "'…'
 const todoOf = (message) => message.replace(/'[^']*'/g, "'…'").replace(/`[^`]*`/g, "`…`").replace(/\b[A-Z][A-Z0-9_/]{2,}\b/g, "…").replace(/(?:…, )+…/g, "…").replace(/\b\d+\b/g, "n").trim();
 
 /** the coverage of the reports in `files`; read(name) answers an include,
+ *  deps is the dependency index of their repository (lib/deps.mjs),
  *  className(file) names the class (default: zcl_ + the report name), and
  *  with keep the generated files of every converted report are in its row */
-export function coverage(files, { read, className, keep = false } = {}) {
+export function coverage(files, { read, className, keep = false, deps } = {}) {
   const rows = [];
   for (const file of files) {
     const raw = readFileSync(file, "utf8");
@@ -78,6 +80,7 @@ export function coverage(files, { read, className, keep = false } = {}) {
       result = convert(includes.source, {
         file, programName: m ? m[1].replace(/#/g, "/") : undefined, textpool, origin: includes.origin,
         className: className?.(file),
+        deps: deps ? dependenciesOf(includes.source, deps) : undefined,
         classFor: (program) => (reader(program) !== undefined ? defaultClassName(program) : undefined),
       });
     } catch (e) {

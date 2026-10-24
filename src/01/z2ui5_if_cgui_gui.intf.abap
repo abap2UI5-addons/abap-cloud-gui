@@ -11,7 +11,22 @@ INTERFACE z2ui5_if_cgui_gui PUBLIC.
       container TYPE string VALUE `CONTAINER`,
       textedit  TYPE string VALUE `TEXTEDIT`,
       html      TYPE string VALUE `HTML`,
+      toolbar   TYPE string VALUE `TOOLBAR`,
+      grid      TYPE string VALUE `GRID`,
     END OF cs_kind.
+
+  TYPES:
+    "! a button of a toolbar
+    BEGIN OF ty_s_button,
+      fcode    TYPE string,
+      icon     TYPE string,
+      text     TYPE string,
+      quickinfo TYPE string,
+      type     TYPE i,
+      disabled TYPE abap_bool,
+      checked  TYPE abap_bool,
+    END OF ty_s_button,
+    ty_t_button TYPE STANDARD TABLE OF ty_s_button WITH EMPTY KEY.
 
   TYPES:
     "! one control: a container (custom, docking, splitter - name is the
@@ -39,13 +54,38 @@ INTERFACE z2ui5_if_cgui_gui PUBLIC.
       hidden    TYPE abap_bool,
       modified  TYPE abap_bool,
       freed     TYPE abap_bool,
+      "! a dialog box container: shown with its caption and a Close button
+      dialog    TYPE abap_bool,
+      buttons   TYPE ty_t_button,
     END OF ty_s_control,
-    ty_t_control TYPE STANDARD TABLE OF ty_s_control WITH EMPTY KEY.
+    ty_t_control TYPE STANDARD TABLE OF ty_s_control WITH EMPTY KEY,
+    "! SET HANDLER: the method of handler (or of the class, a static one)
+    "! the control id calls for its event
+    BEGIN OF ty_s_handler,
+      id      TYPE i,
+      event   TYPE string,
+      handler TYPE REF TO object,
+      class   TYPE string,
+      method  TYPE string,
+    END OF ty_s_handler,
+    ty_t_handler TYPE STANDARD TABLE OF ty_s_handler WITH EMPTY KEY,
+    "! a grid: copies of its field catalog, layout, sort, and the functions
+    "! of its toolbar - its table is the one of the ALV
+    BEGIN OF ty_s_grid,
+      id        TYPE i,
+      fieldcat  TYPE REF TO data,
+      layout    TYPE REF TO data,
+      sort      TYPE REF TO data,
+      functions TYPE ty_t_button,
+    END OF ty_s_grid,
+    ty_t_grid TYPE STANDARD TABLE OF ty_s_grid WITH EMPTY KEY.
 
-  "! a new control - its id
+  "! a new control - its id; object is the control (z2ui5_cl_cgui_gui), to
+  "! which the report passes the events of the browser
   METHODS control_add
     IMPORTING
       control       TYPE ty_s_control
+      object        TYPE REF TO object
     RETURNING
       VALUE(result) TYPE i.
 
@@ -58,6 +98,43 @@ INTERFACE z2ui5_if_cgui_gui PUBLIC.
   METHODS control_set
     IMPORTING
       control TYPE ty_s_control.
+
+  "! the handlers of the controls - the report keeps them, not the control:
+  "! a handler object refers to its controls, a control to its handler
+  "! would be a cycle in the serialized app
+  METHODS handlers_get
+    RETURNING
+      VALUE(result) TYPE ty_t_handler.
+
+  METHODS handlers_set
+    IMPORTING
+      handlers TYPE ty_t_handler.
+
+  "! the grid id shows: a copy of each one bound - its table, the field
+  "! catalog, the layout, the sort (the classic structures, read by the
+  "! names of their fields), the functions of its toolbar; the others stay
+  "! as they were. The report shows it with its ALV (z2ui5_cl_cgui_alv),
+  "! one grid at a time - the last one displayed
+  METHODS grid_display
+    IMPORTING
+      id        TYPE i
+      tab       TYPE REF TO data OPTIONAL
+      fieldcat  TYPE REF TO data OPTIONAL
+      layout    TYPE REF TO data OPTIONAL
+      sort      TYPE REF TO data OPTIONAL
+      functions TYPE REF TO data OPTIONAL.
+
+  "! what the report keeps of the grid id
+  METHODS grid_get
+    IMPORTING
+      id            TYPE i
+    RETURNING
+      VALUE(result) TYPE ty_s_grid.
+
+  "! the rows the user selected in the grid - indices of its table
+  METHODS grid_selected
+    RETURNING
+      VALUE(result) TYPE z2ui5_cl_cgui_alv=>ty_t_row.
 
   "! the controls of the custom control area name, into node - called by
   "! the screen when it renders z2ui5_cl_cgui_selscreen=>custom_control( )

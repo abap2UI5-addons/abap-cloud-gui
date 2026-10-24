@@ -58,7 +58,7 @@ export function corePin() {
   return dep && /^\d+\.\d+\.\d+$/.test(String(dep.branch)) ? dep.branch : null;
 }
 
-const OBJECT = /^([a-z0-9_]+)\.(clas|intf|tabl|dtel)(\.[a-z_]+)?\.(abap|xml)$/i;
+const OBJECT = /^([a-z0-9_]+)\.(clas|intf|tabl|dtel|ttyp)(\.[a-z_]+)?\.(abap|xml)$/i;
 
 function copyObjects(from, to, withTests = false) {
   if (!existsSync(from)) return;
@@ -152,7 +152,7 @@ export async function buildBackend({ files = {}, ddic, seed = [], sources = ["sr
     downportRel: relative(rt.dir, npm.downportDir(rt.dir)).split(sep).join("/"),
     coreRel: relative(rt.dir, lib.dir).split(sep).join("/"),
   });
-  config.input_filter = ["[\\\\/][a-z0-9_]+\\.(clas|intf|tabl|dtel)\\.[a-z_.]*(abap|xml)$"];
+  config.input_filter = ["[\\\\/][a-z0-9_]+\\.(clas|intf|tabl|dtel|ttyp)\\.[a-z_.]*(abap|xml)$"];
   config.write_unit_tests = withTests;
   writeFileSync(join(work, "abap_transpile.json"), JSON.stringify(config, null, 2));
   const transpiler = join(rt.dir, "node_modules", "@abaplint", "transpiler-cli", "abap_transpile");
@@ -166,12 +166,31 @@ export async function buildBackend({ files = {}, ddic, seed = [], sources = ["sr
   }
 
   const objects = [...new Set(readdirSync(input).map((f) => OBJECT.exec(f)).filter(Boolean).map((m) => `${m[1].toLowerCase()}.${m[2].toLowerCase()}`))].sort();
-  const own = npm.devOutputFiles(readdirSync(staging), objects);
+  // transpiler-cli 2.14 on writes the project's modules into staging/project/
+  // and each library into a folder of its own, imported as ../<folder>/x.mjs:
+  // the package's own-apps.mjs points those at its output/<folder>/. Before
+  // 2.14 everything is flat and rewriteImports( ) does it
+  const folders = npm.outputLayout(staging) === "folders";
+  const moduleDir = folders ? join(staging, npm.PROJECT_DIR) : staging;
+  const own = npm.devOutputFiles(readdirSync(moduleDir), objects);
   const local = new Set(own);
   const stray = [];
+  let rewritten = new Map();
+  if (folders) {
+    const script = join(rt.dir, "node_modules", "@abap2ui5", "node-runtime", "setup", "own-apps.mjs");
+    if (!existsSync(script)) return { ok: false, dir: work, reason: `@abap2ui5/node-runtime ${rt.version} writes its output in folders and has no setup/own-apps.mjs` };
+    const { ownApps } = await import(pathToFileURL(script).href);
+    const kept = join(work, "own-apps");
+    try {
+      ownApps({ output: staging, apps: kept });
+    } catch (e) {
+      return { ok: false, dir: work, reason: String(e.message || e) };
+    }
+    rewritten = new Map(own.map((f) => [f, readFileSync(join(kept, f), "utf8")]));
+  }
   for (const f of own) {
-    let text = readFileSync(join(staging, f), "utf8");
-    if (f.endsWith(".mjs")) {
+    let text = rewritten.get(f) ?? readFileSync(join(moduleDir, f), "utf8");
+    if (f.endsWith(".mjs") && !folders) {
       text = npm.rewriteImports(text, local);
       stray.push(...npm.strayImports(text, local).map((s) => `${f} -> ${s}`));
     }
@@ -179,14 +198,18 @@ export async function buildBackend({ files = {}, ddic, seed = [], sources = ["sr
   }
   if (stray.length) return { ok: false, dir: work, reason: `imports the build cannot point at the package: ${stray.slice(0, 5).join(", ")}` };
   const initText = readFileSync(join(staging, "init.mjs"), "utf8");
-  const tables = objects.filter((o) => o.endsWith(".tabl")).map((o) => o.replace(/\.tabl$/, ""));
+  // the transparent tables - a structure (INTTAB) has no table in the database
+  const tables = objects.filter((o) => o.endsWith(".tabl")).map((o) => o.replace(/\.tabl$/, ""))
+    .filter((t) => !/<TABCLASS>INTTAB<\/TABCLASS>/.test(readFileSync(join(input, `${t}.tabl.xml`), "utf8")));
   const schema = tableSchema(initText, tables);
   if (schema.length !== tables.length) return { ok: false, dir: work, reason: `CREATE TABLE for ${tables.join(", ")} not found in the transpiler's init.mjs` };
   const modules = npm.bootOrder(initText, objects.map((o) => `${o}.mjs`).filter((f) => local.has(f)));
   writeFileSync(join(apps, "init.mjs"), initSource({ modules, schema, seed }));
   if (withTests) {
     if (!existsSync(join(staging, "index.mjs"))) return { ok: false, dir: work, reason: "the transpiler wrote no unit-test runner (index.mjs)" };
-    writeFileSync(join(apps, "index.mjs"), readFileSync(join(staging, "index.mjs"), "utf8"));
+    // apps/ is flat: the runner imports the test modules beside it
+    const runner = readFileSync(join(staging, "index.mjs"), "utf8");
+    writeFileSync(join(apps, "index.mjs"), folders ? npm.flatRunner(runner) : runner);
   }
   rmSync(staging, { recursive: true, force: true });
   return { ok: true, dir: work, apps, runtimeDir: rt.dir, version: rt.version, modules, mcp: mcp.dir };

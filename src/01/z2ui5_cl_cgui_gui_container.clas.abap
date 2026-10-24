@@ -31,6 +31,9 @@ CLASS z2ui5_cl_cgui_gui_container DEFINITION PUBLIC
     CONSTANTS lifetime_dynpro  TYPE i VALUE 1.
     CONSTANTS lifetime_default TYPE i VALUE 0.
 
+    "! the Close button of a dialog box container
+    EVENTS close.
+
     "! cl_gui_container=>default_screen and screen0 - the screen itself
     CLASS-DATA default_screen TYPE REF TO z2ui5_cl_cgui_gui_container READ-ONLY.
     CLASS-DATA screen0 TYPE REF TO z2ui5_cl_cgui_gui_container READ-ONLY.
@@ -174,7 +177,10 @@ CLASS z2ui5_cl_cgui_gui_container IMPLEMENTATION.
                      side    = side
                      rows    = rows
                      columns = columns
-                     caption = caption ) ) = abap_false.
+                     caption = caption
+                     " cl_gui_dialogbox_container: a box of its own on the screen
+                     dialog  = xsdbool( width IS SUPPLIED OR height IS SUPPLIED OR top IS SUPPLIED
+                                     OR left IS SUPPLIED ) ) ) = abap_false.
       RAISE cntl_error.
     ENDIF.
 

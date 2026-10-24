@@ -8,7 +8,8 @@
 // The repositories are the ones the community list of ABAP projects names
 // (dotabap-list, list.json - "owner/repo" strings), cloned shallow and
 // sparse into the cache (default build/web-corpus): only *.prog.abap and
-// *.prog.xml, nothing else of a repository is fetched. The code is read, never run,
+// *.prog.xml, and the classes, interfaces and DDIC objects that type what a
+// report reads of them (SPARSE) - nothing else of a repository is fetched. The code is read, never run,
 // and none of it is part of this repository - the cache is under build/.
 // A clone that is there already is kept (--offline uses the cache alone).
 //
@@ -28,6 +29,7 @@ import { spawn } from "node:child_process";
 import { dirname, join, relative, resolve } from "node:path";
 import { coverage, programs, ranked } from "./coverage.mjs";
 import { includesFrom } from "./lib/includes.mjs";
+import { dependencyIndex } from "./lib/deps.mjs";
 import { REPO } from "./lib/gate.mjs";
 
 export const LIST_URL = "https://raw.githubusercontent.com/dotabap/dotabap-list/main/list.json";
@@ -70,12 +72,21 @@ function git(cwd, ...argv) {
   });
 }
 
+// the reports, and what types their globals: the classes, interfaces and
+// DDIC objects of the repository (lib/deps.mjs)
+const SPARSE = ["*.prog.abap", "*.prog.xml", "*.clas.abap", "*.intf.abap", "*.tabl.xml", "*.dtel.xml", "*.doma.xml", "*.ttyp.xml", "*.view.xml"];
+
 /** a shallow clone of the reports of one repository - true when it is there */
 async function clone(name, cache) {
   const dir = join(cache, folderOf(name));
-  if (existsSync(join(dir, ".git"))) return true;
+  // a clone of before keeps its files - the patterns of now are added; it is
+  // there either way
+  if (existsSync(join(dir, ".git"))) {
+    await git(dir, "sparse-checkout", "set", "--no-cone", ...SPARSE);
+    return true;
+  }
   if (!(await git(cache, "clone", "--quiet", "--depth", "1", "--filter=blob:none", "--sparse", `https://github.com/${name}`, folderOf(name)))) return false;
-  return git(dir, "sparse-checkout", "set", "--no-cone", "*.prog.abap", "*.prog.xml");
+  return git(dir, "sparse-checkout", "set", "--no-cone", ...SPARSE);
 }
 
 async function fetchAll(names, cache, parallel = 8) {
@@ -145,7 +156,8 @@ async function main() {
     if (!existsSync(dir)) continue;
     const files = programs(dir);
     const read = includesFrom([...new Set(files.map(dirname))]);
-    for (const row of coverage(files, { read, keep: opts.lint, className: () => `z2ui5_cl_cgui_w${String(++n).padStart(4, "0")}` })) {
+    const deps = dependencyIndex([dir]);
+    for (const row of coverage(files, { read, deps, keep: opts.lint, className: () => `z2ui5_cl_cgui_w${String(++n).padStart(4, "0")}` })) {
       rows.push({ ...row, file: relative(cache, row.file) });
     }
   }

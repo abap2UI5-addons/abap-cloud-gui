@@ -499,10 +499,15 @@ Stage 5 - research
       `after_call_screen( )`
 - [x] The SAP GUI controls of a custom control area or a docking container:
       the containers, the text editor and the HTML viewer as stand-ins of the
-      same methods (`z2ui5_cl_cgui_gui*`)
-- [ ] Their events (SAPEVENT of the HTML viewer, F1 of the editor), the grid
-      in a container next to them, the tree and the picture; table controls,
-      subscreens and tabstrips on a dynpro; a control in a local class
+      same methods (`z2ui5_cl_cgui_gui*`), in a local class too
+- [x] Their events: the toolbar (`function_selected`, `dropdown_clicked`),
+      the SAPEVENT links of the HTML viewer, the close of a dialog box -
+      `SET HANDLER` as `set_handler( )` of the stand-in
+- [x] The grid in a local class: the stand-in `z2ui5_cl_cgui_gui_alv_grid`,
+      the ALV of the report in its container, with its toolbar, user
+      command, double click and hotspot
+- [ ] More than one grid, F1 of the editor, the tree and the picture; table
+      controls, subscreens and tabstrips on a dynpro
 
 Quality, through every stage
 

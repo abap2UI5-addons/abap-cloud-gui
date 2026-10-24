@@ -9,6 +9,8 @@ import { join } from "node:path";
 import { convert, defaultClassName, FRONTEND, GUI, RESERVED_METHODS, UNCATALOGUED } from "../lib/convert.mjs";
 import { corpus, convertEntry, SNAPSHOTS } from "./corpus.mjs";
 import { parseTextpool } from "../lib/textpool.mjs";
+import { dependenciesOf, dependencyIndex } from "../lib/deps.mjs";
+import { tmpdir } from "node:os";
 
 const UPDATE = process.env.UPDATE_SNAPSHOTS === "1";
 const entries = corpus();
@@ -867,7 +869,8 @@ test("the table of the SAP GUI stand-ins in the converter is the classes - their
     const parent = (/INHERITING FROM\s+(\w+)/i.exec(text) ?? [])[1]?.toLowerCase();
     const constants = [...def.matchAll(/^\s*CONSTANTS\s+(\w+)\s/gim)].map((m) => m[1].toLowerCase());
     const attributes = [...def.matchAll(/^\s*(?:CLASS-)?DATA\s+(\w+)\s/gim)].map((m) => m[1].toLowerCase());
-    assert.deepEqual({ ...(parent ? { parent } : {}), constants, attributes, methods }, members, cls);
+    const events = [...def.matchAll(/^\s*EVENTS\s+(\w+)\s*(?:\.|\n\s*EXPORTING)/gm)].map((m) => m[1].toLowerCase());
+    assert.deepEqual({ ...(parent ? { parent } : {}), constants, attributes, events, methods }, members, cls);
   }
   for (const standin of Object.values(GUI.classes)) assert.ok(GUI.members[standin], standin);
 });
@@ -894,8 +897,58 @@ test("SAP GUI controls: a member, a parameter or an event the stand-ins do not h
   assert.deepEqual(refused("  CREATE OBJECT go_e EXPORTING parent = go_c.\n  go_e->set_textstream( 'x' ).\n"), []);
   assert.deepEqual(refused("  go_e->set_comments_string( ).\n"), ["SAP GUI controls: go_e->set_comments_string has no counterpart in z2ui5_cl_cgui_gui_textedit - port this statement by hand"]);
   assert.deepEqual(refused("  go_e->set_textstream( text = 'x' colour = 1 ).\n"), ["SAP GUI controls: colour is no parameter of the method called in the stand-in - port this statement by hand"]);
-  assert.deepEqual(refused("  SET HANDLER lcl=>on_f1 FOR go_e.\n").map((x) => x.split(" - ")[0]), ["SAP GUI controls: the events of the text editor and the HTML viewer (SET HANDLER) have no counterpart yet"]);
-  assert.deepEqual(refusalOf(`${head}DATA go_p TYPE REF TO cl_gui_picture.\n`).map((x) => x.replace(/^\d+:\d+ /, "")), ["SAP GUI controls: cl_gui_picture has no counterpart - the containers, cl_gui_textedit and cl_gui_html_viewer have (z2ui5_cl_cgui_gui*)"]);
+  assert.deepEqual(refusalOf(`${head}DATA go_p TYPE REF TO cl_gui_picture.\n`).map((x) => x.replace(/^\d+:\d+ /, "")), ["SAP GUI controls: cl_gui_picture has no counterpart - the containers, cl_gui_textedit, cl_gui_html_viewer and cl_gui_toolbar have (z2ui5_cl_cgui_gui*)"]);
+});
+
+test("SAP GUI controls: SET HANDLER of a local class's method is set_handler( ) of the stand-in; what it cannot call is refused", () => {
+  const cls = (decl, body) => `REPORT zt.\nCLASS lcl DEFINITION.\n  PUBLIC SECTION.\n    DATA mo_t TYPE REF TO cl_gui_toolbar.\n    DATA mo_c TYPE REF TO cl_gui_custom_container.\n    METHODS run.\n${decl}ENDCLASS.\nCLASS lcl IMPLEMENTATION.\n  METHOD run.\n    CREATE OBJECT mo_c EXPORTING container_name = 'CC'.\n    CREATE OBJECT mo_t EXPORTING parent = mo_c.\n${body}  ENDMETHOD.\n  METHOD on_f.\n  ENDMETHOD.\nENDCLASS.\nSTART-OF-SELECTION.\n  NEW lcl( )->run( ).\n`;
+  const handler = "    METHODS on_f FOR EVENT function_selected OF cl_gui_toolbar IMPORTING fcode.\n";
+  const r = convert(cls(handler, "    SET HANDLER me->on_f FOR mo_t.\n    SET HANDLER on_f FOR mo_t ACTIVATION abap_false.\n"), { file: "zt.prog.abap", className: "zcl_t" });
+  assert.deepEqual(r.refusals.map((x) => x.message), []);
+  const text = Object.values(r.files).join("\n");
+  assert.match(text, /mo_t->set_handler\( handler = me\n\s+method {2}= `ON_F`\n\s+event {3}= `FUNCTION_SELECTED` \)\./);
+  assert.match(text, /activation = abap_false \)\./);
+  // the handler object is in the session: serializable
+  assert.match(text, /CLASS lcl DEFINITION[^.]*\.\n\s+PUBLIC SECTION\.\n\s+INTERFACES if_serializable_object\./);
+  assert.match(text, /METHODS on_f FOR EVENT function_selected OF z2ui5_cl_cgui_gui_toolbar/);
+
+  const refused = (decl, body) => convert(cls(decl, body), { file: "zt.prog.abap", className: "zcl_t" }).refusals.map((x) => x.message.split(" - ")[0]);
+  assert.deepEqual(refused(handler, "    SET HANDLER on_f FOR ALL INSTANCES.\n"), ["SAP GUI controls: SET HANDLER ... FOR ALL INSTANCES"]);
+  assert.deepEqual(refused(handler, "    SET HANDLER lcl=>on_f FOR mo_t.\n"), ["SAP GUI controls: SET HANDLER of a static method"]);
+  // an event the stand-in does not raise
+  assert.deepEqual(refused("    METHODS on_f FOR EVENT dropdown_clicked OF cl_gui_toolbar IMPORTING fcode.\n", "    SET HANDLER on_f FOR mo_c.\n"), ["SAP GUI controls: SET HANDLER on_f"]);
+});
+
+test("TYPE (name) / FOR (name) of a fixed name - a literal or a DATA with a VALUE nothing else names - is typed statically; a name set at runtime is refused", () => {
+  const src = "REPORT zt.\nTABLES vbak.\nDATA selectiontext TYPE string VALUE 'VBAK-VBELN'.\nSELECT-OPTIONS: so_vbeln FOR (selectiontext).\nSELECT-OPTIONS s_subj FOR ('STRING') NO INTERVALS.\nPARAMETERS p_mat TYPE ('MATNR').\nSTART-OF-SELECTION.\n  WRITE: / lines( so_vbeln ), lines( s_subj ), p_mat.\n";
+  const r = convert(src, { file: "zt.prog.abap", className: "zcl_t" });
+  assert.deepEqual(r.refusals.map((x) => x.message), []);
+  const cls = r.files["zcl_t.clas.abap"];
+  assert.match(cls, /DATA so_vbeln_type TYPE vbak-vbeln\./);
+  assert.match(cls, /DATA s_subj_type\s+TYPE string\./);
+  assert.match(cls, /DATA so_vbeln LIKE RANGE OF so_vbeln_type\./);
+  assert.match(cls, /DATA p_mat\s+TYPE matnr\./);
+  // the name is a parameter - its value is known at runtime only
+  const dyn = "REPORT zt.\nPARAMETERS p_type TYPE c LENGTH 30 DEFAULT 'MATNR'.\nPARAMETERS p_data LIKE (p_type).\n";
+  assert.match(convert(dyn, { file: "zt.prog.abap", className: "zcl_t" }).refusals[0].message, /^P_DATA is typed at runtime/);
+  // a DATA with a VALUE that is changed is no fixed name
+  const set = "REPORT zt.\nDATA gv_name TYPE string VALUE 'MATNR'.\nSELECT-OPTIONS s_x FOR (gv_name).\nINITIALIZATION.\n  gv_name = 'WERKS'.\n";
+  assert.match(convert(set, { file: "zt.prog.abap", className: "zcl_t" }).refusals[0].message, /^S_X is typed at runtime/);
+});
+
+test("SAP GUI controls: a grid in a local class is the grid stand-in - VALUE #( ) of a generic parameter takes the classic type, refresh_table_display( ) is passed the table", () => {
+  const src = (refresh) => `REPORT zt.\nCLASS lcl DEFINITION.\n  PUBLIC SECTION.\n    DATA mt TYPE STANDARD TABLE OF spfli WITH DEFAULT KEY.\n    DATA mo_grid TYPE REF TO cl_gui_alv_grid.\n    METHODS show.\n    METHODS on_cmd FOR EVENT user_command OF cl_gui_alv_grid IMPORTING e_ucomm sender.\nENDCLASS.\nCLASS lcl IMPLEMENTATION.\n  METHOD show.\n    mo_grid = NEW cl_gui_alv_grid( i_parent = NEW cl_gui_custom_container( container_name = 'CC' ) ).\n    SET HANDLER on_cmd FOR mo_grid.\n    mo_grid->set_table_for_first_display( EXPORTING is_layout = VALUE #( zebra = abap_true ) it_toolbar_excluding = VALUE #( ( cl_gui_alv_grid=>mc_fc_excl_all ) ) CHANGING it_outtab = mt ).\n  ENDMETHOD.\n  METHOD on_cmd.\n    ${refresh}\n  ENDMETHOD.\nENDCLASS.\nSTART-OF-SELECTION.\n  NEW lcl( )->show( ).\n`;
+  const r = convert(src("sender->refresh_table_display( is_stable = VALUE #( row = abap_true ) )."), { file: "zt.prog.abap", className: "zcl_t" });
+  assert.deepEqual(r.refusals.map((x) => x.message), []);
+  const text = Object.values(r.files).join("\n");
+  assert.match(text, /mo_grid = NEW z2ui5_cl_cgui_gui_alv_grid\( i_parent = NEW z2ui5_cl_cgui_gui_container\( container_name = 'CC' \) \)\./);
+  assert.match(text, /is_layout = VALUE lvc_s_layo\( zebra = abap_true \)/);
+  assert.match(text, /it_toolbar_excluding = VALUE ui_functions\( \( z2ui5_cl_cgui_gui_alv_grid=>mc_fc_excl_all \) \)/);
+  assert.match(text, /sender->refresh_table_display\( EXPORTING is_stable = VALUE lvc_s_stbl\( row = abap_true \) CHANGING it_outtab = mt \)\./);
+  assert.match(convert(src("mo_grid->refresh_table_display( )."), { file: "zt.prog.abap", className: "zcl_t" }).files["zcl_t.clas.locals_imp.abap"], /mo_grid->refresh_table_display\( CHANGING it_outtab = mt \)\./);
+  // a grid of another object: its table is not in reach here
+  const other = src("DATA(lo) = NEW lcl( ).\n    lo->mo_grid->refresh_table_display( ).");
+  assert.match(convert(other, { file: "zt.prog.abap", className: "zcl_t" }).refusals[0]?.message ?? "", /refresh_table_display\( \) - the grid shows a copy of its table/);
 });
 
 test("MESSAGE of an exception object is its text; MODULE x OUTPUT and MODULE x INPUT are two methods", () => {
@@ -916,4 +969,39 @@ test("MESSAGE of an exception object is its text; MODULE x OUTPUT and MODULE x I
 test("SAP GUI controls: a control handed to a class of the report's own is refused - it takes a cl_gui_* object", () => {
   const src = "REPORT zt.\nDATA go_c TYPE REF TO cl_gui_custom_container.\nSTART-OF-SELECTION.\n  CREATE OBJECT go_c EXPORTING container_name = 'CC'.\n  zcl_my_button=>create( parent = go_c ).\n";
   assert.deepEqual(refusalOf(src).map((x) => x.replace(/^\d+:\d+ /, "")), ["SAP GUI controls: go_c, a SAP GUI control, is handed to a method that is no stand-in - it takes a cl_gui_* object - port this statement by hand"]);
+});
+
+test("the dependencies of a report type what it reads of them - an inline declaration of an event block read in another one", () => {
+  const src = "REPORT zt.\nINITIALIZATION.\n  DATA(lo_log) = zcl_app_factory=>create_logger( ).\nSTART-OF-SELECTION.\n  lo_log->add( `x` ).\n";
+  const factory = "CLASS zcl_app_factory DEFINITION PUBLIC CREATE PUBLIC.\n  PUBLIC SECTION.\n    CLASS-METHODS create_logger RETURNING VALUE(result) TYPE REF TO zcl_app_log.\nENDCLASS.\nCLASS zcl_app_factory IMPLEMENTATION.\n  METHOD create_logger.\n  ENDMETHOD.\nENDCLASS.\n";
+  const log = "CLASS zcl_app_log DEFINITION PUBLIC CREATE PUBLIC.\n  PUBLIC SECTION.\n    METHODS add IMPORTING t TYPE string.\nENDCLASS.\nCLASS zcl_app_log IMPLEMENTATION.\n  METHOD add.\n  ENDMETHOD.\nENDCLASS.\n";
+  assert.match(convert(src, { file: "zt.prog.abap", className: "zcl_t" }).refusals[0].message, /^lo_log is declared inline in an event block/);
+
+  const dir = join(tmpdir(), `r2c-deps-${process.pid}`);
+  mkdirSync(join(dir, "src", "sub"), { recursive: true });
+  try {
+    writeFileSync(join(dir, "src", "zcl_app_factory.clas.abap"), factory);
+    writeFileSync(join(dir, "src", "sub", "zcl_app_log.clas.abap"), log);
+    writeFileSync(join(dir, "src", "zcl_app_factory.clas.testclasses.abap"), "CLASS ltcl DEFINITION FOR TESTING. ENDCLASS.\n");
+    writeFileSync(join(dir, "src", "zcl_unused.clas.abap"), "CLASS zcl_unused DEFINITION PUBLIC. ENDCLASS.\n");
+    const index = dependencyIndex([dir]);
+    // what the report names, and what that names in turn - no test class, nothing unnamed
+    const deps = dependenciesOf(src, index);
+    assert.deepEqual(deps.map((d) => d.name).sort(), ["zcl_app_factory.clas.abap", "zcl_app_log.clas.abap"]);
+    assert.deepEqual(dependenciesOf(src, index, 1).map((d) => d.name), ["zcl_app_factory.clas.abap"]);
+    const r = convert(src, { file: "zt.prog.abap", className: "zcl_t", deps });
+    assert.deepEqual(r.refusals, []);
+    assert.match(r.files["zcl_t.clas.abap"], /DATA lo_log TYPE REF TO zcl_app_log\./);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("a name every JavaScript object has - constructor, toString - is no SAP GUI class, icon or ALV type", () => {
+  const src = "REPORT zt.\nDATA go_c TYPE REF TO cl_gui_custom_container.\nCLASS lcl DEFINITION.\n  PUBLIC SECTION.\n    METHODS constructor.\n    METHODS tostring RETURNING VALUE(r) TYPE string.\nENDCLASS.\nCLASS lcl IMPLEMENTATION.\n  METHOD constructor.\n  ENDMETHOD.\n  METHOD tostring.\n    r = `x`.\n  ENDMETHOD.\nENDCLASS.\nSTART-OF-SELECTION.\n  go_c = NEW #( container_name = 'CC' ).\n  WRITE NEW lcl( )->tostring( ).\n";
+  const r = convert(src, { file: "zt.prog.abap", className: "zcl_t" });
+  assert.deepEqual(r.refusals.map((x) => x.message), []);
+  const text = Object.values(r.files).join("\n");
+  assert.doesNotMatch(text, /native code|function Object/);
+  assert.match(text, /METHODS constructor\./);
 });
