@@ -15,6 +15,10 @@ CLASS z2ui5_cl_cgui_gui_toolbar DEFINITION PUBLIC
     CONSTANTS cntb_btype_sep      TYPE i VALUE 3.
     CONSTANTS cntb_btype_group    TYPE i VALUE 4.
     CONSTANTS cntb_btype_check    TYPE i VALUE 5.
+    " the display_mode of the constructor - a toolbar of the browser is
+    " horizontal
+    CONSTANTS m_mode_horizontal TYPE i VALUE 0.
+    CONSTANTS m_mode_vertical   TYPE i VALUE 1.
     CONSTANTS m_id_function_selected TYPE i VALUE 1.
     CONSTANTS m_id_dropdown_clicked  TYPE i VALUE 2.
 

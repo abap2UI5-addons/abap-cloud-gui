@@ -15,6 +15,7 @@ CLASS ltcl_test DEFINITION FINAL FOR TESTING
     METHODS text_into_columns FOR TESTING.
     METHODS text_into_lines FOR TESTING.
     METHODS table_as_text FOR TESTING.
+    METHODS url_of_bytes FOR TESTING.
 
 ENDCLASS.
 
@@ -73,6 +74,37 @@ CLASS ltcl_test IMPLEMENTATION.
     cl_abap_unit_assert=>assert_equals( exp = |a\r\nb|
                                         act = z2ui5_cl_cgui_frontend=>table_to_text( data_tab      = VALUE string_table( ( `a` ) ( `b` ) )
                                                                                      last_line_end = abap_false ) ).
+
+  ENDMETHOD.
+
+  METHOD url_of_bytes.
+
+    TYPES ty_line TYPE x LENGTH 4.
+    DATA lt_bin TYPE STANDARD TABLE OF ty_line WITH EMPTY KEY.
+    DATA lv_url TYPE c LENGTH 255.
+
+    " two lines of four bytes, size cuts the last one: 4D 61 6E 21 4D 61
+    lt_bin = VALUE #( ( CONV ty_line( '4D616E21' ) ) ( CONV ty_line( '4D61FFFF' ) ) ).
+    z2ui5_cl_cgui_frontend=>dp_create_url( EXPORTING  type    = 'image'
+                                                      subtype = 'gif'
+                                                      size    = 6
+                                                      data    = lt_bin
+                                           CHANGING   url     = lv_url
+                                           EXCEPTIONS OTHERS  = 1 ).
+    cl_abap_unit_assert=>assert_subrc( ).
+    cl_abap_unit_assert=>assert_equals( exp = `data:image/gif;base64,TWFuIU1h`
+                                        act = z2ui5_cl_cgui_frontend=>url_content( lv_url ) ).
+    " another URL is as it is
+    cl_abap_unit_assert=>assert_equals( exp = `https://example.org/a.png`
+                                        act = z2ui5_cl_cgui_frontend=>url_content( `https://example.org/a.png` ) ).
+    " no type is no URL
+    z2ui5_cl_cgui_frontend=>dp_create_url( EXPORTING  type = ''
+                                                      data = lt_bin
+                                           CHANGING   url  = lv_url
+                                           EXCEPTIONS dp_invalid_parameter = 1
+                                                      OTHERS               = 2 ).
+    cl_abap_unit_assert=>assert_equals( exp = 1
+                                        act = sy-subrc ).
 
   ENDMETHOD.
 

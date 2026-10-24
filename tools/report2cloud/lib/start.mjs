@@ -18,6 +18,9 @@
 //          own module out, not the backend.
 //   start  every app started through the JSON protocol of the frontend (the
 //          app client of the MCP server), its first screen within a time.
+//   browser (with browser) every app that started, as the real app in
+//          headless Chromium - UI5 boots, renders, Execute runs it, no page
+//          error (lib/browser.mjs).
 //
 // Each report ends in one stage; the funnel and the first error of each are
 // what web.mjs --start writes into the job summary.
@@ -32,6 +35,12 @@ const CHECK = ["check_syntax", "unknown_types", "structure", "parser_error"];
 // what the transpiler cannot transpile and stops without naming a file for
 const UNSUPPORTED = [
   [/^\s*raise\s+resumable\b/im, "RAISE RESUMABLE"],
+  // REF #( ) is, REF type( ) with a type is not - "transpiler: REF # todo1"
+  [/\bref\s+(?!#)[a-z_][\w/=>-]*\s*\(/i, "REF type( )"],
+  // LET <fs> = ... - "LetTranspiler, Expected Field"
+  [/\blet\s+<[\w]+>\s*=/i, "LET with a field symbol"],
+  // VALUE t( ( LINES OF itab ) ) - "unknown ValueBodyLines"
+  [/\(\s*lines\s+of\s/i, "( LINES OF ) in a VALUE body"],
 ];
 
 const objectOf = (file) => file.split(".")[0];
@@ -102,7 +111,7 @@ export const kindOf = (message) => String(message)
  * deps: { name: text } } - with the test backend (test/runtime/backend.mjs).
  * Resolves { stages: [{ file, cls, stage, ok, error? }], funnel } or { error }.
  */
-export async function startAll(rows, { ddic, port = 4499, timeoutMs = 60_000, onLine = () => {} } = {}) {
+export async function startAll(rows, { ddic, port = 4499, timeoutMs = 60_000, browser = false, onLine = () => {} } = {}) {
   const backend = await import("../test/runtime/backend.mjs");
   const dirs = await backend.runtimeSources();
   if (dirs.error) return { error: dirs.error };
@@ -161,9 +170,19 @@ export async function startAll(rows, { ddic, port = 4499, timeoutMs = 60_000, on
   if (!built?.ok) {
     for (const c of apps) stage.set(c, { stage: "build", ok: false, error: `the build failed: ${built?.reason}` });
   } else {
-    const be = await backend.startBackend({ build: built, port });
+    let be = await backend.startBackend({ build: built, port });
     const { createDriver } = await import("../test/runtime/driver.mjs");
-    const d = await createDriver({ mcp: backend.resolveMcpServer().dir, url: be.url });
+    const driver = () => createDriver({ mcp: backend.resolveMcpServer().dir, url: be.url });
+    let d = await driver();
+    // an app that takes the backend down fails, the backend starts again
+    // for the next one
+    const revive = async () => {
+      if (be.alive()) return undefined;
+      const why = `the backend exited: ${be.log.slice(-3).join(" / ").slice(0, 200)}`;
+      be = await backend.startBackend({ build: built, port });
+      d = await driver();
+      return why;
+    };
     const within = (p) => Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(new Error("no first screen within the time")), timeoutMs))]);
     onLine(`start: ${apps.length} apps`);
     for (const c of apps) {
@@ -172,6 +191,22 @@ export async function startAll(rows, { ddic, port = 4499, timeoutMs = 60_000, on
         stage.set(c, { stage: "start", ok: true });
       } catch (e) {
         stage.set(c, { stage: "start", ok: false, error: String(e?.message ?? e) });
+      }
+      const died = await revive();
+      if (died) stage.set(c, { stage: "start", ok: false, error: died });
+    }
+    // the apps that started, in the browser: the UI5 frontend boots them,
+    // renders and runs them (lib/browser.mjs)
+    if (browser) {
+      const { browserRun } = await import("./browser.mjs");
+      const ran = apps.filter((c) => stage.get(c)?.ok);
+      onLine(`start: ${ran.length} apps in the browser`);
+      const after = async (row) => {
+        const died = await revive();
+        if (died) row.errors.unshift(died);
+      };
+      for (const r of await browserRun(ran, { url: be.url, after, onLine })) {
+        if (!r.ok) stage.set(r.cls, { stage: "browser", ok: false, error: r.errors[0] });
       }
     }
     await be.stop();
@@ -182,7 +217,7 @@ export async function startAll(rows, { ddic, port = 4499, timeoutMs = 60_000, on
   }
   const stages = rows.map((r) => ({ file: r.file, cls: classOf(r), ...stage.get(classOf(r)) }));
   const count = (s) => stages.filter((x) => x.stage === s && !x.ok).length;
-  const started = stages.filter((x) => x.ok).length;
+  const started = stages.filter((x) => x.ok || x.stage === "browser").length;
   return {
     stages,
     funnel: {
@@ -190,6 +225,7 @@ export async function startAll(rows, { ddic, port = 4499, timeoutMs = 60_000, on
       checked: rows.length - count("check"),
       built: rows.length - count("check") - count("build"),
       started,
+      ...(browser ? { browser: stages.filter((x) => x.ok).length } : {}),
     },
   };
 }

@@ -96,7 +96,8 @@ CLASS z2ui5_cl_cgui_r2c_18 IMPLEMENTATION.
   METHOD at_line_selection.
 
     " HIDE - the field the clicked line was written with
-    gs_flight = hide.
+    z2ui5_cl_cgui_list=>hide_restore( EXPORTING hide = hide
+                                      CHANGING  val  = gs_flight ).
 
     " the third level replaces the second: Back returns to the flight list
     IF lsind( ) > 2.

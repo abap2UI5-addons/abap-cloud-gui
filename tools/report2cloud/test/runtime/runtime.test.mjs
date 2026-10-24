@@ -679,3 +679,27 @@ test("zr2c_40_sapevent: the SAPEVENT links of an HTML page reach the handler of 
   s = await d.act(s.session, { event: guiAction(s, "Pasta").id });
   assert.deepEqual(toasts(s), ["You picked PASTA"]);
 });
+
+test("zr2c_41_picture: DP_CREATE_URL of the bytes of a GIF, cl_gui_picture shows it - a click reaches the handler", { skip }, async () => {
+  let s = await d.start("z2ui5_cl_cgui_r2c_41");
+  s = await d.act(s.session, { event: "CGUI_EXECUTE" });
+  const xml = d.state().slots.MAIN.xml;
+  const src = /<Image[^>]*src="\{\/(MT_CGUI_GUI\/[^}]*)\}"/.exec(xml);
+  assert.ok(src, "an Image bound to the control");
+  const url = src[1].split("/").reduce((o, k) => o?.[k], d.state().models.MAIN?.data);
+  assert.equal(url, "data:image/gif;base64,R0lGODlhAQABAIAAAP///wAAACH5BAEAAAAALAAAAAABAAEAAAICRAEAOw==");
+  assert.match(xml, /<Image[^>]*width="100%"/, "fitted to the width");
+  const click = s.actions.find((a) => a.event === "CGUI_GUI" && a.control === "sap.m.Image");
+  s = await d.act(s.session, { event: click.id });
+  s = await d.act(s.session, { event: click.id });
+  assert.deepEqual(toasts(s), ["2 stamp(s)"]);
+});
+
+test("zr2c_42_demoget: cl_demo_output=>get( ) - the output as an HTML page for cl_abap_browser, not in the list", { skip }, async () => {
+  let s = await d.start("z2ui5_cl_cgui_r2c_42");
+  s = await d.act(s.session, { event: "CGUI_EXECUTE" });
+  assert.deepEqual(d.lines().filter((l) => l.trim() !== ""), ["25 bottles in the cellar"]);
+  const [page] = htmlOf();
+  assert.match(page, /<pre>Cellar[\s\S]*Riesling[\s\S]*Rose/);
+  assert.doesNotMatch(page, /Merlot/);
+});

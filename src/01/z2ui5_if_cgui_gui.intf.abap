@@ -13,6 +13,7 @@ INTERFACE z2ui5_if_cgui_gui PUBLIC.
       html      TYPE string VALUE `HTML`,
       toolbar   TYPE string VALUE `TOOLBAR`,
       grid      TYPE string VALUE `GRID`,
+      picture   TYPE string VALUE `PICTURE`,
     END OF cs_kind.
 
   TYPES:
@@ -47,6 +48,8 @@ INTERFACE z2ui5_if_cgui_gui PUBLIC.
       text      TYPE string,
       html      TYPE string,
       url       TYPE string,
+      "! the display mode of a picture
+      mode      TYPE i,
       readonly  TYPE abap_bool,
       toolbar   TYPE abap_bool,
       statusbar TYPE abap_bool,

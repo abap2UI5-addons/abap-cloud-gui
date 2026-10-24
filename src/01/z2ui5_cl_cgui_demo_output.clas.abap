@@ -74,6 +74,14 @@ CLASS z2ui5_cl_cgui_demo_output DEFINITION PUBLIC FINAL CREATE PRIVATE.
 
     CLASS-METHODS clear.
 
+    CLASS-METHODS get
+      IMPORTING
+        data          TYPE any   OPTIONAL
+        name          TYPE clike OPTIONAL
+          PREFERRED PARAMETER data
+      RETURNING
+        VALUE(output) TYPE string.
+
   PROTECTED SECTION.
   PRIVATE SECTION.
 
@@ -85,6 +93,9 @@ CLASS z2ui5_cl_cgui_demo_output DEFINITION PUBLIC FINAL CREATE PRIVATE.
     CLASS-DATA go_default TYPE REF TO z2ui5_cl_cgui_demo_output.
 
     DATA mv_level TYPE i.
+    " the line of the list the output started at - 0 before its first
+    " write and after display( ), get( ) and clear( )
+    DATA mv_from TYPE i.
 
     CLASS-METHODS default
       RETURNING
@@ -252,6 +263,17 @@ CLASS z2ui5_cl_cgui_demo_output IMPLEMENTATION.
 
   ENDMETHOD.
 
+  METHOD get.
+
+    IF data IS SUPPLIED.
+      output = default( )->get( data = data
+                                name = name ).
+    ELSE.
+      output = default( )->get( ).
+    ENDIF.
+
+  ENDMETHOD.
+
   METHOD z2ui5_if_cgui_demo_output~write.
 
     output = me.
@@ -398,12 +420,31 @@ CLASS z2ui5_cl_cgui_demo_output IMPLEMENTATION.
       z2ui5_if_cgui_demo_output~write( data = data
                                        name = name ).
     ENDIF.
+    mv_from = 0.
+
+  ENDMETHOD.
+
+  METHOD z2ui5_if_cgui_demo_output~get.
+
+    IF data IS SUPPLIED.
+      z2ui5_if_cgui_demo_output~write( data = data
+                                       name = name ).
+    ENDIF.
+    DATA(lt_line) = COND #( WHEN mv_from > 0 THEN list( )->cut( mv_from ) ).
+    mv_from = 0.
+    output = |<html><body><pre>{ escape( val    = concat_lines_of( table = lt_line
+                                                                   sep   = |\n| )
+                                         format = cl_abap_format=>e_html_text ) }</pre></body></html>|.
 
   ENDMETHOD.
 
   METHOD z2ui5_if_cgui_demo_output~clear.
 
     output = me.
+    IF mv_from > 0.
+      list( )->cut( mv_from ).
+    ENDIF.
+    mv_from = 0.
 
   ENDMETHOD.
 
@@ -417,6 +458,10 @@ CLASS z2ui5_cl_cgui_demo_output IMPLEMENTATION.
           val = `cl_demo_output outside of a report`.
     ENDIF.
     result = lo_report->list( ).
+    " where the output starts - get( ) and clear( ) take it from there on
+    IF mv_from = 0.
+      mv_from = result->current_line( ).
+    ENDIF.
 
   ENDMETHOD.
 

@@ -915,7 +915,7 @@ test("SAP GUI controls: a member, a parameter or an event the stand-ins do not h
   assert.deepEqual(refused("  CREATE OBJECT go_e EXPORTING parent = go_c.\n  go_e->set_textstream( 'x' ).\n"), []);
   assert.deepEqual(refused("  go_e->set_comments_string( ).\n"), ["SAP GUI controls: go_e->set_comments_string has no counterpart in z2ui5_cl_cgui_gui_textedit - port this statement by hand"]);
   assert.deepEqual(refused("  go_e->set_textstream( text = 'x' colour = 1 ).\n"), ["SAP GUI controls: colour is no parameter of the method called in the stand-in - port this statement by hand"]);
-  assert.deepEqual(refusalOf(`${head}DATA go_p TYPE REF TO cl_gui_picture.\n`).map((x) => x.replace(/^\d+:\d+ /, "")), ["SAP GUI controls: cl_gui_picture has no counterpart - the containers, cl_gui_textedit, cl_gui_html_viewer and cl_gui_toolbar have (z2ui5_cl_cgui_gui*)"]);
+  assert.deepEqual(refusalOf(`${head}DATA go_p TYPE REF TO cl_gui_simple_tree.\n`).map((x) => x.replace(/^\d+:\d+ /, "")), ["SAP GUI controls: cl_gui_simple_tree has no counterpart - the containers, cl_gui_textedit, cl_gui_html_viewer, cl_gui_toolbar, cl_gui_picture and cl_gui_alv_grid have (z2ui5_cl_cgui_gui*)"]);
 });
 
 test("SAP GUI controls: SET HANDLER of a local class's method is set_handler( ) of the stand-in; what it cannot call is refused", () => {

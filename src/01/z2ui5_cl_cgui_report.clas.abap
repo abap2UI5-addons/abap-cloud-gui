@@ -1790,6 +1790,25 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
               )->a( n = `target` v = `_blank` ).
         ENDIF.
 
+      WHEN z2ui5_if_cgui_gui=>cs_kind-picture.
+        IF <control>-url CP `sap-icon://*`.
+          node->tag( n = `Icon` ns = `core`
+              )->a( n = `xmlns:core` v = `sap.ui.core`
+              )->a( n = `src`        t = <control>-url
+              )->a( n = `size`       v = `3rem`
+              )->a( n = `press`      v = client->_event( val   = cs_ucomm-gui
+                                                         t_arg = VALUE #( ( |{ id }| ) ( `PICTURE_CLICK` ) ) ) ).
+        ELSEIF <control>-url IS NOT INITIAL.
+          " stretch and fit fill the width of the container
+          node->tag( `Image`
+              )->a( n = `src`   v = client->_bind( val       = <control>-url
+                                                   tab       = mt_cgui_gui
+                                                   tab_index = id )
+              )->a( n = `width` v = COND #( WHEN <control>-mode = 1 OR <control>-mode = 2 OR <control>-mode = 4 THEN `100%` )
+              )->a( n = `press` v = client->_event( val   = cs_ucomm-gui
+                                                    t_arg = VALUE #( ( |{ id }| ) ( `PICTURE_CLICK` ) ) ) ).
+        ENDIF.
+
       WHEN z2ui5_if_cgui_gui=>cs_kind-grid.
         " the grid the ALV shows - another one shows nothing
         IF mv_cgui_grid = id AND mo_cgui_alv IS BOUND.

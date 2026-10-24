@@ -57,3 +57,24 @@ jobs:
     - run: git clone --depth 1 https://github.com/abap2UI5-addons/popups .deps/popups
     - run: git clone --depth 1 --branch "$MCP_SERVER_REF" https://github.com/abap2UI5/mcp-server ../mcp-server
     - run: npm run test:report2cloud:runtime
+
+  # the same reports as the real app: the UI5 frontend in headless Chromium
+  # (Playwright) against the same transpiled backend, UI5 from the @openui5
+  # packages - boot, render, Execute, no page error (npm run
+  # test:report2cloud:browser)
+  browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      MCP_SERVER_REF: main
+    steps:
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+    - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+      with:
+        node-version: '22'
+        cache: 'npm'
+    - run: npm ci
+    - run: npx playwright install --with-deps chromium
+    - run: git clone --depth 1 https://github.com/abap2UI5-addons/popups .deps/popups
+    - run: git clone --depth 1 --branch "$MCP_SERVER_REF" https://github.com/abap2UI5/mcp-server ../mcp-server
+    - run: npm run test:report2cloud:browser

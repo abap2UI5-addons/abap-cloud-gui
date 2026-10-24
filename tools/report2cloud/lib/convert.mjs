@@ -185,6 +185,10 @@ const GUI_CONTROL = /\bcl_gui_(alv_grid|custom_container|docking_container|split
 export const FRONTEND = {
   constants: ["action_ok", "action_cancel", "filetype_all", "filetype_text", "filetype_excel", "filetype_xml", "filetype_html"],
   methods: {
+    dp_create_url: { params: ["type", "subtype", "size", "date", "time", "description", "lifetime", "cacheable", "send_data_as_string", "data", "url"],
+      exceptions: ["dp_invalid_parameter", "dp_error_put_table", "dp_error_general"] },
+    url_content: { params: ["url"],
+      exceptions: [] },
     file_open_dialog: { params: ["window_title", "default_extension", "default_filename", "file_filter", "with_encoding", "initial_directory", "multiselection", "file_table", "rc", "user_action", "file_encoding"],
       exceptions: ["file_open_dialog_failed", "cntl_error", "error_no_gui", "not_supported_by_gui"] },
     file_save_dialog: { params: ["window_title", "default_extension", "default_file_name", "with_encoding", "file_filter", "initial_directory", "prompt_on_overwrite", "filename", "path", "fullpath", "user_action", "file_encoding"],
@@ -231,7 +235,7 @@ export const FRONTEND = {
 };
 
 // the function modules of the frontend, as methods of z2ui5_cl_cgui_frontend
-const FRONTEND_FUNCTIONS = { GUI_UPLOAD: "gui_upload", GUI_DOWNLOAD: "gui_download" };
+const FRONTEND_FUNCTIONS = { GUI_UPLOAD: "gui_upload", GUI_DOWNLOAD: "gui_download", DP_CREATE_URL: "dp_create_url" };
 
 /**
  * The stand-ins of the SAP GUI controls (src/01/z2ui5_cl_cgui_gui*) - the
@@ -252,12 +256,13 @@ export const GUI = {
     cl_gui_textedit: "z2ui5_cl_cgui_gui_textedit",
     cl_gui_html_viewer: "z2ui5_cl_cgui_gui_html_viewer",
     cl_gui_toolbar: "z2ui5_cl_cgui_gui_toolbar",
+    cl_gui_picture: "z2ui5_cl_cgui_gui_picture",
     cl_gui_alv_grid: "z2ui5_cl_cgui_gui_alv_grid",
     cl_alv_event_toolbar_set: "z2ui5_cl_cgui_gui_alv_toolbar",
   },
   members: {
     z2ui5_cl_cgui_gui: {
-      constants: ["true", "false"],
+      constants: ["true", "false", "metric_default", "metric_pixel", "metric_mm", "ws_tabstop", "ws_maximizebox", "ws_group", "ws_minimizebox", "ws_thickframe", "ws_sysmenu", "ws_dlgframe", "ws_border", "ws_caption", "ws_maximize", "ws_clipchildren", "ws_clipsiblings", "ws_visible", "ws_child"],
       attributes: [],
       events: [],
       methods: {
@@ -304,6 +309,16 @@ export const GUI = {
         set_extension: { params: ["extension"],
           exceptions: ["cntl_error", "cntl_system_error"] },
         set_caption: { params: ["caption"],
+          exceptions: ["cntl_error", "cntl_system_error"] },
+        set_top: { params: ["top"],
+          exceptions: ["cntl_error", "cntl_system_error"] },
+        set_left: { params: ["left"],
+          exceptions: ["cntl_error", "cntl_system_error"] },
+        set_width: { params: ["width"],
+          exceptions: ["cntl_error", "cntl_system_error"] },
+        set_height: { params: ["height"],
+          exceptions: ["cntl_error", "cntl_system_error"] },
+        set_metric: { params: ["metric"],
           exceptions: ["cntl_error", "cntl_system_error"] },
         link: { params: ["repid", "dynnr", "container"],
           exceptions: ["cntl_error", "cntl_system_error", "lifetime_dynpro_dynpro_link"] },
@@ -386,9 +401,33 @@ export const GUI = {
           exceptions: [] },
       },
     },
+    z2ui5_cl_cgui_gui_picture: {
+      parent: "z2ui5_cl_cgui_gui",
+      constants: ["display_mode_normal", "display_mode_stretch", "display_mode_fit", "display_mode_normal_center", "display_mode_fit_center", "eventid_picture_click"],
+      attributes: [],
+      events: ["picture_click"],
+      methods: {
+        constructor: { params: ["parent", "lifetime", "shellstyle", "name"],
+          exceptions: ["error"] },
+        load_picture_from_url: { params: ["url", "result"],
+          exceptions: ["error"] },
+        load_picture_from_url_async: { params: ["url"],
+          exceptions: ["error"] },
+        load_picture_from_sap_icons: { params: ["icon"],
+          exceptions: ["error"] },
+        set_display_mode: { params: ["display_mode"],
+          exceptions: ["error"] },
+        clear_picture: { params: [],
+          exceptions: ["error"] },
+        set_registered_events: { params: ["events"],
+          exceptions: ["cntl_error", "cntl_system_error", "illegal_event_combination"] },
+        dispatch: { params: [],
+          exceptions: [] },
+      },
+    },
     z2ui5_cl_cgui_gui_toolbar: {
       parent: "z2ui5_cl_cgui_gui",
-      constants: ["cntb_btype_button", "cntb_btype_dropdown", "cntb_btype_menu", "cntb_btype_sep", "cntb_btype_group", "cntb_btype_check", "m_id_function_selected", "m_id_dropdown_clicked"],
+      constants: ["cntb_btype_button", "cntb_btype_dropdown", "cntb_btype_menu", "cntb_btype_sep", "cntb_btype_group", "cntb_btype_check", "m_mode_horizontal", "m_mode_vertical", "m_id_function_selected", "m_id_dropdown_clicked"],
       attributes: [],
       events: ["function_selected", "dropdown_clicked"],
       methods: {
@@ -1553,7 +1592,7 @@ class Converter {
     const missing = [...new Set([...t.matchAll(/\bcl_gui_\w+/g)].map((m) => m[0]))]
       .filter((c) => !guiClass(c) && !["cl_gui_cfw", "cl_gui_frontend_services"].includes(c));
     if (this.guiVars?.size && !missing.length) return undefined;
-    if (this.guiVars?.size) return `SAP GUI controls: ${missing.join(", ")} ${missing.length > 1 ? "have" : "has"} no counterpart - the containers, cl_gui_textedit, cl_gui_html_viewer and cl_gui_toolbar have (z2ui5_cl_cgui_gui*)`;
+    if (this.guiVars?.size) return `SAP GUI controls: ${missing.join(", ")} ${missing.length > 1 ? "have" : "has"} no counterpart - the containers, cl_gui_textedit, cl_gui_html_viewer, cl_gui_toolbar, cl_gui_picture and cl_gui_alv_grid have (z2ui5_cl_cgui_gui*)`;
     return "SAP GUI controls (cl_gui_*) need a dynpro container - use alv( ) or an abap2UI5 view";
   }
 
@@ -5654,7 +5693,13 @@ class Converter {
   hideRestore() {
     if (!this.hideSet) return [];
     const fields = this.hideSet.split(",");
-    if (fields.length === 1) return ["\" HIDE - the field the clicked line was written with", `${fields[0]} = hide.`];
+    // a structure is written component by component - hide_restore( ) types
+    // the text back into the field, whatever its type
+    if (fields.length === 1) {
+      return ["\" HIDE - the field the clicked line was written with",
+        `z2ui5_cl_cgui_list=>hide_restore( EXPORTING hide = hide`,
+        `                                  CHANGING  val  = ${fields[0]} ).`];
+    }
     const lines = ["\" HIDE - the fields the clicked line was written with", "SPLIT hide AT |\\t| INTO TABLE DATA(lt_hide)."];
     fields.forEach((f, i) => lines.push(`${f} = VALUE #( lt_hide[ ${i + 1} ] OPTIONAL ).`));
     return lines;
@@ -6022,7 +6067,8 @@ class Converter {
     if (!lines.length) lines.push(head.trimEnd());
     lines[lines.length - 1] += " ).";
     b.out.push(...lines);
-    this.note("cl_gui_frontend_services is z2ui5_cl_cgui_frontend - a file the user picks is uploaded in the browser (file_open_dialog( ) in an F4 opens the upload, the F4 runs again with the file), gui_download( ) is a download of the browser");
+    if (fm === "DP_CREATE_URL") this.note("DP_CREATE_URL is z2ui5_cl_cgui_frontend=>dp_create_url( ) - the URL names a data URI of the bytes, which the picture and the HTML viewer of the browser show");
+    else this.note("cl_gui_frontend_services is z2ui5_cl_cgui_frontend - a file the user picks is uploaded in the browser (file_open_dialog( ) in an F4 opens the upload, the F4 runs again with the file), gui_download( ) is a download of the browser");
     this.map(s, `\`z2ui5_cl_cgui_frontend=>${method}( )\` - the function module as the method of the frontend services, its EXCEPTIONS kept`);
   }
 
@@ -7109,7 +7155,7 @@ const ABAP_BROWSER = ["show_html", "show_url", "show_xml", "close_browser", "htm
 // the static methods of z2ui5_cl_cgui_demo_output - the methods of
 // cl_demo_output it has
 const DEMO_OUTPUT = ["new", "write", "write_data", "write_text", "write_html", "write_json", "begin_section", "next_section",
-  "end_section", "line", "display", "display_data", "display_text", "display_html", "display_json", "clear"];
+  "end_section", "line", "display", "display_data", "display_text", "display_html", "display_json", "clear", "get"];
 
 function frontendMember(name) {
   const n = lc(name ?? "");

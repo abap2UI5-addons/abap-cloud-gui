@@ -162,7 +162,8 @@ CLASS z2ui5_cl_cgui_r2c_12 IMPLEMENTATION.
   METHOD at_line_selection.
 
     " HIDE - the field the clicked line was written with
-    gv_num = hide.
+    z2ui5_cl_cgui_list=>hide_restore( EXPORTING hide = hide
+                                      CHANGING  val  = gv_num ).
 
     list( )->new_line(
         )->write( 'Number'

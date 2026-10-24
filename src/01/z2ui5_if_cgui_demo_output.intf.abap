@@ -68,9 +68,20 @@ INTERFACE z2ui5_if_cgui_demo_output PUBLIC.
       data TYPE any   OPTIONAL
       name TYPE clike OPTIONAL.
 
-  "! what was written stays - it is in the list of the run already
+  "! what the output wrote since its last display( ), get( ) or clear( ) is
+  "! taken out of the list again
   METHODS clear
     RETURNING
       VALUE(output) TYPE REF TO z2ui5_if_cgui_demo_output.
+
+  "! data (when passed), then what the output wrote since its last
+  "! display( ), get( ) or clear( ) as an HTML page - taken out of the list,
+  "! for cl_abap_browser=>show_html( ) or an HTML viewer
+  METHODS get
+    IMPORTING
+      data          TYPE any   OPTIONAL
+      name          TYPE clike OPTIONAL
+    RETURNING
+      VALUE(output) TYPE string.
 
 ENDINTERFACE.

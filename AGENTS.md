@@ -240,6 +240,10 @@ from it is rewritten by hand), measured weekly by
   the class fails before its first screen) and `IN` on a select-option
   (the runtime's `IN` knows `I EQ`, `E EQ`, `I CP` - `range_check( )`, the
   rule above). Run it after a change to the converter or to `src/01`.
+  `npm run test:report2cloud:browser` runs the same classes as the real app
+  in headless Chromium (UI5 from the `@openui5` devDependencies): boot,
+  render, Execute, no page error - what the JSON protocol cannot see (a
+  property value UI5 rejects ends the app before its first screen).
 - **It follows the rules above**: report globals become PUBLIC attributes
   (never PRIVATE), the selection screen binds them by reference, ABAP SQL is
   written in strict mode, chains follow the house layout of the samples.

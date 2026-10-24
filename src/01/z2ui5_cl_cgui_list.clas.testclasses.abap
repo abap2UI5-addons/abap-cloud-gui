@@ -33,12 +33,14 @@ CLASS ltcl_test DEFINITION FINAL FOR TESTING
     METHODS clear FOR TESTING.
     METHODS header_repeats FOR TESTING.
     METHODS write_at_position FOR TESTING.
+    METHODS hide_of_a_structure FOR TESTING.
     METHODS write_formats FOR TESTING.
     METHODS input_read_modify FOR TESTING.
     METHODS line_count_and_footer FOR TESTING.
     METHODS format_and_columns FOR TESTING.
     METHODS write_options_r10 FOR TESTING.
     METHODS pages_and_lines FOR TESTING.
+    METHODS cut_from_a_line FOR TESTING.
 
 ENDCLASS.
 
@@ -118,6 +120,37 @@ CLASS ltcl_test IMPLEMENTATION.
 
   ENDMETHOD.
 
+  METHOD hide_of_a_structure.
+
+    TYPES:
+      BEGIN OF ty_s_flight,
+        carrid TYPE c LENGTH 3,
+        seats  TYPE i,
+        price  TYPE p LENGTH 8 DECIMALS 2,
+        fldate TYPE d,
+      END OF ty_s_flight.
+    DATA ls_flight TYPE ty_s_flight.
+    DATA ls_back   TYPE ty_s_flight.
+    DATA lv_number TYPE i.
+
+    " a structure that is no character-like one: component by component
+    ls_flight = VALUE #( carrid = 'LH' seats = 120 price = '420.50' fldate = '20260105' ).
+    DATA(lv_text) = z2ui5_cl_cgui_list=>hide_text( ls_flight ).
+    cl_abap_unit_assert=>assert_equals( act = lv_text
+                                        exp = |LH\t120\t420.50\t20260105| ).
+    z2ui5_cl_cgui_list=>hide_restore( EXPORTING hide = lv_text
+                                      CHANGING  val  = ls_back ).
+    cl_abap_unit_assert=>assert_equals( act = ls_back
+                                        exp = ls_flight ).
+
+    " a single value as it is
+    z2ui5_cl_cgui_list=>hide_restore( EXPORTING hide = z2ui5_cl_cgui_list=>hide_text( 42 )
+                                      CHANGING  val  = lv_number ).
+    cl_abap_unit_assert=>assert_equals( act = lv_number
+                                        exp = 42 ).
+
+  ENDMETHOD.
+
   METHOD write_at_position.
 
     DATA(lo_list) = z2ui5_cl_cgui_list=>factory( ).
@@ -133,11 +166,11 @@ CLASS ltcl_test IMPLEMENTATION.
     lo_list->new_line( )->write( `free` ).
     DATA(lv_view) = lo_list->stringify( NEW ltcl_client( ) ).
     cl_abap_unit_assert=>assert_char_cp( act = lv_view
-                                         exp = `*width="5ch"*AB*width="4ch"*width="3ch"*CD*` ).
+                                         exp = `*width="3.0em"*AB*width="2.4em"*width="1.8em"*CD*` ).
     " the two boxes, the spacer and the width of AB itself - the free line
     " has none
     cl_abap_unit_assert=>assert_equals( act = count( val = lv_view
-                                                     sub = `ch"` )
+                                                     sub = `em"` )
                                         exp = 4 ).
 
   ENDMETHOD.
@@ -355,6 +388,25 @@ CLASS ltcl_test IMPLEMENTATION.
     cl_abap_unit_assert=>assert_true( xsdbool( line_exists( lt_text[ table_line = `  -----` ] ) ) ).
     cl_abap_unit_assert=>assert_equals( act = lo_list->describe_lines( )
                                         exp = 7 ).
+
+  ENDMETHOD.
+
+  METHOD cut_from_a_line.
+
+    DATA(lo_list) = z2ui5_cl_cgui_list=>factory( ).
+    lo_list->write( `one` ).
+    lo_list->new_line( ).
+    DATA(lv_from) = lo_list->current_line( ).
+    lo_list->write( `two` ).
+    lo_list->new_line( ).
+    lo_list->write( `three` ).
+
+    cl_abap_unit_assert=>assert_equals( exp = VALUE string_table( ( `two` ) ( `three` ) )
+                                        act = lo_list->cut( lv_from ) ).
+    " the list goes on where the cut started
+    lo_list->write( `four` ).
+    cl_abap_unit_assert=>assert_equals( exp = VALUE string_table( ( `one` ) ( `four` ) )
+                                        act = lo_list->to_text( ) ).
 
   ENDMETHOD.
 
