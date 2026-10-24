@@ -945,3 +945,12 @@ test("the dependencies of a report type what it reads of them - an inline declar
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test("a name every JavaScript object has - constructor, toString - is no SAP GUI class, icon or ALV type", () => {
+  const src = "REPORT zt.\nDATA go_c TYPE REF TO cl_gui_custom_container.\nCLASS lcl DEFINITION.\n  PUBLIC SECTION.\n    METHODS constructor.\n    METHODS tostring RETURNING VALUE(r) TYPE string.\nENDCLASS.\nCLASS lcl IMPLEMENTATION.\n  METHOD constructor.\n  ENDMETHOD.\n  METHOD tostring.\n    r = `x`.\n  ENDMETHOD.\nENDCLASS.\nSTART-OF-SELECTION.\n  go_c = NEW #( container_name = 'CC' ).\n  WRITE NEW lcl( )->tostring( ).\n";
+  const r = convert(src, { file: "zt.prog.abap", className: "zcl_t" });
+  assert.deepEqual(r.refusals.map((x) => x.message), []);
+  const text = Object.values(r.files).join("\n");
+  assert.doesNotMatch(text, /native code|function Object/);
+  assert.match(text, /METHODS constructor\./);
+});

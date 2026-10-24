@@ -369,6 +369,10 @@ export const GUI = {
   },
 };
 
+/** the stand-in of a SAP GUI class - undefined for any other name (also
+ *  constructor or toString, which every object has) */
+const guiClass = (name) => (Object.hasOwn(GUI.classes, name) ? GUI.classes[name] : undefined);
+
 /** the member of a stand-in or of one of its parents - undefined if none has it */
 function guiMember(cls, name) {
   for (let c = cls; c; c = GUI.members[c]?.parent) {
@@ -875,10 +879,19 @@ class Converter {
     this.analyzeTables();
     this.analyzeAlv();
     this.analyzeScreen();
-    // a local class keeps its source: a SAP GUI control in it stays one
+    // a local class keeps its source - its containers, text editors and HTML
+    // viewers become the stand-ins (localsSource), every other control stays one
     for (const u of this.locals) {
-      const hit = u.stmts.map((x) => lc(renderTokens(stmtTokens(x)))).join(" ").match(GUI_CONTROL);
-      if (hit) this.refuse(u.stmts[0], `SAP GUI controls: the local class uses cl_gui_${hit[1]} - a local class is copied as it is, its controls have no stand-in there; make them global data of the report or move the class into a class of its own`);
+      const text = u.stmts.map((x) => lc(renderTokens(stmtTokens(x)))).join(" ");
+      const hit = text.match(GUI_CONTROL);
+      if (!hit) continue;
+      const missing = [...new Set([...text.matchAll(/\bcl_gui_\w+/g)].map((m) => m[0]))].filter((c) => !guiClass(c) && !["cl_gui_cfw", "cl_gui_frontend_services"].includes(c));
+      const event = /\bfor\s+event\s+\w+\s+of\s+(cl_gui_\w+)/.exec(text);
+      if (!this.guiVars?.size || missing.length) {
+        this.refuse(u.stmts[0], `SAP GUI controls: the local class uses ${missing.length ? missing.join(", ") : `cl_gui_${hit[1]}`} - a local class is copied as it is, its controls have no stand-in there; make them global data of the report or move the class into a class of its own`);
+      } else if (event && guiClass(event[1])) {
+        this.refuse(u.stmts[0], `SAP GUI controls: the local class handles an event of ${event[1]} - the events of the text editor and the HTML viewer have no counterpart yet`);
+      }
     }
   }
 
@@ -1177,16 +1190,17 @@ class Converter {
    *  class of z2ui5_cl_cgui_gui* (GUI) */
   findGuiVars(all) {
     this.guiVars = new Map();
-    for (const x of all) {
+    // the attributes and method data of the local classes as well
+    for (const x of [...all, ...this.locals.flatMap((u) => u.stmts)]) {
       const t = lc(renderTokens(stmtTokens(x)));
       if (kind(x) === "Move") {
         const m = /^data\s*\(\s*([\w/]+)\s*\)\s*=\s*new\s+(cl_gui_\w+)\s*\(/.exec(t);
-        if (m && GUI.classes[m[2]]) this.guiVars.set(m[1], GUI.classes[m[2]]);
+        if (m && guiClass(m[2])) this.guiVars.set(m[1], guiClass(m[2]));
         continue;
       }
-      if (!["Data", "Static"].includes(kind(x)) || this.insideBegin(x)) continue;
+      if (!["Data", "Static", "ClassData"].includes(kind(x)) || this.insideBegin(x)) continue;
       const m = /type\s+ref\s+to\s+(cl_gui_\w+)\b/.exec(t);
-      if (m && GUI.classes[m[1]]) this.guiVars.set(lc(declName(x)), GUI.classes[m[1]]);
+      if (m && guiClass(m[1])) this.guiVars.set(lc(declName(x)), guiClass(m[1]));
     }
   }
 
@@ -1196,7 +1210,7 @@ class Converter {
     const t = lc(text);
     if (!GUI_CONTROL.test(t)) return undefined;
     const missing = [...new Set([...t.matchAll(/\bcl_gui_\w+/g)].map((m) => m[0]))]
-      .filter((c) => !GUI.classes[c] && !["cl_gui_cfw", "cl_gui_frontend_services"].includes(c));
+      .filter((c) => !guiClass(c) && !["cl_gui_cfw", "cl_gui_frontend_services"].includes(c));
     if (this.guiVars?.size && !missing.length) return undefined;
     if (this.guiVars?.size) return `SAP GUI controls: ${missing.join(", ")} ${missing.length > 1 ? "have" : "has"} no counterpart - the containers, cl_gui_textedit and cl_gui_html_viewer have (z2ui5_cl_cgui_gui*)`;
     return "SAP GUI controls (cl_gui_*) need a dynpro container - use alv( ) or an abap2UI5 view";
@@ -1211,9 +1225,9 @@ class Converter {
     let ctor;
     for (let i = 0; i < toks.length; i++) {
       const t = toks[i];
-      if (GUI.classes[t] && toks[i + 1] === "=>") {
-        const m = guiMember(GUI.classes[t], toks[i + 2]);
-        if (!m) return `${t}=>${toks[i + 2]} has no counterpart in ${GUI.classes[t]}`;
+      if (guiClass(t) && toks[i + 1] === "=>") {
+        const m = guiMember(guiClass(t), toks[i + 2]);
+        if (!m) return `${t}=>${toks[i + 2]} has no counterpart in ${guiClass(t)}`;
         if (m.kind === "method") used.push(m);
       }
       if (this.guiVars.has(t) && toks[i + 1] === "->" && toks[i - 1] !== "-" && toks[i - 1] !== "->") {
@@ -1222,13 +1236,13 @@ class Converter {
         if (!m) return `${t}->${toks[i + 2]} has no counterpart in ${cls}`;
         if (m.kind === "method") used.push(m);
       }
-      if (t === "new" && GUI.classes[toks[i + 1]]) ctor = GUI.classes[toks[i + 1]];
+      if (t === "new" && guiClass(toks[i + 1])) ctor = guiClass(toks[i + 1]);
     }
     // CREATE OBJECT go_x [TYPE cl_gui_y]: the constructor of its class
     if (kind(s) === "CreateObject") {
       const type = /\btype\s+([\w/]+)/.exec(toks.join(" "));
       const target = lc(nodeText(child(s, "Target") ?? s).split(/\s/)[0]);
-      ctor = type && GUI.classes[type[1]] ? GUI.classes[type[1]] : this.guiVars.get(target);
+      ctor = type && guiClass(type[1]) ? guiClass(type[1]) : this.guiVars.get(target);
     }
     if (ctor) used.push(guiMember(ctor, "constructor"));
     // a control handed to a method or class of the report's own - that one
@@ -4683,8 +4697,8 @@ class Converter {
       const component = (prev === "-" && toks[i - 1].constructor.name === "Dash") || prev === "->" || prev === "=>" || prev === "~";
       if (component) continue;
       // cl_gui_textedit, cl_gui_custom_container, ... - their stand-ins
-      if (this.guiVars?.size && GUI.classes[t]) {
-        ov.set(key(toks[i]), GUI.classes[t]);
+      if (this.guiVars?.size && guiClass(t)) {
+        ov.set(key(toks[i]), guiClass(t));
         continue;
       }
       // cl_gui_frontend_services=>gui_upload, =>action_ok - the frontend
@@ -5864,7 +5878,9 @@ class Converter {
           const own = new Set([...declared, ...params]);
           const needs = b.body.some((x) => REPORT_KINDS.has(kind(x)) || usesReport(x, own)
             || (kind(x) === "CallFunction" && /^'?(POPUP_|REUSE_ALV_|GUI_UPLOAD'|GUI_DOWNLOAD')/i.test(nodeText(child(x, "FunctionName"))))
-            || /\bcl_gui_(frontend_services|cfw)\b/i.test(renderTokens(stmtTokens(x))));
+            || /\bcl_gui_(frontend_services|cfw)\b/i.test(renderTokens(stmtTokens(x)))
+            // a SAP GUI control: its stand-in, and its CREATE OBJECT a NEW
+            || (this.guiVars?.size && stmtTokens(x).some((t) => guiClass(lc(t.getStr())) || this.guiVars.has(lc(t.getStr())))));
           if (!needs || !b.body.length) continue;
           const key = `${n}~${b.name}`;
           const body = this.convertBody(b.body, { method: key, local: { cls: n, declared: own } });
@@ -5884,6 +5900,11 @@ class Converter {
           toks.forEach((t, i) => {
             const v = lc(t.getStr());
             const prev = i > 0 ? toks[i - 1].getStr() : "";
+            // a SAP GUI control: its stand-in
+            if (this.guiVars?.size && guiClass(v) && !["-", "->", "~"].includes(prev)) {
+              subst.push({ row: t.getRow(), col: t.getCol(), len: t.getStr().length, text: guiClass(v) });
+              return;
+            }
             if (!reportGlobals.has(v) || declared.has(v) || this.movedTypes.has(v) || ["-", "->", "=>", "~"].includes(prev)) return;
             // only a type or a variable of the statement - not a parameter, a
             // component or a dictionary type that shares the name
@@ -6309,6 +6330,11 @@ function renderTableCall(method, params) {
   });
   return `${lines.join("\n")} ).`;
 }
+
+// the tables above are read with any name of the source - a name every
+// object has (constructor, toString) is none of theirs
+Object.setPrototypeOf(ICONS, null);
+Object.setPrototypeOf(LVC_TYPES, null);
 
 // the methods of the runtime the converted code calls, besides BASE_METHODS
 const REPORT_CALLS = ["list", "write", "message", "message_t100", "messages_from_bapiret", "alv", "tree", "set_title",
