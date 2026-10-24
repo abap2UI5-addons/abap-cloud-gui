@@ -23,6 +23,7 @@ CLASS ltcl_test DEFINITION FINAL FOR TESTING
     METHODS range_to_text FOR TESTING.
     METHODS range_to_text_more_lines FOR TESTING.
     METHODS conv_to_text FOR TESTING.
+    METHODS base64_round_trip FOR TESTING.
     METHODS check_boolean FOR TESTING.
     METHODS t_comp FOR TESTING.
     METHODS attri_name_by_ref FOR TESTING.
@@ -154,6 +155,26 @@ CLASS ltcl_test IMPLEMENTATION.
     cl_abap_unit_assert=>assert_equals( exp = `42`
                                         act = z2ui5_cl_cgui_context=>conv_to_text( 42 ) ).
     cl_abap_unit_assert=>assert_initial( z2ui5_cl_cgui_context=>conv_to_text( lv_date ) ).
+
+  ENDMETHOD.
+
+  METHOD base64_round_trip.
+
+    " one, two and three bytes of the last group - the padding of each
+    DATA(lv_x) = CONV xstring( `48656C6C6F2C20E282AC21` ).
+    DO 3 TIMES.
+      DATA(lv_part) = lv_x(sy-index).
+      DATA(lv_b64) = z2ui5_cl_cgui_context=>conv_encode_x_base64( lv_part ).
+      cl_abap_unit_assert=>assert_equals( exp = lv_part
+                                          act = z2ui5_cl_cgui_context=>conv_decode_x_base64( lv_b64 ) ).
+    ENDDO.
+    cl_abap_unit_assert=>assert_equals( exp = `SGVsbG8sIOKCrCE=`
+                                        act = z2ui5_cl_cgui_context=>conv_encode_x_base64( lv_x ) ).
+    cl_abap_unit_assert=>assert_equals( exp = lv_x
+                                        act = z2ui5_cl_cgui_context=>conv_decode_x_base64( `SGVsbG8sIOKCrCE=` ) ).
+    cl_abap_unit_assert=>assert_equals( exp = `Hello, €!`
+                                        act = z2ui5_cl_cgui_context=>conv_get_string_by_xstring(
+                                                  z2ui5_cl_cgui_context=>conv_decode_x_base64( `SGVsbG8s` && |\n| && `IOKCrCE=` ) ) ).
 
   ENDMETHOD.
 

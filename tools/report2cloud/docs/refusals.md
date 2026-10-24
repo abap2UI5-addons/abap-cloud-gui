@@ -12,7 +12,7 @@ A refused statement has no counterpart in an abap-cloud-gui report. The converte
 | [INCLUDE without its file](#include-missing) | `include-missing` |
 | [Logical databases: NODES, GET, REJECT, dynamic and free selections](#logical-database) | `logical-database` |
 | [Fields of another program: ASSIGN ('(PROG)FIELD')](#foreign-field) | `foreign-field` |
-| [The SAP GUI frontend: controls, frontend services, GUI_DOWNLOAD / GUI_UPLOAD](#sap-gui) | `sap-gui` |
+| [The SAP GUI frontend: controls, the frontend services the browser has no counterpart for](#sap-gui) | `sap-gui` |
 | [Desktop integration and system calls: OLE, CALL 'C-function', EDITOR-CALL, GENERATE](#desktop) | `desktop` |
 | [Reading the list back: GET CURSOR, READ LINE, MODIFY LINE](#list-read) | `list-read` |
 | [List control without a counterpart: SCROLL LIST, SET USER-COMMAND, print control](#list-control) | `list-control` |
@@ -160,13 +160,13 @@ Pass the value as a parameter, or read it again from the database. Within the re
 
 <a id="sap-gui"></a>
 
-## The SAP GUI frontend: controls, frontend services, GUI_DOWNLOAD / GUI_UPLOAD
+## The SAP GUI frontend: controls, the frontend services the browser has no counterpart for
 
-**Why.** There is no SAP GUI on the other side: no custom container to put a control in, no frontend to read or write a file on. A `cl_gui_alv_grid` is converted to `alv( )`; the other controls are refused.
+**Why.** There is no SAP GUI on the other side: no custom container to put a control in, no file system of the user. A `cl_gui_alv_grid` is converted to `alv( )`; the other controls are refused. The files are converted: `cl_gui_frontend_services` is `z2ui5_cl_cgui_frontend` - `file_open_dialog` in an F4 opens an upload in the browser and runs the F4 again with the file, `gui_upload` reads it, `gui_download` is a download of the browser, `GUI_UPLOAD` / `GUI_DOWNLOAD` become its methods. What it does not have - the registry, the GUI version, an option of a method it does not take - is refused.
 
 **Rewrite.**
 
-Remove the frontend call from the report. A download becomes the export of `alv( )` (CSV or Excel) or an abap2UI5 download in the class, an upload an abap2UI5 file uploader; a control becomes `alv( )` or an abap2UI5 view. A progress indicator is simply dropped.
+Remove the call, or write it with what `z2ui5_cl_cgui_frontend` has: the file dialogs, `gui_upload`, `gui_download`, the folders, `execute` of a URL, `clipboard_export`. A control becomes `alv( )` or an abap2UI5 view. A progress indicator is simply dropped.
 
 <a id="desktop"></a>
 

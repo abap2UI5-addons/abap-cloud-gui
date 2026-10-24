@@ -6,7 +6,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { convert, defaultClassName, RESERVED_METHODS, UNCATALOGUED } from "../lib/convert.mjs";
+import { convert, defaultClassName, FRONTEND, RESERVED_METHODS, UNCATALOGUED } from "../lib/convert.mjs";
 import { corpus, convertEntry, SNAPSHOTS } from "./corpus.mjs";
 
 const UPDATE = process.env.UPDATE_SNAPSHOTS === "1";
@@ -387,6 +387,46 @@ test("ON VALUE-REQUEST FOR s_x-low and FOR s_x-high: one WHEN, value_request_par
   assert.match(refusalOf(`${src}AT SELECTION-SCREEN ON VALUE-REQUEST FOR s_x-high.\n  s_x-high = 'Y'.\n`)[0], /^8:1 a second ON VALUE-REQUEST for S_X/);
 });
 
+test("the files of the user: cl_gui_frontend_services and GUI_UPLOAD as z2ui5_cl_cgui_frontend, EXCEPTIONS kept", () => {
+  const cls = classOf("zr2c_22_files");
+  const { result } = converted.get("zr2c_22_files");
+  assert.equal(result.ok, true, result.refusals.map((x) => x.message).join("\n"));
+  assert.match(cls, /z2ui5_cl_cgui_frontend=>gui_upload\( EXPORTING  filename            = p_file\n(.*\n)*?\s+CHANGING   data_tab            = gt_seats\n\s+EXCEPTIONS file_open_error     = 1\n\s+OTHERS              = 2 \)\./);
+  assert.match(cls, /^\s+z2ui5_cl_cgui_frontend=>file_open_dialog\(\n\s+EXPORTING\n/m);
+  assert.match(cls, /lt_files  TYPE z2ui5_cl_cgui_frontend=>ty_t_file_table,/);
+  assert.match(cls, /lv_action = z2ui5_cl_cgui_frontend=>action_ok/);
+  assert.match(cls, /z2ui5_cl_cgui_frontend=>gui_download\(\n/);
+  assert.doesNotMatch(cls, /cl_gui_frontend_services|filetable/i);
+});
+
+test("cl_gui_frontend_services: a member or a parameter the browser has no counterpart for is refused", () => {
+  const src = "REPORT zt.\nDATA lv TYPE string.\nSTART-OF-SELECTION.\n  cl_gui_frontend_services=>get_gui_version( CHANGING version_table = lv ).\n  cl_gui_frontend_services=>gui_upload( EXPORTING filename = lv check_bom = abap_true CHANGING data_tab = lv ).\n  CALL FUNCTION 'GUI_UPLOAD' EXPORTING filename = lv no_auth_check = 'X' TABLES data_tab = lv.\n  cl_gui_cfw=>flush( ).\n";
+  assert.deepEqual(refusalOf(src).map((x) => x.split(";")[0]), [
+    "4:3 cl_gui_frontend_services - get_gui_version has no counterpart in the browser",
+    "5:3 cl_gui_frontend_services - gui_upload( check_bom = ... ) is not supported",
+    "6:3 CALL FUNCTION 'GUI_UPLOAD' - EXPORTING no_auth_check has no counterpart in z2ui5_cl_cgui_frontend=>gui_upload( )",
+  ]);
+});
+
+test("the table of z2ui5_cl_cgui_frontend in the converter is the class - its constants, methods, parameters, exceptions", () => {
+  const text = readFileSync(new URL("../../../src/01/z2ui5_cl_cgui_frontend.clas.abap", import.meta.url), "utf8");
+  const def = text.slice(0, text.indexOf("PROTECTED SECTION"));
+  const methods = {};
+  for (const m of def.matchAll(/^\s*CLASS-METHODS\s+(\w+)([^.]*)\./gim)) {
+    let section;
+    const params = [];
+    const exceptions = [];
+    for (const line of m[2].split("\n").map((l) => l.trim()).filter(Boolean)) {
+      if (/^(IMPORTING|EXPORTING|CHANGING|RETURNING|EXCEPTIONS)$/.test(line)) section = line;
+      else if (section === "EXCEPTIONS") exceptions.push(line.toLowerCase());
+      else if (section && section !== "RETURNING") params.push(line.split(/\s+/)[0].toLowerCase());
+    }
+    methods[m[1].toLowerCase()] = { params, exceptions };
+  }
+  const constants = [...def.matchAll(/^\s*CONSTANTS\s+(\w+)\s/gim)].map((m) => m[1].toLowerCase());
+  assert.deepEqual({ constants, methods }, FRONTEND);
+});
+
 test("a TABLES parameter used with its header line gets a work area of the method", () => {
   const r = convert("REPORT zt.\nDATA gt TYPE STANDARD TABLE OF i.\nSTART-OF-SELECTION.\n  PERFORM f TABLES gt.\nFORM f TABLES tt STRUCTURE gt.\n  LOOP AT tt.\n    WRITE tt.\n  ENDLOOP.\n  CLEAR tt.\n  tt = 7.\n  APPEND tt.\nENDFORM.\n", { file: "zt.prog.abap", className: "zcl_t" });
   assert.deepEqual(r.refusals, []);
@@ -399,17 +439,17 @@ test("a TABLES parameter used with its header line gets a work area of the metho
   assert.match(cls, /APPEND ls_tt TO tt\./);
 });
 
-test("refused: GUI_DOWNLOAD, PERFORM IN PROGRAM - a table with a header line, a popup and a function key no longer", () => {
+test("refused: BDC_OPEN_GROUP, PERFORM IN PROGRAM - a table with a header line, a popup and a function key no longer", () => {
   const r = refusalOf([
     "REPORT zt.",
     "DATA gt TYPE i OCCURS 0.",
     "SELECTION-SCREEN FUNCTION KEY 1.",
     "START-OF-SELECTION.",
-    "  CALL FUNCTION 'GUI_DOWNLOAD' EXPORTING filename = 'x'.",
+    "  CALL FUNCTION 'BDC_OPEN_GROUP' EXPORTING group = 'x'.",
     "  PERFORM x IN PROGRAM zother.",
   ].join("\n"));
   assert.deepEqual(r.map((x) => x.split(" - ")[0]), [
-    "5:3 CALL FUNCTION 'GUI_DOWNLOAD'",
+    "5:3 CALL FUNCTION 'BDC_OPEN_GROUP'",
     "6:3 PERFORM of a FORM of another program, dynamic or ON COMMIT",
   ]);
 });

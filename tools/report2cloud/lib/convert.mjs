@@ -164,6 +164,8 @@ const LVC_TYPES = {
   lvc_t_row: "z2ui5_cl_cgui_alv=>ty_t_lvc_row", lvc_s_row: "z2ui5_cl_cgui_alv=>ty_s_lvc_row",
   lvc_t_roid: "z2ui5_cl_cgui_alv=>ty_t_lvc_roid", lvc_s_roid: "z2ui5_cl_cgui_alv=>ty_s_lvc_roid",
   lvc_s_col: "z2ui5_cl_cgui_alv=>ty_s_lvc_col",
+  // the file table of cl_gui_frontend_services=>file_open_dialog( )
+  filetable: "z2ui5_cl_cgui_frontend=>ty_t_file_table", file_table: "z2ui5_cl_cgui_frontend=>ty_s_file_table",
 };
 
 // the statements that open and close a block
@@ -172,6 +174,61 @@ const CLOSERS = new Set(["EndIf", "EndCase", "EndLoop", "EndDo", "EndWhile", "En
 
 // SAP GUI controls - they need a dynpro container
 const GUI_CONTROL = /\bcl_gui_(alv_grid|custom_container|docking_container|splitter_container|dialogbox_container|container|html_viewer|textedit|picture|toolbar|simple_tree|column_tree|list_tree|gos_container|easy_splitter_container)\b/;
+
+// z2ui5_cl_cgui_frontend - CL_GUI_FRONTEND_SERVICES in the browser: its
+// constants and methods, the parameters and classic exceptions of each. A
+// call of cl_gui_frontend_services=> becomes a call of it when it names
+// only these; a test compares the table with the class
+export const FRONTEND = {
+  constants: ["action_ok", "action_cancel", "filetype_all", "filetype_text", "filetype_excel", "filetype_xml", "filetype_html"],
+  methods: {
+    file_open_dialog: { params: ["window_title", "default_extension", "default_filename", "file_filter", "with_encoding", "initial_directory", "multiselection", "file_table", "rc", "user_action", "file_encoding"],
+      exceptions: ["file_open_dialog_failed", "cntl_error", "error_no_gui", "not_supported_by_gui"] },
+    file_save_dialog: { params: ["window_title", "default_extension", "default_file_name", "with_encoding", "file_filter", "initial_directory", "prompt_on_overwrite", "filename", "path", "fullpath", "user_action", "file_encoding"],
+      exceptions: ["cntl_error", "error_no_gui", "not_supported_by_gui", "invalid_default_file_name"] },
+    directory_browse: { params: ["window_title", "initial_folder", "selected_folder"],
+      exceptions: ["cntl_error", "error_no_gui", "not_supported_by_gui"] },
+    gui_upload: { params: ["filename", "filetype", "has_field_separator", "header_length", "read_by_line", "dat_mode", "codepage", "ignore_cerr", "replacement", "virus_scan_profile", "filelength", "header", "data_tab", "isscanperformed"],
+      exceptions: ["file_open_error", "file_read_error", "no_batch", "gui_refuse_filetransfer", "invalid_type", "no_authority", "unknown_error", "bad_data_format", "header_not_allowed", "separator_not_allowed", "header_too_long", "unknown_dp_error", "access_denied", "dp_out_of_memory", "disk_full", "dp_timeout", "not_supported_by_gui", "error_no_gui"] },
+    gui_download: { params: ["bin_filesize", "filename", "filetype", "append", "write_field_separator", "header", "trunc_trailing_blanks", "write_lf", "col_select", "col_select_mask", "dat_mode", "confirm_overwrite", "no_auth_check", "codepage", "ignore_cerr", "replacement", "write_bom", "trunc_trailing_blanks_eol", "show_transfer_status", "fieldnames", "write_lf_after_last_line", "virus_scan_profile", "filelength", "data_tab"],
+      exceptions: ["file_write_error", "no_batch", "gui_refuse_filetransfer", "invalid_type", "no_authority", "unknown_error", "header_not_allowed", "separator_not_allowed", "filesize_not_allowed", "header_too_long", "dp_error_create", "dp_error_send", "dp_error_write", "unknown_dp_error", "access_denied", "dp_out_of_memory", "disk_full", "dp_timeout", "file_not_found", "dataprovider_exception", "control_flush_error", "not_supported_by_gui", "error_no_gui"] },
+    get_file_separator: { params: ["file_separator"],
+      exceptions: ["not_supported_by_gui", "error_no_gui", "cntl_error"] },
+    get_desktop_directory: { params: ["desktop_directory"],
+      exceptions: ["cntl_error", "error_no_gui", "not_supported_by_gui"] },
+    get_temp_directory: { params: ["temp_dir"],
+      exceptions: ["cntl_error", "error_no_gui", "not_supported_by_gui"] },
+    get_sapgui_workdir: { params: ["sapworkdir"],
+      exceptions: ["get_sapworkdir_failed", "cntl_error", "error_no_gui", "not_supported_by_gui"] },
+    get_system_directory: { params: ["system_directory"],
+      exceptions: ["cntl_error", "error_no_gui", "not_supported_by_gui"] },
+    directory_list_files: { params: ["directory", "filter"],
+      exceptions: [] },
+    directory_get_current: { params: ["current_directory"],
+      exceptions: ["directory_get_current_failed", "cntl_error", "error_no_gui", "not_supported_by_gui"] },
+    file_exist: { params: ["file"],
+      exceptions: ["cntl_error", "error_no_gui", "wrong_parameter", "not_supported_by_gui"] },
+    directory_exist: { params: ["directory"],
+      exceptions: ["cntl_error", "error_no_gui", "wrong_parameter", "not_supported_by_gui"] },
+    directory_create: { params: ["directory", "rc"],
+      exceptions: ["directory_create_failed", "cntl_error", "error_no_gui", "directory_access_denied", "directory_already_exists", "path_not_found", "unknown_error", "not_supported_by_gui", "wrong_parameter"] },
+    execute: { params: ["document", "application", "parameter", "default_directory", "maximized", "minimized", "synchronous", "operation"],
+      exceptions: ["cntl_error", "error_no_gui", "bad_parameter", "file_not_found", "path_not_found", "file_extension_unknown", "error_execute_failed", "synchronous_failed", "not_supported_by_gui"] },
+    clipboard_export: { params: ["no_auth_check", "data", "rc"],
+      exceptions: ["cntl_error", "error_no_gui", "not_supported_by_gui", "no_authority"] },
+    text_to_table: { params: ["text", "separator", "data_tab"],
+      exceptions: [] },
+    table_to_text: { params: ["data_tab", "separator", "last_line_end"],
+      exceptions: [] },
+    set_files: { params: ["files"],
+      exceptions: [] },
+    file_name: { params: ["path"],
+      exceptions: [] },
+  },
+};
+
+// the function modules of the frontend, as methods of z2ui5_cl_cgui_frontend
+const FRONTEND_FUNCTIONS = { GUI_UPLOAD: "gui_upload", GUI_DOWNLOAD: "gui_download" };
 
 // statements a body keeps chained when the report chains them
 const CHAINABLE = new Set(["Clear", "Free", "Data", "DataBegin", "DataEnd", "Constant", "Type", "TypeBegin", "TypeEnd", "Static", "FieldSymbol", "Refresh"]);
@@ -3709,9 +3766,32 @@ class Converter {
           this.refuse(s, "SAP GUI controls (cl_gui_*) need a dynpro container - use alv( ) or an abap2UI5 view");
           return;
         }
-        if (/\bcl_gui_frontend_services\b/.test(t)) {
-          this.refuse(s, "cl_gui_frontend_services - there is no SAP GUI frontend; use an abap2UI5 file upload or download");
+        if (/^(call\s+method\s+)?cl_gui_cfw\s*=>\s*(flush|update_view)\b/.test(t)) {
+          this.map(s, "dropped - cl_gui_cfw=>flush( ): the controls of SAP GUI, nothing to flush in the browser");
           return;
+        }
+        if (/\bcl_gui_frontend_services\b/.test(t)) {
+          const bad = this.frontendCheck(s);
+          if (bad) {
+            this.refuse(s, `cl_gui_frontend_services - ${bad}; z2ui5_cl_cgui_frontend has the files (file_open_dialog, gui_upload, gui_download, ...) - port this call by hand`);
+            return;
+          }
+          this.note("cl_gui_frontend_services is z2ui5_cl_cgui_frontend - a file the user picks is uploaded in the browser (file_open_dialog( ) in an F4 opens the upload, the F4 runs again with the file), gui_download( ) is a download of the browser");
+          this.map(s, "`z2ui5_cl_cgui_frontend=>...` - the same method, parameters and exceptions, for the files in the browser");
+          // CALL METHOD x=>m EXPORTING ... is x=>m( EXPORTING ... ) - the
+          // functional writing of the house
+          const toks = stmtTokens(s);
+          const at = toks.findIndex((x, i) => i > 1 && x.getStr() === "=>");
+          if (/^call\s+method\b/.test(t) && at > 1 && toks[at + 1]) {
+            const ov = this.rewrites(s, b.ctx, b);
+            ov.set(key(toks[0]), null);
+            ov.set(key(toks[1]), null);
+            ov.set(key(toks[at + 1]), `${lc(toks[at + 1].getStr())}(`);
+            const last = toks[toks.length - 1];
+            ov.set(key(last), `${ov.has(key(last)) ? ov.get(key(last)) : last.getStr()} )`);
+            out.push(`${renderTokens(toks, ov, s.getColon()).trim()}.`);
+            return;
+          }
         }
         break;
       }
@@ -3985,6 +4065,12 @@ class Converter {
       // it is an operand of its own
       const component = (prev === "-" && toks[i - 1].constructor.name === "Dash") || prev === "->" || prev === "=>" || prev === "~";
       if (component) continue;
+      // cl_gui_frontend_services=>gui_upload, =>action_ok - the frontend
+      // services of the runtime, when it has that member
+      if (t === "cl_gui_frontend_services" && toks[i + 1]?.getStr() === "=>" && frontendMember(toks[i + 2]?.getStr())) {
+        ov.set(key(toks[i]), "z2ui5_cl_cgui_frontend");
+        continue;
+      }
       const next = toks[i + 1]?.getStr();
       const next2 = lc(toks[i + 2]?.getStr() ?? "");
       if ((ctx.userCommand || ctx.ucomm) && (t === "sy" || t === "sscrfields") && next === "-" && next2 === "ucomm") {
@@ -4080,7 +4166,7 @@ class Converter {
       }
       if (LVC_TYPES[t] && ["type", "of", "like"].includes(lc(prev))) {
         ov.set(key(toks[i]), LVC_TYPES[t]);
-        if (!this.lvcNoted) {
+        if (/^lvc_/.test(t) && !this.lvcNoted) {
           this.lvcNoted = true;
           this.note("LVC_T_ROW / LVC_S_ROW / LVC_T_ROID - the row types of the classic grid are the types of z2ui5_cl_cgui_alv, with index and row_id as before");
         }
@@ -4703,8 +4789,76 @@ class Converter {
     b.skipTo = b.index + 1 + branch.length;
   }
 
+  /** what z2ui5_cl_cgui_frontend does not have of this statement's calls of
+   *  cl_gui_frontend_services - undefined when it has everything */
+  frontendCheck(s) {
+    const toks = stmtTokens(s);
+    for (let i = 0; i + 2 < toks.length; i++) {
+      if (lc(toks[i].getStr()) === "cl_gui_frontend_services" && toks[i + 1].getStr() === "=>" && !frontendMember(toks[i + 2].getStr())) {
+        return `${lc(toks[i + 2].getStr())} has no counterpart in the browser`;
+      }
+    }
+    const call = /cl_gui_frontend_services\s*=>\s*(\w+)/i.exec(renderTokens(toks));
+    const m = call && FRONTEND.methods[lc(call[1])];
+    if (!m) return undefined;
+    for (const n of findAll(s, "ParameterName").map((x) => lc(nodeText(x)))) {
+      // RECEIVING result = ... of a functional method
+      if (!m.params.includes(n) && !m.exceptions.includes(n) && n !== "others" && n !== "result") return `${lc(call[1])}( ${n} = ... ) is not supported`;
+    }
+    return undefined;
+  }
+
+  /** CALL FUNCTION 'GUI_UPLOAD' / 'GUI_DOWNLOAD' as the method of
+   *  z2ui5_cl_cgui_frontend: EXPORTING and IMPORTING as they are, TABLES
+   *  data_tab CHANGING, the EXCEPTIONS kept - sy-subrc stays */
+  frontendFunction(s, b, fm) {
+    const method = FRONTEND_FUNCTIONS[fm];
+    const sig = FRONTEND.methods[method];
+    const ov = this.rewrites(s, b.ctx, b);
+    const sections = { EXPORTING: [], IMPORTING: [], CHANGING: [], EXCEPTIONS: [] };
+    const params = child(s, "FunctionParameters");
+    let keyword;
+    for (const c of params ? params.getChildren() : []) {
+      if (isToken(c)) {
+        keyword = uc(c.getFirstToken().getStr());
+        continue;
+      }
+      for (const p of children(c)) {
+        const name = lc(nodeText(child(p, "ParameterName") ?? p.getChildren()[0]));
+        const value = kind(p) === "ParameterException" ? nodeText(p.getChildren()[p.getChildren().length - 1]) : nodeText(p.getChildren()[p.getChildren().length - 1], ov);
+        const shown = name === "others" ? "OTHERS" : name;
+        const known = keyword === "EXCEPTIONS" ? name === "others" || sig.exceptions.includes(name) : sig.params.includes(name);
+        if (!known) {
+          this.refuse(s, `CALL FUNCTION '${fm}' - ${keyword} ${name} has no counterpart in z2ui5_cl_cgui_frontend=>${method}( ); port this call by hand`);
+          return;
+        }
+        // TABLES data_tab is CHANGING, TABLES fieldnames a table it reads
+        const section = keyword === "TABLES" ? (name === "data_tab" ? "CHANGING" : "EXPORTING") : keyword;
+        sections[section].push({ name: shown, value });
+      }
+    }
+    const head = `z2ui5_cl_cgui_frontend=>${method}( `;
+    const width = Math.max(0, ...Object.values(sections).flat().map((p) => p.name.length));
+    const lines = [];
+    for (const [title, list] of Object.entries(sections)) {
+      list.forEach((p, i) => {
+        const lead = i === 0 ? title.padEnd(10) : " ".repeat(10);
+        lines.push(`${lines.length ? " ".repeat(head.length) : head}${lead} ${p.name.padEnd(width)} = ${p.value}`);
+      });
+    }
+    if (!lines.length) lines.push(head.trimEnd());
+    lines[lines.length - 1] += " ).";
+    b.out.push(...lines);
+    this.note("cl_gui_frontend_services is z2ui5_cl_cgui_frontend - a file the user picks is uploaded in the browser (file_open_dialog( ) in an F4 opens the upload, the F4 runs again with the file), gui_download( ) is a download of the browser");
+    this.map(s, `\`z2ui5_cl_cgui_frontend=>${method}( )\` - the function module as the method of the frontend services, its EXCEPTIONS kept`);
+  }
+
   callFunction(s, b) {
     const fm = uc(unquote(nodeText(child(s, "FunctionName")).trim()));
+    if (FRONTEND_FUNCTIONS[fm]) {
+      this.frontendFunction(s, b, fm);
+      return true;
+    }
     // the progress of SAP GUI's status bar - the browser shows its own busy indicator
     if (fm === "SAPGUI_PROGRESS_INDICATOR") {
       this.note("SAPGUI_PROGRESS_INDICATOR / cl_progress_indicator - dropped, the browser shows a busy indicator while the server works");
@@ -5073,7 +5227,8 @@ class Converter {
             .flatMap((x) => findAll(x, "MethodParamName").map((p) => lc(nodeText(p)))));
           const own = new Set([...declared, ...params]);
           const needs = b.body.some((x) => REPORT_KINDS.has(kind(x)) || usesReport(x, own)
-            || (kind(x) === "CallFunction" && /^'?(POPUP_|REUSE_ALV_)/i.test(nodeText(child(x, "FunctionName")))));
+            || (kind(x) === "CallFunction" && /^'?(POPUP_|REUSE_ALV_|GUI_UPLOAD'|GUI_DOWNLOAD')/i.test(nodeText(child(x, "FunctionName"))))
+            || /\bcl_gui_(frontend_services|cfw)\b/i.test(renderTokens(stmtTokens(x))));
           if (!needs || !b.body.length) continue;
           const key = `${n}~${b.name}`;
           const body = this.convertBody(b.body, { method: key, local: { cls: n, declared: own } });
@@ -5591,6 +5746,12 @@ function caseBody(param, entries) {
   for (const e of entries) body.push(`  WHEN ${literal(e.field)}.`, ...e.body.map((l) => indent(l, 4)));
   body.push("ENDCASE.");
   return body;
+}
+
+/** whether z2ui5_cl_cgui_frontend has a constant or method of that name */
+function frontendMember(name) {
+  const n = lc(name ?? "");
+  return FRONTEND.constants.includes(n) || Object.hasOwn(FRONTEND.methods, n);
 }
 
 function renderCall(method, imp, chg) {

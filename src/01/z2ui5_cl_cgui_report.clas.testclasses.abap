@@ -156,6 +156,7 @@ CLASS ltcl_test DEFINITION FINAL FOR TESTING
     METHODS select_option_complex FOR TESTING.
     METHODS secondary_list_and_back FOR TESTING.
     METHODS leave_during_the_run FOR TESTING.
+    METHODS file_upload_and_download FOR TESTING.
     METHODS current_screen_afresh FOR TESTING.
     METHODS alv_box_copy_selection FOR TESTING.
     METHODS url_values_screen_only FOR TESTING.
@@ -329,6 +330,27 @@ CLASS ltcl_report IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD at_value_request.
+
+    TYPES:
+      BEGIN OF ty_s_file,
+        filename TYPE c LENGTH 1024,
+      END OF ty_s_file.
+    DATA lt_file   TYPE STANDARD TABLE OF ty_s_file WITH DEFAULT KEY.
+    DATA lv_rc     TYPE i.
+    DATA lv_action TYPE i.
+
+    " F4 on the text - the file dialog of SAP GUI, converted
+    IF field = `P_TEXT`.
+      z2ui5_cl_cgui_frontend=>file_open_dialog( EXPORTING  file_filter = `Text (*.txt)|*.txt|`
+                                                CHANGING   file_table  = lt_file
+                                                           rc          = lv_rc
+                                                           user_action = lv_action
+                                                EXCEPTIONS OTHERS      = 1 ).
+      IF sy-subrc = 0 AND lv_action = z2ui5_cl_cgui_frontend=>action_ok AND lv_rc = 1.
+        p_text = lt_file[ 1 ]-filename.
+      ENDIF.
+      RETURN.
+    ENDIF.
 
     " F4 on the upper limit of the code - a hit list of its own
     IF field = `S_CODE` AND value_request_part( ) = z2ui5_cl_cgui_selscreen=>cs_part-high.
@@ -615,6 +637,79 @@ CLASS ltcl_test IMPLEMENTATION.
     " the message of the report, and not the one of an empty list
     cl_abap_unit_assert=>assert_true( xsdbool( line_exists( mo_cut->mt_cgui_msg[ text = `Unknown airline` ] ) ) ).
     cl_abap_unit_assert=>assert_false( xsdbool( line_exists( mo_cut->mt_cgui_msg[ text = `List contains no data` ] ) ) ).
+
+  ENDMETHOD.
+
+  METHOD file_upload_and_download.
+
+    TYPES:
+      BEGIN OF ty_s_air,
+        carrid TYPE c LENGTH 3,
+        name   TYPE c LENGTH 20,
+      END OF ty_s_air.
+    DATA lt_air TYPE STANDARD TABLE OF ty_s_air WITH DEFAULT KEY.
+
+    init( ).
+    " F4 opens the upload - the dialog answers cancel the first time
+    event( name = z2ui5_cl_cgui_selscreen=>cs_event-value_request
+           args = VALUE #( ( `P_TEXT` ) ) ).
+    DATA(lo_file) = CAST z2ui5_cl_cgui_file( mo_client->mo_called ).
+    cl_abap_unit_assert=>assert_initial( mo_report->p_text ).
+
+    " the user picks a file in the browser and confirms
+    mo_client->mo_app = lo_file.
+    mo_client->mv_init = abap_true.
+    lo_file->z2ui5_if_app~main( mo_client ).
+    mo_client->mv_init = abap_false.
+    cl_abap_unit_assert=>assert_true( xsdbool( mo_client->mv_popup CS `FileUploader` ) ).
+    cl_abap_unit_assert=>assert_true( xsdbool( mo_client->mv_popup CS `fileType="txt"` ) ).
+    lo_file->mv_value = `data:text/plain;base64,` && z2ui5_cl_cgui_context=>conv_encode_x_base64(
+        z2ui5_cl_cgui_context=>conv_get_xstring_by_string( |LH\tLufthansa\r\nAA\tAmerican\r\n| ) ).
+    lo_file->mv_path = `C:\fakepath\airlines.txt`.
+    mo_client->mv_event = `CGUI_FILE_UPLOAD`.
+    lo_file->z2ui5_if_app~main( mo_client ).
+    mo_client->mv_event = `CGUI_FILE_OK`.
+    lo_file->z2ui5_if_app~main( mo_client ).
+    cl_abap_unit_assert=>assert_true( mo_client->mv_left ).
+
+    " back in the report: the F4 runs again, and the dialog answers the file
+    mo_client->mo_app = mo_report.
+    CLEAR: mo_client->mo_called, mo_client->mv_event.
+    mo_client->mo_prev = lo_file.
+    mo_client->mv_navigated = abap_true.
+    mo_cut->z2ui5_if_app~main( mo_client ).
+    mo_client->mv_navigated = abap_false.
+    cl_abap_unit_assert=>assert_equals( act = mo_report->p_text
+                                        exp = `airlines.txt` ).
+    cl_abap_unit_assert=>assert_not_bound( mo_client->mo_called ).
+
+    " gui_upload( ) reads it by its name, whatever the folder and the case
+    z2ui5_cl_cgui_frontend=>gui_upload( EXPORTING  filename            = `C:\any\AIRLINES.TXT`
+                                                   has_field_separator = abap_true
+                                        CHANGING   data_tab            = lt_air
+                                        EXCEPTIONS file_open_error     = 1
+                                                   OTHERS              = 2 ).
+    cl_abap_unit_assert=>assert_subrc( exp = 0 ).
+    cl_abap_unit_assert=>assert_equals( act = lt_air[ 2 ]-name
+                                        exp = `American` ).
+    z2ui5_cl_cgui_frontend=>gui_upload( EXPORTING  filename        = `missing.txt`
+                                        CHANGING   data_tab        = lt_air
+                                        EXCEPTIONS file_open_error = 1
+                                                   OTHERS          = 2 ).
+    cl_abap_unit_assert=>assert_subrc( exp = 1 ).
+
+    " gui_download( ) hands the file to the browser
+    lt_air = VALUE #( ( carrid = `LH` name = `Lufthansa` ) ).
+    CLEAR mo_client->mt_action.
+    z2ui5_cl_cgui_frontend=>gui_download( EXPORTING  filename              = `C:\out\list.csv`
+                                                     write_field_separator = abap_true
+                                          CHANGING   data_tab              = lt_air
+                                          EXCEPTIONS OTHERS                = 1 ).
+    cl_abap_unit_assert=>assert_subrc( exp = 0 ).
+    cl_abap_unit_assert=>assert_equals( act = mo_client->mt_action[ 1 ]
+                                        exp = |{ mo_client->z2ui5_if_client~cs_event-download_b64_file }:data:text/csv;base64,| &&
+                                              |{ z2ui5_cl_cgui_context=>conv_encode_x_base64(
+                                                     z2ui5_cl_cgui_context=>conv_get_xstring_by_string( |LH\tLufthansa\r\n| ) ) }\|list.csv| ).
 
   ENDMETHOD.
 

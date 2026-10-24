@@ -244,6 +244,14 @@ CLASS z2ui5_cl_cgui_context DEFINITION PUBLIC FINAL CREATE PUBLIC.
       RETURNING
         VALUE(result) TYPE string.
 
+    "! the bytes of base64 val - plain ABAP, for the data URI of an upload;
+    "! a character outside the alphabet ends it
+    CLASS-METHODS conv_decode_x_base64
+      IMPORTING
+        val           TYPE string
+      RETURNING
+        VALUE(result) TYPE xstring.
+
     "! val in width characters, aligned LEFT, RIGHT or CENTER with blanks -
     "! a string template's WIDTH and ALIGN, which the transpiled runtime
     "! aligns left only. A longer val stays as it is
@@ -409,6 +417,47 @@ CLASS z2ui5_cl_cgui_context IMPLEMENTATION.
       CATCH cx_root.
         CLEAR result.
     ENDTRY.
+
+  ENDMETHOD.
+
+  METHOD conv_decode_x_base64.
+
+    CONSTANTS lc_alphabet TYPE string VALUE `ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/`.
+    DATA lv_byte  TYPE x LENGTH 1.
+    DATA lv_bits  TYPE i.
+    DATA lv_count TYPE i.
+    DATA lv_power TYPE i.
+    DATA lv_char  TYPE string.
+
+    DATA(lv_len) = strlen( val ).
+    DATA(lv_off) = 0.
+    WHILE lv_off < lv_len.
+      lv_char = substring( val = val off = lv_off len = 1 ).
+      lv_off = lv_off + 1.
+      IF lv_char = `=`.
+        EXIT.
+      ENDIF.
+      DATA(lv_value) = find( val = lc_alphabet sub = lv_char ).
+      IF lv_value < 0.
+        " a line break of a wrapped encoding is no character of it
+        IF lv_char = |\n| OR lv_char = |\r| OR lv_char = ` `.
+          CONTINUE.
+        ENDIF.
+        EXIT.
+      ENDIF.
+      lv_bits = lv_bits * 64 + lv_value.
+      lv_count = lv_count + 6.
+      IF lv_count >= 8.
+        lv_count = lv_count - 8.
+        lv_power = 1.
+        DO lv_count TIMES.
+          lv_power = lv_power * 2.
+        ENDDO.
+        lv_byte = lv_bits DIV lv_power.
+        lv_bits = lv_bits MOD lv_power.
+        CONCATENATE result lv_byte INTO result IN BYTE MODE.
+      ENDIF.
+    ENDWHILE.
 
   ENDMETHOD.
 

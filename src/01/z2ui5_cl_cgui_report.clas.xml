@@ -253,6 +253,12 @@
      <ENTRY>Select a row</ENTRY>
      <LENGTH>30</LENGTH>
     </item>
+    <item>
+     <ID>I</ID>
+     <KEY>045</KEY>
+     <ENTRY>File &amp;1 uploaded</ENTRY>
+     <LENGTH>60</LENGTH>
+    </item>
    </TPOOL>
   </asx:values>
  </asx:abap>

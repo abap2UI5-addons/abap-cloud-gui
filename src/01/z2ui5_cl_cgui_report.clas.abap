@@ -43,6 +43,8 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
 
   PUBLIC SECTION.
     INTERFACES z2ui5_if_app.
+    "! the files of cl_gui_frontend_services - z2ui5_cl_cgui_frontend
+    INTERFACES z2ui5_if_cgui_files.
 
     CONSTANTS:
       BEGIN OF cs_ucomm,
@@ -793,6 +795,13 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
     " the variant attributes of the fields shown: not ready for input, hidden
     DATA mt_cgui_var_protect   TYPE string_table.
     DATA mt_cgui_var_hide      TYPE string_table.
+    " the files the user uploaded (z2ui5_cl_cgui_frontend=>gui_upload( )
+    " reads them), the names file_open_dialog( ) answers on its second run
+    " and what runs again after the upload: the F4 of mv_cgui_pending_field
+    " or Execute
+    DATA mt_cgui_file          TYPE z2ui5_cl_cgui_file=>ty_t_file.
+    DATA mt_cgui_file_pick     TYPE string_table.
+    DATA mv_cgui_file_rerun    TYPE string.
 
   PRIVATE SECTION.
 
@@ -815,6 +824,7 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
         filter_col     TYPE string VALUE `FILTER_COL`,
         filter         TYPE string VALUE `FILTER`,
         alv_f4         TYPE string VALUE `ALV_F4`,
+        file           TYPE string VALUE `FILE`,
       END OF cs_pending.
 
     TYPES:
@@ -1130,6 +1140,12 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
       IMPORTING
         col TYPE string.
 
+    "! the files the user picked in the upload dialog of upload_popup( ) -
+    "! stored, and the F4 or Execute that opened it run again
+    METHODS file_result
+      IMPORTING
+        field TYPE string.
+
     "! GET CURSOR and SY-LISEL of a click into the list
     METHODS cursor_from_list
       IMPORTING
@@ -1241,6 +1257,8 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
   METHOD z2ui5_if_app~main.
 
     me->client = client.
+    " cl_gui_frontend_services of the report - its files are the report's
+    z2ui5_cl_cgui_frontend=>set_files( me ).
     CLEAR mt_cgui_msg.
     mv_cgui_nav = abap_false.
     " the messages of the run stay while the popover opens and the user
@@ -1490,6 +1508,122 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
     IF sy-subrc = 0.
       GET REFERENCE OF <cell> INTO result.
     ENDIF.
+
+  ENDMETHOD.
+
+  METHOD z2ui5_if_cgui_files~upload_popup.
+
+    " the F4 that opened the dialog runs again - or Execute, while the
+    " selection screen is processed; elsewhere the files wait for the user
+    " to repeat what needs them
+    mv_cgui_file_rerun = COND #( WHEN mv_cgui_value_field IS NOT INITIAL THEN cs_pending-f4
+                                 WHEN mv_cgui_screen = cs_screen-selection THEN cs_ucomm-execute ).
+    IF mv_cgui_file_rerun = cs_ucomm-execute.
+      " the run stops here - it starts again with the files
+      mv_cgui_stop = abap_true.
+    ENDIF.
+    mv_cgui_pending_field = mv_cgui_value_field.
+    mv_cgui_pending_part = mv_cgui_value_part.
+    mv_cgui_pending_kind = cs_pending-file.
+    mv_cgui_nav = abap_true.
+    client->nav_app_call( z2ui5_cl_cgui_file=>factory( title    = title
+                                                       multiple = multiple
+                                                       filter   = filter ) ).
+
+  ENDMETHOD.
+
+  METHOD file_result.
+
+    DATA lo_popup TYPE REF TO z2ui5_cl_cgui_file.
+
+    TRY.
+        lo_popup = CAST #( client->get_app_prev( ) ).
+      CATCH cx_root.
+        RETURN.
+    ENDTRY.
+    DATA(ls_result) = lo_popup->result( ).
+    IF ls_result-confirmed = abap_false.
+      CLEAR mv_cgui_file_rerun.
+      RETURN.
+    ENDIF.
+
+    CLEAR mt_cgui_file_pick.
+    LOOP AT ls_result-files INTO DATA(ls_file).
+      DELETE mt_cgui_file WHERE name = ls_file-name.
+      INSERT ls_file INTO TABLE mt_cgui_file.
+      INSERT ls_file-name INTO TABLE mt_cgui_file_pick.
+    ENDLOOP.
+
+    DATA(lv_rerun) = mv_cgui_file_rerun.
+    CLEAR mv_cgui_file_rerun.
+    CASE lv_rerun.
+      WHEN cs_pending-f4.
+        mv_cgui_value_field = field.
+        mv_cgui_value_part = mv_cgui_pending_part.
+        CLEAR mv_cgui_pending_part.
+        at_value_request( field ).
+        CLEAR: mv_cgui_value_field, mv_cgui_value_part.
+      WHEN cs_ucomm-execute.
+        on_execute( ).
+      WHEN OTHERS.
+        message( replace( val  = 'File &1 uploaded'(045)
+                          sub  = `&1`
+                          with = concat_lines_of( table = mt_cgui_file_pick
+                                                  sep   = `, ` ) ) ).
+    ENDCASE.
+    " a second dialog of the same run opens the upload again
+    CLEAR mt_cgui_file_pick.
+
+  ENDMETHOD.
+
+  METHOD z2ui5_if_cgui_files~picked.
+
+    result = mt_cgui_file_pick.
+    CLEAR mt_cgui_file_pick.
+
+  ENDMETHOD.
+
+  METHOD z2ui5_if_cgui_files~names.
+
+    LOOP AT mt_cgui_file INTO DATA(ls_file).
+      INSERT ls_file-name INTO TABLE result.
+    ENDLOOP.
+
+  ENDMETHOD.
+
+  METHOD z2ui5_if_cgui_files~content.
+
+    CLEAR: content, found.
+    DATA(lv_name) = to_upper( z2ui5_cl_cgui_frontend=>file_name( name ) ).
+    LOOP AT mt_cgui_file INTO DATA(ls_file).
+      IF to_upper( ls_file-name ) = lv_name.
+        content = ls_file-content.
+        found = abap_true.
+        RETURN.
+      ENDIF.
+    ENDLOOP.
+
+  ENDMETHOD.
+
+  METHOD z2ui5_if_cgui_files~download.
+
+    client->follow_up_action( val   = client->cs_event-download_b64_file
+                              t_arg = VALUE #( ( |data:{ mime };base64,{ z2ui5_cl_cgui_context=>conv_encode_x_base64( content ) }| )
+                                               ( name ) ) ).
+
+  ENDMETHOD.
+
+  METHOD z2ui5_if_cgui_files~open_url.
+
+    client->follow_up_action( val   = client->cs_event-open_new_tab
+                              t_arg = VALUE #( ( url ) ) ).
+
+  ENDMETHOD.
+
+  METHOD z2ui5_if_cgui_files~clipboard.
+
+    client->follow_up_action( val   = client->cs_event-clipboard_copy
+                              t_arg = VALUE #( ( text ) ) ).
 
   ENDMETHOD.
 
@@ -2138,6 +2272,9 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
 
       WHEN cs_pending-alv_f4.
         alv_f4_result( lv_col ).
+
+      WHEN cs_pending-file.
+        file_result( lv_field ).
 
       WHEN cs_pending-decide OR cs_pending-values.
         TRY.
