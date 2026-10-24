@@ -547,3 +547,16 @@ test("zr2c_12_pages: LINE-COUNT, TOP-OF-PAGE with sy-pagno, END-OF-PAGE, NEW-PAG
   assert.ok(s.fields.length, "still on the selection screen");
   assert.deepEqual(popover(s), ["error: A last page needs two lines"]);
 });
+
+test("zr2c_22_files: GUI_UPLOAD of a path typed in - the upload dialog opens for it instead of a file error, Cancel goes back", { skip }, async () => {
+  let s = await d.start("z2ui5_cl_cgui_r2c_22");
+  s = await d.act(s.session, { values: { P_FILE: "C:\\data\\seats.txt" }, event: "CGUI_EXECUTE" });
+  assert.equal(s.layer, "popup");
+  assert.deepEqual(actionsOf(s, "CGUI_FILE_UPLOAD").map((a) => a.control), ["z2ui5.cc.FileUploader"]);
+  assert.equal(actionsOf(s, "CGUI_FILE_CANCEL")[0].label, "seats.txt", "the dialog names the file");
+  assert.deepEqual(popover(s), [], "no message that the file cannot be read");
+  // the upload itself is no field of the app client (a custom control) -
+  // the second run with the picked file is the unit test file_upload_and_download
+  s = await d.act(s.session, { event: actionsOf(s, "CGUI_FILE_CANCEL").find((a) => a.control === "sap.m.Button").id });
+  assert.deepEqual(fieldsOf(s), ['P_FILE="C:\\\\data\\\\seats.txt"*', "P_SAVE=false"]);
+});

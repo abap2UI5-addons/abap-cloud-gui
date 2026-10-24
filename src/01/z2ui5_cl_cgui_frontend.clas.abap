@@ -12,7 +12,9 @@
 "!   this time file_open_dialog( ) answers action_ok with their names
 "! - gui_upload( ) reads a picked file by its name (the folder of filename
 "!   does not matter), ASC as lines of text - split at the tab with
-"!   has_field_separator - and BIN as bytes
+"!   has_field_separator - and BIN as bytes; a name no file was picked
+"!   for (a path of the PC) opens the upload dialog, and Execute runs
+"!   again with the file the user picks for it
 "! - gui_download( ) hands the file to the browser, named as filename
 "!   without its folder
 "! - file_save_dialog( ) and directory_browse( ) answer at once: the browser
@@ -369,6 +371,10 @@ CLASS z2ui5_cl_cgui_frontend DEFINITION PUBLIC FINAL CREATE PRIVATE.
     " the report of the roundtrip - set by z2ui5_cl_cgui_report at its start
     CLASS-DATA go_report TYPE REF TO z2ui5_if_cgui_files.
 
+    " the run stops: z2ui5_cx_cgui_stop - raised here, a method with classic
+    " EXCEPTIONS cannot RAISE EXCEPTION, it only lets a CX_NO_CHECK pass
+    CLASS-METHODS stop_run.
+
     CLASS-METHODS mime_type
       IMPORTING
         name TYPE csequence
@@ -454,6 +460,19 @@ CLASS z2ui5_cl_cgui_frontend IMPLEMENTATION.
     go_report->content( EXPORTING name    = CONV #( filename )
                              IMPORTING content = DATA(lv_content)
                                        found   = DATA(lv_found) ).
+    IF lv_found = abap_false.
+      " a name the browser has no file of - a path of the PC typed in or
+      " fixed in the code: the file the user picks for it in the run again
+      DATA(lt_pick) = go_report->picked( ).
+      IF lines( lt_pick ) = 1.
+        go_report->content( EXPORTING name    = lt_pick[ 1 ]
+                            IMPORTING content = lv_content
+                                      found   = lv_found ).
+      ELSEIF go_report->upload_popup( title = file_name( filename ) ) = abap_true.
+        " the run stops here - it starts again with the file
+        stop_run( ).
+      ENDIF.
+    ENDIF.
     IF lv_found = abap_false.
       RAISE file_open_error.
     ENDIF.
@@ -745,6 +764,12 @@ CLASS z2ui5_cl_cgui_frontend IMPLEMENTATION.
   METHOD set_files.
 
     go_report = files.
+
+  ENDMETHOD.
+
+  METHOD stop_run.
+
+    RAISE EXCEPTION TYPE z2ui5_cx_cgui_stop.
 
   ENDMETHOD.
 

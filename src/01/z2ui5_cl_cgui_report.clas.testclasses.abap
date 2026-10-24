@@ -773,11 +773,25 @@ CLASS ltcl_test IMPLEMENTATION.
     cl_abap_unit_assert=>assert_subrc( exp = 0 ).
     cl_abap_unit_assert=>assert_equals( act = lt_air[ 2 ]-name
                                         exp = `American` ).
-    z2ui5_cl_cgui_frontend=>gui_upload( EXPORTING  filename        = `missing.txt`
-                                        CHANGING   data_tab        = lt_air
-                                        EXCEPTIONS file_open_error = 1
-                                                   OTHERS          = 2 ).
-    cl_abap_unit_assert=>assert_subrc( exp = 1 ).
+    " a name the browser has no file of - a path of the PC: the upload
+    " dialog opens for it, the run stops and Execute runs again with the file
+    CLEAR mo_client->mo_called.
+    TRY.
+        z2ui5_cl_cgui_frontend=>gui_upload( EXPORTING  filename        = `C:\data\missing.txt`
+                                            CHANGING   data_tab        = lt_air
+                                            EXCEPTIONS file_open_error = 1
+                                                       OTHERS          = 2 ).
+        cl_abap_unit_assert=>fail( `the run goes on without the file` ).
+      CATCH z2ui5_cx_cgui_stop ##NO_HANDLER.
+    ENDTRY.
+    cl_abap_unit_assert=>assert_initial( lt_air ).
+    lo_file = CAST z2ui5_cl_cgui_file( mo_client->mo_called ).
+    mo_client->mo_app = lo_file.
+    mo_client->mv_init = abap_true.
+    lo_file->z2ui5_if_app~main( mo_client ).
+    mo_client->mv_init = abap_false.
+    mo_client->mo_app = mo_report.
+    cl_abap_unit_assert=>assert_true( xsdbool( mo_client->mv_popup CS `title="missing.txt"` ) ).
 
     " gui_download( ) hands the file to the browser
     lt_air = VALUE #( ( carrid = `LH` name = `Lufthansa` ) ).

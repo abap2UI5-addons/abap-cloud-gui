@@ -4,12 +4,15 @@
 INTERFACE z2ui5_if_cgui_files PUBLIC.
 
   "! the upload dialog - when the user picked the files, the F4 that
-  "! opened it (or Execute) runs again and picked( ) answers with them
+  "! opened it (or Execute) runs again and picked( ) answers with them;
+  "! rerun: the run stops here and starts again with the files (Execute)
   METHODS upload_popup
     IMPORTING
-      title    TYPE string    OPTIONAL
-      multiple TYPE abap_bool OPTIONAL
-      filter   TYPE string    OPTIONAL.
+      title        TYPE string    OPTIONAL
+      multiple     TYPE abap_bool OPTIONAL
+      filter       TYPE string    OPTIONAL
+    RETURNING
+      VALUE(rerun) TYPE abap_bool.
 
   "! the names of the files picked for the run of the dialog - once
   METHODS picked
