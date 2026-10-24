@@ -951,6 +951,61 @@ test("SAP GUI controls: a grid in a local class is the grid stand-in - VALUE #( 
   assert.match(convert(other, { file: "zt.prog.abap", className: "zcl_t" }).refusals[0]?.message ?? "", /refresh_table_display\( \) - the grid shows a copy of its table/);
 });
 
+test("what the syntax check of the web corpus found: MESSAGE of an exception of a multi-line CATCH or a local class, DATA( ) in a local class, the fields a SELECTION-SCREEN declares, a label set at runtime", () => {
+  const src = [
+    "REPORT zt.",
+    "DATA lv_result TYPE i.",
+    "SELECTION-SCREEN BEGIN OF BLOCK b1 WITH FRAME TITLE b1_title.",
+    "SELECTION-SCREEN COMMENT 1(20) sc_t001.",
+    "PARAMETERS p_x TYPE c.",
+    "SELECTION-SCREEN END OF BLOCK b1.",
+    "CLASS lcl DEFINITION.",
+    "  PUBLIC SECTION.",
+    "    DATA error TYPE REF TO cx_root.",
+    "    METHODS run.",
+    "ENDCLASS.",
+    "CLASS lcl IMPLEMENTATION.",
+    "  METHOD run.",
+    "    DATA(lv_result) = 2.",
+    "    b1_title = 'Title'.",
+    "    %_p_x_%_app_%-text = 'Mark'.",
+    "    TRY.",
+    "      CATCH cx_sy_zerodivide INTO error.",
+    "        MESSAGE error TYPE 'W'.",
+    "    ENDTRY.",
+    "  ENDMETHOD.",
+    "ENDCLASS.",
+    "INITIALIZATION.",
+    "  NEW lcl( )->run( ).",
+    "START-OF-SELECTION.",
+    "  TRY.",
+    "    CATCH cx_sy_zerodivide",
+    "          cx_sy_arithmetic_overflow",
+    "    INTO DATA(lx).",
+    "      MESSAGE lx TYPE 'E'.",
+    "  ENDTRY.",
+    "",
+  ].join("\n");
+  const r = convert(src, { file: "zt.prog.abap", className: "zcl_t" });
+  assert.deepEqual(r.refusals.map((x) => x.message), []);
+  const cls = r.files["zcl_t.clas.abap"];
+  const imp = r.files["zcl_t.clas.locals_imp.abap"];
+  assert.match(cls, /message\( text = lx->get_text\( \)/);
+  assert.match(imp, /lcl_r2c=>app->message\( text = error->get_text\( \)/);
+  // the local variable of the method, not the report's global
+  assert.match(imp, /DATA\(lv_result\) = 2\./);
+  assert.match(imp, /lcl_r2c=>app->b1_title = 'Title'\./);
+  // a comment field is c LENGTH 83, as in the classic
+  assert.match(cls, /DATA sc_t001\s+TYPE c LENGTH 83\./);
+  // the label set at runtime: a global, shown while set
+  assert.match(cls, /DATA gv_label_p_x\s+TYPE string\./);
+  assert.match(imp, /lcl_r2c=>app->gv_label_p_x = 'Mark'\./);
+  assert.match(cls, /text\s*= gv_label_p_x/);
+  // a comment in a chain of TYPES does not cut it in two
+  const chain = convert("REPORT zt.\nTYPES: BEGIN OF ty_s,\n         a TYPE i, \"one\n         b TYPE string, \"two\n       END OF ty_s.\nDATA gs TYPE ty_s.\nSTART-OF-SELECTION.\n  WRITE gs-b.\n", { file: "zt.prog.abap", className: "zcl_t" });
+  assert.match(chain.files["zcl_t.clas.abap"], /BEGIN OF ty_s,\n\s+a TYPE i,\n\s+b TYPE string,\n\s+END OF ty_s\./);
+});
+
 test("MESSAGE of an exception object is its text; MODULE x OUTPUT and MODULE x INPUT are two methods", () => {
   const r = convert("REPORT zt.\nSTART-OF-SELECTION.\n  TRY.\n      RAISE EXCEPTION TYPE cx_sy_zerodivide.\n    CATCH cx_root INTO DATA(lx).\n      MESSAGE lx TYPE 'I'.\n  ENDTRY.\n", { file: "zt.prog.abap", className: "zcl_t" });
   assert.match(r.files["zcl_t.clas.abap"], /message\( text = lx->get_text\( \)\n\s+type = `I` \)\./);

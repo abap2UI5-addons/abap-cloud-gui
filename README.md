@@ -379,7 +379,11 @@ Stage 0 - release, and the number to move
       weekly (`report2cloud:web`), the share that converts without a refusal
       and the refusals ranked in the job summary - the number every stage
       below is measured by
-- [ ] The share of the web corpus that starts in the transpiled runtime
+- [x] The share of the web corpus that starts in the transpiled runtime:
+      `report2cloud:web --start` checks, builds and starts the converted
+      reports weekly, the funnel and where they stopped in the job summary
+      (first run: 74 of 596 converted reports start, most of the others
+      read a class or table of their repository the sparse clone lacks)
 - [x] `report2cloud:coverage` - the measurement over a folder of reports
 - [x] Includes inlined from beside the report, macros expanded
 

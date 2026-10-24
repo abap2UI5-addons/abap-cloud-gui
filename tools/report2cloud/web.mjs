@@ -3,7 +3,7 @@
 // the web, the number every stage of the roadmap is measured by.
 //
 //   node tools/report2cloud/web.mjs [--list url|file] [--cache dir] [--limit n]
-//        [--lint] [--json file] [--summary file] [--offline]
+//        [--lint] [--start] [--json file] [--summary file] [--offline]
 //
 // The repositories are the ones the community list of ABAP projects names
 // (dotabap-list, list.json - "owner/repo" strings), cloned shallow and
@@ -20,6 +20,10 @@
 // scratch copy of the repository): the findings in the generated classes,
 // ranked - most of them name a dependency of the report that is not in the
 // sparse clone, the parser errors and redefinitions are the converter's.
+// With --start the converted classes are checked, built and started in the
+// transpiled runtime (lib/start.mjs - an mcp-server checkout beside this
+// repository and the popups, as for npm run test:report2cloud:runtime): the
+// funnel converted / checked / built / started and the first errors, ranked.
 //
 // Prints the summary; --summary appends it as Markdown (the job summary of
 // the weekly workflow), --json writes a line per report. Exit code 1 when a
@@ -31,10 +35,11 @@ import { coverage, programs, ranked } from "./coverage.mjs";
 import { includesFrom } from "./lib/includes.mjs";
 import { dependencyIndex } from "./lib/deps.mjs";
 import { REPO } from "./lib/gate.mjs";
+import { kindOf as startKindOf } from "./lib/start.mjs";
 
 export const LIST_URL = "https://raw.githubusercontent.com/dotabap/dotabap-list/main/list.json";
 
-const USAGE = `usage: node tools/report2cloud/web.mjs [--list url|file] [--cache dir] [--limit n] [--lint] [--json file] [--summary file] [--offline]`;
+const USAGE = `usage: node tools/report2cloud/web.mjs [--list url|file] [--cache dir] [--limit n] [--lint] [--start] [--json file] [--summary file] [--offline]`;
 
 function args(argv) {
   const opts = { list: LIST_URL, cache: join(REPO, "build", "web-corpus") };
@@ -43,6 +48,7 @@ function args(argv) {
     if (a === "--help" || a === "-h") opts.help = true;
     else if (a === "--lint") opts.lint = true;
     else if (a === "--offline") opts.offline = true;
+    else if (a === "--start") opts.start = true;
     else if (["--list", "--cache", "--limit", "--json", "--summary"].includes(a)) {
       if (argv[i + 1] === undefined) throw new Error(`${a} needs a value`);
       opts[a.slice(2)] = argv[++i];
@@ -104,7 +110,7 @@ async function fetchAll(names, cache, parallel = 8) {
 /** what a lint finding is about, without the names of one report */
 const kindOf = (f) => `${f.key}: ${String(f.message).replace(/"[^"]*"/g, "\"…\"").replace(/\b[A-Z0-9_]{3,}\b/g, "…").slice(0, 100)}`;
 
-export function markdown({ rows, repos, failed, findings }) {
+export function markdown({ rows, repos, failed, findings, started }) {
   const converted = rows.filter((r) => r.ok).length;
   const crashed = rows.filter((r) => r.crashed);
   const pct = (n) => (rows.length ? `${Math.round((n / rows.length) * 100)} %` : "-");
@@ -124,6 +130,21 @@ export function markdown({ rows, repos, failed, findings }) {
     lines.push("", `abaplint v750 over the converted classes: ${findings.length} finding(s), ${parser} parser error(s) - most findings name a dependency the sparse clone does not have.`, "",
       "| findings | kind |", "|---:|---|",
       ...[...byKind].sort((a, b) => b[1] - a[1]).slice(0, 15).map(([k, n]) => `| ${n} | ${k.replace(/\|/g, "\\|")} |`));
+  }
+  if (started?.error) lines.push("", `Not started in the transpiled runtime: ${started.error}`);
+  else if (started) {
+    const f = started.funnel;
+    const share = (k) => (f.converted ? `${Math.round((k / f.converted) * 100)} %` : "-");
+    const byKind = new Map();
+    for (const s of started.stages.filter((x) => !x.ok)) {
+      const k = `${s.stage}: ${startKindOf(s.error)}`;
+      byKind.set(k, (byKind.get(k) ?? 0) + 1);
+    }
+    lines.push("", `In the transpiled runtime: **${f.started} of ${f.converted} converted reports start (${share(f.started)})** - ${f.checked} pass the syntax check of the transpile, ${f.built} build.`, "",
+      "| stage | reports |", "|---|---:|",
+      `| converted | ${f.converted} |`, `| checked | ${f.checked} |`, `| built | ${f.built} |`, `| started | ${f.started} |`, "",
+      "| reports | stopped at |", "|---:|---|",
+      ...[...byKind].sort((a, b) => b[1] - a[1]).slice(0, 20).map(([k, n]) => `| ${n} | ${k.replace(/\|/g, "\\|")} |`));
   }
   if (crashed.length) lines.push("", "Crashed the converter:", "", ...crashed.map((c) => `- \`${c.file}\`: ${c.crashed}`));
   return `${lines.join("\n")}\n`;
@@ -157,7 +178,7 @@ async function main() {
     const files = programs(dir);
     const read = includesFrom([...new Set(files.map(dirname))]);
     const deps = dependencyIndex([dir]);
-    for (const row of coverage(files, { read, deps, keep: opts.lint, className: () => `z2ui5_cl_cgui_w${String(++n).padStart(4, "0")}` })) {
+    for (const row of coverage(files, { read, deps, keep: opts.lint || opts.start, className: () => `z2ui5_cl_cgui_w${String(++n).padStart(4, "0")}` })) {
       rows.push({ ...row, file: relative(cache, row.file) });
     }
   }
@@ -167,10 +188,23 @@ async function main() {
     const { lint } = await import("./lib/gate.mjs");
     const files = Object.assign({}, ...rows.filter((r) => r.files).map((r) => r.files));
     findings = Object.keys(files).length ? lint({ files, target: "v750", naming: false }).generated : [];
-    for (const r of rows) delete r.files;
+  }
+  let started;
+  if (opts.start) {
+    const { startAll } = await import("./lib/start.mjs");
+    const { DDIC } = await import("./test/corpus.mjs");
+    started = await startAll(rows.filter((r) => r.files), { ddic: DDIC, onLine: (l) => console.log(l) });
+    for (const s of started.stages ?? []) {
+      const r = rows.find((x) => x.file === s.file);
+      r.start = s.ok ? "started" : `${s.stage}: ${s.error}`;
+    }
+  }
+  for (const r of rows) {
+    delete r.files;
+    delete r.deps;
   }
 
-  const md = markdown({ rows, repos: names.length, failed, findings });
+  const md = markdown({ rows, repos: names.length, failed, findings, started });
   console.log(md);
   if (opts.summary) appendFileSync(opts.summary, md);
   if (opts.json) writeFileSync(resolve(opts.json), `${rows.map((r) => JSON.stringify(r)).join("\n")}\n`);

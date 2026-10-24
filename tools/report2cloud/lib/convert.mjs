@@ -757,6 +757,52 @@ class Converter {
     return true;
   }
 
+  /**
+   * %_p_x_%_app_%-text = '...' - the label of a field of the selection
+   * screen set at runtime (in INITIALIZATION, usually). It becomes a global
+   * gv_label_<field>, declared on the line of REPORT, and the screen shows
+   * it while it is set (screenLabels). Returns whether the source changed.
+   */
+  resolveScreenLabels() {
+    const edits = [];
+    const fields = new Set();
+    const taken = new Set(this.stmts.flatMap((s) => stmtTokens(s).map((t) => lc(t.getStr()))));
+    const names = new Map();
+    for (const s of this.stmts) {
+      const toks = stmtTokens(s);
+      toks.forEach((t, i) => {
+        const m = /^%_([\w/]+?)_%_app_%$/i.exec(t.getStr());
+        if (!m || toks[i + 1]?.getStr() !== "-" || lc(toks[i + 2]?.getStr() ?? "") !== "text") return;
+        const field = lc(m[1]);
+        if (!names.has(field)) {
+          let v = `gv_label_${field}`.slice(0, 30);
+          for (let n = 2; taken.has(v); n++) v = `gv_label${n}_${field}`.slice(0, 30);
+          taken.add(v);
+          names.set(field, v);
+        }
+        fields.add(field);
+        const last = toks[i + 2];
+        edits.push({ row: t.getRow(), col: t.getCol(), len: last.getCol() + last.getStr().length - t.getCol(), to: names.get(field) });
+      });
+    }
+    if (!edits.length) return false;
+    // the declarations after REPORT - the rows stay as they are
+    const report = this.stmts.find((s) => kind(s) === "Report") ?? this.stmts[0];
+    const dot = report.getTokens().at(-1);
+    edits.push({ row: dot.getRow(), col: dot.getCol() + 1, len: 0, to: ` ${[...names.values()].map((v) => `DATA ${v} TYPE string.`).join(" ")}` });
+    const lines = this.source.split("\n");
+    edits.sort((a, b) => b.row - a.row || b.col - a.col);
+    for (const e of edits) {
+      const l = lines[e.row - 1];
+      lines[e.row - 1] = l.slice(0, e.col - 1) + e.to + l.slice(e.col - 1 + e.len);
+    }
+    this.source = lines.join("\n");
+    this.lines = lines;
+    this.screenLabels = names;
+    this.note(`the labels of ${[...fields].map(uc).join(", ")} set at runtime (%_..._%_app_%-text) - the global ${[...names.values()].join(", ")}, shown while set`);
+    return true;
+  }
+
   /** the types abaplint's syntax check gives the variables of the program
    *  scope (name -> abaplint type) - for the inline declarations of the
    *  event blocks; an unknown dependency gives a void type */
@@ -850,6 +896,7 @@ class Converter {
     this.parse();
     if (this.renameReserved()) this.parse();
     if (this.resolveDynamicTypes()) this.parse();
+    if (this.resolveScreenLabels()) this.parse();
     this.segment();
     if (!this.programName && this.header) this.programName = lc(this.header.name);
     this.programName = this.programName ?? "zreport";
@@ -964,8 +1011,11 @@ class Converter {
         // twice - kept once, an attribute can be declared once only
         const text = (x) => renderTokens(stmtTokens(x)).replace(/\s+/g, " ").toLowerCase();
         const again = end === i && k === "Data" && this.decls.some((x) => kind(x) === "Data" && text(x) === text(s));
-        if (!again) for (let j = i; j <= end; j++) this.decls.push(this.stmts[j]);
-        else this.note(`DATA ${lc(declName(s) ?? "")} is declared twice the same way - an attribute of the class once`);
+        // a comment inside the run (TYPES: a TYPE i, "comment) would cut a
+        // chain in two - it is left out
+        if (!again) {
+          for (let j = i; j <= end; j++) if (j === i || kind(this.stmts[j]) !== "Comment") this.decls.push(this.stmts[j]);
+        } else this.note(`DATA ${lc(declName(s) ?? "")} is declared twice the same way - an attribute of the class once`);
         i = end;
         pendingComments = [];
         continue;
@@ -1026,6 +1076,12 @@ class Converter {
         }
       }
       if (["Type", "TypeBegin"].includes(k) && !this.insideBegin(s)) this.globalTypes.add(lc(name));
+    }
+    // the fields a SELECTION-SCREEN declares itself - a frame title, a
+    // comment, a push button: data of the report as well
+    for (const s of this.decls) {
+      if (kind(s) !== "SelectionScreen") continue;
+      for (const f of findAll(s, "InlineField")) this.globalData.add(lc(nodeText(f)));
     }
     this.globalConstants = new Set(this.decls.filter((s) => ["Constant", "ConstantBegin"].includes(kind(s)) && !this.insideBegin(s))
       .map((s) => lc(declName(s) ?? "")));
@@ -1600,15 +1656,18 @@ class Converter {
   isExceptionVar(name) {
     if (!this.exceptionVars) {
       this.exceptionVars = new Set();
-      for (const x of [...this.decls, ...this.events.flatMap((e) => e.stmts), ...this.forms.flatMap((f) => f.body)]) {
+      // the local classes too: their attributes and the CATCH of their methods
+      for (const x of [...this.decls, ...this.events.flatMap((e) => e.stmts), ...this.forms.flatMap((f) => f.body),
+        ...this.modules.flatMap((m) => m.body), ...this.locals.flatMap((u) => u.stmts)]) {
         const t = lc(renderTokens(stmtTokens(x)));
-        const c = /^catch\b.*\binto\s+(?:data\s*\(\s*)?([\w/]+)/.exec(t);
+        // CATCH cx_a cx_b ... INTO x - over several lines
+        const c = /^catch\b[\s\S]*\binto\s+(?:data\s*\(\s*)?([\w/]+)/.exec(t);
         if (c) this.exceptionVars.add(c[1]);
         const d = /^data\s*:?\s*([\w/]+)\s+type\s+ref\s+to\s+([\w/]+)/.exec(t);
         if (d && /^(\/\w+\/)?[yz]?cx_|^if_message$|^if_t100_message$/.test(d[2])) this.exceptionVars.add(d[1]);
       }
     }
-    return this.exceptionVars.has(name);
+    return this.exceptionVars.has(lc(name));
   }
 
   /** the roots of the dynpro fields - gs_data of GS_DATA-CARRID */
@@ -2237,6 +2296,19 @@ class Converter {
       if (this.fcatVars.has(fcatRoot) || toks.some((t, i) => this.fcatVars.has(lc(t)) && (i === 0 || !["-", "->", "=>"].includes(toks[i - 1])))) {
         const m = /^([\w/]+)\s*-\s*(\w+)\s*=\s*(.+)$/.exec(flat);
         const orig = /^[\w/]+\s*-\s*\w+\s*=\s*(.+)$/.exec(toks.join(" "));
+        // a block over the field catalog (LOOP AT fcat ASSIGNING <fs> ... ENDLOOP)
+        // sets its columns by position - dropped alone, its ENDLOOP would stay
+        if (OPENERS.has(k)) {
+          this.refuse(s, `${shortText(s)} - a block over the field catalog; alv( ) takes the columns set field by field, port it by hand`);
+          continue;
+        }
+        // a value the alv( ) chain can take where the grid is shown: a literal,
+        // a text symbol, a global of the report - not a FORM's parameter
+        const fixed = (v) => /^['`]/.test(v) || /^text-\w+$/i.test(v) || this.globalData.has(lc(v.split("-")[0]));
+        if (k === "Move" && m && this.fcatVars.has(m[1]) && /^(fieldname|seltext_[lms]|reptext_ddic|scrtext_[lms]|coltext)$/.test(m[2]) && !fixed(orig[1].trim())) {
+          this.refuse(s, `the field catalog is filled from ${orig[1].trim()} - alv( ) is set up where the grid is shown, where it is not known; port the field catalog by hand`);
+          continue;
+        }
         if (k === "Move" && m && this.fcatVars.has(m[1])) {
           const cur = fcatWa.get(m[1]) ?? {};
           if (m[2] === "fieldname") cur.name = uc(unquote(orig[1].trim()));
@@ -2293,6 +2365,15 @@ class Converter {
         continue;
       }
 
+    }
+    // any other use of a SALV object - or of its columns - has nothing to
+    // refer to any more: the objects are gone, alv( ) shows the table
+    for (const s of seq) {
+      if (this.alvPlan.has(s) || ["Data", "Static", "Comment"].includes(kind(s))) continue;
+      const toks = stmtTokens(s).map((t) => lc(t.getStr()));
+      const used = toks.find((t, i) => this.salv.has(t) || cols.has(t) || col.has(t)
+        ? i === 0 || !["-", "->", "=>", "~"].includes(toks[i - 1]) : false);
+      if (used) this.refuse(s, `${used}, an object of CL_SALV_TABLE, is used here - alv( ) has no object to refer to; port the statement by hand`);
     }
     // a FORM that only built the field catalog or set up the ALV is empty now
     this.emptyForms = new Set(this.forms.filter((f) => {
@@ -2979,7 +3060,7 @@ class Converter {
         const modif = child(s, "Modif");
         const noDisplay = hasSeq(w, "NO", "-", "DISPLAY");
         const params = [{ name: "val", value: name }];
-        const text = this.selectionText(name, s, fieldTexts);
+        const text = this.labelText(name, this.selectionText(name, s, fieldTexts));
         if (text) params.push({ name: "text", value: text });
         let method = "parameter";
         if (checkbox && !noDisplay) method = "checkbox";
@@ -3031,7 +3112,7 @@ class Converter {
         const forNode = after(s, "FOR");
         const forText = lc(nodeText(forNode));
         const params = [{ name: "val", value: name }];
-        const text = this.selectionText(name, s, fieldTexts);
+        const text = this.labelText(name, this.selectionText(name, s, fieldTexts));
         if (text) params.push({ name: "text", value: text });
         if (w.includes("OBLIGATORY")) params.push({ name: "obligatory", value: "abap_true" });
         if (this.valueRequest.has(name)) params.push({ name: "value_help", value: "abap_true" });
@@ -3175,14 +3256,28 @@ class Converter {
           const names = [lc(declName(s) ?? "")];
           if (s.getColon()) for (let j = i + 1; this.decls[j] && sameColon(this.decls[j], s); j++) names.push(lc(declName(this.decls[j]) ?? ""));
           const dest = destOf(s, names);
+          let counted = false;
           if (dest) {
             target = dest;
             if (!sticky && /Begin$/.test(k) && !s.getColon()) {
               sticky = dest;
               stickyDepth = 0;
+            } else if (!sticky && /Begin$/.test(k)) {
+              // TYPES: BEGIN OF x. INCLUDE STRUCTURE y. TYPES: END OF x. - the
+              // chain ends before its END OF: the run goes on after it
+              let depth = 0;
+              for (let j = i; this.decls[j] && (j === i || sameColon(this.decls[j], s)); j++) {
+                if (/Begin$/.test(kind(this.decls[j]))) depth++;
+                if (/End$/.test(kind(this.decls[j]))) depth--;
+              }
+              if (depth > 0) {
+                sticky = dest;
+                stickyDepth = depth;
+                counted = true;
+              }
             }
           }
-          if (sticky) {
+          if (sticky && !counted) {
             if (/Begin$/.test(k)) stickyDepth++;
             if (/End$/.test(k)) stickyDepth--;
           }
@@ -3370,6 +3465,14 @@ class Converter {
     return undefined;
   }
 
+  /** the text of a field of the selection screen - the label set at runtime
+   *  while it is set (resolveScreenLabels) */
+  labelText(name, text) {
+    const v = this.screenLabels?.get(lc(name));
+    if (!v) return text;
+    return text ? `COND string( WHEN ${v} IS NOT INITIAL THEN ${v} ELSE ${text} )` : v;
+  }
+
   selectionText(name, s, missing) {
     const t = this.pool.selection.get(uc(name));
     if (t) return literal(t);
@@ -3428,11 +3531,13 @@ class Converter {
     const textElement = child(s, "TextElement");
     const inline = child(s, "InlineField");
     // a COMMENT, PUSHBUTTON or block TITLE with a field name instead of a
-    // text symbol declares that field - the report sets it in INITIALIZATION
+    // text symbol declares that field - the report sets it in INITIALIZATION.
+    // A comment and a push button declare it c LENGTH 83, as the classic
+    // does whatever their visible length - a method may take it typed so
     const fieldText = (len) => {
       const name = lc(nodeText(inline));
       heading("selection screen");
-      push(`DATA ${name} TYPE ${len ? `c LENGTH ${len}` : "string"}.`);
+      push(`DATA ${name} TYPE ${len ? "c LENGTH 83" : "string"}.`);
       return name;
     };
     const lengthOf = () => {
@@ -3887,6 +3992,16 @@ class Converter {
     this.currentLocals = new Set(stmts.filter((s) => ["Data", "DataBegin", "Constant", "Type", "Ranges", "FieldSymbol"].includes(kind(s)))
       .map((s) => lc(declName(s) ?? "")));
     if (ctx.form) for (const p of ctx.form.params) this.currentLocals.add(p.name);
+    // DATA( x ) in a method of a local class: a variable of the method, also
+    // when the report has a global x
+    if (ctx.local) {
+      for (const s of stmts) {
+        const toks = stmtTokens(s);
+        toks.forEach((t, i) => {
+          if (lc(t.getStr()) === "data" && toks[i + 1]?.getStr() === "(" && toks[i + 3]?.getStr() === ")") this.currentLocals.add(lc(toks[i + 2].getStr()));
+        });
+      }
+    }
     // the tables with a header line of this body: a FORM's own (their work
     // area is declared right after them, where the table is known) and the
     // TABLES parameters the FORM uses with their header line (a work area
@@ -5559,7 +5674,9 @@ class Converter {
     } else {
       text = nodeText(textSrc, ov);
       // MESSAGE lx_error TYPE 'I' - the text of the exception object
-      if (/^[\w/]+$/.test(text) && this.isExceptionVar(lc(text))) text = `${text}->get_text( )`;
+      // an exception object - also the one before it (lx->previous)
+      const exc = /^([\w/]+)(\s*->\s*previous)*$/i.exec(text);
+      if (exc && this.isExceptionVar(lc(exc[1]))) text = `${text}->get_text( )`;
       type = typeNode ? nodeText(typeNode, ov) : literal("S");
       this.map(s, "`message( )`");
     }
@@ -6148,9 +6265,11 @@ class Converter {
       if (!declaredOf.has(n)) declaredOf.set(n, new Set());
       if (!methodsOf.has(n)) methodsOf.set(n, new Set());
       for (const s of u.stmts) {
-        if (["Data", "ClassData", "Constant", "Type", "TypeBegin", "ConstantBegin", "MethodDef", "FieldSymbol", "Events", "ClassDataBegin", "DataBegin"].includes(kind(s))) declaredOf.get(n).add(lc(declName(s) ?? ""));
+        // the data of the class - a method is no data, and the parameters of a
+        // method are its own (the body adds them): a global of that name is
+        // the report's in every other method
+        if (["Data", "ClassData", "Constant", "Type", "TypeBegin", "ConstantBegin", "FieldSymbol", "Events", "ClassDataBegin", "DataBegin"].includes(kind(s))) declaredOf.get(n).add(lc(declName(s) ?? ""));
         if (kind(s) === "MethodDef") methodsOf.get(n).add(lc(nodeText(child(s, "MethodName"))));
-        for (const p of findAll(s, "MethodParamName")) declaredOf.get(n).add(lc(nodeText(p)));
       }
     }
     // a subclass inherits what its local superclass declares

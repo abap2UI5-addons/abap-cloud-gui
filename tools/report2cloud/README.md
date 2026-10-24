@@ -113,7 +113,7 @@ code is 0 whatever the numbers.
 ### The web corpus
 
 ```
-npm run report2cloud:web -- [--lint] [--limit n] [--json file] [--summary file] [--offline]
+npm run report2cloud:web -- [--lint] [--start] [--limit n] [--json file] [--summary file] [--offline]
 ```
 
 measures the converter on the open-source ABAP of the web: the repositories
@@ -123,7 +123,13 @@ the programs and the classes, interfaces and DDIC objects that type them,
 read and never run, and none of it part of this repository. Every report is
 converted with the includes and the dependencies of its own repository; `--lint` lints the converted classes together (v750), where the
 parser errors and redefinitions are the converter's and most other findings
-name a dependency the sparse clone does not have. A clone in the cache is
+name a dependency the sparse clone does not have. `--start` takes the
+converted classes into the transpiled runtime, the way the runtime test runs
+its own corpus (an mcp-server checkout beside this repository and the
+popups): the syntax check of the transpile with the dependencies of each
+report, one build, and every app started through the JSON protocol of the
+frontend - the funnel converted / checked / built / started and the first
+errors, ranked (`lib/start.mjs`). A clone in the cache is
 kept, `--offline` uses the cache alone. The workflow
 `.github/workflows/report2cloud-web.yaml` runs it weekly and writes the
 summary into the job summary; it fails when a report crashes the converter.

@@ -58,7 +58,8 @@ const todoOf = (message) => message.replace(/'[^']*'/g, "'…'").replace(/`[^`]*
 /** the coverage of the reports in `files`; read(name) answers an include,
  *  deps is the dependency index of their repository (lib/deps.mjs),
  *  className(file) names the class (default: zcl_ + the report name), and
- *  with keep the generated files of every converted report are in its row */
+ *  with keep the generated files of every converted report are in its row,
+ *  and the files of the dependencies it reads (deps: { name: text }) */
 export function coverage(files, { read, className, keep = false, deps } = {}) {
   const rows = [];
   for (const file of files) {
@@ -75,12 +76,13 @@ export function coverage(files, { read, className, keep = false, deps } = {}) {
     }
     const m = /^(.+)\.prog\.abap$/i.exec(basename(file));
     let result;
+    const needs = deps ? dependenciesOf(includes.source, deps) : undefined;
     try {
       const reader = read ?? includesFrom([dir]);
       result = convert(includes.source, {
         file, programName: m ? m[1].replace(/#/g, "/") : undefined, textpool, origin: includes.origin,
         className: className?.(file),
-        deps: deps ? dependenciesOf(includes.source, deps) : undefined,
+        deps: needs,
         classFor: (program) => (reader(program) !== undefined ? defaultClassName(program) : undefined),
       });
     } catch (e) {
@@ -101,7 +103,7 @@ export function coverage(files, { read, className, keep = false, deps } = {}) {
       mapped: result.mapped.length,
       includes: includes.included.length,
       missing: includes.missing,
-      ...(keep && result.ok ? { files: result.files } : {}),
+      ...(keep && result.ok ? { files: result.files, deps: Object.fromEntries((needs ?? []).map((d) => [d.name, d.text])) } : {}),
     });
   }
   return rows;
