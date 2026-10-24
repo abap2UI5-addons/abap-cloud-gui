@@ -45,6 +45,8 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
     INTERFACES z2ui5_if_app.
     "! the files of cl_gui_frontend_services - z2ui5_cl_cgui_frontend
     INTERFACES z2ui5_if_cgui_files.
+    "! the SAP GUI controls - z2ui5_cl_cgui_gui and its subclasses
+    INTERFACES z2ui5_if_cgui_gui.
 
     CONSTANTS:
       BEGIN OF cs_ucomm,
@@ -145,6 +147,9 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
     "! the input fields of the list (WRITE ... INPUT) - every field is bound
     "! to its line
     DATA mt_cgui_list_input TYPE z2ui5_cl_cgui_list=>ty_t_input.
+    "! the SAP GUI controls of the report (z2ui5_if_cgui_gui) - a text
+    "! editor is bound to its line
+    DATA mt_cgui_gui TYPE z2ui5_if_cgui_gui=>ty_t_control.
     "! the rows of the ALV tree the browser shows - bound to the tree table
     DATA mt_cgui_tree_view TYPE z2ui5_cl_cgui_tree=>ty_t_view.
 
@@ -877,6 +882,23 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
     DATA mv_cgui_file_rerun    TYPE string.
 
   PRIVATE SECTION.
+    "! the controls of a container (or the control) id into node
+    METHODS gui_render
+      IMPORTING
+        id   TYPE i
+        node TYPE REF TO z2ui5_cl_ui5_view_builder.
+
+    "! the docking containers of the screen dynnr
+    METHODS gui_docked
+      IMPORTING
+        dynnr TYPE string
+        node  TYPE REF TO z2ui5_cl_ui5_view_builder.
+
+    "! the screen a docking container without dynnr sits on - the one shown
+    METHODS gui_screen
+      RETURNING
+        VALUE(result) TYPE string.
+
 
     CONSTANTS:
       BEGIN OF cs_screen,
@@ -1364,6 +1386,7 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
     me->client = client.
     " cl_gui_frontend_services of the report - its files are the report's
     z2ui5_cl_cgui_frontend=>set_files( me ).
+    z2ui5_cl_cgui_gui=>set_report( me ).
     CLEAR mt_cgui_msg.
     mv_cgui_nav = abap_false.
     " the messages of the run stay while the popover opens and the user
@@ -1393,6 +1416,121 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
     ENDIF.
 
     messages_display( ).
+
+  ENDMETHOD.
+
+  METHOD z2ui5_if_cgui_gui~control_add.
+
+    DATA(ls_control) = control.
+    ls_control-id = lines( mt_cgui_gui ) + 1.
+    " a docking container sits on the screen it is created for
+    IF ls_control-kind = z2ui5_if_cgui_gui=>cs_kind-container AND ls_control-parent IS INITIAL
+        AND ls_control-name IS INITIAL AND ls_control-dynnr IS INITIAL.
+      ls_control-dynnr = gui_screen( ).
+    ELSEIF ls_control-dynnr IS NOT INITIAL AND ls_control-dynnr CO `0123456789`.
+      ls_control-dynnr = dynnr_norm( ls_control-dynnr ).
+    ENDIF.
+    INSERT ls_control INTO TABLE mt_cgui_gui.
+    result = ls_control-id.
+
+  ENDMETHOD.
+
+  METHOD z2ui5_if_cgui_gui~control_get.
+
+    READ TABLE mt_cgui_gui INTO result INDEX id.
+
+  ENDMETHOD.
+
+  METHOD z2ui5_if_cgui_gui~control_set.
+
+    MODIFY mt_cgui_gui FROM control INDEX control-id.
+
+  ENDMETHOD.
+
+  METHOD z2ui5_if_cgui_gui~custom_render.
+
+    LOOP AT mt_cgui_gui INTO DATA(ls_control)
+         WHERE kind = z2ui5_if_cgui_gui=>cs_kind-container AND parent = 0 AND name = name AND freed = abap_false.
+      gui_render( id   = ls_control-id
+                  node = node ).
+    ENDLOOP.
+
+  ENDMETHOD.
+
+  METHOD gui_docked.
+
+    LOOP AT mt_cgui_gui INTO DATA(ls_control)
+         WHERE kind = z2ui5_if_cgui_gui=>cs_kind-container AND parent = 0 AND name IS INITIAL
+           AND dynnr = dynnr AND freed = abap_false.
+      gui_render( id   = ls_control-id
+                  node = node ).
+    ENDLOOP.
+
+  ENDMETHOD.
+
+  METHOD gui_screen.
+
+    result = SWITCH #( mv_cgui_screen
+                       WHEN cs_screen-dynpro THEN mv_cgui_dynpro
+                       WHEN cs_screen-selection THEN `1000`
+                       ELSE `LIST` ).
+
+  ENDMETHOD.
+
+  METHOD gui_render.
+
+    READ TABLE mt_cgui_gui ASSIGNING FIELD-SYMBOL(<control>) INDEX id.
+    IF sy-subrc <> 0 OR <control>-freed = abap_true OR <control>-hidden = abap_true.
+      RETURN.
+    ENDIF.
+
+    CASE <control>-kind.
+      WHEN z2ui5_if_cgui_gui=>cs_kind-container.
+        DATA(lo_box) = node->ele( `VBox`
+            )->a( n = `width` v = `100%` ).
+        IF <control>-caption IS NOT INITIAL.
+          lo_box->tag( `Title`
+              )->a( n = `text` t = <control>-caption ).
+        ENDIF.
+        " the cells of a splitter row by row, the controls in their order
+        DATA(lt_child) = VALUE z2ui5_if_cgui_gui=>ty_t_control( ).
+        LOOP AT mt_cgui_gui INTO DATA(ls_child) WHERE parent = id.
+          INSERT ls_child INTO TABLE lt_child.
+        ENDLOOP.
+        SORT lt_child BY row column id.
+        LOOP AT lt_child INTO ls_child.
+          gui_render( id   = ls_child-id
+                      node = lo_box ).
+        ENDLOOP.
+
+      WHEN z2ui5_if_cgui_gui=>cs_kind-textedit.
+        node->tag( `TextArea`
+            )->a( n = `value`    v = client->_bind( val       = <control>-text
+                                                    tab       = mt_cgui_gui
+                                                    tab_index = id )
+            )->a( n = `editable` b = xsdbool( <control>-readonly = abap_false )
+            )->a( n = `width`    v = `100%`
+            )->a( n = `rows`     v = `12`
+            )->a( n = `growing`  b = abap_true
+            )->a( n = `class`    v = `sapUiTinyMarginTopBottom` ).
+
+      WHEN z2ui5_if_cgui_gui=>cs_kind-html.
+        IF <control>-html IS NOT INITIAL.
+          " sanitized: no script, no event handler of the document
+          node->tag( n = `HTML` ns = `core`
+              )->a( n = `xmlns:core`      v = `sap.ui.core`
+              )->a( n = `content`         v = client->_bind( val       = <control>-html
+                                                             tab       = mt_cgui_gui
+                                                             tab_index = id )
+              )->a( n = `sanitizeContent` b = abap_true
+              )->a( n = `preferDOM`       b = abap_false ).
+        ELSEIF <control>-url IS NOT INITIAL.
+          node->tag( `Link`
+              )->a( n = `text`   t = <control>-url
+              )->a( n = `href`   t = <control>-url
+              )->a( n = `target` v = `_blank` ).
+        ENDIF.
+    ENDCASE.
 
   ENDMETHOD.
 
@@ -1686,6 +1824,7 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
 
     result = z2ui5_cl_cgui_selscreen=>factory( client          = client
                                                value_help_auto = abap_true ).
+    result->set_gui( me ).
     dynpro_screen( dynnr  = mv_cgui_dynpro
                    screen = result ).
     mo_cgui_screen = result.
@@ -5424,6 +5563,8 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
       CLEAR lv_window.
     ELSEIF lo_dynpro IS BOUND.
       lo_dynpro->render( page ).
+      gui_docked( dynnr = mv_cgui_dynpro
+                  node  = page ).
       lv_button_text = 'Continue'(046).
       lv_button_icon = `sap-icon://accept`.
       lv_button_ucomm = cs_ucomm-enter.
@@ -5454,6 +5595,8 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
       so_buffer_prepare( screen ).
       tab_binding_prepare( screen ).
       screen->render( page ).
+      gui_docked( dynnr = `1000`
+                  node  = page ).
       lv_button_text = 'Execute'(026).
       lv_button_icon = `sap-icon://begin`.
       lv_button_ucomm = cs_ucomm-execute.

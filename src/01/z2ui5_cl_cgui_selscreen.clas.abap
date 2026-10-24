@@ -329,6 +329,20 @@ CLASS z2ui5_cl_cgui_selscreen DEFINITION PUBLIC FINAL CREATE PRIVATE.
       RETURNING
         VALUE(result) TYPE REF TO z2ui5_cl_cgui_selscreen.
 
+    "! the custom control area name of a dynpro - the SAP GUI controls of
+    "! its container (z2ui5_cl_cgui_gui_container with container_name),
+    "! rendered by the report set with set_gui( )
+    METHODS custom_control
+      IMPORTING
+        name          TYPE clike
+      RETURNING
+        VALUE(result) TYPE REF TO z2ui5_cl_cgui_selscreen.
+
+    "! the report that renders the custom control areas
+    METHODS set_gui
+      IMPORTING
+        gui TYPE REF TO z2ui5_if_cgui_gui.
+
     "! SELECTION-SCREEN PUSHBUTTON ... USER-COMMAND
     METHODS button
       IMPORTING
@@ -408,6 +422,7 @@ CLASS z2ui5_cl_cgui_selscreen DEFINITION PUBLIC FINAL CREATE PRIVATE.
         tabbed      TYPE string VALUE `TABBED_BEGIN`,
         tab         TYPE string VALUE `TAB`,
         tabbed_end  TYPE string VALUE `TABBED_END`,
+        custom      TYPE string VALUE `CUSTOM`,
       END OF cs_kind.
 
     CONSTANTS:
@@ -480,6 +495,7 @@ CLASS z2ui5_cl_cgui_selscreen DEFINITION PUBLIC FINAL CREATE PRIVATE.
     DATA client  TYPE REF TO z2ui5_if_client.
     DATA mo_app  TYPE REF TO object.
     DATA mt_item TYPE ty_t_item.
+    DATA mi_gui TYPE REF TO z2ui5_if_cgui_gui.
     DATA mv_value_help_auto TYPE abap_bool.
     DATA mv_preview         TYPE abap_bool.
     DATA mt_listbox         TYPE ty_t_listbox.
@@ -941,6 +957,20 @@ CLASS z2ui5_cl_cgui_selscreen IMPLEMENTATION.
 
   ENDMETHOD.
 
+  METHOD custom_control.
+
+    INSERT VALUE #( kind = cs_kind-custom
+                    name = to_upper( condense( name ) ) ) INTO TABLE mt_item.
+    result = me.
+
+  ENDMETHOD.
+
+  METHOD set_gui.
+
+    mi_gui = gui.
+
+  ENDMETHOD.
+
   METHOD button.
 
     INSERT VALUE #( kind     = cs_kind-button
@@ -1188,6 +1218,13 @@ CLASS z2ui5_cl_cgui_selscreen IMPLEMENTATION.
         WHEN cs_kind-tabbed_end.
           CLEAR: lo_form, lo_line, lv_in_line, lo_tab_items.
           lo_container = node.
+
+        WHEN cs_kind-custom.
+          CLEAR: lo_form, lo_line, lv_in_line.
+          IF mi_gui IS BOUND.
+            mi_gui->custom_render( name = lr_item->name
+                                   node = lo_container ).
+          ENDIF.
 
         WHEN cs_kind-uline.
           CLEAR: lo_form, lo_line, lv_in_line.
