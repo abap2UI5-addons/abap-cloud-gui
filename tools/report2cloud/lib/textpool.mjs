@@ -150,7 +150,7 @@ const items = (xml, name) => [...xml.matchAll(new RegExp(`<${name}>([\\s\\S]*?)<
 /** [{ screen, description, type, containers: [{ type, name, parent }],
  *  fields: [{ cont, contName, type, name, text, line, column, length, height, input,
  *  output, required, group1, fcode, invisible, icon }], flow: [line] }] -
- *  screen with its four digits, the texts as the screen painter has them
+ *  containers with their place as the fields have it; screen with its four digits, the texts as the screen painter has them
  *  (underscores of a template included) */
 export function parseDynpros(xml) {
   const m = xml && /<DYNPROS>([\s\S]*?)<\/DYNPROS>/.exec(xml);
@@ -164,7 +164,11 @@ export function parseDynpros(xml) {
       screen: tag(header, "SCREEN").trim().padStart(4, "0"),
       description: tag(header, "DESCRIPT").trim(),
       type: up(header, "TYPE"),
-      containers: items(it, "RPY_DYCATT").map((r) => ({ type: up(r, "TYPE"), name: up(r, "NAME"), parent: up(r, "ELEMENT_OF") })),
+      containers: items(it, "RPY_DYCATT").map((r) => ({
+        type: up(r, "TYPE"), name: up(r, "NAME"), parent: up(r, "ELEMENT_OF"),
+        line: Number(tag(r, "LINE")) || 0, column: Number(tag(r, "COLUMN")) || 0,
+        length: Number(tag(r, "LENGTH")) || 0, height: Number(tag(r, "HEIGHT")) || 0,
+      })),
       fields: items(it, "RPY_DYFATC").map((r) => ({
         cont: up(r, "CONT_TYPE"), contName: up(r, "CONT_NAME"), type: up(r, "TYPE"), name: up(r, "NAME"), text: tag(r, "TEXT").replace(/\s+$/, ""),
         line: Number(tag(r, "LINE")) || 0, column: Number(tag(r, "COLUMN")) || 0,

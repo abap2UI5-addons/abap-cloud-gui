@@ -93,6 +93,10 @@ CLASS ltcl_report DEFINITION INHERITING FROM z2ui5_cl_cgui_report FINAL.
     DATA mv_seats    TYPE i.
     DATA mv_after    TYPE string.
     DATA mv_pai      TYPE string.
+    " a text editor in the custom control area CC of screen 0100
+    DATA mv_gui      TYPE abap_bool.
+    DATA mo_edit     TYPE REF TO z2ui5_cl_cgui_gui_textedit.
+    DATA mv_note     TYPE string.
     DATA mv_replace TYPE abap_bool.
     DATA mv_exit     TYPE string.
     DATA mv_exit_err TYPE abap_bool.
@@ -167,6 +171,7 @@ CLASS ltcl_test DEFINITION FINAL FOR TESTING
     METHODS file_upload_and_download FOR TESTING.
     METHODS current_screen_afresh FOR TESTING.
     METHODS dynpro_call_and_leave FOR TESTING.
+    METHODS dynpro_text_editor FOR TESTING.
     METHODS alv_box_copy_selection FOR TESTING.
     METHODS url_values_screen_only FOR TESTING.
     METHODS url_skip_screen FOR TESTING.
@@ -265,6 +270,10 @@ CLASS ltcl_report IMPLEMENTATION.
 
   METHOD dynpro_screen.
 
+    IF dynnr = `0100` AND mv_gui = abap_true.
+      screen->custom_control( 'CC' ).
+      RETURN.
+    ENDIF.
     IF dynnr = `0100`.
       screen->parameter( val       = p_carrid
                          text      = `Airline`
@@ -281,6 +290,11 @@ CLASS ltcl_report IMPLEMENTATION.
 
   METHOD dynpro_pbo.
 
+    " the classic PBO: the control once, in the container of the area
+    IF mv_gui = abap_true AND mo_edit IS NOT BOUND.
+      mo_edit = NEW #( parent = NEW z2ui5_cl_cgui_gui_container( container_name = 'CC' ) ).
+      mo_edit->set_textstream( `first note` ).
+    ENDIF.
     set_pf_status( VALUE #( ( name = `SAVE` text = `Save` ) ) ).
     LOOP AT current_screen( )->loop_at_screen( ) INTO DATA(ls_screen) WHERE group1 = `SEA`.
       ls_screen-intensified = abap_true.
@@ -292,6 +306,9 @@ CLASS ltcl_report IMPLEMENTATION.
 
   METHOD dynpro_pai.
 
+    IF mo_edit IS BOUND.
+      mo_edit->get_textstream( IMPORTING text = mv_note ).
+    ENDIF.
     mv_pai = |{ mv_pai }PAI{ dynnr }:{ ucomm };|.
     CASE ucomm.
       WHEN `SAVE`.
@@ -829,6 +846,35 @@ CLASS ltcl_test IMPLEMENTATION.
     cl_abap_unit_assert=>assert_equals( act = mo_cut->mv_cgui_screen
                                         exp = `SELECTION` ).
     cl_abap_unit_assert=>assert_initial( mo_cut->mt_cgui_dynpro_stack ).
+
+  ENDMETHOD.
+
+  METHOD dynpro_text_editor.
+
+    init( ).
+    mo_report->p_carrid = `LH`.
+    mo_report->mv_dynpro = abap_true.
+    mo_report->mv_gui = abap_true.
+    event( z2ui5_cl_cgui_report=>cs_ucomm-execute ).
+
+    " the text editor of the PBO in the area CC, bound to its line
+    cl_abap_unit_assert=>assert_equals( act = mo_cut->mv_cgui_screen
+                                        exp = `DYNPRO` ).
+    cl_abap_unit_assert=>assert_equals( act = lines( mo_cut->mt_cgui_gui )
+                                        exp = 2 ).
+    cl_abap_unit_assert=>assert_true( xsdbool( mo_client->mv_view CS `<TextArea` ) ).
+    cl_abap_unit_assert=>assert_equals( act = mo_cut->mt_cgui_gui[ 2 ]-text
+                                        exp = `first note` ).
+
+    " what the user typed, on Save: the PAI reads it, the PBO does not set it again
+    mo_cut->mt_cgui_gui[ 2 ]-text = `typed note`.
+    event( `CHECK` ).
+    cl_abap_unit_assert=>assert_equals( act = mo_report->mv_note
+                                        exp = `typed note` ).
+    cl_abap_unit_assert=>assert_equals( act = mo_cut->mt_cgui_gui[ 2 ]-text
+                                        exp = `typed note` ).
+    cl_abap_unit_assert=>assert_equals( act = lines( mo_cut->mt_cgui_gui )
+                                        exp = 2 ).
 
   ENDMETHOD.
 
