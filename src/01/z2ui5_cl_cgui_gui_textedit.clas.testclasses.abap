@@ -6,6 +6,8 @@ CLASS ltcl_gui DEFINITION FINAL FOR TESTING.
     DATA mt_control TYPE z2ui5_if_cgui_gui=>ty_t_control.
     DATA mt_object TYPE STANDARD TABLE OF REF TO object WITH EMPTY KEY.
     DATA mt_handler TYPE z2ui5_if_cgui_gui=>ty_t_handler.
+    DATA mt_grid TYPE z2ui5_if_cgui_gui=>ty_t_grid.
+    DATA mr_grid_tab TYPE REF TO data.
 
 ENDCLASS.
 
@@ -49,6 +51,46 @@ CLASS ltcl_gui IMPLEMENTATION.
   METHOD z2ui5_if_cgui_gui~custom_render ##NEEDED.
   ENDMETHOD.
 
+  METHOD z2ui5_if_cgui_gui~grid_display.
+
+    FIELD-SYMBOLS <from> TYPE any.
+    FIELD-SYMBOLS <to>   TYPE any.
+
+    READ TABLE mt_grid ASSIGNING FIELD-SYMBOL(<grid>) WITH KEY id = id.
+    IF sy-subrc <> 0.
+      INSERT VALUE #( id = id ) INTO TABLE mt_grid ASSIGNING <grid>.
+    ENDIF.
+    IF tab IS BOUND.
+      ASSIGN tab->* TO <from>.
+      CREATE DATA mr_grid_tab LIKE <from>.
+      ASSIGN mr_grid_tab->* TO <to>.
+      <to> = <from>.
+    ENDIF.
+    IF fieldcat IS BOUND.
+      ASSIGN fieldcat->* TO <from>.
+      CREATE DATA <grid>-fieldcat LIKE <from>.
+      ASSIGN <grid>-fieldcat->* TO <to>.
+      <to> = <from>.
+    ENDIF.
+    IF functions IS BOUND.
+      ASSIGN functions->* TO <from>.
+      <grid>-functions = <from>.
+    ENDIF.
+
+  ENDMETHOD.
+
+  METHOD z2ui5_if_cgui_gui~grid_get.
+
+    READ TABLE mt_grid INTO result WITH KEY id = id.
+
+  ENDMETHOD.
+
+  METHOD z2ui5_if_cgui_gui~grid_selected.
+
+    result = VALUE #( ( 2 ) ).
+
+  ENDMETHOD.
+
 ENDCLASS.
 
 
@@ -64,6 +106,14 @@ CLASS ltcl_handler DEFINITION FINAL FOR TESTING.
       IMPORTING fcode.
     METHODS on_sapevent FOR EVENT sapevent OF z2ui5_cl_cgui_gui_html_viewer
       IMPORTING action query_table.
+    METHODS on_toolbar FOR EVENT toolbar OF z2ui5_cl_cgui_gui_alv_grid
+      IMPORTING e_object e_interactive.
+    METHODS on_double_click FOR EVENT double_click OF z2ui5_cl_cgui_gui_alv_grid
+      IMPORTING e_row e_column.
+    METHODS on_hotspot FOR EVENT hotspot_click OF z2ui5_cl_cgui_gui_alv_grid
+      IMPORTING e_row_id e_column_id es_row_no.
+    METHODS on_user_command FOR EVENT user_command OF z2ui5_cl_cgui_gui_alv_grid
+      IMPORTING e_ucomm.
 
 ENDCLASS.
 
@@ -93,6 +143,32 @@ CLASS ltcl_handler IMPLEMENTATION.
 
   ENDMETHOD.
 
+  METHOD on_toolbar.
+
+    APPEND VALUE #( function = 'FULL' icon = `sap-icon://accept` text = 'Full' ) TO e_object->mt_toolbar.
+    APPEND VALUE #( butn_type = 3 ) TO e_object->mt_toolbar.
+    mv_log = |{ mv_log }TOOLBAR { e_interactive };|.
+
+  ENDMETHOD.
+
+  METHOD on_double_click.
+
+    mv_log = |{ mv_log }DOUBLE_CLICK { e_row-index } { e_column-fieldname };|.
+
+  ENDMETHOD.
+
+  METHOD on_hotspot.
+
+    mv_log = |{ mv_log }HOTSPOT { e_row_id-index } { e_column_id-fieldname } { es_row_no-row_id };|.
+
+  ENDMETHOD.
+
+  METHOD on_user_command.
+
+    mv_log = |{ mv_log }UCOMM { e_ucomm };|.
+
+  ENDMETHOD.
+
 ENDCLASS.
 
 
@@ -114,6 +190,7 @@ CLASS ltcl_test DEFINITION FINAL
     METHODS html_document FOR TESTING.
     METHODS events FOR TESTING.
     METHODS toolbar_buttons FOR TESTING.
+    METHODS grid FOR TESTING.
     METHODS sapevent_links FOR TESTING.
 
 ENDCLASS.
@@ -362,6 +439,72 @@ CLASS ltcl_test IMPLEMENTATION.
     cl_abap_unit_assert=>assert_equals( act = lt_link[ 1 ]-text exp = `Flight 0400` ).
     cl_abap_unit_assert=>assert_equals( act = lt_link[ 2 ]-action exp = `back` ).
     cl_abap_unit_assert=>assert_equals( act = lt_link[ 2 ]-text exp = `Back` ).
+
+  ENDMETHOD.
+
+  METHOD grid.
+
+    TYPES:
+      BEGIN OF ty_s_fcat,
+        fieldname TYPE c LENGTH 30,
+        coltext   TYPE c LENGTH 40,
+        hotspot   TYPE abap_bool,
+      END OF ty_s_fcat,
+      ty_t_fcat TYPE STANDARD TABLE OF ty_s_fcat WITH EMPTY KEY,
+      BEGIN OF ty_s_line,
+        carrid TYPE c LENGTH 3,
+        connid TYPE n LENGTH 4,
+      END OF ty_s_line,
+      BEGIN OF ty_s_index,
+        index   TYPE i,
+        rowtype TYPE c LENGTH 30,
+      END OF ty_s_index.
+    DATA lt_line TYPE STANDARD TABLE OF ty_s_line WITH EMPTY KEY.
+    DATA lt_index TYPE STANDARD TABLE OF ty_s_index WITH EMPTY KEY.
+    DATA lt_fcat_back TYPE ty_t_fcat.
+    FIELD-SYMBOLS <tab> TYPE STANDARD TABLE.
+
+    DATA(lo_handler) = NEW ltcl_handler( ).
+    DATA(lo_grid) = NEW z2ui5_cl_cgui_gui_alv_grid( i_parent = mo_cont ).
+    cl_abap_unit_assert=>assert_equals( act = mo_gui->mt_control[ lo_grid->get_id( ) ]-kind
+                                        exp = z2ui5_if_cgui_gui=>cs_kind-grid ).
+    lo_grid->set_handler( handler = lo_handler method = 'ON_TOOLBAR' event = 'TOOLBAR' ).
+    lo_grid->set_handler( handler = lo_handler method = 'ON_DOUBLE_CLICK' event = 'DOUBLE_CLICK' ).
+    lo_grid->set_handler( handler = lo_handler method = 'ON_HOTSPOT' event = 'HOTSPOT_CLICK' ).
+    lo_grid->set_handler( handler = lo_handler method = 'ON_USER_COMMAND' event = 'USER_COMMAND' ).
+
+    lt_line = VALUE #( ( carrid = 'LH' connid = '0400' ) ( carrid = 'LH' connid = '0402' ) ).
+    DATA(lt_fcat) = VALUE ty_t_fcat( ( fieldname = 'CARRID' coltext = 'Airline' )
+                                     ( fieldname = 'CONNID' coltext = 'Flight' hotspot = abap_true ) ).
+    lo_grid->set_table_for_first_display( CHANGING it_outtab       = lt_line
+                                                   it_fieldcatalog = lt_fcat ).
+    " the report has a copy of the table and of the field catalog, and the
+    " functions the toolbar handler appended - no separator
+    ASSIGN mo_gui->mr_grid_tab->* TO <tab>.
+    cl_abap_unit_assert=>assert_equals( act = lines( <tab> ) exp = 2 ).
+    DATA(ls_grid) = mo_gui->mt_grid[ id = lo_grid->get_id( ) ].
+    cl_abap_unit_assert=>assert_equals( act = lines( ls_grid-functions ) exp = 1 ).
+    cl_abap_unit_assert=>assert_equals( act = ls_grid-functions[ 1 ]-fcode exp = `FULL` ).
+    cl_abap_unit_assert=>assert_equals( act = lo_handler->mv_log exp = |TOOLBAR ;| ).
+    lo_grid->get_frontend_fieldcatalog( IMPORTING et_fieldcatalog = lt_fcat_back ).
+    cl_abap_unit_assert=>assert_equals( act = lt_fcat_back exp = lt_fcat ).
+
+    " refreshed: the table as it is now
+    APPEND VALUE #( carrid = 'AA' connid = '0017' ) TO lt_line.
+    lo_grid->refresh_table_display( CHANGING it_outtab = lt_line ).
+    ASSIGN mo_gui->mr_grid_tab->* TO <tab>.
+    cl_abap_unit_assert=>assert_equals( act = lines( <tab> ) exp = 3 ).
+
+    " the events of the browser
+    CLEAR lo_handler->mv_log.
+    lo_grid->dispatch( event = `DOUBLE_CLICK` value = `2` ).
+    lo_grid->dispatch( event = `HOTSPOT_CLICK` value = |1{ cl_abap_char_utilities=>horizontal_tab }connid| ).
+    lo_grid->dispatch( event = `USER_COMMAND` value = `FULL` ).
+    cl_abap_unit_assert=>assert_equals( act = lo_handler->mv_log
+                                        exp = |DOUBLE_CLICK 2 ;HOTSPOT 1 CONNID 1;UCOMM FULL;| ).
+
+    lo_grid->get_selected_rows( IMPORTING et_index_rows = lt_index ).
+    cl_abap_unit_assert=>assert_equals( act = lt_index[ 1 ]-index exp = 2 ).
 
   ENDMETHOD.
 

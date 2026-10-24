@@ -249,6 +249,8 @@ export const GUI = {
     cl_gui_textedit: "z2ui5_cl_cgui_gui_textedit",
     cl_gui_html_viewer: "z2ui5_cl_cgui_gui_html_viewer",
     cl_gui_toolbar: "z2ui5_cl_cgui_gui_toolbar",
+    cl_gui_alv_grid: "z2ui5_cl_cgui_gui_alv_grid",
+    cl_alv_event_toolbar_set: "z2ui5_cl_cgui_gui_alv_toolbar",
   },
   members: {
     z2ui5_cl_cgui_gui: {
@@ -405,11 +407,80 @@ export const GUI = {
           exceptions: [] },
       },
     },
+    z2ui5_cl_cgui_gui_alv_grid: {
+      parent: "z2ui5_cl_cgui_gui",
+      constants: ["mc_fc_excl_all", "mc_fc_detail", "mc_fc_print", "mc_fc_refresh", "mc_fc_loc_cut", "mc_fc_loc_copy", "mc_fc_loc_paste", "mc_fc_loc_undo", "mc_fc_loc_append_row", "mc_fc_loc_insert_row", "mc_fc_loc_delete_row", "mc_fc_loc_copy_row", "mc_fc_sort_asc", "mc_fc_sort_dsc", "mc_fc_find", "mc_fc_filter", "mc_fc_sum", "mc_fc_views", "mc_fc_info", "mc_fc_graph", "mc_mb_export", "mc_mb_variant", "mc_evt_enter", "mc_evt_modified", "mc_style_enabled", "mc_style_disabled", "mc_style_hotspot"],
+      attributes: [],
+      events: ["double_click", "hotspot_click", "user_command", "toolbar"],
+      methods: {
+        constructor: { params: ["i_shellstyle", "i_lifetime", "i_parent", "i_appl_events", "i_parentdbg", "i_applogparent", "i_graphicsparent", "i_name", "i_fcat_complete"],
+          exceptions: ["error_cntl_create", "error_cntl_init", "error_cntl_link", "error_dp_create"] },
+        set_table_for_first_display: { params: ["i_buffer_active", "i_bypassing_buffer", "i_consistency_check", "i_structure_name", "is_variant", "i_save", "i_default", "is_layout", "is_print", "it_special_groups", "it_toolbar_excluding", "it_hyperlink", "it_alv_graphics", "it_except_qinfo", "it_outtab", "it_fieldcatalog", "it_sort", "it_filter"],
+          exceptions: ["invalid_parameter_combination", "program_error", "too_many_lines"] },
+        refresh_table_display: { params: ["is_stable", "i_soft_refresh", "it_outtab"],
+          exceptions: ["finished"] },
+        set_frontend_fieldcatalog: { params: ["it_fieldcatalog"],
+          exceptions: [] },
+        get_frontend_fieldcatalog: { params: ["et_fieldcatalog"],
+          exceptions: [] },
+        set_frontend_layout: { params: ["is_layout"],
+          exceptions: [] },
+        get_frontend_layout: { params: ["es_layout"],
+          exceptions: [] },
+        set_sort_criteria: { params: ["it_sort"],
+          exceptions: ["no_fieldcatalog_available"] },
+        get_selected_rows: { params: ["et_index_rows", "et_row_no"],
+          exceptions: [] },
+        set_toolbar_interactive: { params: [],
+          exceptions: [] },
+        check_changed_data: { params: ["e_valid", "c_refresh"],
+          exceptions: [] },
+        register_edit_event: { params: ["i_event_id"],
+          exceptions: ["error"] },
+        set_ready_for_input: { params: ["i_ready_for_input"],
+          exceptions: [] },
+        dispatch: { params: [],
+          exceptions: [] },
+      },
+    },
+    z2ui5_cl_cgui_gui_alv_toolbar: {
+      constants: [],
+      attributes: ["mt_toolbar"],
+      events: [],
+      methods: {
+      },
+    },
   },
 };
 
 /** the stand-in of a SAP GUI class - undefined for any other name (also
  *  constructor or toString, which every object has) */
+/** text without the arguments of its constructor expressions - VALUE #( a = 1 ),
+ *  CONV, CORRESPONDING, COND, SWITCH, REDUCE, FILTER: their components and
+ *  conditions are no parameters of a call */
+function withoutConstructorArgs(text) {
+  let out = text;
+  for (;;) {
+    const m = /\b(value|conv|corresponding|cond|switch|reduce|filter|exact|ref|cast)\s+[\w#~=>/-]*\s*\(/.exec(out);
+    if (!m) return out;
+    let depth = 0;
+    let end = m.index + m[0].length - 1;
+    for (; end < out.length; end++) {
+      if (out[end] === "(") depth++;
+      else if (out[end] === ")" && --depth === 0) break;
+    }
+    out = `${out.slice(0, m.index)}x${out.slice(end + 1)}`;
+  }
+}
+
+/** the classic types of the generic parameters of the grid stand-in - a
+ *  VALUE #( ... ) there has no type to take, it is written with this one */
+const GRID_VALUE_TYPES = {
+  is_layout: "lvc_s_layo", is_variant: "disvariant", is_print: "lvc_s_prnt", is_stable: "lvc_s_stbl",
+  it_toolbar_excluding: "ui_functions", it_sort: "lvc_t_sort", it_filter: "lvc_t_filt",
+  it_fieldcatalog: "lvc_t_fcat", it_special_groups: "lvc_t_sgrp", it_hyperlink: "lvc_t_hype",
+  it_except_qinfo: "lvc_t_qinf",
+};
 const guiClass = (name) => (Object.hasOwn(GUI.classes, name) ? GUI.classes[name] : undefined);
 
 /** whether a stand-in or one of its parents raises the event */
@@ -1406,13 +1477,77 @@ class Converter {
     return "SAP GUI controls (cl_gui_*) need a dynpro container - use alv( ) or an abap2UI5 view";
   }
 
+  /** the calls of the grid stand-in: VALUE #( ... ) of a generic parameter
+   *  takes the classic type; refresh_table_display( ) is passed the table
+   *  set_table_for_first_display( ) showed - the stand-in shows a copy */
+  gridRewrites(toks, ov, ctx) {
+    if (!this.guiVars?.size || ![...this.guiVars.values()].includes("z2ui5_cl_cgui_gui_alv_grid")) return;
+    const text = toks.map((t) => lc(t.getStr()));
+    const own = GUI.members.z2ui5_cl_cgui_gui_alv_grid.methods;
+    const gridCall = text.some((t, i) => text[i - 1] === "->" && Object.hasOwn(own, t) && t !== "dispatch");
+    if (!gridCall) return;
+    for (let i = 2; i < text.length; i++) {
+      if (text[i] === "#" && text[i - 1] === "value" && text[i - 2] === "=" && Object.hasOwn(GRID_VALUE_TYPES, text[i - 3])) {
+        ov.set(key(toks[i]), GRID_VALUE_TYPES[text[i - 3]]);
+      }
+    }
+    const at = text.findIndex((t, i) => t === "refresh_table_display" && text[i - 1] === "->");
+    if (at < 0) return;
+    // the grid of another object: its table is not in reach
+    if (text[at - 3] === "->" && text[at - 4] !== "me") return;
+    const outtab = this.gridOuttab(text[at - 2], ctx);
+    if (!outtab) return;
+    const changing = `CHANGING it_outtab = ${outtab}`;
+    if (text[at + 1] === "(") {
+      let depth = 0;
+      let close = at + 1;
+      for (; close < text.length; close++) {
+        if (text[close].endsWith("(")) depth++;
+        else if (text[close].startsWith(")") && --depth === 0) break;
+      }
+      const inner = text.slice(at + 2, close);
+      if (inner.length && !inner.some((t) => ["exporting", "changing", "importing"].includes(t))) ov.set(key(toks[at + 1]), "( EXPORTING");
+      if (!inner.includes("changing")) ov.set(key(toks[close]), `${changing} )`);
+    } else if (!text.includes("changing")) {
+      // CALL METHOD grid->refresh_table_display [EXPORTING ...]
+      const last = toks[toks.length - 1];
+      ov.set(key(last), `${ov.get(key(last)) ?? last.getStr()} ${changing}`);
+    }
+  }
+
+  /** the table the grid recv shows - it_outtab of its
+   *  set_table_for_first_display( ) in the same class (sender: the grid of
+   *  that class); undefined when there is none or more than one */
+  gridOuttab(recv, ctx = {}) {
+    if (!this.gridTables) {
+      this.gridTables = [];
+      const scan = (stmts, cls) => {
+        for (const x of stmts) {
+          const t = lc(renderTokens(stmtTokens(x)));
+          const m = /([\w/]+)\s*->\s*set_table_for_first_display\b/.exec(t);
+          const o = /\bit_outtab\s*=\s*([\w/]+(?:\s*(?:->|-)\s*[\w/]+)*)/.exec(t);
+          if (m && o) this.gridTables.push({ cls, var: m[1], outtab: o[1].replace(/\s+/g, "") });
+        }
+      };
+      scan([...this.events.flatMap((e) => e.stmts), ...this.forms.flatMap((f) => f.body), ...this.modules.flatMap((m) => m.body)], undefined);
+      let cls;
+      for (const u of this.locals) {
+        if (u.kind === "ClassImplementation") cls = lc(nodeText(child(u.stmts[0], "ClassName") ?? u.stmts[0].getChildren()[1]));
+        scan(u.stmts, u.kind === "ClassImplementation" ? cls : undefined);
+      }
+    }
+    const cls = ctx.local?.cls;
+    const hits = new Set(this.gridTables.filter((g) => g.cls === cls && (recv === "sender" || g.var === recv)).map((g) => g.outtab));
+    return hits.size === 1 ? [...hits][0] : undefined;
+  }
+
   /** what a statement uses of a SAP GUI control that its stand-in does not
    *  have - undefined when it has everything */
   guiCheck(s) {
     if (!this.guiVars?.size) return undefined;
     const toks = stmtTokens(s).map((x) => lc(x.getStr()));
     const used = [];
-    let ctor;
+    const ctors = [];
     for (let i = 0; i < toks.length; i++) {
       const t = toks[i];
       if (guiClass(t) && toks[i + 1] === "=>") {
@@ -1426,15 +1561,17 @@ class Converter {
         if (!m) return `${t}->${toks[i + 2]} has no counterpart in ${cls}`;
         if (m.kind === "method") used.push(m);
       }
-      if (t === "new" && guiClass(toks[i + 1])) ctor = guiClass(toks[i + 1]);
+      // NEW cl_gui_alv_grid( i_parent = NEW cl_gui_custom_container( ... ) ) - both
+      if (t === "new" && guiClass(toks[i + 1])) ctors.push(guiClass(toks[i + 1]));
     }
     // CREATE OBJECT go_x [TYPE cl_gui_y]: the constructor of its class
     if (kind(s) === "CreateObject") {
       const type = /\btype\s+([\w/]+)/.exec(toks.join(" "));
       const target = lc(nodeText(child(s, "Target") ?? s).split(/\s/)[0]);
-      ctor = type && guiClass(type[1]) ? guiClass(type[1]) : this.guiVars.get(target);
+      const ctor = type && guiClass(type[1]) ? guiClass(type[1]) : this.guiVars.get(target);
+      if (ctor) ctors.push(ctor);
     }
-    if (ctor) used.push(guiMember(ctor, "constructor"));
+    for (const c of ctors) used.push(guiMember(c, "constructor"));
     // a control handed to a method or class of the report's own - that one
     // takes a SAP GUI control, not its stand-in
     if (!used.length && /->|=>|\bnew\b|^create\s+object|^call\s+(function|method)/.test(toks.join(" "))) {
@@ -1449,7 +1586,9 @@ class Converter {
     const known = new Set(["others", "error_message", ...used.flatMap((m) => [...m.params, ...m.exceptions])]);
     const flat = toks.join(" ");
     const head = /^(?:data\s*\(\s*[\w/]+\s*\)|[\w/-]+)\s*=(?!=)/.exec(flat);
-    const body = head ? flat.slice(head[0].length) : flat;
+    // the components of a VALUE #( ... ) or another constructor expression
+    // are no parameters
+    const body = withoutConstructorArgs(head ? flat.slice(head[0].length) : flat);
     for (const m of body.matchAll(/(?:^|[(\s])([a-z_][\w]*)\s*=(?![=>])/g)) {
       if (!known.has(m[1])) return `${m[1]} is no parameter of ${used.length > 1 ? "the methods called" : "the method called"} in the stand-in`;
     }
@@ -4316,6 +4455,13 @@ class Converter {
         this.guiSetHandler(s, b);
         return;
       }
+      // refresh_table_display( ) of the grid stand-in needs the table
+      const refresh = /(?:([\w/]+)\s*->\s*)?([\w/]+)\s*->\s*refresh_table_display\b/.exec(t);
+      const foreign = refresh?.[1] && refresh[1] !== "me";
+      if (refresh && (this.guiVars.get(refresh[2]) === "z2ui5_cl_cgui_gui_alv_grid" || refresh[2] === "sender") && (foreign || !this.gridOuttab(refresh[2], b.ctx))) {
+        this.refuse(s, `SAP GUI controls: ${refresh[2]}->refresh_table_display( ) - the grid shows a copy of its table, and the table set_table_for_first_display( ) gave it is not in reach here; pass it: CHANGING it_outtab = ...`);
+        return;
+      }
       const bad = !DECL.has(k) && this.guiCheck(s);
       if (bad) {
         this.refuse(s, `SAP GUI controls: ${bad} - port this statement by hand`);
@@ -5038,6 +5184,7 @@ class Converter {
       this.mapOnce(s, cmp, "`z2ui5_cl_cgui_context=>range_check( val range )` - IN outside ABAP SQL");
     }
     this.strictSql(s, ov);
+    this.gridRewrites(toks, ov, ctx);
     return ov;
   }
 
@@ -6087,7 +6234,11 @@ class Converter {
             || (kind(x) === "CallFunction" && /^'?(POPUP_|REUSE_ALV_|GUI_UPLOAD'|GUI_DOWNLOAD')/i.test(nodeText(child(x, "FunctionName"))))
             || /\bcl_gui_(frontend_services|cfw)\b/i.test(renderTokens(stmtTokens(x)))
             // a SAP GUI control: its stand-in, and its CREATE OBJECT a NEW
-            || (this.guiVars?.size && stmtTokens(x).some((t) => guiClass(lc(t.getStr())) || this.guiVars.has(lc(t.getStr())))));
+            || (this.guiVars?.size && stmtTokens(x).some((t) => guiClass(lc(t.getStr())) || this.guiVars.has(lc(t.getStr()))))
+            // an icon of the type pool ICON - the stand-ins take sap-icon:// names
+            || (this.guiVars?.size && stmtTokens(x).some((t) => ICONS[lc(t.getStr())]))
+            // sender->... in a handler of an event of a control
+            || (this.guiVars?.size && /\bsender\s*->/i.test(renderTokens(stmtTokens(x)))));
           if (!needs || !b.body.length) continue;
           const key = `${n}~${b.name}`;
           const body = this.convertBody(b.body, { method: key, local: { cls: n, declared: own } });

@@ -190,6 +190,14 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
     "! wherever the app is restored from its serialized form
     DATA mt_cgui_handler TYPE ty_t_cgui_handler.
     DATA mt_cgui_handler_obj TYPE STANDARD TABLE OF REF TO object WITH EMPTY KEY.
+    "! the grids (z2ui5_cl_cgui_gui_alv_grid) and the one the ALV shows
+    DATA mt_cgui_grid TYPE z2ui5_if_cgui_gui=>ty_t_grid.
+    DATA mv_cgui_grid TYPE i.
+    "! the field catalog and the layout of the grid shown - attributes of
+    "! their own: a data reference in a line of a table does not come back
+    "! from the serialized app of the transpiled runtime
+    DATA mr_cgui_grid_fieldcat TYPE REF TO data.
+    DATA mr_cgui_grid_layout TYPE REF TO data.
 
     TYPES:
       BEGIN OF ty_s_cgui_msg,
@@ -919,6 +927,19 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
         event TYPE string
         value TYPE string.
 
+    "! a copy of the data val refers to
+    CLASS-METHODS grid_copy
+      IMPORTING
+        val           TYPE REF TO data
+      RETURNING
+        VALUE(result) TYPE REF TO data.
+
+    "! the ALV into node - on the page of the output, or in the container of
+    "! the grid that shows it
+    METHODS alv_render
+      IMPORTING
+        node TYPE REF TO z2ui5_cl_ui5_view_builder.
+
     "! the docking containers of the screen dynnr
     METHODS gui_docked
       IMPORTING
@@ -1526,6 +1547,105 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
 
   ENDMETHOD.
 
+  METHOD z2ui5_if_cgui_gui~grid_display.
+
+    FIELD-SYMBOLS <tab>  TYPE STANDARD TABLE.
+    FIELD-SYMBOLS <copy> TYPE STANDARD TABLE.
+    FIELD-SYMBOLS <part> TYPE any.
+
+    READ TABLE mt_cgui_grid ASSIGNING FIELD-SYMBOL(<grid>) WITH KEY id = id.
+    IF sy-subrc <> 0.
+      INSERT VALUE #( id = id ) INTO TABLE mt_cgui_grid ASSIGNING <grid>.
+    ENDIF.
+    " another grid shows now - the field catalog and the layout are its
+    IF mv_cgui_grid <> id.
+      CLEAR: mr_cgui_grid_fieldcat, mr_cgui_grid_layout.
+    ENDIF.
+    " a copy of the field catalog and the layout - for get_frontend_*( )
+    IF fieldcat IS BOUND.
+      mr_cgui_grid_fieldcat = grid_copy( fieldcat ).
+    ENDIF.
+    IF layout IS BOUND.
+      mr_cgui_grid_layout = grid_copy( layout ).
+    ENDIF.
+
+    DATA lo_alv TYPE REF TO z2ui5_cl_cgui_alv.
+    IF mv_cgui_grid = id AND mo_cgui_alv IS BOUND.
+      " the grid shows: its table anew, the ALV keeps what it has
+      lo_alv = mo_cgui_alv.
+      IF tab IS BOUND.
+        ASSIGN tab->* TO <tab>.
+        CREATE DATA mr_cgui_alv LIKE <tab>.
+        ASSIGN mr_cgui_alv->* TO <copy>.
+        <copy> = <tab>.
+        CLEAR: mr_cgui_alv_box, mr_cgui_alv_page, mt_cgui_alv_index.
+      ENDIF.
+    ELSEIF tab IS BOUND.
+      ASSIGN tab->* TO <tab>.
+      lo_alv = alv( <tab> )->set_line_selection( ).
+    ELSE.
+      RETURN.
+    ENDIF.
+    IF fieldcat IS BOUND.
+      ASSIGN fieldcat->* TO <part>.
+      lo_alv->set_fieldcat( <part> ).
+    ENDIF.
+    IF layout IS BOUND.
+      ASSIGN layout->* TO <part>.
+      lo_alv->set_layout_classic( <part> ).
+    ENDIF.
+    IF sort IS BOUND.
+      ASSIGN sort->* TO <part>.
+      lo_alv->set_sort_classic( <part> ).
+    ENDIF.
+    " the functions of the toolbar - each one once
+    IF functions IS BOUND.
+      DATA lt_function TYPE z2ui5_if_cgui_gui=>ty_t_button.
+      ASSIGN functions->* TO <part>.
+      lt_function = <part>.
+      LOOP AT lt_function INTO DATA(ls_function) WHERE fcode IS NOT INITIAL AND type <> 3.
+        IF line_exists( <grid>-functions[ fcode = ls_function-fcode ] ).
+          CONTINUE.
+        ENDIF.
+        lo_alv->add_function( name    = ls_function-fcode
+                              text    = ls_function-text
+                              icon    = COND #( WHEN ls_function-icon CP `sap-icon://*` THEN ls_function-icon )
+                              tooltip = ls_function-quickinfo ).
+        INSERT ls_function INTO TABLE <grid>-functions.
+      ENDLOOP.
+    ENDIF.
+    mv_cgui_grid = id.
+
+  ENDMETHOD.
+
+  METHOD z2ui5_if_cgui_gui~grid_get.
+
+    READ TABLE mt_cgui_grid INTO result WITH KEY id = id.
+    IF id = mv_cgui_grid.
+      result-fieldcat = mr_cgui_grid_fieldcat.
+      result-layout = mr_cgui_grid_layout.
+    ENDIF.
+
+  ENDMETHOD.
+
+  METHOD z2ui5_if_cgui_gui~grid_selected.
+
+    result = get_selected_rows( ).
+
+  ENDMETHOD.
+
+  METHOD grid_copy.
+
+    FIELD-SYMBOLS <from> TYPE any.
+    FIELD-SYMBOLS <to>   TYPE any.
+
+    ASSIGN val->* TO <from>.
+    CREATE DATA result LIKE <from>.
+    ASSIGN result->* TO <to>.
+    <to> = <from>.
+
+  ENDMETHOD.
+
   METHOD z2ui5_if_cgui_gui~custom_render.
 
     LOOP AT mt_cgui_gui INTO DATA(ls_control)
@@ -1642,6 +1762,12 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
               )->a( n = `text`   t = <control>-url
               )->a( n = `href`   t = <control>-url
               )->a( n = `target` v = `_blank` ).
+        ENDIF.
+
+      WHEN z2ui5_if_cgui_gui=>cs_kind-grid.
+        " the grid the ALV shows - another one shows nothing
+        IF mv_cgui_grid = id AND mo_cgui_alv IS BOUND.
+          alv_render( node ).
         ENDIF.
 
       WHEN z2ui5_if_cgui_gui=>cs_kind-toolbar.
@@ -2471,18 +2597,31 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
         DATA(lv_alv_row) = alv_row( z2ui5_cl_cgui_alv=>get_row_by_event( client ) ).
         ms_cgui_cursor = VALUE #( line = lv_alv_row ).
         CLEAR mv_cgui_lisel.
-        on_line_selection( row  = lv_alv_row
-                           hide = `` ).
+        " the ALV of a grid: its event double_click
+        IF mv_cgui_grid IS NOT INITIAL.
+          gui_event( id    = mv_cgui_grid
+                     event = `DOUBLE_CLICK`
+                     value = |{ lv_alv_row }| ).
+        ELSE.
+          on_line_selection( row  = lv_alv_row
+                             hide = `` ).
+        ENDIF.
 
       WHEN z2ui5_cl_cgui_alv=>cs_event-hotspot.
         DATA(ls_hotspot) = z2ui5_cl_cgui_alv=>get_hotspot_by_event( client ).
         ms_cgui_cursor = VALUE #( field = ls_hotspot-column
                                   line  = alv_row( ls_hotspot-row ) ).
         CLEAR mv_cgui_lisel.
-        on_line_selection( row    = alv_row( ls_hotspot-row )
-                           hide   = ls_hotspot-column
-                           column = ls_hotspot-column
-                           link   = abap_true ).
+        IF mv_cgui_grid IS NOT INITIAL.
+          gui_event( id    = mv_cgui_grid
+                     event = `HOTSPOT_CLICK`
+                     value = |{ alv_row( ls_hotspot-row ) }{ cl_abap_char_utilities=>horizontal_tab }{ ls_hotspot-column }| ).
+        ELSE.
+          on_line_selection( row    = alv_row( ls_hotspot-row )
+                             hide   = ls_hotspot-column
+                             column = ls_hotspot-column
+                             link   = abap_true ).
+        ENDIF.
 
       WHEN cs_ucomm-gui.
         " an event of a SAP GUI control: id, event, value
@@ -2500,8 +2639,14 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
           CLEAR mv_cgui_pending_ucomm.
         ENDIF.
 
+        " a function of the toolbar of a grid: its event user_command
+        READ TABLE mt_cgui_grid INTO DATA(ls_grid) WITH KEY id = mv_cgui_grid.
+        IF sy-subrc = 0 AND line_exists( ls_grid-functions[ fcode = lv_event ] ).
+          gui_event( id    = mv_cgui_grid
+                     event = `USER_COMMAND`
+                     value = lv_event ).
         " a function on a dynpro is its PAI
-        IF mv_cgui_screen = cs_screen-dynpro.
+        ELSEIF mv_cgui_screen = cs_screen-dynpro.
           on_dynpro_command( lv_event ).
         ELSE.
           at_user_command( lv_event ).
@@ -3830,7 +3975,8 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
 
     CLEAR: mo_cgui_list, mo_cgui_alv, mr_cgui_alv, mr_cgui_alv_box, mv_cgui_alv_name, mt_cgui_level,
            mr_cgui_alv_page, mt_cgui_alv_index, mo_cgui_tree, mt_cgui_tree_view,
-           mv_cgui_window, mv_cgui_window_title, mv_cgui_window_cols, mv_cgui_window_lines.
+           mv_cgui_window, mv_cgui_window_title, mv_cgui_window_cols, mv_cgui_window_lines,
+           mt_cgui_grid, mv_cgui_grid, mr_cgui_grid_fieldcat, mr_cgui_grid_layout.
     mv_cgui_left = abap_false.
     start_of_selection( ).
     " CALL SCREEN: the dynpro shows, the rest follows when it is left
@@ -5887,7 +6033,7 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
 
   ENDMETHOD.
 
-  METHOD view_display_output.
+  METHOD alv_render.
 
     FIELD-SYMBOLS <tab>  TYPE STANDARD TABLE.
     FIELD-SYMBOLS <page> TYPE STANDARD TABLE.
@@ -5936,12 +6082,21 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
           ENDLOOP.
           ASSIGN mr_cgui_alv_page->* TO <tab>.
         ENDIF.
-        mo_cgui_alv->render( node   = page
+        mo_cgui_alv->render( node   = node
                              client = client
                              tab    = <tab>
                              total  = lv_total
                              all    = lv_all ).
       ENDIF.
+    ENDIF.
+
+  ENDMETHOD.
+
+  METHOD view_display_output.
+
+    " a grid of the report shows the ALV in its container
+    IF mo_cgui_alv IS BOUND AND mv_cgui_grid IS INITIAL.
+      alv_render( page ).
     ENDIF.
 
     IF mo_cgui_tree IS BOUND.

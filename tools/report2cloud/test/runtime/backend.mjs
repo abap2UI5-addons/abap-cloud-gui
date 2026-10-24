@@ -58,7 +58,7 @@ export function corePin() {
   return dep && /^\d+\.\d+\.\d+$/.test(String(dep.branch)) ? dep.branch : null;
 }
 
-const OBJECT = /^([a-z0-9_]+)\.(clas|intf|tabl|dtel)(\.[a-z_]+)?\.(abap|xml)$/i;
+const OBJECT = /^([a-z0-9_]+)\.(clas|intf|tabl|dtel|ttyp)(\.[a-z_]+)?\.(abap|xml)$/i;
 
 function copyObjects(from, to, withTests = false) {
   if (!existsSync(from)) return;
@@ -152,7 +152,7 @@ export async function buildBackend({ files = {}, ddic, seed = [], sources = ["sr
     downportRel: relative(rt.dir, npm.downportDir(rt.dir)).split(sep).join("/"),
     coreRel: relative(rt.dir, lib.dir).split(sep).join("/"),
   });
-  config.input_filter = ["[\\\\/][a-z0-9_]+\\.(clas|intf|tabl|dtel)\\.[a-z_.]*(abap|xml)$"];
+  config.input_filter = ["[\\\\/][a-z0-9_]+\\.(clas|intf|tabl|dtel|ttyp)\\.[a-z_.]*(abap|xml)$"];
   config.write_unit_tests = withTests;
   writeFileSync(join(work, "abap_transpile.json"), JSON.stringify(config, null, 2));
   const transpiler = join(rt.dir, "node_modules", "@abaplint", "transpiler-cli", "abap_transpile");
@@ -179,7 +179,9 @@ export async function buildBackend({ files = {}, ddic, seed = [], sources = ["sr
   }
   if (stray.length) return { ok: false, dir: work, reason: `imports the build cannot point at the package: ${stray.slice(0, 5).join(", ")}` };
   const initText = readFileSync(join(staging, "init.mjs"), "utf8");
-  const tables = objects.filter((o) => o.endsWith(".tabl")).map((o) => o.replace(/\.tabl$/, ""));
+  // the transparent tables - a structure (INTTAB) has no table in the database
+  const tables = objects.filter((o) => o.endsWith(".tabl")).map((o) => o.replace(/\.tabl$/, ""))
+    .filter((t) => !/<TABCLASS>INTTAB<\/TABCLASS>/.test(readFileSync(join(input, `${t}.tabl.xml`), "utf8")));
   const schema = tableSchema(initText, tables);
   if (schema.length !== tables.length) return { ok: false, dir: work, reason: `CREATE TABLE for ${tables.join(", ")} not found in the transpiler's init.mjs` };
   const modules = npm.bootOrder(initText, objects.map((o) => `${o}.mjs`).filter((f) => local.has(f)));

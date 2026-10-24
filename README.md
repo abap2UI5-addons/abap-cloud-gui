@@ -503,8 +503,11 @@ Stage 5 - research
 - [x] Their events: the toolbar (`function_selected`, `dropdown_clicked`),
       the SAPEVENT links of the HTML viewer, the close of a dialog box -
       `SET HANDLER` as `set_handler( )` of the stand-in
-- [ ] The grid in a container next to them, F1 of the editor, the tree and
-      the picture; table controls, subscreens and tabstrips on a dynpro
+- [x] The grid in a local class: the stand-in `z2ui5_cl_cgui_gui_alv_grid`,
+      the ALV of the report in its container, with its toolbar, user
+      command, double click and hotspot
+- [ ] More than one grid, F1 of the editor, the tree and the picture; table
+      controls, subscreens and tabstrips on a dynpro
 
 Quality, through every stage
 

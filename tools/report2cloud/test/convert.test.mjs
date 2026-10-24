@@ -936,6 +936,21 @@ test("TYPE (name) / FOR (name) of a fixed name - a literal or a DATA with a VALU
   assert.match(convert(set, { file: "zt.prog.abap", className: "zcl_t" }).refusals[0].message, /^S_X is typed at runtime/);
 });
 
+test("SAP GUI controls: a grid in a local class is the grid stand-in - VALUE #( ) of a generic parameter takes the classic type, refresh_table_display( ) is passed the table", () => {
+  const src = (refresh) => `REPORT zt.\nCLASS lcl DEFINITION.\n  PUBLIC SECTION.\n    DATA mt TYPE STANDARD TABLE OF spfli WITH DEFAULT KEY.\n    DATA mo_grid TYPE REF TO cl_gui_alv_grid.\n    METHODS show.\n    METHODS on_cmd FOR EVENT user_command OF cl_gui_alv_grid IMPORTING e_ucomm sender.\nENDCLASS.\nCLASS lcl IMPLEMENTATION.\n  METHOD show.\n    mo_grid = NEW cl_gui_alv_grid( i_parent = NEW cl_gui_custom_container( container_name = 'CC' ) ).\n    SET HANDLER on_cmd FOR mo_grid.\n    mo_grid->set_table_for_first_display( EXPORTING is_layout = VALUE #( zebra = abap_true ) it_toolbar_excluding = VALUE #( ( cl_gui_alv_grid=>mc_fc_excl_all ) ) CHANGING it_outtab = mt ).\n  ENDMETHOD.\n  METHOD on_cmd.\n    ${refresh}\n  ENDMETHOD.\nENDCLASS.\nSTART-OF-SELECTION.\n  NEW lcl( )->show( ).\n`;
+  const r = convert(src("sender->refresh_table_display( is_stable = VALUE #( row = abap_true ) )."), { file: "zt.prog.abap", className: "zcl_t" });
+  assert.deepEqual(r.refusals.map((x) => x.message), []);
+  const text = Object.values(r.files).join("\n");
+  assert.match(text, /mo_grid = NEW z2ui5_cl_cgui_gui_alv_grid\( i_parent = NEW z2ui5_cl_cgui_gui_container\( container_name = 'CC' \) \)\./);
+  assert.match(text, /is_layout = VALUE lvc_s_layo\( zebra = abap_true \)/);
+  assert.match(text, /it_toolbar_excluding = VALUE ui_functions\( \( z2ui5_cl_cgui_gui_alv_grid=>mc_fc_excl_all \) \)/);
+  assert.match(text, /sender->refresh_table_display\( EXPORTING is_stable = VALUE lvc_s_stbl\( row = abap_true \) CHANGING it_outtab = mt \)\./);
+  assert.match(convert(src("mo_grid->refresh_table_display( )."), { file: "zt.prog.abap", className: "zcl_t" }).files["zcl_t.clas.locals_imp.abap"], /mo_grid->refresh_table_display\( CHANGING it_outtab = mt \)\./);
+  // a grid of another object: its table is not in reach here
+  const other = src("DATA(lo) = NEW lcl( ).\n    lo->mo_grid->refresh_table_display( ).");
+  assert.match(convert(other, { file: "zt.prog.abap", className: "zcl_t" }).refusals[0]?.message ?? "", /refresh_table_display\( \) - the grid shows a copy of its table/);
+});
+
 test("MESSAGE of an exception object is its text; MODULE x OUTPUT and MODULE x INPUT are two methods", () => {
   const r = convert("REPORT zt.\nSTART-OF-SELECTION.\n  TRY.\n      RAISE EXCEPTION TYPE cx_sy_zerodivide.\n    CATCH cx_root INTO DATA(lx).\n      MESSAGE lx TYPE 'I'.\n  ENDTRY.\n", { file: "zt.prog.abap", className: "zcl_t" });
   assert.match(r.files["zcl_t.clas.abap"], /message\( text = lx->get_text\( \)\n\s+type = `I` \)\./);

@@ -324,6 +324,34 @@ test("zr2c_26_events: a toolbar, the links of an HTML viewer and a dialog box - 
   assert.equal(boxes(), 1);
 });
 
+test("zr2c_27_gridlocal: a grid in a local class - in the custom control area of its dynpro, the field catalog, the toolbar function, double click and hotspot to the handlers", { skip }, async () => {
+  const rows = () => d.state().models.MAIN.data.MR_CGUI_ALV["*"];
+  // no selection screen: START-OF-SELECTION calls the screen, its PBO creates the grid
+  let s = await d.start("z2ui5_cl_cgui_r2c_27");
+  const xml = () => d.state().slots.MAIN.xml;
+  assert.match(xml(), /rows="\{\/MR_CGUI_ALV\/\*\}"/, "the grid in the custom control area");
+  assert.deepEqual(rows().map((r) => `${r.CARRID} ${r.CONNID}`), ["AA 0017", "LH 0400", "LH 0402", "LH 2402"]);
+  // the field catalog: its texts, the hotspot of the city
+  for (const label of ["Airline", "Flight", "From", "To"]) assert.match(xml(), new RegExp(`text="${label}"`), label);
+  assert.equal(s.tables[0]?.label, "Connections (4)", "grid_title of the layout, the ALV counts the rows");
+
+  // double click and hotspot: the handlers read the row of their own table
+  s = await d.act(s.session, { event: "CGUI_ALV_LINE_SELECTION", args: ["/MR_CGUI_ALV/*/1"] });
+  assert.deepEqual(toasts(s), ["LH 0400"]);
+  s = await d.act(s.session, { event: "CGUI_ALV_HOTSPOT", args: ["/MR_CGUI_ALV/*/2", "CITYFROM"] });
+  assert.deepEqual(toasts(s), ["CITYFROM: FRANKFURT"]);
+
+  // the function of the toolbar handler: user_command adds a row, refresh_table_display( ) shows it
+  assert.ok(actionsOf(s, "ADD").length >= 1, JSON.stringify(s.actions.map((a) => a.event)));
+  s = await d.act(s.session, { event: "ADD" });
+  assert.equal(rows().length, 5);
+  assert.equal(rows()[4].CARRID, "UA");
+
+  // Back: LEAVE TO SCREEN 0 of the PAI module
+  s = await d.act(s.session, { event: "CGUI_BACK" });
+  assert.doesNotMatch(xml() ?? "", /MR_CGUI_ALV/);
+});
+
 test("zr2c_21_lclreport: a local report class that reads the selection screen, writes the list and calls a FORM", { skip }, async () => {
   let s = await d.start("z2ui5_cl_cgui_r2c_21");
   s = await d.act(s.session, { event: "CGUI_EXECUTE" });
