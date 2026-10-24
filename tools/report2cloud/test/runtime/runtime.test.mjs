@@ -245,13 +245,12 @@ test("zr2c_24_gridinline: no selection screen - the grid created inline in INITI
   // no selection screen: INITIALIZATION goes straight on, the grid is the first page
   let s = await d.start("z2ui5_cl_cgui_r2c_24");
   assert.deepEqual(s.fields, []);
-  assert.ok(s.texts.includes("Connections in a grid (4)"), s.texts.join(" | "));
-  // the table is no attribute: alv( ) copied it into a data reference, bound as
-  // {/MR_CGUI_ALV/*} - the snapshot does not read that path, the model has the rows
+  // the table is no attribute: alv( ) copied it into a data reference, bound as {/MR_CGUI_ALV/*}
   const xml = d.state().slots.MAIN.xml;
   assert.match(xml, /rows="\{\/MR_CGUI_ALV\/\*\}"/);
-  const rows = d.state().models.MAIN.data.MR_CGUI_ALV["*"];
-  assert.deepEqual(rows.map((r) => `${r.CARRID} ${r.CONNID}`), ["AA 0017", "LH 0400", "LH 0402", "LH 2402"], "ORDER BY carrid, connid");
+  assert.equal(s.tables.length, 1);
+  assert.equal(s.tables[0].label, "Connections in a grid (4)");
+  assert.deepEqual(s.tables[0].rows.map((r) => `${r.CARRID} ${r.CONNID}`), ["AA 0017", "LH 0400", "LH 0402", "LH 2402"], "ORDER BY carrid, connid");
   // the VALUE field catalog: the column texts, MANDT hidden
   for (const label of ["Airline", "Flight", "From", "To"]) assert.match(xml, new RegExp(`text="${label}"`), label);
   assert.doesNotMatch(xml, /text="MANDT"|"\{MANDT\}"/, "MANDT is hidden");
@@ -261,7 +260,7 @@ test("zr2c_24_gridinline: no selection screen - the grid created inline in INITI
   assert.deepEqual(s.fields, []);
   assert.ok(actionsOf(s, "CGUI_EXECUTE").length >= 1);
   s = await d.act(s.session, { event: "CGUI_EXECUTE" });
-  assert.ok(s.texts.includes("Connections in a grid (4)"));
+  assert.equal(s.tables[0].label, "Connections in a grid (4)");
 });
 
 test("zr2c_25_textedit: a text editor and an HTML viewer in the custom control areas of a dynpro - typed, previewed, saved", { skip }, async () => {
