@@ -497,9 +497,12 @@ Stage 5 - research
       methods called by `dynpro_pbo( )` / `dynpro_pai( )`, `CALL SCREEN`,
       `SET SCREEN`, `LEAVE TO SCREEN` and the statements after the call in
       `after_call_screen( )`
-- [ ] Table controls, subscreens and tabstrips on a dynpro, and the SAP GUI
-      controls of a custom control (text editor, HTML viewer, tree) as
-      stand-ins of the same methods and events
+- [x] The SAP GUI controls of a custom control area or a docking container:
+      the containers, the text editor and the HTML viewer as stand-ins of the
+      same methods (`z2ui5_cl_cgui_gui*`)
+- [ ] Their events (SAPEVENT of the HTML viewer, F1 of the editor), the grid
+      in a container next to them, the tree and the picture; table controls,
+      subscreens and tabstrips on a dynpro; a control in a local class
 
 Quality, through every stage
 

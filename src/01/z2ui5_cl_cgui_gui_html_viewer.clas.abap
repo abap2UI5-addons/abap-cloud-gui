@@ -84,6 +84,27 @@ CLASS z2ui5_cl_cgui_gui_html_viewer DEFINITION PUBLIC
       EXCEPTIONS
         cntl_error.
 
+    "! single sign-on - the browser sends its own credentials
+    METHODS enable_sapsso
+      IMPORTING
+        enabled TYPE clike DEFAULT abap_true
+      EXCEPTIONS
+        cntl_error.
+
+    "! the URL in a browser of its own - a link that opens it
+    METHODS show_url_in_browser
+      IMPORTING
+        url TYPE clike
+      EXCEPTIONS
+        cntl_error.
+
+    "! the document shown in a browser of its own - a link that opens it
+    METHODS detach_url_in_browser
+      IMPORTING
+        url TYPE clike OPTIONAL
+      EXCEPTIONS
+        cntl_error.
+
   PROTECTED SECTION.
   PRIVATE SECTION.
     TYPES:
@@ -161,6 +182,26 @@ CLASS z2ui5_cl_cgui_gui_html_viewer IMPLEMENTATION.
     DATA(ls_control) = get( ).
     CLEAR: ls_control-html, ls_control-url.
     put( ls_control ).
+
+  ENDMETHOD.
+
+  METHOD enable_sapsso ##NEEDED.
+  ENDMETHOD.
+
+  METHOD show_url_in_browser.
+
+    DATA(ls_control) = get( ).
+    CLEAR ls_control-html.
+    ls_control-url = condense( CONV string( url ) ).
+    put( ls_control ).
+
+  ENDMETHOD.
+
+  METHOD detach_url_in_browser.
+
+    IF url IS NOT INITIAL.
+      show_url_in_browser( url ).
+    ENDIF.
 
   ENDMETHOD.
 

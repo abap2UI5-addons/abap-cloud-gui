@@ -6,7 +6,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { convert, defaultClassName, FRONTEND, RESERVED_METHODS, UNCATALOGUED } from "../lib/convert.mjs";
+import { convert, defaultClassName, FRONTEND, GUI, RESERVED_METHODS, UNCATALOGUED } from "../lib/convert.mjs";
 import { corpus, convertEntry, SNAPSHOTS } from "./corpus.mjs";
 import { parseTextpool } from "../lib/textpool.mjs";
 
@@ -845,4 +845,75 @@ test("cl_gui_frontend_services=>directory_list_files( files_only ) is z2ui5_cl_c
   const r = convert(src, { file: "zt.prog.abap", className: "zcl_t" });
   assert.deepEqual(r.refusals.map((x) => x.message), []);
   assert.match(r.files["zcl_t.clas.abap"], /z2ui5_cl_cgui_frontend=>directory_list_files\(/);
+});
+
+test("the table of the SAP GUI stand-ins in the converter is the classes - their constants, attributes, methods, parameters, exceptions", () => {
+  for (const [cls, members] of Object.entries(GUI.members)) {
+    const text = readFileSync(new URL(`../../../src/01/${cls}.clas.abap`, import.meta.url), "utf8");
+    const def = text.slice(text.indexOf("PUBLIC SECTION"), text.indexOf("PROTECTED SECTION"));
+    const methods = {};
+    for (const m of def.matchAll(/^\s*(?:CLASS-)?METHODS\s+(\w+)([\s\S]*?)\.\s*$/gim)) {
+      let section;
+      const params = [];
+      const exceptions = [];
+      for (const line of m[2].split("\n").map((l) => l.trim()).filter(Boolean)) {
+        if (/^(IMPORTING|EXPORTING|CHANGING|RETURNING|EXCEPTIONS)$/.test(line)) section = line;
+        else if (/^PREFERRED/.test(line)) continue;
+        else if (section === "EXCEPTIONS") exceptions.push(line.toLowerCase());
+        else if (section && section !== "RETURNING") params.push(line.split(/\s+/)[0].toLowerCase());
+      }
+      methods[m[1].toLowerCase()] = { params, exceptions };
+    }
+    const parent = (/INHERITING FROM\s+(\w+)/i.exec(text) ?? [])[1]?.toLowerCase();
+    const constants = [...def.matchAll(/^\s*CONSTANTS\s+(\w+)\s/gim)].map((m) => m[1].toLowerCase());
+    const attributes = [...def.matchAll(/^\s*(?:CLASS-)?DATA\s+(\w+)\s/gim)].map((m) => m[1].toLowerCase());
+    assert.deepEqual({ ...(parent ? { parent } : {}), constants, attributes, methods }, members, cls);
+  }
+  for (const standin of Object.values(GUI.classes)) assert.ok(GUI.members[standin], standin);
+});
+
+test("SAP GUI controls: the containers, the text editor and the HTML viewer become their stand-ins, CREATE OBJECT is NEW", () => {
+  const cls = classOf("zr2c_25_textedit");
+  const { result } = converted.get("zr2c_25_textedit");
+  assert.equal(result.ok, true, result.refusals.map((x) => x.message).join("\n"));
+  assert.match(cls, /DATA go_notes\s+TYPE REF TO z2ui5_cl_cgui_gui_container\./);
+  assert.match(cls, /DATA go_editor\s+TYPE REF TO z2ui5_cl_cgui_gui_textedit\./);
+  assert.match(cls, /DATA go_html\s+TYPE REF TO z2ui5_cl_cgui_gui_html_viewer\./);
+  assert.match(cls, /go_notes = NEW #\( container_name = 'NOTES' \)\./);
+  assert.match(cls, /go_editor = NEW #\( parent {21}= go_notes\n\s+wordwrap_mode {14}= z2ui5_cl_cgui_gui_textedit=>wordwrap_at_fixed_position/);
+  assert.match(cls, /go_editor->set_toolbar_mode\( z2ui5_cl_cgui_gui_textedit=>false \)\./);
+  assert.match(cls, /go_html->load_data\( IMPORTING assigned_url = lv_url\n\s+CHANGING {2}data_table {3}= lt_html \)\./);
+  // the custom control areas of the screen, after the line of the buttons
+  assert.match(cls, /\)->line_end\(\n\s+\)->custom_control\( `NOTES`\n\s+\)->custom_control\( `PREVIEW` \)\./);
+  assert.doesNotMatch(cls, /cl_gui_/i);
+});
+
+test("SAP GUI controls: a member, a parameter or an event the stand-ins do not have is refused; other controls are", () => {
+  const head = "REPORT zt.\nDATA go_c TYPE REF TO cl_gui_custom_container.\nDATA go_e TYPE REF TO cl_gui_textedit.\nSTART-OF-SELECTION.\n  CREATE OBJECT go_c EXPORTING container_name = 'CC'.\n";
+  const refused = (body) => refusalOf(`${head}${body}`).map((x) => x.replace(/^\d+:\d+ /, ""));
+  assert.deepEqual(refused("  CREATE OBJECT go_e EXPORTING parent = go_c.\n  go_e->set_textstream( 'x' ).\n"), []);
+  assert.deepEqual(refused("  go_e->set_comments_string( ).\n"), ["SAP GUI controls: go_e->set_comments_string has no counterpart in z2ui5_cl_cgui_gui_textedit - port this statement by hand"]);
+  assert.deepEqual(refused("  go_e->set_textstream( text = 'x' colour = 1 ).\n"), ["SAP GUI controls: colour is no parameter of the method called in the stand-in - port this statement by hand"]);
+  assert.deepEqual(refused("  SET HANDLER lcl=>on_f1 FOR go_e.\n").map((x) => x.split(" - ")[0]), ["SAP GUI controls: the events of the text editor and the HTML viewer (SET HANDLER) have no counterpart yet"]);
+  assert.deepEqual(refusalOf(`${head}DATA go_p TYPE REF TO cl_gui_picture.\n`).map((x) => x.replace(/^\d+:\d+ /, "")), ["SAP GUI controls: cl_gui_picture has no counterpart - the containers, cl_gui_textedit and cl_gui_html_viewer have (z2ui5_cl_cgui_gui*)"]);
+});
+
+test("MESSAGE of an exception object is its text; MODULE x OUTPUT and MODULE x INPUT are two methods", () => {
+  const r = convert("REPORT zt.\nSTART-OF-SELECTION.\n  TRY.\n      RAISE EXCEPTION TYPE cx_sy_zerodivide.\n    CATCH cx_root INTO DATA(lx).\n      MESSAGE lx TYPE 'I'.\n  ENDTRY.\n", { file: "zt.prog.abap", className: "zcl_t" });
+  assert.match(r.files["zcl_t.clas.abap"], /message\( text = lx->get_text\( \)\n\s+type = `I` \)\./);
+  const xml = `<abapGit><asx:abap><asx:values><DYNPROS><item><HEADER><PROGRAM>ZT</PROGRAM><SCREEN>0100</SCREEN><TYPE>N</TYPE></HEADER>
+<CONTAINERS><RPY_DYCATT><TYPE>SCREEN</TYPE><NAME>SCREEN</NAME></RPY_DYCATT></CONTAINERS><FIELDS></FIELDS>
+<FLOW_LOGIC><RPY_DYFLOW><LINE>PROCESS BEFORE OUTPUT.</LINE></RPY_DYFLOW><RPY_DYFLOW><LINE>MODULE init_0100.</LINE></RPY_DYFLOW><RPY_DYFLOW><LINE>PROCESS AFTER INPUT.</LINE></RPY_DYFLOW><RPY_DYFLOW><LINE>MODULE init_0100.</LINE></RPY_DYFLOW></FLOW_LOGIC></item></DYNPROS></asx:values></asx:abap></abapGit>`;
+  const src = "REPORT zt.\nDATA gv TYPE i.\nSTART-OF-SELECTION.\n  CALL SCREEN 100.\nMODULE init_0100 OUTPUT.\n  gv = 1.\nENDMODULE.\nMODULE init_0100 INPUT.\n  LEAVE TO SCREEN 0.\nENDMODULE.\n";
+  const d = convert(src, { file: "zt.prog.abap", className: "zcl_t", textpool: parseTextpool(xml) });
+  assert.deepEqual(d.refusals.map((x) => x.message), []);
+  const cls = d.files["zcl_t.clas.abap"];
+  assert.match(cls, /METHOD dynpro_pbo\.\n\n\s+CASE dynnr\.\n\s+WHEN `0100`\.\n\s+init_0100\( \)\./);
+  assert.match(cls, /METHOD dynpro_pai\.(.*\n)*?\s+init_0100_pai\( \)\./);
+  assert.match(cls, /METHOD init_0100_pai\.\n\n\s+leave_to_screen\( `0000` \)\./);
+});
+
+test("SAP GUI controls: a control handed to a class of the report's own is refused - it takes a cl_gui_* object", () => {
+  const src = "REPORT zt.\nDATA go_c TYPE REF TO cl_gui_custom_container.\nSTART-OF-SELECTION.\n  CREATE OBJECT go_c EXPORTING container_name = 'CC'.\n  zcl_my_button=>create( parent = go_c ).\n";
+  assert.deepEqual(refusalOf(src).map((x) => x.replace(/^\d+:\d+ /, "")), ["SAP GUI controls: go_c, a SAP GUI control, is handed to a method that is no stand-in - it takes a cl_gui_* object - port this statement by hand"]);
 });

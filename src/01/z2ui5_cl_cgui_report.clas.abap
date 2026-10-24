@@ -1430,6 +1430,15 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
     ELSEIF ls_control-dynnr IS NOT INITIAL AND ls_control-dynnr CO `0123456789`.
       ls_control-dynnr = dynnr_norm( ls_control-dynnr ).
     ENDIF.
+    " a custom control area holds one container - a new one (the PBO of a
+    " run that starts afresh) replaces the one before
+    IF ls_control-kind = z2ui5_if_cgui_gui=>cs_kind-container AND ls_control-parent IS INITIAL
+        AND ls_control-name IS NOT INITIAL.
+      LOOP AT mt_cgui_gui ASSIGNING FIELD-SYMBOL(<old>)
+           WHERE kind = z2ui5_if_cgui_gui=>cs_kind-container AND parent = 0 AND name = ls_control-name.
+        <old>-freed = abap_true.
+      ENDLOOP.
+    ENDIF.
     INSERT ls_control INTO TABLE mt_cgui_gui.
     result = ls_control-id.
 
