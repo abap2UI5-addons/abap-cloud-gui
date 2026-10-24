@@ -789,3 +789,22 @@ test("a dynpro the converter does not build is refused at its modules - a contro
   assert.match(refused(src, undefined).find((x) => x.startsWith("5:1")), /^5:1 MODULE - the screens are in the \.prog\.xml \(--texts\), which was not passed/);
   assert.match(refused(src, xml("", ["PROCESS AFTER INPUT.", "  MODULE user_command_0200."])).find((x) => x.startsWith("5:1")), /^5:1 MODULE - screen 0100 calls MODULE user_command_0200, which is not in the report/);
 });
+
+test("a grid created inline, a VALUE field catalog, no selection screen: alv( ) in start_of_selection( ), the IF sy-subrc around CALL SCREEN gone", () => {
+  const cls = classOf("zr2c_24_gridinline");
+  const { result } = converted.get("zr2c_24_gridinline");
+  assert.equal(result.ok, true, result.refusals.map((x) => x.message).join("\n"));
+  // INITIALIZATION went straight on with START-OF-SELECTION - its statements are there
+  assert.match(cls, /METHOD initialization\.\n\n\s+set_title\( `Connections in a grid` \)\.\n\n\s+ENDMETHOD\./);
+  assert.match(cls, /METHOD start_of_selection\.\n\n\s+SELECT \* FROM spfli INTO TABLE @DATA\(connections\)/);
+  assert.match(cls, /alv\( connections\n\s+\)->set_column_text\( name = `CARRID`\n\s+text = 'Airline'\n(.*\n){4}\s+\)->set_column_text\( name = `CITYTO`\n\s+text = 'To'\n\s+\)->set_column_hidden\( `MANDT` \)\./);
+  assert.doesNotMatch(cls, /cl_gui_|DATA\(grid\)|DATA\(fcat\)|IF sy-subrc/i);
+  assert.ok(result.mapped.some((m) => /no selection screen: INITIALIZATION went straight on/.test(m.target)));
+});
+
+test("a report with a selection screen keeps its INITIALIZATION; an IF of the source that is empty stays", () => {
+  const src = "REPORT zt.\nPARAMETERS p TYPE i.\nINITIALIZATION.\n  p = 1.\nSTART-OF-SELECTION.\n  IF p = 2.\n  ENDIF.\n  WRITE p.\n";
+  const r = convert(src, { file: "zt.prog.abap", className: "zcl_t" });
+  assert.match(r.files["zcl_t.clas.abap"], /METHOD initialization\.\n\n\s+p = 1\./);
+  assert.match(r.files["zcl_t.clas.abap"], /IF p = 2\.\n\s+ENDIF\./);
+});

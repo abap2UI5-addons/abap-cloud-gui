@@ -941,6 +941,13 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
       RETURNING
         VALUE(result) TYPE z2ui5_cl_cgui_selscreen=>ty_t_field.
 
+    "! abap_true when selection_screen( ) declares nothing - no field, no
+    "! comment, no button: a classic report without a selection screen goes
+    "! on with START-OF-SELECTION right after INITIALIZATION
+    METHODS screen_empty
+      RETURNING
+        VALUE(result) TYPE abap_bool.
+
     "! abap_true when field is a field of the selection screen or of the
     "! popup screen - the attribute name an event argument carries
     METHODS screen_field_check
@@ -1444,7 +1451,7 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
     url_values_get( ).
     url_values_apply( ).
 
-    IF mv_cgui_skip = abap_true OR to_upper( url_param( cv_cgui_url_skip ) ) = abap_true.
+    IF mv_cgui_skip = abap_true OR to_upper( url_param( cv_cgui_url_skip ) ) = abap_true OR screen_empty( ) = abap_true.
       IF mv_cgui_variant_start IS NOT INITIAL.
         " the variant arrives with the browser's storage - the run waits for
         " it, and a timer runs it when nothing is stored
@@ -2535,6 +2542,15 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
                                                      app    = me ).
     selection_screen( screen ).
     result = screen->get_fields( ).
+
+  ENDMETHOD.
+
+  METHOD screen_empty.
+
+    DATA(screen) = z2ui5_cl_cgui_selscreen=>factory( client = client
+                                                     app    = me ).
+    selection_screen( screen ).
+    result = xsdbool( screen->loop_at_screen( ) IS INITIAL ).
 
   ENDMETHOD.
 

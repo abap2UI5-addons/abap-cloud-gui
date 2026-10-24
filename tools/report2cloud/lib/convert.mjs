@@ -658,6 +658,7 @@ class Converter {
   // ---------------------------------------------------------------- analyze
 
   analyze() {
+    this.initializationWithoutScreen();
     this.resolveGridScreen();
     // the names of the report's global data objects and types
     this.globalData = new Set();
@@ -718,6 +719,21 @@ class Converter {
     this.analyzeTables();
     this.analyzeAlv();
     this.analyzeScreen();
+  }
+
+  /** a report without a selection screen goes on with START-OF-SELECTION
+   *  right after INITIALIZATION - the runtime clears the output before
+   *  start_of_selection( ), so what INITIALIZATION builds (a grid, a list)
+   *  goes in front of it */
+  initializationWithoutScreen() {
+    if (this.decls.some((s) => ["Parameter", "SelectOption", "SelectionScreen"].includes(kind(s)))) return;
+    const inits = this.events.filter((e) => e.kind === "Initialization");
+    if (!inits.length) return;
+    for (const e of inits) {
+      e.kind = "StartOfSelection";
+      e.fromInit = true;
+    }
+    this.events = [...inits, ...this.events.filter((e) => !inits.includes(e))];
   }
 
   insideBegin(s) {
@@ -802,12 +818,20 @@ class Converter {
     this.okVars = new Set();
     const text = (x) => lc(renderTokens(stmtTokens(x)));
     const all = [...this.decls, ...this.events.flatMap((e) => e.stmts), ...this.forms.flatMap((f) => f.body), ...this.modules.flatMap((m) => m.body)];
+    const containers = "cl_gui_(custom_container|docking_container|container|dialogbox_container|splitter_container|easy_splitter_container)";
     for (const x of all) {
+      // DATA(grid) = NEW cl_gui_alv_grid( ... ) - declared where it is created
+      if (kind(x) === "Move") {
+        const m = /^data\s*\(\s*([\w/]+)\s*\)\s*=\s*new\s+(cl_gui_\w+)\s*\(/.exec(text(x));
+        if (m && m[2] === "cl_gui_alv_grid") this.gridVars.add(m[1]);
+        else if (m && new RegExp(`^${containers}$`).test(m[2])) this.contVars.add(m[1]);
+        continue;
+      }
       if (!["Data", "Static"].includes(kind(x))) continue;
       const t = text(x);
       const name = lc(declName(x) ?? "");
       if (/type\s+ref\s+to\s+cl_gui_alv_grid\b/.test(t)) this.gridVars.add(name);
-      else if (/type\s+ref\s+to\s+cl_gui_(custom_container|docking_container|container|dialogbox_container|splitter_container|easy_splitter_container)\b/.test(t)) this.contVars.add(name);
+      else if (new RegExp(`type\\s+ref\\s+to\\s+${containers}\\b`).test(t)) this.contVars.add(name);
     }
     if (!this.gridVars.size) {
       this.resolveDynpro();
@@ -1166,7 +1190,7 @@ class Converter {
    *  undefined when it is none of them */
   gridPlan(s, k, flat, seq, si) {
     const objs = new Set([...this.gridVars, ...this.contVars, ...this.handlerVars]);
-    const target = child(s, "Target") ? lc(nodeText(child(s, "Target"))) : undefined;
+    const target = child(s, "Target") ? lc(nodeText(child(s, "Target"))).replace(/^data\s*\(\s*([\w/]+)\s*\)$/, "$1") : undefined;
     if ((k === "CreateObject" || (k === "Move" && /=\s*(new|cast)\b/.test(flat))) && objs.has(target)) {
       return { action: "drop", reason: "the grid, its container or the handler object - alv( ) needs none" };
     }
@@ -1380,6 +1404,12 @@ class Converter {
     // the variables: REF TO cl_salv_*, the field catalog and layout types
     const allStmts = [...this.decls, ...this.events.flatMap((e) => e.stmts), ...this.forms.flatMap((f) => f.body)];
     for (const s of allStmts) {
+      // DATA(fcat) = VALUE lvc_t_fcat( ... ) - declared where it is filled
+      if (kind(s) === "Move") {
+        const m = /^data\s*\(\s*([\w/]+)\s*\)\s*=\s*value\s+(slis_t_fieldcat_alv|lvc_t_fcat)\s*\(/.exec(lc(renderTokens(stmtTokens(s))));
+        if (m) this.fcatVars.add(m[1]);
+        continue;
+      }
       if (!["Data", "Static"].includes(kind(s))) continue;
       const text = lc(renderTokens(stmtTokens(s)));
       const name = lc(declName(s) ?? "");
@@ -1594,6 +1624,15 @@ class Converter {
           else if (m[2] === "do_sum" && /'x'|abap_true/.test(m[3])) cur.sum = true;
           else this.note("field catalog settings without a counterpart (output length, key, sums, column position) - the grid takes columns and widths from the table");
           fcatWa.set(m[1], cur);
+        } else if (k === "Move" && /^(?:data\s*\(\s*)?([\w/]+)(?:\s*\))?\s*=\s*value\s+[\w/#]+\s*\(/.test(flat)) {
+          // fcat = VALUE #( ( fieldname = 'A' coltext = 'T' ) ( ... ) ) - a column per row
+          const target = /^(?:data\s*\(\s*)?([\w/]+)/.exec(flat)[1];
+          const text = toks.join(" ");
+          const rows = valueRows(text.slice(text.search(/\bvalue\b/i)));
+          if (this.fcatVars.has(target) && rows) {
+            if (!fcat.has(target)) fcat.set(target, []);
+            fcat.get(target).push(...rows.map(fcatColumn));
+          }
         } else if (k === "Append") {
           const m2 = /^append\s+([\w/]+)\s+to\s+([\w/]+)/.exec(flat);
           const v = /^append\s+value\s+#\s*\((.*)\)\s+to\s+([\w/]+)/i.exec(toks.join(" "));
@@ -1601,17 +1640,8 @@ class Converter {
             if (!fcat.has(m2[2])) fcat.set(m2[2], []);
             fcat.get(m2[2]).push({ ...(fcatWa.get(m2[1]) ?? {}) });
           } else if (v && this.fcatVars.has(lc(v[2]))) {
-            const cur = {};
-            for (const p of v[1].matchAll(/(\w+)\s*=\s*('(?:[^']|'')*'|`(?:[^`]|``)*`|[\w-]+)/g)) {
-              const comp = lc(p[1]);
-              if (comp === "fieldname") cur.name = uc(unquote(p[2]));
-              else if (/^(seltext_[lms]|reptext_ddic|scrtext_[lms]|coltext)$/.test(comp)) cur.text = p[2];
-              else if ((comp === "no_out" || comp === "tech") && /'x'|abap_true/i.test(p[2])) cur.hidden = true;
-              else if (comp === "hotspot" && /'x'|abap_true/i.test(p[2])) cur.hotspot = true;
-              else if (comp === "do_sum" && /'x'|abap_true/i.test(p[2])) cur.sum = true;
-            }
             if (!fcat.has(lc(v[2]))) fcat.set(lc(v[2]), []);
-            fcat.get(lc(v[2])).push(cur);
+            fcat.get(lc(v[2])).push(fcatColumn(v[1]));
           }
         } else if (k === "Clear") {
           for (const v of this.fcatVars) if (new RegExp(`\\b${v}\\b`).test(flat)) fcatWa.set(v, {});
@@ -1981,7 +2011,8 @@ class Converter {
       const sos = byKind("StartOfSelection");
       if (sos.length || byKind("EndOfSelection").length) body.push(...this.resetGlobals());
       for (const e of sos) {
-        if (!e.implicit) this.map(e.stmt, "`start_of_selection( )`");
+        if (e.fromInit) this.map(e.stmt, "`start_of_selection( )` - the report has no selection screen: INITIALIZATION went straight on with START-OF-SELECTION");
+        else if (!e.implicit) this.map(e.stmt, "`start_of_selection( )`");
         else this.map(e.stmt, "`start_of_selection( )` - statements before the first event block");
         if (body.length) body.push("");
         body.push(...this.convertBody(e.stmts, { method: "start_of_selection" }));
@@ -2226,7 +2257,7 @@ class Converter {
       // the local classes reach the report through the instance of the event
       const app = locals.app && methods.includes(m) ? [`${this.appRef} = me.`] : [];
       const globalFs = [...was, ...(this.prelude.get(m.name) ?? []), ...this.fieldSymbolDecls(m.body), ...app];
-      for (const l of [...globalFs, ...(globalFs.length ? [""] : []), ...trimBlank(m.body)]) lines.push(indent(l, 4));
+      for (const l of [...globalFs, ...(globalFs.length ? [""] : []), ...trimBlank(dropEmptyIfs(m.body))]) lines.push(indent(l, 4));
       lines.push("");
       lines.push("  ENDMETHOD.");
     }
@@ -5766,6 +5797,23 @@ function indent(text, n) {
   return pad + text.replace(/\n/g, `\n${pad}`);
 }
 
+/** an IF sy-subrc whose statements were all dropped - around the CALL
+ *  SCREEN of the grid, after the EXCEPTIONS of its first display - goes too */
+function dropEmptyIfs(lines) {
+  const out = [...lines];
+  for (let i = 0; i < out.length; i++) {
+    const m = /^(\s*)IF\s+(sy-subrc\s+[^()]*)\.\s*$/i.exec(out[i]);
+    if (!m) continue;
+    let j = i + 1;
+    while (j < out.length && out[j].trim() === "") j++;
+    if (j < out.length && new RegExp(`^${m[1]}ENDIF\\.\\s*$`, "i").test(out[j])) {
+      out.splice(i, j - i + 1);
+      i = Math.max(-1, i - 2);
+    }
+  }
+  return out;
+}
+
 function trimBlank(lines) {
   let a = 0;
   let b = lines.length;
@@ -6072,6 +6120,49 @@ function parseFlow(lines) {
     flow.problems.push(`${st.split(" ").slice(0, 3).join(" ")} in the flow logic`);
   }
   return flow;
+}
+
+/** a row of a field catalog written as components - fieldname = 'A'
+ *  coltext = 'T' no_out = abap_true - the column of the alv( ) chain */
+function fcatColumn(text) {
+  const cur = {};
+  for (const p of text.matchAll(/(\w+)\s*=\s*('(?:[^']|'')*'|`(?:[^`]|``)*`|[\w-]+)/g)) {
+    const comp = lc(p[1]);
+    if (comp === "fieldname") cur.name = uc(unquote(p[2]));
+    else if (/^(seltext_[lms]|reptext_ddic|scrtext_[lms]|coltext)$/.test(comp)) cur.text = p[2];
+    else if ((comp === "no_out" || comp === "tech") && /'x'|abap_true/i.test(p[2])) cur.hidden = true;
+    else if (comp === "hotspot" && /'x'|abap_true/i.test(p[2])) cur.hotspot = true;
+    else if (comp === "do_sum" && /'x'|abap_true/i.test(p[2])) cur.sum = true;
+  }
+  return cur;
+}
+
+/** the rows of VALUE type( ( ... ) ( ... ) ) - the text inside each row's
+ *  parentheses; undefined when the text is no such VALUE */
+function valueRows(text) {
+  const open = text.indexOf("(");
+  if (open < 0) return undefined;
+  const rows = [];
+  let depth = 0;
+  let start;
+  let quote;
+  for (let i = open + 1; i < text.length; i++) {
+    const c = text[i];
+    if (quote) {
+      if (c === quote) quote = undefined;
+      continue;
+    }
+    if (c === "'" || c === "`") quote = c;
+    else if (c === "(") {
+      if (depth === 0) start = i + 1;
+      depth++;
+    } else if (c === ")") {
+      if (depth === 0) return rows;
+      depth--;
+      if (depth === 0) rows.push(text.slice(start, i));
+    }
+  }
+  return undefined;
 }
 
 /** CASE field. WHEN `A`. ... ENDCASE. */
