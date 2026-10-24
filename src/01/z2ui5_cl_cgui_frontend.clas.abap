@@ -19,8 +19,11 @@
 "!   without its folder
 "! - file_save_dialog( ) and directory_browse( ) answer at once: the browser
 "!   asks where a download goes. The folders are `.`, the separator `/`
+"! - DP_CREATE_URL, SCMS_BINARY_TO_XSTRING, SCMS_XSTRING_TO_BINARY,
+"!   SCMS_STRING_TO_XSTRING and SSFC_BASE64_ENCODE / _DECODE are methods of
+"!   their names here: bytes, lines of bytes, text and base64 in plain ABAP
 "! Outside of a report of the runtime (no report has run yet) every method
-"! raises its first exception.
+"! of the files raises its first exception.
 CLASS z2ui5_cl_cgui_frontend DEFINITION PUBLIC FINAL CREATE PRIVATE.
 
   PUBLIC SECTION.
@@ -376,6 +379,74 @@ CLASS z2ui5_cl_cgui_frontend DEFINITION PUBLIC FINAL CREATE PRIVATE.
         dp_error_put_table
         dp_error_general.
 
+    "! SCMS_BINARY_TO_XSTRING - the bytes of the lines of binary_tab, cut
+    "! at input_length
+    CLASS-METHODS scms_binary_to_xstring
+      IMPORTING
+        input_length TYPE i     OPTIONAL
+        first_line   TYPE i     OPTIONAL
+        last_line    TYPE i     OPTIONAL
+        binary_tab   TYPE STANDARD TABLE
+      EXPORTING
+        buffer       TYPE xstring
+      EXCEPTIONS
+        failed.
+
+    "! SCMS_XSTRING_TO_BINARY - buffer as lines of bytes of the line type of
+    "! binary_tab; output_length is the number of bytes
+    CLASS-METHODS scms_xstring_to_binary
+      IMPORTING
+        buffer          TYPE xstring
+        append_to_table TYPE abap_bool DEFAULT abap_false
+      EXPORTING
+        output_length   TYPE i
+      CHANGING
+        binary_tab      TYPE STANDARD TABLE.
+
+    "! SCMS_STRING_TO_XSTRING - text in UTF-8, whatever encoding names
+    CLASS-METHODS scms_string_to_xstring
+      IMPORTING
+        text     TYPE string
+        mimetype TYPE clike OPTIONAL
+        encoding TYPE clike OPTIONAL
+      EXPORTING
+        buffer   TYPE xstring
+      EXCEPTIONS
+        failed.
+
+    "! SSFC_BASE64_ENCODE - bindata, cut at binleng, in base64
+    CLASS-METHODS ssfc_base64_encode
+      IMPORTING
+        bindata TYPE xsequence
+        binleng TYPE i OPTIONAL
+      EXPORTING
+        b64data TYPE clike
+      EXCEPTIONS
+        ssf_krn_error
+        ssf_krn_noop
+        ssf_krn_nomemory
+        ssf_krn_opinv
+        ssf_krn_input_data_error
+        ssf_krn_invalid_par
+        ssf_krn_invalid_parlen.
+
+    "! SSFC_BASE64_DECODE - the bytes of base64 b64data
+    CLASS-METHODS ssfc_base64_decode
+      IMPORTING
+        b64data    TYPE clike
+        b64leng    TYPE i         OPTIONAL
+        b64_strict TYPE abap_bool OPTIONAL
+      EXPORTING
+        bindata    TYPE xstring
+      EXCEPTIONS
+        ssf_krn_error
+        ssf_krn_noop
+        ssf_krn_nomemory
+        ssf_krn_opinv
+        ssf_krn_input_data_error
+        ssf_krn_invalid_par
+        ssf_krn_invalid_parlen.
+
     "! the data URI of a URL of dp_create_url( ) - any other URL as it is
     CLASS-METHODS url_content
       IMPORTING
@@ -414,6 +485,15 @@ CLASS z2ui5_cl_cgui_frontend DEFINITION PUBLIC FINAL CREATE PRIVATE.
     " the run stops: z2ui5_cx_cgui_stop - raised here, a method with classic
     " EXCEPTIONS cannot RAISE EXCEPTION, it only lets a CX_NO_CHECK pass
     CLASS-METHODS stop_run.
+
+    " the bytes of the lines of a table - a line, or its first component, as
+    " bytes; size cuts them
+    CLASS-METHODS bytes_of
+      IMPORTING
+        data          TYPE STANDARD TABLE
+        size          TYPE i OPTIONAL
+      RETURNING
+        VALUE(result) TYPE xstring.
 
     CLASS-METHODS mime_type
       IMPORTING
@@ -814,24 +894,101 @@ CLASS z2ui5_cl_cgui_frontend IMPLEMENTATION.
     ENDIF.
     IF lv_type CP `text/*`.
       lv_content = z2ui5_cl_cgui_context=>conv_get_xstring_by_string( table_to_text( data_tab = data ) ).
+      IF size > 0 AND size < xstrlen( lv_content ).
+        lv_content = lv_content(size).
+      ENDIF.
     ELSE.
-      LOOP AT data ASSIGNING FIELD-SYMBOL(<line>).
-        ASSIGN COMPONENT 1 OF STRUCTURE <line> TO FIELD-SYMBOL(<bytes>).
-        IF sy-subrc <> 0.
-          ASSIGN <line> TO <bytes>.
-        ENDIF.
-        DATA(lv_bytes) = CONV xstring( <bytes> ).
-        CONCATENATE lv_content lv_bytes INTO lv_content IN BYTE MODE.
-      ENDLOOP.
-    ENDIF.
-    IF size > 0 AND size < xstrlen( lv_content ).
-      lv_content = lv_content(size).
+      lv_content = bytes_of( data = data
+                             size = size ).
     ENDIF.
     DATA(lv_url) = |z2ui5-cgui-url:{ lines( gt_url ) + 1 }|.
     INSERT VALUE #( url     = lv_url
                     content = |data:{ lv_type };base64,{ z2ui5_cl_cgui_context=>conv_encode_x_base64( lv_content ) }| )
            INTO TABLE gt_url.
     url = lv_url.
+
+  ENDMETHOD.
+
+  METHOD bytes_of.
+
+    LOOP AT data ASSIGNING FIELD-SYMBOL(<line>).
+      ASSIGN COMPONENT 1 OF STRUCTURE <line> TO FIELD-SYMBOL(<bytes>).
+      IF sy-subrc <> 0.
+        ASSIGN <line> TO <bytes>.
+      ENDIF.
+      DATA(lv_bytes) = CONV xstring( <bytes> ).
+      CONCATENATE result lv_bytes INTO result IN BYTE MODE.
+    ENDLOOP.
+    IF size > 0 AND size < xstrlen( result ).
+      result = result(size).
+    ENDIF.
+
+  ENDMETHOD.
+
+  METHOD scms_binary_to_xstring.
+
+    buffer = bytes_of( data = binary_tab
+                       size = input_length ).
+
+  ENDMETHOD.
+
+  METHOD scms_xstring_to_binary.
+
+    DATA lr_line TYPE REF TO data.
+    DATA lv_width TYPE i.
+
+    IF append_to_table = abap_false.
+      CLEAR binary_tab.
+    ENDIF.
+    output_length = xstrlen( buffer ).
+    CREATE DATA lr_line LIKE LINE OF binary_tab.
+    ASSIGN lr_line->* TO FIELD-SYMBOL(<line>).
+    ASSIGN COMPONENT 1 OF STRUCTURE <line> TO FIELD-SYMBOL(<bytes>).
+    IF sy-subrc <> 0.
+      ASSIGN <line> TO <bytes>.
+    ENDIF.
+    DATA(lo_type) = cl_abap_typedescr=>describe_by_data( <bytes> ).
+    lv_width = lo_type->length.
+    " a line of type xstring takes it all
+    IF lo_type->type_kind = cl_abap_typedescr=>typekind_xstring.
+      lv_width = nmax( val1 = output_length
+                       val2 = 1 ).
+    ENDIF.
+    DATA(lv_offset) = 0.
+    WHILE lv_offset < output_length.
+      CLEAR <line>.
+      DATA(lv_length) = nmin( val1 = lv_width
+                              val2 = output_length - lv_offset ).
+      <bytes> = buffer+lv_offset(lv_length).
+      APPEND <line> TO binary_tab.
+      lv_offset = lv_offset + lv_width.
+    ENDWHILE.
+
+  ENDMETHOD.
+
+  METHOD scms_string_to_xstring.
+
+    buffer = z2ui5_cl_cgui_context=>conv_get_xstring_by_string( text ).
+
+  ENDMETHOD.
+
+  METHOD ssfc_base64_encode.
+
+    DATA(lv_bytes) = CONV xstring( bindata ).
+    IF binleng > 0 AND binleng < xstrlen( lv_bytes ).
+      lv_bytes = lv_bytes(binleng).
+    ENDIF.
+    b64data = z2ui5_cl_cgui_context=>conv_encode_x_base64( lv_bytes ).
+
+  ENDMETHOD.
+
+  METHOD ssfc_base64_decode.
+
+    DATA(lv_text) = condense( CONV string( b64data ) ).
+    IF b64leng > 0 AND b64leng < strlen( lv_text ).
+      lv_text = lv_text(b64leng).
+    ENDIF.
+    bindata = z2ui5_cl_cgui_context=>conv_decode_x_base64( lv_text ).
 
   ENDMETHOD.
 

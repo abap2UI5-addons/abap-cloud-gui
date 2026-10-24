@@ -703,3 +703,12 @@ test("zr2c_42_demoget: cl_demo_output=>get( ) - the output as an HTML page for c
   assert.match(page, /<pre>Cellar[\s\S]*Riesling[\s\S]*Rose/);
   assert.doesNotMatch(page, /Merlot/);
 });
+
+test("zr2c_43_base64: SCMS_* and SSFC_BASE64_ENCODE as methods of the frontend, a text editor created with NEW #( )", { skip }, async () => {
+  let s = await d.start("z2ui5_cl_cgui_r2c_43");
+  s = await d.act(s.session, { event: "CGUI_EXECUTE" });
+  assert.deepEqual(d.lines().filter((l) => l.trim() !== ""), ["15 bytes in 2 lines", "The bytes came back unchanged"]);
+  const bound = /<TextArea[^>]*value="\{\/(MT_CGUI_GUI\/[^}]*)\}"/.exec(d.state().slots.MAIN.xml);
+  assert.ok(bound, "a text area bound to the control");
+  assert.equal(bound[1].split("/").reduce((o, k) => o?.[k], d.state().models.MAIN?.data), "U2VlIHlvdSBhdCBub29u");
+});
