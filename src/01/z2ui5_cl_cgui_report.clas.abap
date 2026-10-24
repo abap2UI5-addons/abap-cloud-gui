@@ -163,14 +163,6 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
     "! the SAP GUI controls of the report (z2ui5_if_cgui_gui) - a text
     "! editor is bound to its line
     DATA mt_cgui_gui TYPE z2ui5_if_cgui_gui=>ty_t_control.
-    "! the controls themselves, line by line of mt_cgui_gui - the events of
-    "! the browser go to them
-    DATA mt_cgui_gui_obj TYPE STANDARD TABLE OF REF TO object WITH EMPTY KEY.
-    "! the handlers SET HANDLER set for the events of the controls, and
-    "! their objects - once each: the handler of two events stays one object
-    "! wherever the app is restored from its serialized form
-    DATA mt_cgui_handler TYPE ty_t_cgui_handler.
-    DATA mt_cgui_handler_obj TYPE STANDARD TABLE OF REF TO object WITH EMPTY KEY.
     "! the rows of the ALV tree the browser shows - bound to the tree table
     DATA mt_cgui_tree_view TYPE z2ui5_cl_cgui_tree=>ty_t_view.
 
@@ -190,6 +182,14 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
         messages TYPE ty_t_cgui_message.
 
   PROTECTED SECTION.
+    "! the controls themselves, line by line of mt_cgui_gui - the events of
+    "! the browser go to them
+    DATA mt_cgui_gui_obj TYPE STANDARD TABLE OF REF TO object WITH EMPTY KEY.
+    "! the handlers SET HANDLER set for the events of the controls, and
+    "! their objects - once each: the handler of two events stays one object
+    "! wherever the app is restored from its serialized form
+    DATA mt_cgui_handler TYPE ty_t_cgui_handler.
+    DATA mt_cgui_handler_obj TYPE STANDARD TABLE OF REF TO object WITH EMPTY KEY.
 
     TYPES:
       BEGIN OF ty_s_cgui_msg,
