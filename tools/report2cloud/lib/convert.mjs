@@ -612,6 +612,80 @@ class Converter {
     return true;
   }
 
+  /**
+   * PARAMETERS p TYPE (name) / SELECT-OPTIONS s FOR (name) whose name is a
+   * literal, or a global DATA with a literal VALUE that nothing else names:
+   * the type is known when the class is written. TYPE (name) becomes TYPE
+   * <type>; FOR (name) needs a data object - a DATA <s>_type TYPE <type>
+   * goes before it. A name that is set at runtime stays a refusal.
+   * Returns whether the source was changed.
+   */
+  resolveDynamicTypes() {
+    const values = new Map();     // global DATA name -> literal VALUE
+    const uses = new Map();       // name -> occurrences outside (name)
+    let depth = 0;
+    for (const s of this.stmts) {
+      const k = kind(s);
+      if (["Form", "MethodImplementation", "FunctionModule", "ClassImplementation", "ClassDefinition", "Interface"].includes(k)) depth++;
+      if (["EndForm", "EndMethod", "EndFunction", "EndClass", "EndInterface"].includes(k)) depth = Math.max(0, depth - 1);
+      const toks = stmtTokens(s);
+      if (!depth && k === "Data") {
+        const at = toks.findIndex((t) => uc(t.getStr()) === "VALUE");
+        const lit = toks[at + 1]?.getStr();
+        if (at > 0 && /^['`][^'`]*['`]$/.test(lit ?? "") && toks.length === at + 2) {
+          values.set(lc(declName(s) ?? ""), lit.slice(1, -1));
+          continue;
+        }
+      }
+      toks.forEach((t, i) => {
+        const n = lc(t.getStr());
+        if (toks[i - 1]?.getStr() === "(" && toks[i + 1]?.getStr() === ")" && ["TYPE", "LIKE", "FOR"].includes(uc(toks[i - 2]?.getStr() ?? ""))) return;
+        uses.set(n, (uses.get(n) ?? 0) + 1);
+      });
+    }
+    const taken = new Set(this.stmts.flatMap((s) => stmtTokens(s).map((t) => lc(t.getStr()))));
+    const edits = [];
+    for (const s of this.stmts) {
+      const k = kind(s);
+      if (k !== "Parameter" && k !== "SelectOption") continue;
+      const toks = stmtTokens(s);
+      const at = toks.findIndex((t, i) => ["TYPE", "LIKE", "FOR"].includes(uc(t.getStr())) && toks[i + 1]?.getStr() === "(" && toks[i + 3]?.getStr() === ")");
+      if (at < 0) continue;
+      const inner = toks[at + 2].getStr();
+      const name = /^'([^']*)'$/.exec(inner)?.[1]
+        ?? (values.has(lc(inner)) && !uses.has(lc(inner)) ? values.get(lc(inner)) : undefined);
+      if (!name || !/^[A-Za-z_/][\w/]*(-[\w/]+)?$/.test(name.trim())) continue;
+      const type = lc(name.trim());
+      const open = toks[at + 1];
+      const close = toks[at + 3];
+      if (close.getRow() !== open.getRow()) continue;
+      if (k === "Parameter") {
+        // LIKE (name) of a DDIC field is TYPE of it
+        edits.push({ row: toks[at].getRow(), col: toks[at].getCol(), len: close.getCol() + 1 - toks[at].getCol(), to: `TYPE ${type}` });
+      } else {
+        const so = lc(declName(s) ?? "so");
+        let helper = `${so}_type`.slice(0, 30);
+        for (let i = 2; taken.has(helper); i++) helper = `${so}_type${i}`.slice(0, 30);
+        taken.add(helper);
+        edits.push({ row: open.getRow(), col: open.getCol(), len: close.getCol() + 1 - open.getCol(), to: helper });
+        // the helper on the line of the statement - the rows stay as they are
+        const first = toks[0];
+        edits.push({ row: first.getRow(), col: first.getCol(), len: 0, to: `DATA ${helper} TYPE ${type}. ` });
+      }
+      this.note(`${uc(declName(s) ?? "")} ${uc(toks[at].getStr())} (${inner}) - the name is fixed (${uc(type)}), so the field is typed with it when the class is written`);
+    }
+    if (!edits.length) return false;
+    const lines = this.source.split("\n");
+    edits.sort((a, b) => b.row - a.row || b.col - a.col);
+    for (const e of edits) {
+      const l = lines[e.row - 1];
+      lines[e.row - 1] = l.slice(0, e.col - 1) + e.to + l.slice(e.col - 1 + e.len);
+    }
+    this.source = lines.join("\n");
+    this.lines = lines;
+    return true;
+  }
+
   /** the types abaplint's syntax check gives the variables of the program
    *  scope (name -> abaplint type) - for the inline declarations of the
    *  event blocks; an unknown dependency gives a void type */
@@ -704,6 +778,7 @@ class Converter {
   run() {
     this.parse();
     if (this.renameReserved()) this.parse();
+    if (this.resolveDynamicTypes()) this.parse();
     this.segment();
     if (!this.programName && this.header) this.programName = lc(this.header.name);
     this.programName = this.programName ?? "zreport";

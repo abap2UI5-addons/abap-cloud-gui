@@ -383,7 +383,7 @@ INITIALIZATION.
 
 ## A field of the selection screen typed at runtime (TYPE (name), FOR (name)) or with a local type
 
-**Why.** Every field of the selection screen becomes a public attribute of the class - typed when the class is written. A type taken from a variable at runtime has nothing to type it with, and a type of a local class (`lcl_x=>ty_name`) cannot type a public attribute: the local types of a class pool only reach its private section.
+**Why.** Every field of the selection screen becomes a public attribute of the class - typed when the class is written. A name that is fixed - a literal, `FOR ('STRING')`, or a global DATA with a literal VALUE that nothing else names - is converted: the field is typed with it. A type taken from a variable set at runtime has nothing to type it with, and a type of a local class (`lcl_x=>ty_name`) cannot type a public attribute: the local types of a class pool only reach its private section.
 
 **Rewrite.**
 

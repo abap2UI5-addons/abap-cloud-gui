@@ -919,6 +919,23 @@ test("SAP GUI controls: SET HANDLER of a local class's method is set_handler( ) 
   assert.deepEqual(refused("    METHODS on_f FOR EVENT dropdown_clicked OF cl_gui_toolbar IMPORTING fcode.\n", "    SET HANDLER on_f FOR mo_c.\n"), ["SAP GUI controls: SET HANDLER on_f"]);
 });
 
+test("TYPE (name) / FOR (name) of a fixed name - a literal or a DATA with a VALUE nothing else names - is typed statically; a name set at runtime is refused", () => {
+  const src = "REPORT zt.\nTABLES vbak.\nDATA selectiontext TYPE string VALUE 'VBAK-VBELN'.\nSELECT-OPTIONS: so_vbeln FOR (selectiontext).\nSELECT-OPTIONS s_subj FOR ('STRING') NO INTERVALS.\nPARAMETERS p_mat TYPE ('MATNR').\nSTART-OF-SELECTION.\n  WRITE: / lines( so_vbeln ), lines( s_subj ), p_mat.\n";
+  const r = convert(src, { file: "zt.prog.abap", className: "zcl_t" });
+  assert.deepEqual(r.refusals.map((x) => x.message), []);
+  const cls = r.files["zcl_t.clas.abap"];
+  assert.match(cls, /DATA so_vbeln_type TYPE vbak-vbeln\./);
+  assert.match(cls, /DATA s_subj_type\s+TYPE string\./);
+  assert.match(cls, /DATA so_vbeln LIKE RANGE OF so_vbeln_type\./);
+  assert.match(cls, /DATA p_mat\s+TYPE matnr\./);
+  // the name is a parameter - its value is known at runtime only
+  const dyn = "REPORT zt.\nPARAMETERS p_type TYPE c LENGTH 30 DEFAULT 'MATNR'.\nPARAMETERS p_data LIKE (p_type).\n";
+  assert.match(convert(dyn, { file: "zt.prog.abap", className: "zcl_t" }).refusals[0].message, /^P_DATA is typed at runtime/);
+  // a DATA with a VALUE that is changed is no fixed name
+  const set = "REPORT zt.\nDATA gv_name TYPE string VALUE 'MATNR'.\nSELECT-OPTIONS s_x FOR (gv_name).\nINITIALIZATION.\n  gv_name = 'WERKS'.\n";
+  assert.match(convert(set, { file: "zt.prog.abap", className: "zcl_t" }).refusals[0].message, /^S_X is typed at runtime/);
+});
+
 test("MESSAGE of an exception object is its text; MODULE x OUTPUT and MODULE x INPUT are two methods", () => {
   const r = convert("REPORT zt.\nSTART-OF-SELECTION.\n  TRY.\n      RAISE EXCEPTION TYPE cx_sy_zerodivide.\n    CATCH cx_root INTO DATA(lx).\n      MESSAGE lx TYPE 'I'.\n  ENDTRY.\n", { file: "zt.prog.abap", className: "zcl_t" });
   assert.match(r.files["zcl_t.clas.abap"], /message\( text = lx->get_text\( \)\n\s+type = `I` \)\./);

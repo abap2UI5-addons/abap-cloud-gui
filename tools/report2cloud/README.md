@@ -247,7 +247,7 @@ class `ZR2C` must exist in the target system.
 | `INCLUDE x` | the include's source, inlined before the parse from `x.prog.abap` beside the report (or `--includes`), recursively; `IF FOUND` without a file is dropped |
 | `DEFINE` ... `END-OF-DEFINITION`, a macro call | the statements of the macro at every call, with the spacing of its body; the definition and the call are not carried over |
 | `REPORT` / `PROGRAM` | the class, `INHERITING FROM z2ui5_cl_cgui_report`; `MESSAGE-ID` is the class of every short `MESSAGE e001`; the title of the text pool is `set_title( )`; `LINE-COUNT n` is `set_line_count( n )` in `initialization( )` - the runtime counts the lines of the list without header and footer, the classic `n` counted them too (noted) |
-| `PARAMETERS p TYPE/LIKE ...` | a PUBLIC attribute and `screen->parameter( )`; `LIKE` a DDIC field becomes `TYPE`, `p(10)` / `TYPE c LENGTH 10` / `DECIMALS` are kept |
+| `PARAMETERS p TYPE/LIKE ...` | a PUBLIC attribute and `screen->parameter( )`; `LIKE` a DDIC field becomes `TYPE`, `p(10)` / `TYPE c LENGTH 10` / `DECIMALS` are kept; `TYPE (name)` / `FOR (name)` of a fixed name - a literal, or a DATA with a literal VALUE nothing else names - is typed with it (`FOR` through a `DATA s_type TYPE name`) |
 | `... DEFAULT v` | `p = v.` at the top of `initialization( )` |
 | `... OBLIGATORY`, `MODIF ID m`, `NO-DISPLAY` | `obligatory`, `modif_id`, `no_display` |
 | `... AS LISTBOX VISIBLE LENGTH n [USER-COMMAND u]`, `MEMORY ID pid`, `VALUE CHECK`, `MATCHCODE OBJECT h` | `as_listbox`, `visible_length`, `user_command`, `memory_id`, `value_check`, `matchcode` (a TODO for `MATCHCODE`: the runtime reads the search help from the DDIC, which ABAP Cloud does not have) |
