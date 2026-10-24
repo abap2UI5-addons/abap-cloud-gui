@@ -932,7 +932,13 @@ test("SAP GUI controls: SET HANDLER of a local class's method is set_handler( ) 
 
   const refused = (decl, body) => convert(cls(decl, body), { file: "zt.prog.abap", className: "zcl_t" }).refusals.map((x) => x.message.split(" - ")[0]);
   assert.deepEqual(refused(handler, "    SET HANDLER on_f FOR ALL INSTANCES.\n"), ["SAP GUI controls: SET HANDLER ... FOR ALL INSTANCES"]);
-  assert.deepEqual(refused(handler, "    SET HANDLER lcl=>on_f FOR mo_t.\n"), ["SAP GUI controls: SET HANDLER of a static method"]);
+  // a static method: called through an object of its local class (RTTI
+  // finds the class by the object), with a constructor that takes
+  // parameters by the absolute name of the class
+  const statics = (ctor) => convert(cls(`    CLASS-METHODS on_f FOR EVENT function_selected OF cl_gui_toolbar IMPORTING fcode.\n${ctor}`, "    SET HANDLER lcl=>on_f FOR mo_t.\n"), { file: "zt.prog.abap", className: "zcl_t" });
+  assert.deepEqual(statics("").refusals.map((x) => x.message), []);
+  assert.match(Object.values(statics("").files).join("\n"), /mo_t->set_handler\( handler = NEW lcl\( \)\n\s+method {2}= `ON_F`/);
+  assert.match(Object.values(statics("    METHODS constructor IMPORTING iv_x TYPE i.\n").draft).join("\n"), /mo_t->set_handler\( class {2}= `\\CLASS-POOL=ZCL_T\\CLASS=LCL`/);
   // an event the stand-in does not raise
   assert.deepEqual(refused("    METHODS on_f FOR EVENT dropdown_clicked OF cl_gui_toolbar IMPORTING fcode.\n", "    SET HANDLER on_f FOR mo_c.\n"), ["SAP GUI controls: SET HANDLER on_f"]);
 });

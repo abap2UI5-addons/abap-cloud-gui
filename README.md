@@ -303,6 +303,19 @@ anew.
 | `z2ui5_cl_cgui_r2c_23` | `zr2c_23_dynpro` - A dynpro of fields |
 | `z2ui5_cl_cgui_r2c_25` | `zr2c_25_textedit` - Notes of an airline on a dynpro with two SAP GUI controls |
 | `z2ui5_cl_cgui_r2c_26` | `zr2c_26_events` - The events of SAP GUI controls, handled by a local class |
+| `z2ui5_cl_cgui_r2c_28` | `zr2c_28_browser` - A price list as an HTML page |
+| `z2ui5_cl_cgui_r2c_29` | `zr2c_29_demooutput` - A small inventory written with cl_demo_output |
+| `z2ui5_cl_cgui_r2c_30` | `zr2c_30_salvcolumns` - Exam results in a CL_SALV_TABLE grid, every column header its name and its text |
+| `z2ui5_cl_cgui_r2c_31` | `zr2c_31_toolbar` - A toolbar and an HTML viewer on the screen itself |
+| `z2ui5_cl_cgui_r2c_32` | `zr2c_32_xmlpopup` - An order as XML in a window of its own |
+| `z2ui5_cl_cgui_r2c_33` | `zr2c_33_strings` - A name split into its parts and rebuilt |
+| `z2ui5_cl_cgui_r2c_34` | `zr2c_34_controllevels` - Sales per region and month with the classic control levels |
+| `z2ui5_cl_cgui_r2c_35` | `zr2c_35_dates` - Dates of a project |
+| `z2ui5_cl_cgui_r2c_36` | `zr2c_36_ranges` - A product list filtered with select-options on local data |
+| `z2ui5_cl_cgui_r2c_37` | `zr2c_37_expressions` - The constructor expressions of a team roster |
+| `z2ui5_cl_cgui_r2c_38` | `zr2c_38_confirm` - Cleaning up a to-do list |
+| `z2ui5_cl_cgui_r2c_39` | `zr2c_39_textedit` - A note editor on the screen itself |
+| `z2ui5_cl_cgui_r2c_40` | `zr2c_40_sapevent` - A menu as an HTML page on the screen |
 
 ## Converting existing reports: report2cloud
 
@@ -542,6 +555,11 @@ Stage 5 - research
 - [x] The grid in a local class: the stand-in `z2ui5_cl_cgui_gui_alv_grid`,
       the ALV of the report in its container, with its toolbar, user
       command, double click and hotspot
+- [x] Controls on the screen itself (`cl_gui_container=>default_screen`):
+      toolbar, text editor and HTML viewer above the list of the run, no
+      dynpro needed; `cl_abap_browser` as the stand-in
+      `z2ui5_cl_cgui_abap_browser`; the loop over the columns of a SALV
+      grid; static event handlers of a local class
 - [x] `cl_demo_output` (in 72 reports of the web corpus): the stand-in
       `z2ui5_cl_cgui_demo_output` writes into the list - values, structures
       and tables as columns, sections as headings
