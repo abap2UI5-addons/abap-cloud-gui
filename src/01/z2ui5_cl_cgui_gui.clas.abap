@@ -19,6 +19,12 @@ CLASS z2ui5_cl_cgui_gui DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
       IMPORTING
         report TYPE REF TO z2ui5_if_cgui_gui.
 
+    "! the report of the roundtrip - for the stand-ins that are no control
+    "! (z2ui5_cl_cgui_demo_output)
+    CLASS-METHODS get_report
+      RETURNING
+        VALUE(result) TYPE REF TO z2ui5_if_cgui_gui.
+
     "! the focus goes into the control - the browser keeps it where the user is
     CLASS-METHODS set_focus
       IMPORTING
@@ -113,6 +119,12 @@ CLASS z2ui5_cl_cgui_gui IMPLEMENTATION.
   METHOD set_report.
 
     go_report = report.
+
+  ENDMETHOD.
+
+  METHOD get_report.
+
+    result = go_report.
 
   ENDMETHOD.
 

@@ -102,7 +102,7 @@ export const kindOf = (message) => String(message)
  * deps: { name: text } } - with the test backend (test/runtime/backend.mjs).
  * Resolves { stages: [{ file, cls, stage, ok, error? }], funnel } or { error }.
  */
-export async function startAll(rows, { ddic, port = 4499, timeoutMs = 20_000, onLine = () => {} } = {}) {
+export async function startAll(rows, { ddic, port = 4499, timeoutMs = 60_000, onLine = () => {} } = {}) {
   const backend = await import("../test/runtime/backend.mjs");
   const dirs = await backend.runtimeSources();
   if (dirs.error) return { error: dirs.error };

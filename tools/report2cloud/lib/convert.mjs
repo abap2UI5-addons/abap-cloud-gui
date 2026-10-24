@@ -27,7 +27,6 @@
 // is not released on ABAP Cloud, a selection text the source does not carry,
 // a formatting option of WRITE the list does not know - is a TODO of the
 // migration report, with its position in the generated class.
-import { createRequire } from "node:module";
 import {
   abaplint, after, child, children, findAll, hasSeq, isToken, key, kind, lc, literal, nodeText,
   partTokens, renderTokens, stmtTokens, uc, unquote, words,
@@ -35,12 +34,13 @@ import {
 import { classXml, longLines, normalizeAbap } from "./abapgit.mjs";
 import { functionKey } from "./textpool.mjs";
 import { refusalOf } from "./refusals.mjs";
+// a static import, not a require( ): the converter runs in the browser too
+// (the playground of the site, site/)
+import { Indent } from "@abaplint/core/build/src/pretty_printer/indent.js";
 
 /** the refusal messages no entry of the catalogue matched - a gap there */
 export const UNCATALOGUED = new Set();
 
-const require = createRequire(import.meta.url);
-const { Indent } = require("@abaplint/core/build/src/pretty_printer/indent");
 
 // the event blocks of a report
 const EVENTS = new Set(["Initialization", "LoadOfProgram", "AtSelectionScreen", "StartOfSelection",
@@ -259,6 +259,8 @@ export const GUI = {
       events: [],
       methods: {
         set_report: { params: ["report"],
+          exceptions: [] },
+        get_report: { params: [],
           exceptions: [] },
         set_focus: { params: ["control"],
           exceptions: ["cntl_error", "cntl_system_error"] },
@@ -5167,6 +5169,16 @@ class Converter {
         ov.set(key(toks[i]), `z2ui5_cl_cgui_gui_toolbar=>${t}`);
         continue;
       }
+      // cl_demo_output=>write( ), if_demo_output - the stand-in that writes
+      // into the list of the report
+      if (t === "cl_demo_output" && toks[i + 1]?.getStr() === "=>" && DEMO_OUTPUT.includes(lc(toks[i + 2]?.getStr() ?? ""))) {
+        ov.set(key(toks[i]), "z2ui5_cl_cgui_demo_output");
+        continue;
+      }
+      if (t === "if_demo_output") {
+        ov.set(key(toks[i]), "z2ui5_if_cgui_demo_output");
+        continue;
+      }
       // cl_gui_frontend_services=>gui_upload, =>action_ok - the frontend
       // services of the runtime, when it has that member
       if (t === "cl_gui_frontend_services" && toks[i + 1]?.getStr() === "=>" && frontendMember(toks[i + 2]?.getStr())) {
@@ -6993,6 +7005,11 @@ function caseBody(param, entries) {
 }
 
 /** whether z2ui5_cl_cgui_frontend has a constant or method of that name */
+// the static methods of z2ui5_cl_cgui_demo_output - the methods of
+// cl_demo_output it has
+const DEMO_OUTPUT = ["new", "write", "write_data", "write_text", "write_html", "write_json", "begin_section", "next_section",
+  "end_section", "line", "display", "display_data", "display_text", "display_html", "display_json", "clear"];
+
 function frontendMember(name) {
   const n = lc(name ?? "");
   return FRONTEND.constants.includes(n) || Object.hasOwn(FRONTEND.methods, n);

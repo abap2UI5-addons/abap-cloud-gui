@@ -1060,3 +1060,42 @@ test("a name every JavaScript object has - constructor, toString - is no SAP GUI
   assert.doesNotMatch(text, /native code|function Object/);
   assert.match(text, /METHODS constructor\./);
 });
+
+test("cl_demo_output and if_demo_output are the stand-in that writes into the list - a method it does not have stays and is named for the release", () => {
+  const r = convert(`REPORT zdemo.
+DATA itab TYPE STANDARD TABLE OF i WITH DEFAULT KEY.
+DATA out TYPE REF TO if_demo_output.
+START-OF-SELECTION.
+  APPEND 1 TO itab.
+  cl_demo_output=>begin_section( 'Numbers' ).
+  cl_demo_output=>write( itab ).
+  out = cl_demo_output=>new( ).
+  out->write_text( 'x' )->line( )->display( ).
+  cl_demo_output=>display( itab ).
+  cl_demo_output=>write_xml( '<a/>' ).`, { file: "zdemo.prog.abap" });
+  assert.equal(r.ok, true);
+  const cls = r.files["zcl_demo.clas.abap"];
+  assert.match(cls, /DATA out\s+TYPE REF TO z2ui5_if_cgui_demo_output\./);
+  assert.match(cls, /z2ui5_cl_cgui_demo_output=>begin_section\( 'Numbers' \)\./);
+  assert.match(cls, /out = z2ui5_cl_cgui_demo_output=>new\( \)\./);
+  assert.match(cls, /z2ui5_cl_cgui_demo_output=>display\( itab \)\./);
+  assert.match(cls, /cl_demo_output=>write_xml/);
+  assert.deepEqual(r.release.map((x) => x.name), ["CL_DEMO_OUTPUT"]);
+});
+
+test("the converter runs in the browser too - no node: import in convert.mjs and what it imports (the playground of the site)", () => {
+  const lib = new URL("../lib/", import.meta.url);
+  const seen = new Set();
+  const walk = (file) => {
+    if (seen.has(file)) return;
+    seen.add(file);
+    const text = readFileSync(new URL(file, lib), "utf8");
+    for (const m of text.matchAll(/^import\s[^;]*?from\s+"([^"]+)"/gms)) {
+      assert.ok(!m[1].startsWith("node:"), `${file} imports ${m[1]}`);
+      if (m[1].startsWith("./")) walk(m[1].slice(2));
+    }
+  };
+  walk("convert.mjs");
+  walk("report.mjs");
+  assert.ok(seen.has("abap.mjs") && seen.has("refusals.mjs"));
+});

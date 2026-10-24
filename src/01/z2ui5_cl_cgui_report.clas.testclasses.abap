@@ -207,6 +207,7 @@ CLASS ltcl_test DEFINITION FINAL FOR TESTING
     METHODS tree_expand_and_node FOR TESTING.
     METHODS draft_serializable FOR TESTING.
     METHODS draft_references FOR TESTING.
+    METHODS demo_output_into_list FOR TESTING.
     METHODS serialize
       IMPORTING
         step TYPE string.
@@ -718,6 +719,35 @@ CLASS ltcl_test IMPLEMENTATION.
     " the message of the report, and not the one of an empty list
     cl_abap_unit_assert=>assert_true( xsdbool( line_exists( mo_cut->mt_cgui_msg[ text = `Unknown airline` ] ) ) ).
     cl_abap_unit_assert=>assert_false( xsdbool( line_exists( mo_cut->mt_cgui_msg[ text = `List contains no data` ] ) ) ).
+
+  ENDMETHOD.
+
+  METHOD demo_output_into_list.
+
+    TYPES:
+      BEGIN OF ty_s_air,
+        carrid TYPE c LENGTH 3,
+        seats  TYPE i,
+      END OF ty_s_air.
+    DATA lt_air TYPE STANDARD TABLE OF ty_s_air WITH DEFAULT KEY.
+
+    z2ui5_cl_cgui_gui=>set_report( mo_cut ).
+    lt_air = VALUE #( ( carrid = `LH` seats = 120 ) ( carrid = `AA` seats = 8 ) ).
+    z2ui5_cl_cgui_demo_output=>begin_section( `Flights` ).
+    z2ui5_cl_cgui_demo_output=>write_text( `Seats per airline` ).
+    z2ui5_cl_cgui_demo_output=>write( data = lt_air
+                                      name = `LT_AIR` ).
+    z2ui5_cl_cgui_demo_output=>new( )->write_html( `<p>a <b>bold</b> end</p>` )->line( ).
+    z2ui5_cl_cgui_demo_output=>display( 42 ).
+
+    DATA(lt_text) = mo_cut->list( )->to_text( ).
+    DELETE lt_text WHERE table_line IS INITIAL.
+    " a section is a heading, a table its columns under the component names,
+    " html its text, line( ) a ULINE - after the page header of the report
+    cl_abap_unit_assert=>assert_equals(
+        act = concat_lines_of( table = lt_text sep = `|` )
+        exp = |HEADER\|Flights\|Seats per airline\|LT_AIR\|CARRID SEATS\|LH     120  \|AA     8    \| a  bold  end\||
+           && |{ repeat( val = `-` occ = 80 ) }\|42| ).
 
   ENDMETHOD.
 
