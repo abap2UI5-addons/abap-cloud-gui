@@ -89,6 +89,10 @@ CLASS ltcl_report DEFINITION INHERITING FROM z2ui5_cl_cgui_report FINAL.
     DATA mv_block    TYPE string.
     DATA mv_window   TYPE abap_bool.
     DATA mv_leave    TYPE abap_bool.
+    DATA mv_dynpro   TYPE abap_bool.
+    DATA mv_seats    TYPE i.
+    DATA mv_after    TYPE string.
+    DATA mv_pai      TYPE string.
     DATA mv_replace TYPE abap_bool.
     DATA mv_exit     TYPE string.
     DATA mv_exit_err TYPE abap_bool.
@@ -106,6 +110,10 @@ CLASS ltcl_report DEFINITION INHERITING FROM z2ui5_cl_cgui_report FINAL.
     METHODS at_value_request REDEFINITION.
     METHODS at_alv_value_request REDEFINITION.
     METHODS at_tree_node REDEFINITION.
+    METHODS dynpro_screen REDEFINITION.
+    METHODS dynpro_pbo REDEFINITION.
+    METHODS dynpro_pai REDEFINITION.
+    METHODS after_call_screen REDEFINITION.
 
 ENDCLASS.
 
@@ -158,6 +166,7 @@ CLASS ltcl_test DEFINITION FINAL FOR TESTING
     METHODS leave_during_the_run FOR TESTING.
     METHODS file_upload_and_download FOR TESTING.
     METHODS current_screen_afresh FOR TESTING.
+    METHODS dynpro_call_and_leave FOR TESTING.
     METHODS alv_box_copy_selection FOR TESTING.
     METHODS url_values_screen_only FOR TESTING.
     METHODS url_skip_screen FOR TESTING.
@@ -254,7 +263,62 @@ CLASS ltcl_report IMPLEMENTATION.
 
   ENDMETHOD.
 
+  METHOD dynpro_screen.
+
+    IF dynnr = `0100`.
+      screen->parameter( val       = p_carrid
+                         text      = `Airline`
+                         read_only = abap_true
+          )->parameter( val        = mv_seats
+                        text       = `Seats`
+                        obligatory = abap_true
+                        modif_id   = `SEA`
+          )->button( text  = `Check`
+                     event = `CHECK` ).
+    ENDIF.
+
+  ENDMETHOD.
+
+  METHOD dynpro_pbo.
+
+    set_pf_status( VALUE #( ( name = `SAVE` text = `Save` ) ) ).
+    LOOP AT current_screen( )->loop_at_screen( ) INTO DATA(ls_screen) WHERE group1 = `SEA`.
+      ls_screen-intensified = abap_true.
+      current_screen( )->modify_screen( ls_screen ).
+    ENDLOOP.
+    mv_pai = |{ mv_pai }PBO{ dynnr };|.
+
+  ENDMETHOD.
+
+  METHOD dynpro_pai.
+
+    mv_pai = |{ mv_pai }PAI{ dynnr }:{ ucomm };|.
+    CASE ucomm.
+      WHEN `SAVE`.
+        leave_to_screen( `0` ).
+      WHEN `NEXT`.
+        set_screen( `0200` ).
+      WHEN `BACK`.
+        leave_to_screen( `0` ).
+    ENDCASE.
+
+  ENDMETHOD.
+
+  METHOD after_call_screen.
+
+    mv_after = dynnr.
+    list( )->new_line(
+        )->write( |Seats { mv_seats }| ).
+
+  ENDMETHOD.
+
   METHOD start_of_selection.
+
+    " CALL SCREEN - the rest comes in after_call_screen( )
+    IF mv_dynpro = abap_true.
+      call_screen( `100` ).
+      RETURN.
+    ENDIF.
 
     " LEAVE PROGRAM after a message - back on the selection screen
     IF mv_leave = abap_true.
@@ -710,6 +774,53 @@ CLASS ltcl_test IMPLEMENTATION.
                                         exp = |{ mo_client->z2ui5_if_client~cs_event-download_b64_file }:data:text/csv;base64,| &&
                                               |{ z2ui5_cl_cgui_context=>conv_encode_x_base64(
                                                      z2ui5_cl_cgui_context=>conv_get_xstring_by_string( |LH\tLufthansa\r\n| ) ) }\|list.csv| ).
+
+  ENDMETHOD.
+
+  METHOD dynpro_call_and_leave.
+
+    init( ).
+    mo_report->p_carrid = `LH`.
+    mo_report->mv_dynpro = abap_true.
+    event( z2ui5_cl_cgui_report=>cs_ucomm-execute ).
+
+    " the dynpro shows - its PBO ran, its fields and its status are on the page
+    cl_abap_unit_assert=>assert_equals( act = mo_cut->mv_cgui_screen
+                                        exp = `DYNPRO` ).
+    cl_abap_unit_assert=>assert_equals( act = mo_cut->mv_cgui_dynpro
+                                        exp = `0100` ).
+    cl_abap_unit_assert=>assert_equals( act = mo_report->mv_pai
+                                        exp = `PBO0100;` ).
+    cl_abap_unit_assert=>assert_true( xsdbool( mo_client->mv_view CS `Seats` AND mo_client->mv_view CS `EVENT:SAVE` ) ).
+    cl_abap_unit_assert=>assert_true( xsdbool( mo_client->mv_view CS `EVENT:CHECK` ) ).
+
+    " a push button: the required seats are checked first, no PAI
+    event( `CHECK` ).
+    cl_abap_unit_assert=>assert_equals( act = mo_report->mv_pai
+                                        exp = `PBO0100;PBO0100;` ).
+    cl_abap_unit_assert=>assert_true( xsdbool( line_exists( mo_cut->mt_cgui_msg[ type = `E` ] ) ) ).
+
+    " with the seats: PAI, the dynpro stays and its PBO runs again
+    mo_report->mv_seats = 2.
+    event( `CHECK` ).
+    cl_abap_unit_assert=>assert_equals( act = mo_report->mv_pai
+                                        exp = `PBO0100;PBO0100;PAI0100:CHECK;PBO0100;` ).
+    cl_abap_unit_assert=>assert_equals( act = mo_cut->mv_cgui_screen
+                                        exp = `DYNPRO` ).
+
+    " SAVE leaves: what followed CALL SCREEN runs and the list shows
+    event( `SAVE` ).
+    cl_abap_unit_assert=>assert_equals( act = mo_report->mv_after
+                                        exp = `0100` ).
+    cl_abap_unit_assert=>assert_equals( act = mo_cut->mv_cgui_screen
+                                        exp = `OUTPUT` ).
+    cl_abap_unit_assert=>assert_true( xsdbool( mo_client->mv_view CS `Seats 2` ) ).
+
+    " Back on the list - the selection screen, the dynpro stack is empty
+    event( z2ui5_cl_cgui_report=>cs_ucomm-back ).
+    cl_abap_unit_assert=>assert_equals( act = mo_cut->mv_cgui_screen
+                                        exp = `SELECTION` ).
+    cl_abap_unit_assert=>assert_initial( mo_cut->mt_cgui_dynpro_stack ).
 
   ENDMETHOD.
 

@@ -253,7 +253,8 @@ const BASE_METHODS = ["cgui_run_in_background",
   "popup_get_values", "popup_get_values_sval", "popup_values_sval", "popup_answer", "popup_values", "value_help_popup", "vrm_set_values",
   "leave_to_selection_screen", "window", "call_selection_screen", "submit", "set_parameter_id", "get_parameter_id",
   "set_line_count", "set_pf_status", "set_title", "set_variant", "set_variant_store", "set_layout_store", "get_link",
-  "current_screen"];
+  "current_screen", "dynpro_screen", "dynpro_pbo", "dynpro_pai", "after_call_screen",
+  "call_screen", "set_screen", "leave_to_screen", "leave_screen", "screen_left"];
 export const RESERVED_METHODS = new Set([...BASE_METHODS, "client", "cs_ucomm", "z2ui5_if_app~main", "main",
   "at_selection_screen_ucomm", "constructor"]);
 
@@ -5662,7 +5663,8 @@ const REPORT_CALLS = ["list", "write", "message", "message_t100", "messages_from
   "set_pf_status", "set_line_count", "leave_to_selection_screen", "submit", "call_selection_screen", "window",
   "popup_to_confirm", "popup_to_decide", "popup_get_values", "popup_get_values_sval", "popup_values_sval",
   "popup_answer", "popup_values", "value_help_popup", "lsind", "set_lsind", "get_selected_rows", "get_cursor",
-  "lisel", "set_parameter_id", "get_parameter_id", "set_cursor_field", "vrm_set_values", "current_screen"];
+  "lisel", "set_parameter_id", "get_parameter_id", "set_cursor_field", "vrm_set_values", "current_screen",
+  "call_screen", "set_screen", "leave_to_screen", "leave_screen", "screen_left"];
 
 /**
  * A call of a method of the report class written without its instance -

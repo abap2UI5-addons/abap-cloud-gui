@@ -178,7 +178,8 @@ CLASS z2ui5_cl_cgui_selscreen DEFINITION PUBLIC FINAL CREATE PRIVATE.
     "! key of its value table. help - F1 (on by default): a help button
     "! beside the field when its data element has documentation, raising
     "! cs_event-help_request; help_request - the report answers F1 itself
-    "! (AT SELECTION-SCREEN ON HELP-REQUEST), the button is there either way
+    "! (AT SELECTION-SCREEN ON HELP-REQUEST), the button is there either way.
+    "! read_only - an output field of a dynpro: shown, not ready for input
     METHODS parameter
       IMPORTING
         val            TYPE any
@@ -196,6 +197,7 @@ CLASS z2ui5_cl_cgui_selscreen DEFINITION PUBLIC FINAL CREATE PRIVATE.
         help           TYPE abap_bool DEFAULT abap_true
         help_request   TYPE abap_bool DEFAULT abap_false
         matchcode      TYPE clike     OPTIONAL
+        read_only      TYPE abap_bool DEFAULT abap_false
       RETURNING
         VALUE(result)  TYPE REF TO z2ui5_cl_cgui_selscreen.
 
@@ -681,6 +683,7 @@ CLASS z2ui5_cl_cgui_selscreen IMPLEMENTATION.
     ENDIF.
     ls_item-modif_id     = modif_id.
     ls_item-no_display   = no_display.
+    ls_item-read_only    = read_only.
     ls_item-visible_len  = visible_length.
     ls_item-user_command = user_command.
     ls_item-memory_id    = to_upper( memory_id ).
