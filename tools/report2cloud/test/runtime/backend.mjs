@@ -255,8 +255,10 @@ export function startBackend({ build, port }) {
           resolveStart({
             url: `http://127.0.0.1:${port}/`,
             log,
+            // false once the backend has exited - an app that takes it down
+            alive: () => child.exitCode === null && child.signalCode === null,
             stop: () => new Promise((done) => {
-              if (child.exitCode !== null) return done();
+              if (child.exitCode !== null || child.signalCode !== null) return done();
               child.once("exit", () => done());
               child.kill();
             }),

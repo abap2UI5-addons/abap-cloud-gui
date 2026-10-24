@@ -351,6 +351,38 @@ CLASS z2ui5_cl_cgui_frontend DEFINITION PUBLIC FINAL CREATE PRIVATE.
       RETURNING
         VALUE(result) TYPE string.
 
+    "! DP_CREATE_URL - a URL of the lines of data, for cl_gui_picture and
+    "! cl_gui_html_viewer: a short name (z2ui5-cgui-url:n), which fits the
+    "! CHAR field a report keeps it in, for the data URI url_content( )
+    "! answers. type is the MIME type (image/png) or its first half (image)
+    "! with subtype; lines of bytes are the bytes, size cuts them, lines of
+    "! text a text
+    CLASS-METHODS dp_create_url
+      IMPORTING
+        type                TYPE clike
+        subtype             TYPE clike OPTIONAL
+        size                TYPE i     OPTIONAL
+        date                TYPE d     OPTIONAL
+        time                TYPE t     OPTIONAL
+        description         TYPE clike OPTIONAL
+        lifetime            TYPE clike OPTIONAL
+        cacheable           TYPE clike OPTIONAL
+        send_data_as_string TYPE clike OPTIONAL
+        data                TYPE STANDARD TABLE
+      CHANGING
+        url                 TYPE clike
+      EXCEPTIONS
+        dp_invalid_parameter
+        dp_error_put_table
+        dp_error_general.
+
+    "! the data URI of a URL of dp_create_url( ) - any other URL as it is
+    CLASS-METHODS url_content
+      IMPORTING
+        url           TYPE clike
+      RETURNING
+        VALUE(result) TYPE string.
+
     "! the report the methods work for - z2ui5_cl_cgui_report sets itself at
     "! the start of every roundtrip
     CLASS-METHODS set_files
@@ -370,6 +402,14 @@ CLASS z2ui5_cl_cgui_frontend DEFINITION PUBLIC FINAL CREATE PRIVATE.
 
     " the report of the roundtrip - set by z2ui5_cl_cgui_report at its start
     CLASS-DATA go_report TYPE REF TO z2ui5_if_cgui_files.
+
+    " the data URIs of dp_create_url( ) - for the roundtrip they are made in
+    TYPES:
+      BEGIN OF ty_s_url,
+        url     TYPE string,
+        content TYPE string,
+      END OF ty_s_url.
+    CLASS-DATA gt_url TYPE STANDARD TABLE OF ty_s_url WITH EMPTY KEY.
 
     " the run stops: z2ui5_cx_cgui_stop - raised here, a method with classic
     " EXCEPTIONS cannot RAISE EXCEPTION, it only lets a CX_NO_CHECK pass
@@ -757,6 +797,50 @@ CLASS z2ui5_cl_cgui_frontend IMPLEMENTATION.
                               sep   = |\r\n| ).
     IF last_line_end = abap_true AND lt_line IS NOT INITIAL.
       result = result && |\r\n|.
+    ENDIF.
+
+  ENDMETHOD.
+
+  METHOD dp_create_url.
+
+    DATA lv_content TYPE xstring.
+
+    DATA(lv_type) = to_lower( condense( CONV string( type ) ) ).
+    IF lv_type IS INITIAL.
+      RAISE dp_invalid_parameter.
+    ENDIF.
+    IF find( val = lv_type sub = `/` ) < 0.
+      lv_type = |{ lv_type }/{ to_lower( condense( CONV string( subtype ) ) ) }|.
+    ENDIF.
+    IF lv_type CP `text/*`.
+      lv_content = z2ui5_cl_cgui_context=>conv_get_xstring_by_string( table_to_text( data_tab = data ) ).
+    ELSE.
+      LOOP AT data ASSIGNING FIELD-SYMBOL(<line>).
+        ASSIGN COMPONENT 1 OF STRUCTURE <line> TO FIELD-SYMBOL(<bytes>).
+        IF sy-subrc <> 0.
+          ASSIGN <line> TO <bytes>.
+        ENDIF.
+        DATA(lv_bytes) = CONV xstring( <bytes> ).
+        CONCATENATE lv_content lv_bytes INTO lv_content IN BYTE MODE.
+      ENDLOOP.
+    ENDIF.
+    IF size > 0 AND size < xstrlen( lv_content ).
+      lv_content = lv_content(size).
+    ENDIF.
+    DATA(lv_url) = |z2ui5-cgui-url:{ lines( gt_url ) + 1 }|.
+    INSERT VALUE #( url     = lv_url
+                    content = |data:{ lv_type };base64,{ z2ui5_cl_cgui_context=>conv_encode_x_base64( lv_content ) }| )
+           INTO TABLE gt_url.
+    url = lv_url.
+
+  ENDMETHOD.
+
+  METHOD url_content.
+
+    result = condense( CONV string( url ) ).
+    READ TABLE gt_url INTO DATA(ls_url) WITH KEY url = result.
+    IF sy-subrc = 0.
+      result = ls_url-content.
     ENDIF.
 
   ENDMETHOD.

@@ -116,7 +116,8 @@ CLASS z2ui5_cl_cgui_r2c_08 IMPLEMENTATION.
   METHOD at_line_selection.
 
     " HIDE - the field the clicked line was written with
-    gs_task-id = hide.
+    z2ui5_cl_cgui_list=>hide_restore( EXPORTING hide = hide
+                                      CHANGING  val  = gs_task-id ).
 
     READ TABLE gt_task INTO gs_task WITH KEY id = gs_task-id.
     IF sy-subrc = 0.

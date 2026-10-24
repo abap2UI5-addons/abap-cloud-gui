@@ -61,7 +61,7 @@
     // controls - a converted call passes what the classic one did, used or
     // not - and its constants
     "unused_variables": {
-      "exclude": ["z2ui5_cl_cgui_frontend", "z2ui5_cl_cgui_gui"]
+      "exclude": ["z2ui5_cl_cgui_frontend", "z2ui5_cl_cgui_gui", "z2ui5_cl_cgui_abap_browser"]
     },
     "unused_types": true,
     "unused_methods": true,
@@ -268,9 +268,10 @@
     "prefer_abap_bool_values": true,
     "prefer_pragmas": true,
     "prefer_raise_exception_new": true,
-    // get_textmodified_status( ) of CL_GUI_TEXTEDIT exports its status
+    // get_textmodified_status( ) of CL_GUI_TEXTEDIT exports its status,
+    // show_html( ) of CL_ABAP_BROWSER its html_errors
     "prefer_returning_to_exporting": {
-      "exclude": ["z2ui5_cl_cgui_gui"]
+      "exclude": ["z2ui5_cl_cgui_gui", "z2ui5_cl_cgui_abap_browser"]
     },
     "preferred_compare_operator": true,
     "preferred_parameter_ignored": true,

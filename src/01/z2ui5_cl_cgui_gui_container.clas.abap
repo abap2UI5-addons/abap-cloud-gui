@@ -148,6 +148,43 @@ CLASS z2ui5_cl_cgui_gui_container DEFINITION PUBLIC
         cntl_error
         cntl_system_error.
 
+    "! the position, size and metric of a dialog box or a docking container
+    "! - the browser lays the controls out itself: taken, without effect
+    METHODS set_top
+      IMPORTING
+        top TYPE i
+      EXCEPTIONS
+        cntl_error
+        cntl_system_error.
+
+    METHODS set_left
+      IMPORTING
+        left TYPE i
+      EXCEPTIONS
+        cntl_error
+        cntl_system_error.
+
+    METHODS set_width
+      IMPORTING
+        width TYPE i
+      EXCEPTIONS
+        cntl_error
+        cntl_system_error.
+
+    METHODS set_height
+      IMPORTING
+        height TYPE i
+      EXCEPTIONS
+        cntl_error
+        cntl_system_error.
+
+    METHODS set_metric
+      IMPORTING
+        metric TYPE i
+      EXCEPTIONS
+        cntl_error
+        cntl_system_error.
+
     "! a docking container is linked to another screen
     METHODS link
       IMPORTING
@@ -232,6 +269,21 @@ CLASS z2ui5_cl_cgui_gui_container IMPLEMENTATION.
     ls_control-caption = caption.
     put( ls_control ).
 
+  ENDMETHOD.
+
+  METHOD set_top.
+  ENDMETHOD.
+
+  METHOD set_left.
+  ENDMETHOD.
+
+  METHOD set_width.
+  ENDMETHOD.
+
+  METHOD set_height.
+  ENDMETHOD.
+
+  METHOD set_metric.
   ENDMETHOD.
 
   METHOD link.

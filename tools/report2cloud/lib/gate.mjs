@@ -111,6 +111,9 @@ export function lint({ files, target, ddic, naming = true, keep = false }) {
   const work = mkdtempSync(join(tmpdir(), `report2cloud-${target}-`));
   try {
     cpSync(join(REPO, "src"), join(work, "src"), { recursive: true });
+    // src/03 holds the corpus classes as converted - the ones linted here
+    // are the conversion of now, under src/r2c
+    rmSync(join(work, "src", "03"), { recursive: true, force: true });
     mkdirSync(join(work, "src", "r2c"));
     writeFileSync(join(work, "src", "r2c", "package.devc.xml"), PACKAGE);
     for (const [name, text] of Object.entries(files)) writeFileSync(join(work, "src", "r2c", name), text);
@@ -155,6 +158,9 @@ export function lintUi5({ files, keep = false }) {
   const work = mkdtempSync(join(tmpdir(), "report2cloud-abap2ui5lint-"));
   try {
     cpSync(join(REPO, "src"), join(work, "src"), { recursive: true });
+    // src/03 holds the corpus classes as converted - the ones linted here
+    // are the conversion of now, under src/r2c
+    rmSync(join(work, "src", "03"), { recursive: true, force: true });
     mkdirSync(join(work, "src", "r2c"));
     writeFileSync(join(work, "src", "r2c", "package.devc.xml"), PACKAGE);
     for (const [name, text] of Object.entries(files)) writeFileSync(join(work, "src", "r2c", name), text);

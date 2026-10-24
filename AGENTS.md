@@ -15,6 +15,7 @@ list, ALV grid, messages. Language of code, comments, commits and docs:
 |---|---|
 | `src/01` | the framework: `z2ui5_cl_cgui_report` (report runtime), `_selscreen`, `_list`, `_alv`, `_tree`, `_layout` (the layout dialog of the ALV), `_popup`, `_range`, `_select`, `_variant` (selection variants), `_context` (RTTI and conversion helpers), `z2ui5_cx_cgui_error`; the two stores: `z2ui5_if_cgui_variant_store` with `z2ui5_cl_cgui_variant_db` (table `Z2UI5_CGUI_VAR`, data elements `Z2UI5_CGUI_VAR_*`) and `z2ui5_if_cgui_layout_store` with `z2ui5_cl_cgui_layout_db` (table `Z2UI5_CGUI_LAY`) |
 | `src/02` | samples `z2ui5_cl_cgui_sample_01` … `_11` |
+| `src/03` | the test set: the corpus reports of report2cloud as converted (`z2ui5_cl_cgui_r2c_NN`), generated - never edit by hand, `UPDATE_SNAPSHOTS=1 npm run test:report2cloud` writes it. Only the reports whose migration report names nothing for the release, so the package activates on ABAP Cloud too; the gate test's scratch copy leaves it out and lints the conversion of now under `src/r2c` |
 | `tools/report2cloud` | `report2cloud`, a Node CLI (no ABAP object) that converts a classic report into a report class of this addon - THE generator of this repository, see below |
 | `scripts/unit.mjs` | `npm run unit` - the ABAP Unit tests in the transpiled backend, tables included |
 | `site/`, `scripts/build-site.mjs` | `npm run site` - the GitHub Pages site: the page about the addon and the report2cloud playground, the converter bundled for the browser with esbuild (`.github/workflows/pages.yaml` deploys `build/site` from main). The converter stays browser-safe: no `node:` import in `tools/report2cloud/lib/convert.mjs` and what it imports (`report.mjs`, `refusals.mjs`, `abap.mjs`, `abapgit.mjs`, `textpool.mjs`) - file access belongs to the CLI |
@@ -239,6 +240,10 @@ from it is rewritten by hand), measured weekly by
   the class fails before its first screen) and `IN` on a select-option
   (the runtime's `IN` knows `I EQ`, `E EQ`, `I CP` - `range_check( )`, the
   rule above). Run it after a change to the converter or to `src/01`.
+  `npm run test:report2cloud:browser` runs the same classes as the real app
+  in headless Chromium (UI5 from the `@openui5` devDependencies): boot,
+  render, Execute, no page error - what the JSON protocol cannot see (a
+  property value UI5 rejects ends the app before its first screen).
 - **It follows the rules above**: report globals become PUBLIC attributes
   (never PRIVATE), the selection screen binds them by reference, ABAP SQL is
   written in strict mode, chains follow the house layout of the samples.

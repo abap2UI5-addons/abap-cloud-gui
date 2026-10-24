@@ -1492,7 +1492,7 @@ CLASS z2ui5_cl_cgui_selscreen IMPLEMENTATION.
           node->a( n = `maxLength` v = |{ item-max_length }| ).
         ENDIF.
         IF item-visible_len > 0.
-          node->a( n = `width` v = |{ item-visible_len + 4 }ch| ).
+          node->a( n = `width` v = z2ui5_cl_cgui_list=>width_of( item-visible_len + 4 ) ).
         ENDIF.
         IF item-value_help = abap_true.
           node->a( n = `showValueHelp`    b = abap_true
@@ -1519,7 +1519,7 @@ CLASS z2ui5_cl_cgui_selscreen IMPLEMENTATION.
     render_state( node = lo_select
                   item = item ).
     IF item-visible_len > 0.
-      lo_select->a( n = `width` v = |{ item-visible_len + 6 }ch| ).
+      lo_select->a( n = `width` v = z2ui5_cl_cgui_list=>width_of( item-visible_len + 6 ) ).
     ENDIF.
     IF item-user_command IS NOT INITIAL.
       lo_select->a( n = `change` v = client->_event( item-user_command ) ).
@@ -1677,7 +1677,7 @@ CLASS z2ui5_cl_cgui_selscreen IMPLEMENTATION.
 
     " VISIBLE LENGTH: the field keeps its width
     IF item-visible_len > 0.
-      lo_field->a( n = `width` v = |{ item-visible_len + 4 }ch| ).
+      lo_field->a( n = `width` v = z2ui5_cl_cgui_list=>width_of( item-visible_len + 4 ) ).
       RETURN.
     ENDIF.
     lo_field->ele( `layoutData`

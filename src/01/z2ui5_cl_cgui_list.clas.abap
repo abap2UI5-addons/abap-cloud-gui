@@ -117,6 +117,30 @@ CLASS z2ui5_cl_cgui_list DEFINITION PUBLIC FINAL CREATE PUBLIC.
       END OF ty_s_input_bind.
     TYPES ty_t_input_bind TYPE STANDARD TABLE OF ty_s_input_bind WITH EMPTY KEY.
 
+    "! the width of chars characters of a list or screen - in em, 0.6 em a character
+    "! (a CSSSize of UI5 has no unit ch)
+    "! HIDE val as the text a line keeps - a structure component by
+    "! component, separated by a tab (a string template takes no structure)
+    CLASS-METHODS hide_text
+      IMPORTING
+        val           TYPE any
+      RETURNING
+        VALUE(result) TYPE string.
+
+    "! the field of HIDE from the text of the clicked line - a structure
+    "! component by component, as hide_text( ) wrote it
+    CLASS-METHODS hide_restore
+      IMPORTING
+        hide TYPE string
+      CHANGING
+        val  TYPE any.
+
+    CLASS-METHODS width_of
+      IMPORTING
+        chars         TYPE i
+      RETURNING
+        VALUE(result) TYPE string.
+
     CLASS-METHODS factory
       RETURNING
         VALUE(result) TYPE REF TO z2ui5_cl_cgui_list.
@@ -308,6 +332,14 @@ CLASS z2ui5_cl_cgui_list DEFINITION PUBLIC FINAL CREATE PUBLIC.
     METHODS has_content
       RETURNING
         VALUE(result) TYPE abap_bool.
+
+    "! the lines from line from on as plain text, taken out of the list - the
+    "! list goes on at from (cl_demo_output=>get( ) and clear( ))
+    METHODS cut
+      IMPORTING
+        from          TYPE i
+      RETURNING
+        VALUE(result) TYPE string_table.
 
     "! the list as plain text lines - the spool output of a background run
     METHODS to_text
@@ -541,7 +573,7 @@ CLASS z2ui5_cl_cgui_list IMPLEMENTATION.
     " LOOP - the transpiled runtime passes even a VALUE( ) of type any by
     " reference, and its RTTI is ABAP code that loops
     IF hide IS SUPPLIED.
-      ls_item-hide = |{ hide }|.
+      ls_item-hide = hide_text( hide ).
     ENDIF.
     ls_item-kind        = cs_kind-text.
     ls_item-text        = text_format( val         = val
@@ -711,7 +743,7 @@ CLASS z2ui5_cl_cgui_list IMPLEMENTATION.
 
   METHOD hide.
 
-    DATA(lv_hide) = |{ val }|.
+    DATA(lv_hide) = hide_text( val ).
     LOOP AT mt_item REFERENCE INTO DATA(lr_item) WHERE line = mv_line AND kind = cs_kind-text.
       lr_item->hide    = lv_hide.
       lr_item->hotspot = abap_true.
@@ -1283,6 +1315,21 @@ CLASS z2ui5_cl_cgui_list IMPLEMENTATION.
 
   ENDMETHOD.
 
+  METHOD cut.
+
+    DATA lt_cut TYPE ty_t_item.
+
+    LOOP AT mt_item INTO DATA(ls_item) WHERE line >= from AND header = abap_false AND footer = abap_false.
+      INSERT ls_item INTO TABLE lt_cut.
+    ENDLOOP.
+    result = items_to_text( lt_cut ).
+    DELETE mt_item WHERE line >= from AND header = abap_false AND footer = abap_false.
+    mv_line = nmax( val1 = from
+                    val2 = 1 ).
+    CLEAR: mv_col, mv_col_line, mv_next_pos, mv_body_line.
+
+  ENDMETHOD.
+
   METHOD to_text.
 
     result = items_to_text( sequence( ) ).
@@ -1379,6 +1426,65 @@ CLASS z2ui5_cl_cgui_list IMPLEMENTATION.
 
   ENDMETHOD.
 
+  METHOD hide_text.
+
+    FIELD-SYMBOLS <copy> TYPE any.
+    FIELD-SYMBOLS <comp> TYPE any.
+    DATA lr_copy TYPE REF TO data.
+
+    " a copy first: the transpiled runtime passes val by reference, and its
+    " RTTI is ABAP code that loops - `hide = sy-tabix` would change on the way
+    CREATE DATA lr_copy LIKE val.
+    ASSIGN lr_copy->* TO <copy>.
+    <copy> = val.
+    IF cl_abap_typedescr=>describe_by_data( <copy> )->kind <> cl_abap_typedescr=>kind_struct.
+      result = |{ <copy> }|.
+      RETURN.
+    ENDIF.
+    DATA(lv_index) = 0.
+    DO.
+      lv_index = lv_index + 1.
+      ASSIGN COMPONENT lv_index OF STRUCTURE <copy> TO <comp>.
+      IF sy-subrc <> 0.
+        EXIT.
+      ENDIF.
+      DATA(lv_text) = COND string( WHEN cl_abap_typedescr=>describe_by_data( <comp> )->kind = cl_abap_typedescr=>kind_elem
+                                   THEN |{ <comp> }| ).
+      result = COND #( WHEN lv_index = 1 THEN lv_text ELSE |{ result }\t{ lv_text }| ).
+    ENDDO.
+
+  ENDMETHOD.
+
+  METHOD hide_restore.
+
+    FIELD-SYMBOLS <comp> TYPE any.
+
+    IF cl_abap_typedescr=>describe_by_data( val )->kind <> cl_abap_typedescr=>kind_struct.
+      val = hide.
+      RETURN.
+    ENDIF.
+    CLEAR val.
+    SPLIT hide AT |\t| INTO TABLE DATA(lt_part).
+    LOOP AT lt_part INTO DATA(lv_part).
+      ASSIGN COMPONENT sy-tabix OF STRUCTURE val TO <comp>.
+      IF sy-subrc <> 0.
+        EXIT.
+      ENDIF.
+      IF cl_abap_typedescr=>describe_by_data( <comp> )->kind = cl_abap_typedescr=>kind_elem.
+        <comp> = lv_part.
+      ENDIF.
+    ENDLOOP.
+
+  ENDMETHOD.
+
+  METHOD width_of.
+
+    DATA(lv_tenths) = nmax( val1 = chars
+                            val2 = 0 ) * 6.
+    result = |{ lv_tenths DIV 10 }.{ lv_tenths MOD 10 }em|.
+
+  ENDMETHOD.
+
   METHOD render_items.
 
     " WRITE AT pos(len): a spacer fills up to the column, the value takes
@@ -1416,7 +1522,7 @@ CLASS z2ui5_cl_cgui_list IMPLEMENTATION.
       IF lr_item->pos > 0.
         IF lr_item->pos - 1 > lv_col.
           lo_line->tag( `HBox`
-              )->a( n = `width` v = |{ lr_item->pos - 1 - lv_col }ch| ).
+              )->a( n = `width` v = width_of( lr_item->pos - 1 - lv_col ) ).
         ENDIF.
         lv_col = lr_item->pos - 1.
       ENDIF.
@@ -1426,7 +1532,7 @@ CLASS z2ui5_cl_cgui_list IMPLEMENTATION.
                                ELSE strlen( lr_item->text ) + 1 ).
       IF line_exists( lt_columned[ table_line = lr_item->line ] ) AND lv_width > 0.
         render_item( node   = lo_line->ele( `HBox`
-                                  )->a( n = `width` v = |{ lv_width }ch| )
+                                  )->a( n = `width` v = width_of( lv_width ) )
                      client = client
                      item   = lr_item->*
                      inputs = inputs ).
@@ -1473,7 +1579,7 @@ CLASS z2ui5_cl_cgui_list IMPLEMENTATION.
                                                                  tab_index = lv_index ) ).
           node->tag( `Input`
               )->a( n = `value` v = lv_value_bind
-              )->a( n = `width` v = |{ COND i( WHEN item-len > 0 THEN item-len ELSE nmax( val1 = strlen( item-text ) val2 = 10 ) ) + 2 }ch|
+              )->a( n = `width` v = width_of( COND i( WHEN item-len > 0 THEN item-len ELSE nmax( val1 = strlen( item-text ) val2 = 10 ) ) + 2 )
               )->a( n = `class` t = lv_class ).
         ENDIF.
         RETURN.
@@ -1505,7 +1611,7 @@ CLASS z2ui5_cl_cgui_list IMPLEMENTATION.
               )->a( n = `design` v = `Bold`
               )->a( n = `class`  t = lv_class ).
           IF item-len > 0.
-            node->a( n = `width` v = |{ item-len }ch| ).
+            node->a( n = `width` v = width_of( item-len ) ).
           ENDIF.
           RETURN.
         ENDIF.
@@ -1530,7 +1636,7 @@ CLASS z2ui5_cl_cgui_list IMPLEMENTATION.
               )->a( n = `wrapping`         b = abap_false
               )->a( n = `class`            t = lv_class ).
           IF item-len > 0.
-            node->a( n = `width`     v = |{ item-len }ch|
+            node->a( n = `width`     v = width_of( item-len )
                )->a( n = `textAlign` v = SWITCH #( item-justify
                                                    WHEN cs_justify-right THEN `End`
                                                    WHEN cs_justify-center THEN `Center`
@@ -1565,11 +1671,11 @@ CLASS z2ui5_cl_cgui_list IMPLEMENTATION.
           DATA(lo_rule) = node->ele( `HBox` ).
           IF item-pos > 1.
             lo_rule->tag( `HBox`
-                )->a( n = `width` v = |{ item-pos - 1 }ch| ).
+                )->a( n = `width` v = width_of( item-pos - 1 ) ).
           ENDIF.
           lo_rule->tag( `Toolbar`
               )->a( n = `height` v = `2px`
-              )->a( n = `width`  v = COND #( WHEN item-len > 0 THEN |{ item-len }ch| ELSE `100%` )
+              )->a( n = `width`  v = COND #( WHEN item-len > 0 THEN width_of( item-len ) ELSE `100%` )
               )->a( n = `design` v = `Solid` ).
         ELSE.
           node->tag( `Toolbar`

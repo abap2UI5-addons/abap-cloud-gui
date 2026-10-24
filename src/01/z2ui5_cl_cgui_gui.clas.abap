@@ -13,6 +13,36 @@ CLASS z2ui5_cl_cgui_gui DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
     CONSTANTS true  TYPE i VALUE 1.
     CONSTANTS false TYPE i VALUE 0.
 
+    " cl_gui_control - the metric and the window styles of the classic
+    " controls; the browser lays the controls out itself, they are taken
+    " and have no effect
+    CONSTANTS metric_default TYPE i VALUE 0.
+    CONSTANTS metric_pixel   TYPE i VALUE 1.
+    CONSTANTS metric_mm      TYPE i VALUE 2.
+    CONSTANTS ws_tabstop      TYPE i VALUE 65536.
+    CONSTANTS ws_maximizebox  TYPE i VALUE 65536.
+    CONSTANTS ws_group        TYPE i VALUE 131072.
+    CONSTANTS ws_minimizebox  TYPE i VALUE 131072.
+    CONSTANTS ws_thickframe   TYPE i VALUE 262144.
+    CONSTANTS ws_sysmenu      TYPE i VALUE 524288.
+    CONSTANTS ws_dlgframe     TYPE i VALUE 4194304.
+    CONSTANTS ws_border       TYPE i VALUE 8388608.
+    CONSTANTS ws_caption      TYPE i VALUE 12582912.
+    CONSTANTS ws_maximize     TYPE i VALUE 16777216.
+    CONSTANTS ws_clipchildren TYPE i VALUE 33554432.
+    CONSTANTS ws_clipsiblings TYPE i VALUE 67108864.
+    CONSTANTS ws_visible      TYPE i VALUE 268435456.
+    CONSTANTS ws_child        TYPE i VALUE 1073741824.
+
+    TYPES:
+      "! CNTL_SIMPLE_EVENT(S) - the events set_registered_events( ) of a
+      "! control takes; ABAP Cloud has not the DDIC types
+      BEGIN OF ty_s_simple_event,
+        eventid    TYPE i,
+        appl_event TYPE abap_bool,
+      END OF ty_s_simple_event.
+    TYPES ty_t_simple_events TYPE STANDARD TABLE OF ty_s_simple_event WITH DEFAULT KEY.
+
     "! the report the controls belong to - z2ui5_cl_cgui_report sets it at
     "! the start of every roundtrip
     CLASS-METHODS set_report

@@ -18,7 +18,8 @@
     "report2cloud:docs": "node tools/report2cloud/docs.mjs",
     "test:report2cloud:runtime": "node --test --test-concurrency=1 \"tools/report2cloud/test/runtime/*.test.mjs\"",
     "unit": "node scripts/unit.mjs",
-    "site": "node scripts/build-site.mjs"
+    "site": "node scripts/build-site.mjs",
+    "test:report2cloud:browser": "node --test tools/report2cloud/test/browser/*.test.mjs"
   },
   "repository": {
     "type": "git",
@@ -30,7 +31,17 @@
     "@abap2ui5/linter-render": "^0.8.5",
     "@abaplint/cli": "^2.120.75",
     "@abaplint/core": "^2.120.75",
-    "esbuild": "0.28.1"
+    "@openui5/sap.f": "1.153.0",
+    "@openui5/sap.m": "1.153.0",
+    "@openui5/sap.tnt": "1.153.0",
+    "@openui5/sap.ui.codeeditor": "1.153.0",
+    "@openui5/sap.ui.core": "1.153.0",
+    "@openui5/sap.ui.layout": "1.153.0",
+    "@openui5/sap.ui.table": "1.153.0",
+    "@openui5/sap.ui.unified": "1.153.0",
+    "@openui5/themelib_sap_horizon": "1.153.0",
+    "esbuild": "0.28.1",
+    "playwright": "1.63.0"
   },
   "engines": {
     "node": ">=22"

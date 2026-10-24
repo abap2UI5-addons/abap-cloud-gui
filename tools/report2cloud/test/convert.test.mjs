@@ -1,13 +1,13 @@
 // The conversion of the corpus: snapshots of every generated file and of
 // the migration report, the abapGit format of the files, and the mapping
 // table construct by construct. UPDATE_SNAPSHOTS=1 writes the snapshots
-// anew - review the diff before committing it.
+// anew, and the test set src/03 - review the diff before committing it.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { convert, defaultClassName, FRONTEND, GUI, RESERVED_METHODS, UNCATALOGUED } from "../lib/convert.mjs";
-import { corpus, convertEntry, SNAPSHOTS } from "./corpus.mjs";
+import { corpus, convertEntry, inTestSet, SNAPSHOTS, TEST_SET } from "./corpus.mjs";
 import { parseTextpool } from "../lib/textpool.mjs";
 import { dependenciesOf, dependencyIndex } from "../lib/deps.mjs";
 import { tmpdir } from "node:os";
@@ -39,6 +39,24 @@ for (const e of entries) {
     assert.deepEqual(readdirSync(dir).sort(), Object.keys(actual).sort(), "the generated files");
     for (const [name, text] of Object.entries(actual)) {
       assert.equal(text, readFileSync(join(dir, name), "utf8"), `${e.name}/${name} differs from its snapshot`);
+    }
+  });
+
+  test(`test set src/03: ${e.name}`, () => {
+    const c = converted.get(e.name);
+    const mine = readdirSync(TEST_SET).filter((f) => f.startsWith(`${c.result.className}.`)).sort();
+    if (UPDATE) {
+      for (const f of mine) rmSync(join(TEST_SET, f));
+      if (inTestSet(c)) for (const [name, text] of Object.entries(c.result.files)) writeFileSync(join(TEST_SET, name), text);
+      return;
+    }
+    if (!inTestSet(c)) {
+      assert.deepEqual(mine, [], `${e.name} needs ${c.result.release.map((x) => x.name).join(", ") || "its refusals fixed"} - not in src/03, which activates on ABAP Cloud too`);
+      return;
+    }
+    assert.deepEqual(mine, Object.keys(c.result.files).sort(), `src/03 holds the files of ${e.name} - run UPDATE_SNAPSHOTS=1 npm run test:report2cloud`);
+    for (const [name, text] of Object.entries(c.result.files)) {
+      assert.equal(readFileSync(join(TEST_SET, name), "utf8"), text, `src/03/${name} differs from the conversion`);
     }
   });
 
@@ -897,7 +915,7 @@ test("SAP GUI controls: a member, a parameter or an event the stand-ins do not h
   assert.deepEqual(refused("  CREATE OBJECT go_e EXPORTING parent = go_c.\n  go_e->set_textstream( 'x' ).\n"), []);
   assert.deepEqual(refused("  go_e->set_comments_string( ).\n"), ["SAP GUI controls: go_e->set_comments_string has no counterpart in z2ui5_cl_cgui_gui_textedit - port this statement by hand"]);
   assert.deepEqual(refused("  go_e->set_textstream( text = 'x' colour = 1 ).\n"), ["SAP GUI controls: colour is no parameter of the method called in the stand-in - port this statement by hand"]);
-  assert.deepEqual(refusalOf(`${head}DATA go_p TYPE REF TO cl_gui_picture.\n`).map((x) => x.replace(/^\d+:\d+ /, "")), ["SAP GUI controls: cl_gui_picture has no counterpart - the containers, cl_gui_textedit, cl_gui_html_viewer and cl_gui_toolbar have (z2ui5_cl_cgui_gui*)"]);
+  assert.deepEqual(refusalOf(`${head}DATA go_p TYPE REF TO cl_gui_simple_tree.\n`).map((x) => x.replace(/^\d+:\d+ /, "")), ["SAP GUI controls: cl_gui_simple_tree has no counterpart - the containers, cl_gui_textedit, cl_gui_html_viewer, cl_gui_toolbar, cl_gui_picture and cl_gui_alv_grid have (z2ui5_cl_cgui_gui*)"]);
 });
 
 test("SAP GUI controls: SET HANDLER of a local class's method is set_handler( ) of the stand-in; what it cannot call is refused", () => {
@@ -914,7 +932,13 @@ test("SAP GUI controls: SET HANDLER of a local class's method is set_handler( ) 
 
   const refused = (decl, body) => convert(cls(decl, body), { file: "zt.prog.abap", className: "zcl_t" }).refusals.map((x) => x.message.split(" - ")[0]);
   assert.deepEqual(refused(handler, "    SET HANDLER on_f FOR ALL INSTANCES.\n"), ["SAP GUI controls: SET HANDLER ... FOR ALL INSTANCES"]);
-  assert.deepEqual(refused(handler, "    SET HANDLER lcl=>on_f FOR mo_t.\n"), ["SAP GUI controls: SET HANDLER of a static method"]);
+  // a static method: called through an object of its local class (RTTI
+  // finds the class by the object), with a constructor that takes
+  // parameters by the absolute name of the class
+  const statics = (ctor) => convert(cls(`    CLASS-METHODS on_f FOR EVENT function_selected OF cl_gui_toolbar IMPORTING fcode.\n${ctor}`, "    SET HANDLER lcl=>on_f FOR mo_t.\n"), { file: "zt.prog.abap", className: "zcl_t" });
+  assert.deepEqual(statics("").refusals.map((x) => x.message), []);
+  assert.match(Object.values(statics("").files).join("\n"), /mo_t->set_handler\( handler = NEW lcl\( \)\n\s+method {2}= `ON_F`/);
+  assert.match(Object.values(statics("    METHODS constructor IMPORTING iv_x TYPE i.\n").draft).join("\n"), /mo_t->set_handler\( class {2}= `\\CLASS-POOL=ZCL_T\\CLASS=LCL`/);
   // an event the stand-in does not raise
   assert.deepEqual(refused("    METHODS on_f FOR EVENT dropdown_clicked OF cl_gui_toolbar IMPORTING fcode.\n", "    SET HANDLER on_f FOR mo_c.\n"), ["SAP GUI controls: SET HANDLER on_f"]);
 });

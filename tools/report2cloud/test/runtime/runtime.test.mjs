@@ -560,3 +560,146 @@ test("zr2c_22_files: GUI_UPLOAD of a path typed in - the upload dialog opens for
   s = await d.act(s.session, { event: actionsOf(s, "CGUI_FILE_CANCEL").find((a) => a.control === "sap.m.Button").id });
   assert.deepEqual(fieldsOf(s), ['P_FILE="C:\\\\data\\\\seats.txt"*', "P_SAVE=false"]);
 });
+
+/** the content of the core:HTML controls of the main view */
+const htmlOf = () => [...(d.state().slots.MAIN?.xml ?? "").matchAll(/<core:HTML[^>]*content="([^"]*)"/g)].map((m) => {
+  // a binding {/MT_CGUI_GUI/1/HTML}: its value in the model of the view
+  const path = /^\{\/(.*)\}$/.exec(m[1]);
+  if (!path) return m[1];
+  return String(path[1].split("/").reduce((o, k) => o?.[k], d.state().models.MAIN?.data) ?? "");
+});
+const guiAction = (s, label) => s.actions.find((a) => a.event === "CGUI_GUI" && a.label === label);
+
+test("zr2c_28_browser: cl_abap_browser=>show_html( ) on cl_gui_container=>default_screen - the page above the list of the run", { skip }, async () => {
+  let s = await d.start("z2ui5_cl_cgui_r2c_28");
+  s = await d.act(s.session, { values: { P_DISC: 20 }, event: "CGUI_EXECUTE" });
+  assert.equal(s.layer, "main");
+  assert.equal((d.state().slots.MAIN.xml.match(/<core:HTML/g) ?? []).length, 1, "one document on the screen");
+  assert.deepEqual(boxes(s), [], "no dialog box - the container is the screen");
+});
+
+test("zr2c_29_demooutput: cl_demo_output - sections, a text, the tables as columns, the value of display( )", { skip }, async () => {
+  let s = await d.start("z2ui5_cl_cgui_r2c_29");
+  s = await d.act(s.session, { event: "CGUI_EXECUTE" });
+  const lines = d.lines().filter((l) => l !== "");
+  assert.deepEqual(lines, ["Inventory", "4 items, 173 pieces in stock", "Stock", "ITEM QUANTITY SHELF", "BOLT 120 A1", "NUT 3 A2", "WASHER 48 B1", "SCREW 2 B4",
+    "To reorder", "Below the minimum", "ITEM QUANTITY SHELF", "NUT 3 A2", "SCREW 2 B4", "173"]);
+});
+
+test("zr2c_30_salvcolumns: a LOOP over get_columns( )->get( ) - every column header its name and its text", { skip }, async () => {
+  let s = await d.start("z2ui5_cl_cgui_r2c_30");
+  s = await d.act(s.session, { event: "CGUI_EXECUTE" });
+  assert.equal(s.tables.length, 1);
+  // the components of a local type have no DDIC text - their text is their name
+  assert.deepEqual(s.tables[0].columns.map((c) => c.label), ["STUDENT (STUDENT)", "SUBJECT (SUBJECT)", "POINTS (POINTS)", "PASSED (PASSED)"]);
+  assert.equal(s.tables[0].rowCount, 3);
+});
+
+test("zr2c_31_toolbar: a toolbar and an HTML viewer on the screen - a static method of a local class handles the button", { skip }, async () => {
+  let s = await d.start("z2ui5_cl_cgui_r2c_31");
+  assert.match(htmlOf().join(), /Count: 0/);
+  s = await d.act(s.session, { event: guiAction(s, "Up").id });
+  s = await d.act(s.session, { event: guiAction(s, "Up").id });
+  assert.match(htmlOf().join(), /Count: 2/, "the handler counted up twice");
+  s = await d.act(s.session, { event: guiAction(s, "Down").id });
+  assert.match(htmlOf().join(), /Count: 1/);
+});
+
+test("zr2c_32_xmlpopup: cl_abap_browser=>show_xml( ) without a container - a dialog box with the XML as text, Close ends it", { skip }, async () => {
+  let s = await d.start("z2ui5_cl_cgui_r2c_32");
+  s = await d.act(s.session, { event: "CGUI_EXECUTE" });
+  assert.deepEqual(d.lines(), ["Order 4711 with 3 item(s) shown as XML"]);
+  assert.match(htmlOf().join(), /&lt;order id=/, "the XML escaped in a pre");
+  s = await d.act(s.session, { event: guiAction(s, "Close").id });
+  assert.deepEqual(htmlOf(), [], "closed");
+  assert.deepEqual(d.lines(), ["Order 4711 with 3 item(s) shown as XML"]);
+});
+
+test("zr2c_33_strings: SPLIT, CONCATENATE, REPLACE, TRANSLATE and the string functions", { skip }, async () => {
+  let s = await d.start("z2ui5_cl_cgui_r2c_33");
+  s = await d.act(s.session, { event: "CGUI_EXECUTE" });
+  assert.deepEqual(d.lines(), ["Input: ada   augusta  lovelace", "Condensed: ada augusta lovelace", "Parts: 3", "---",
+    "1 Ada 3", "2 Augusta 7", "3 Lovelace 8", "---", "Initials: A.A.L.", "Upper case: ADA AUGUSTA LOVELACE",
+    "With dashes: ada-augusta-lovelace", "Vowels raised: AdA AUgUstA lOvElAcE", "Reversed: ecalevol atsugua ada"]);
+});
+
+test("zr2c_34_controllevels: AT FIRST, AT NEW, AT END OF and AT LAST over a sorted table", { skip }, async () => {
+  await d.start("z2ui5_cl_cgui_r2c_34");
+  assert.deepEqual(d.lines(), ["Sales per region", "---", "NORTH", "01 120.00", "01 30.00", "02 99.90", "Total 249.90", "",
+    "SOUTH", "01 80.50", "02 150.00", "Total 230.50", "", "---", "All regions 480.40"]);
+});
+
+test("zr2c_35_dates: date arithmetic - days between, working days, first and last of the month, week days", { skip }, async () => {
+  let s = await d.start("z2ui5_cl_cgui_r2c_35");
+  s = await d.act(s.session, { event: "CGUI_EXECUTE" });
+  assert.deepEqual(d.lines(), ["Days between start and end: 74", `After 10 working days: ${listDate("20260119")}`, "---",
+    `First of the month: ${listDate("20260101")} Thursday`, `Last of the month: ${listDate("20260131")} Saturday`, `Start: ${listDate("20260105")} Monday`]);
+  s = await d.act(s.session, { event: "CGUI_BACK" });
+  s = await d.act(s.session, { values: { P_END: "2026-01-01" }, event: "CGUI_EXECUTE" });
+  assert.ok(s.fields.length, "the end before the start keeps the screen");
+});
+
+test("zr2c_36_ranges: IN on select-options over local data, DELETE ADJACENT DUPLICATES", { skip }, async () => {
+  let s = await d.start("z2ui5_cl_cgui_r2c_36");
+  s = await d.act(s.session, { event: "CGUI_EXECUTE" });
+  assert.deepEqual(d.lines(), ["3 product(s) in the selection", "---", "HOME CHAIR 120", "HOME LAMP 45", "OUT TENT 210"]);
+  s = await d.act(s.session, { event: "CGUI_BACK" });
+  s = await d.act(s.session, { values: { P_UNIQ: false }, event: "CGUI_EXECUTE" });
+  assert.deepEqual(d.lines(), ["4 product(s) in the selection", "---", "HOME CHAIR 120", "HOME LAMP 45", "HOME LAMP 45", "OUT TENT 210"]);
+});
+
+test("zr2c_37_expressions: FILTER, REDUCE, VALUE FOR, COND, SWITCH, CORRESPONDING", { skip }, async () => {
+  let s = await d.start("z2ui5_cl_cgui_r2c_37");
+  s = await d.act(s.session, { values: { P_TEAM: "B" }, event: "CGUI_EXECUTE" });
+  assert.deepEqual(d.lines(), ["Team B: 2 members, 13 goals", "---", "Noah 2 scorer Beta", "Finn 11 star Beta", "---", "More than five goals: Mia, Finn"]);
+});
+
+test("zr2c_38_confirm: POPUP_TO_CONFIRM in START-OF-SELECTION - the run goes on with the answer", { skip }, async () => {
+  let s = await d.start("z2ui5_cl_cgui_r2c_38");
+  s = await d.act(s.session, { event: "CGUI_EXECUTE" });
+  assert.equal(s.layer, "popup");
+  s = await d.act(s.session, { event: actionsOf(s, "CGUI_POP_OPTION_1")[0].id });
+  assert.deepEqual(d.lines(), ["The tasks that are done were deleted.", "---", "[ ] Test it"]);
+  s = await d.act(s.session, { event: "CGUI_BACK" });
+  s = await d.act(s.session, { event: "CGUI_EXECUTE" });
+  s = await d.act(s.session, { event: actionsOf(s, "CGUI_POP_OPTION_2")[0].id });
+  assert.deepEqual(d.lines(), ["Nothing was deleted.", "---", "[x] Write the report", "[ ] Test it", "[x] Ship it"]);
+});
+
+test("zr2c_39_textedit: a text editor and a toolbar on the screen - the handler of a local class reads the text", { skip }, async () => {
+  let s = await d.start("z2ui5_cl_cgui_r2c_39");
+  s = await d.act(s.session, { event: "CGUI_EXECUTE" });
+  s = await d.act(s.session, { event: guiAction(s, "Count").id });
+  assert.deepEqual(toasts(s), ["The note has 8 characters"]);
+});
+
+test("zr2c_40_sapevent: the SAPEVENT links of an HTML page reach the handler of a local class", { skip }, async () => {
+  let s = await d.start("z2ui5_cl_cgui_r2c_40");
+  assert.deepEqual(s.actions.filter((a) => a.control === "sap.m.Link").map((a) => a.label), ["Soup of the day", "Pasta"]);
+  s = await d.act(s.session, { event: guiAction(s, "Pasta").id });
+  assert.deepEqual(toasts(s), ["You picked PASTA"]);
+});
+
+test("zr2c_41_picture: DP_CREATE_URL of the bytes of a GIF, cl_gui_picture shows it - a click reaches the handler", { skip }, async () => {
+  let s = await d.start("z2ui5_cl_cgui_r2c_41");
+  s = await d.act(s.session, { event: "CGUI_EXECUTE" });
+  const xml = d.state().slots.MAIN.xml;
+  const src = /<Image[^>]*src="\{\/(MT_CGUI_GUI\/[^}]*)\}"/.exec(xml);
+  assert.ok(src, "an Image bound to the control");
+  const url = src[1].split("/").reduce((o, k) => o?.[k], d.state().models.MAIN?.data);
+  assert.equal(url, "data:image/gif;base64,R0lGODlhAQABAIAAAP///wAAACH5BAEAAAAALAAAAAABAAEAAAICRAEAOw==");
+  assert.match(xml, /<Image[^>]*width="100%"/, "fitted to the width");
+  const click = s.actions.find((a) => a.event === "CGUI_GUI" && a.control === "sap.m.Image");
+  s = await d.act(s.session, { event: click.id });
+  s = await d.act(s.session, { event: click.id });
+  assert.deepEqual(toasts(s), ["2 stamp(s)"]);
+});
+
+test("zr2c_42_demoget: cl_demo_output=>get( ) - the output as an HTML page for cl_abap_browser, not in the list", { skip }, async () => {
+  let s = await d.start("z2ui5_cl_cgui_r2c_42");
+  s = await d.act(s.session, { event: "CGUI_EXECUTE" });
+  assert.deepEqual(d.lines().filter((l) => l.trim() !== ""), ["25 bottles in the cellar"]);
+  const [page] = htmlOf();
+  assert.match(page, /<pre>Cellar[\s\S]*Riesling[\s\S]*Rose/);
+  assert.doesNotMatch(page, /Merlot/);
+});

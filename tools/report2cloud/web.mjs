@@ -39,7 +39,7 @@ import { kindOf as startKindOf } from "./lib/start.mjs";
 
 export const LIST_URL = "https://raw.githubusercontent.com/dotabap/dotabap-list/main/list.json";
 
-const USAGE = `usage: node tools/report2cloud/web.mjs [--list url|file] [--cache dir] [--limit n] [--lint] [--start] [--json file] [--summary file] [--offline]`;
+const USAGE = `usage: node tools/report2cloud/web.mjs [--list url|file] [--cache dir] [--limit n] [--lint] [--start] [--browser] [--json file] [--summary file] [--offline]`;
 
 function args(argv) {
   const opts = { list: LIST_URL, cache: join(REPO, "build", "web-corpus") };
@@ -49,6 +49,7 @@ function args(argv) {
     else if (a === "--lint") opts.lint = true;
     else if (a === "--offline") opts.offline = true;
     else if (a === "--start") opts.start = true;
+    else if (a === "--browser") opts.browser = opts.start = true;
     else if (["--list", "--cache", "--limit", "--json", "--summary"].includes(a)) {
       if (argv[i + 1] === undefined) throw new Error(`${a} needs a value`);
       opts[a.slice(2)] = argv[++i];
@@ -142,7 +143,8 @@ export function markdown({ rows, repos, failed, findings, started }) {
     }
     lines.push("", `In the transpiled runtime: **${f.started} of ${f.converted} converted reports start (${share(f.started)})** - ${f.checked} pass the syntax check of the transpile, ${f.built} build.`, "",
       "| stage | reports |", "|---|---:|",
-      `| converted | ${f.converted} |`, `| checked | ${f.checked} |`, `| built | ${f.built} |`, `| started | ${f.started} |`, "",
+      `| converted | ${f.converted} |`, `| checked | ${f.checked} |`, `| built | ${f.built} |`, `| started | ${f.started} |`,
+      ...(f.browser !== undefined ? [`| in the browser | ${f.browser} |`] : []), "",
       "| reports | stopped at |", "|---:|---|",
       ...[...byKind].sort((a, b) => b[1] - a[1]).slice(0, 20).map(([k, n]) => `| ${n} | ${k.replace(/\|/g, "\\|")} |`));
   }
@@ -193,7 +195,7 @@ async function main() {
   if (opts.start) {
     const { startAll } = await import("./lib/start.mjs");
     const { DDIC } = await import("./test/corpus.mjs");
-    started = await startAll(rows.filter((r) => r.files), { ddic: DDIC, onLine: (l) => console.log(l) });
+    started = await startAll(rows.filter((r) => r.files), { ddic: DDIC, browser: opts.browser, onLine: (l) => console.log(l) });
     for (const s of started.stages ?? []) {
       const r = rows.find((x) => x.file === s.file);
       r.start = s.ok ? "started" : `${s.stage}: ${s.error}`;
