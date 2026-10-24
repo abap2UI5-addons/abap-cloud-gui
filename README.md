@@ -11,6 +11,8 @@
 [![check-abap2UI5](https://img.shields.io/github/actions/workflow/status/abap2UI5-addons/abap-cloud-gui/check-abap2ui5.yaml?branch=main&label=check-abap2UI5)](https://github.com/abap2UI5-addons/abap-cloud-gui/actions/workflows/check-abap2ui5.yaml)
 [![report2cloud](https://img.shields.io/github/actions/workflow/status/abap2UI5-addons/abap-cloud-gui/report2cloud.yaml?branch=main&label=report2cloud)](https://github.com/abap2UI5-addons/abap-cloud-gui/actions/workflows/report2cloud.yaml)
 
+**[Try the report converter in the browser](https://abap2ui5-addons.github.io/abap-cloud-gui/#playground)**
+
 **Write abap2UI5 apps the way you write a classic ABAP report.** Selection
 screen, `WRITE` list, ALV grid, `START-OF-SELECTION`, `AT LINE-SELECTION`,
 `MESSAGE` - the same concepts, running as a UI5 app in the browser. On ABAP
@@ -382,8 +384,11 @@ Stage 0 - release, and the number to move
 - [x] The share of the web corpus that starts in the transpiled runtime:
       `report2cloud:web --start` checks, builds and starts the converted
       reports weekly, the funnel and where they stopped in the job summary
-      (first run: 74 of 596 converted reports start, most of the others
-      read a class or table of their repository the sparse clone lacks)
+      (first run: 74 of 596 converted reports start, 82 with the upload
+      dialog of `GUI_UPLOAD` and `cl_demo_output`; most of the others read
+      a class or table of their repository the sparse clone lacks)
+- [x] A site with the converter in the browser - GitHub Pages, the
+      playground converts a pasted report on the page (`npm run site`)
 - [x] `report2cloud:coverage` - the measurement over a folder of reports
 - [x] Includes inlined from beside the report, macros expanded
 
@@ -510,6 +515,9 @@ Stage 5 - research
 - [x] The grid in a local class: the stand-in `z2ui5_cl_cgui_gui_alv_grid`,
       the ALV of the report in its container, with its toolbar, user
       command, double click and hotspot
+- [x] `cl_demo_output` (in 72 reports of the web corpus): the stand-in
+      `z2ui5_cl_cgui_demo_output` writes into the list - values, structures
+      and tables as columns, sections as headings
 - [ ] More than one grid, F1 of the editor, the tree and the picture; table
       controls, subscreens and tabstrips on a dynpro
 
@@ -536,6 +544,7 @@ npm run check:abap2ui5  # abap2UI5-linter over apps and views
 npm run check:regex     # no regular expressions in src/
 npm run unit            # ABAP Unit in the transpiled backend (needs ../mcp-server and .deps/popups)
 npm run test:report2cloud  # the report converter: snapshots and abaplint over its output
+npm run site            # the GitHub Pages site with the converter playground into build/site (-- --serve: on :8080)
 ```
 
 The ABAP Unit tests run in CI in the transpiled abap2UI5 backend
