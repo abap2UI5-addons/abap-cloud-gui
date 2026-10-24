@@ -17,11 +17,12 @@ const tag = (item, name) => {
   return m ? decode(m[1]) : "";
 };
 
-/** { title, symbols: Map("001" -> text), selection: Map("P_CARR" -> text | null), cua }
+/** { title, symbols: Map("001" -> text), selection: Map("P_CARR" -> text | null), cua, dynpros }
  *  - null for a selection text taken from the DDIC; cua the GUI status and
- *  titles of the program (parseCua), undefined when the file has none. */
+ *  titles of the program (parseCua), undefined when the file has none;
+ *  dynpros its screens (parseDynpros). */
 export function parseTextpool(xml) {
-  const pool = { title: "", symbols: new Map(), selection: new Map(), cua: parseCua(xml) };
+  const pool = { title: "", symbols: new Map(), selection: new Map(), cua: parseCua(xml), dynpros: parseDynpros(xml) };
   if (!xml) return pool;
   const tpool = /<TPOOL>([\s\S]*?)<\/TPOOL>/.exec(xml);
   if (!tpool) return pool;
@@ -132,4 +133,48 @@ export function parseCua(xml) {
   }
   const titles = new Map(tit.map((r) => [up(r, "CODE"), tag(r, "TEXT").replace(/\s+$/, "")]));
   return { statuses, titles };
+}
+
+// ---------------------------------------------------------------- dynpros
+//
+// abapGit writes the screens of a program into the same .prog.xml, under
+// <DYNPROS>: per screen its HEADER (SCREEN, DESCRIPT, TYPE), the CONTAINERS
+// (the screen itself, frames are fields; subscreens, table controls,
+// tabstrips and custom controls are containers), the FIELDS (RPY_DYFATC:
+// TYPE, NAME, TEXT, LINE, COLUMN, LENGTH, HEIGHT, INPUT_FLD, OUTPUT_FLD,
+// REQU_ENTRY, GROUP1, PUSH_FCODE, INVISIBLE, ...) and the FLOW_LOGIC, one
+// source line per RPY_DYFLOW.
+
+const items = (xml, name) => [...xml.matchAll(new RegExp(`<${name}>([\\s\\S]*?)</${name}>`, "g"))].map((r) => r[1]);
+
+/** [{ screen, description, type, containers: [{ type, name, parent }],
+ *  fields: [{ cont, contName, type, name, text, line, column, length, height, input,
+ *  output, required, group1, fcode, invisible, icon }], flow: [line] }] -
+ *  screen with its four digits, the texts as the screen painter has them
+ *  (underscores of a template included) */
+export function parseDynpros(xml) {
+  const m = xml && /<DYNPROS>([\s\S]*?)<\/DYNPROS>/.exec(xml);
+  if (!m) return [];
+  const screens = [];
+  for (const it of m[1].split(/<\/item>/).map((x) => x.replace(/^[\s\S]*?<item>/, "")).filter((x) => x.includes("<HEADER>"))) {
+    const header = /<HEADER>([\s\S]*?)<\/HEADER>/.exec(it)[1];
+    const up = (r, n) => tag(r, n).trim().toUpperCase();
+    const flag = (r, n) => up(r, n) === "X";
+    screens.push({
+      screen: tag(header, "SCREEN").trim().padStart(4, "0"),
+      description: tag(header, "DESCRIPT").trim(),
+      type: up(header, "TYPE"),
+      containers: items(it, "RPY_DYCATT").map((r) => ({ type: up(r, "TYPE"), name: up(r, "NAME"), parent: up(r, "ELEMENT_OF") })),
+      fields: items(it, "RPY_DYFATC").map((r) => ({
+        cont: up(r, "CONT_TYPE"), contName: up(r, "CONT_NAME"), type: up(r, "TYPE"), name: up(r, "NAME"), text: tag(r, "TEXT").replace(/\s+$/, ""),
+        line: Number(tag(r, "LINE")) || 0, column: Number(tag(r, "COLUMN")) || 0,
+        length: Number(tag(r, "LENGTH")) || 0, height: Number(tag(r, "HEIGHT")) || 1,
+        input: flag(r, "INPUT_FLD"), output: flag(r, "OUTPUT_FLD") || flag(r, "OUTPUTONLY"),
+        required: ["O", "X"].includes(up(r, "REQU_ENTRY")), group1: up(r, "GROUP1"),
+        fcode: up(r, "PUSH_FCODE"), invisible: flag(r, "INVISIBLE"), icon: up(r, "ICON_NAME"),
+      })),
+      flow: items(it, "RPY_DYFLOW").map((r) => tag(r, "LINE")),
+    });
+  }
+  return screens;
 }

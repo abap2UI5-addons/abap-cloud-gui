@@ -54,12 +54,12 @@ const DECL = new Set(["Data", "DataBegin", "DataEnd", "Type", "TypeBegin", "Type
 
 // statements with no counterpart - refused wherever they stand
 const REFUSED = {
-  CallScreen: "CALL SCREEN - a dynpro has no counterpart in a browser app; build the screen as an abap2UI5 view or a popup",
+  CallScreen: "CALL SCREEN - the dynpro is not converted (a dynpro of fields is, from the .prog.xml - see the MODULE refusals); else build the screen as an abap2UI5 view or a popup",
   SetScreen: "SET SCREEN - dynpro flow logic has no counterpart",
   CallDialog: "CALL DIALOG - dialog modules have no counterpart",
   CallTransaction: "CALL TRANSACTION - no SAP GUI transaction can be started from a browser app (batch input with USING is no API on ABAP Cloud either); call the released API of the application instead",
   ExecSQL: "EXEC SQL - native SQL is not available on ABAP Cloud; use ABAP SQL on a released CDS view",
-  Module: "MODULE - dynpro modules have no counterpart",
+  Module: "MODULE - the .prog.xml has no screens (DYNPROS); a dynpro of fields is converted from them",
   Include: "INCLUDE - no such include beside the report (as <include>.prog.abap, the name abapGit writes); put it there, or name its folder with --includes",
   Nodes: "NODES - logical databases have no counterpart; read the data with ABAP SQL",
   Get: "GET - logical database events have no counterpart; read the data with ABAP SQL",
@@ -766,6 +766,8 @@ class Converter {
     this.tablesKept = new Set();
     const tables = this.decls.filter((s) => kind(s) === "Tables").map((s) => lc(declName(s)));
     if (!tables.length) return;
+    // a field of a dynpro is the work area of TABLES
+    for (const root of this.dynproFieldRoots()) if (tables.includes(root)) this.tablesKept.add(root);
     const body = [...this.events.flatMap((e) => e.stmts), ...this.forms.flatMap((f) => f.body)];
     for (const s of body) {
       if (kind(s) === "Comment") continue;
@@ -808,7 +810,7 @@ class Converter {
       else if (/type\s+ref\s+to\s+cl_gui_(custom_container|docking_container|container|dialogbox_container|splitter_container|easy_splitter_container)\b/.test(t)) this.contVars.add(name);
     }
     if (!this.gridVars.size) {
-      for (const m of this.modules) this.refuse(m.stmt, REFUSED.Module);
+      this.resolveDynpro();
       return;
     }
 
@@ -887,6 +889,272 @@ class Converter {
     const outside = [...this.events.filter((e) => !e.pai).flatMap((e) => e.stmts), ...this.forms.flatMap((f) => f.body), ...this.gridHandlers.flatMap((h) => h.body)]
       .flatMap((x) => x.getTokens().map((t) => lc(t.getStr())));
     this.okDropped = new Set([...this.okVars].filter((v) => !outside.includes(v)));
+  }
+
+  /**
+   * A dynpro of fields - the screens abapGit wrote into the .prog.xml. The
+   * modules become private methods, the flow logic the hooks of the
+   * runtime: dynpro_screen( ) builds the fields with the selection-screen
+   * builder, dynpro_pbo( ) and dynpro_pai( ) call the modules of PROCESS
+   * BEFORE OUTPUT and AFTER INPUT, and what followed CALL SCREEN goes on
+   * in after_call_screen( ). A screen with a custom control, a subscreen,
+   * a table control or a tabstrip, or flow logic with LOOP or CALL
+   * SUBSCREEN, is refused.
+   */
+  resolveDynpro() {
+    const bodies = [...this.events.map((e) => e.stmts), ...this.forms.map((f) => f.body), ...this.modules.map((m) => m.body)];
+    const screenStmts = bodies.flat().filter((x) => ["CallScreen", "SetScreen", "Leave"].includes(kind(x)));
+    const calls = screenStmts.filter((x) => kind(x) === "CallScreen");
+    if (!this.modules.length && !calls.length) return;
+    const refuseModules = (message) => { for (const m of this.modules) this.refuse(m.stmt, message); };
+    const dynpros = new Map((this.pool.dynpros ?? []).map((d) => [d.screen, d]));
+    if (!dynpros.size) {
+      refuseModules(this.pool.cua || this.pool.title || this.pool.symbols.size
+        ? REFUSED.Module
+        : "MODULE - the screens are in the .prog.xml (--texts), which was not passed; with it a dynpro of fields is converted");
+      return;
+    }
+    // the screens the report reaches: CALL SCREEN, SET SCREEN, LEAVE TO SCREEN
+    const number = (x) => {
+      const t = lc(renderTokens(stmtTokens(x)));
+      const m = /^(?:call\s+screen|set\s+screen|leave\s+to\s+screen)\s+(['`]?)(\d+)\1(?:\s|$)/.exec(t);
+      if (m) return m[2].padStart(4, "0");
+      if (/^(call\s+screen|set\s+screen|leave\s+to\s+screen)\s/.test(t)) return null;
+      return undefined;
+    };
+    const reached = new Set();
+    for (const x of screenStmts) {
+      const nr = number(x);
+      if (nr === null) {
+        refuseModules(`MODULE - ${uc(renderTokens(stmtTokens(x)).split(/\s+/).slice(0, 2).join(" "))} with a variable - the screens are converted when the report names them`);
+        return;
+      }
+      if (nr && nr !== "0000") reached.add(nr);
+    }
+    const problems = [];
+    const screens = [];
+    for (const nr of reached) {
+      const d = dynpros.get(nr);
+      if (!d) {
+        problems.push(`screen ${nr} is not in the .prog.xml`);
+        continue;
+      }
+      const kinds = { CUST_CTRL: "custom control (a SAP GUI control)", SUBSCREEN: "subscreen area", TABLE_CTRL: "table control", STRIP_CTRL: "tabstrip" };
+      for (const c of d.containers.filter((x) => !["SCREEN", "RADIOGROUP"].includes(x.type))) problems.push(`screen ${nr} has a ${kinds[c.type] ?? c.type} ${c.name}`);
+      for (const f of d.fields.filter((x) => !DYNPRO_FIELDS.has(x.type))) problems.push(`screen ${nr} has a field ${f.name || f.text} of type ${f.type}`);
+      const flow = parseFlow(d.flow);
+      problems.push(...flow.problems.map((p) => `screen ${nr}: ${p}`));
+      for (const c of [...flow.pbo, ...flow.pai, ...flow.pov]) {
+        if (!this.modules.some((m) => m.name === c.module)) problems.push(`screen ${nr} calls MODULE ${c.module}, which is not in the report`);
+      }
+      screens.push({ ...d, ...flow, okcode: lc(d.fields.find((f) => f.type === "OKCODE")?.name ?? "") });
+    }
+    if (problems.length) {
+      refuseModules(`MODULE - ${[...new Set(problems)].slice(0, 3).join("; ")} - a dynpro of fields is converted (texts, inputs, checkboxes, radio buttons, frames, push buttons)`);
+      return;
+    }
+    screens.sort((a, b) => a.screen.localeCompare(b.screen));
+    this.dynpro = { screens, continued: new Set() };
+    // the modules: private methods, called by the flow logic
+    for (const m of this.modules) {
+      const pai = screens.filter((d) => d.pai.some((c) => c.module === m.name));
+      const okcodes = new Set(pai.map((d) => d.okcode).filter(Boolean));
+      this.forms.push({ stmt: m.stmt, body: m.body, module: m, performed: true, okcode: okcodes.size === 1 ? [...okcodes][0] : undefined });
+    }
+  }
+
+  /** a checkbox or radio button of a dynpro declared as one character -
+   *  abap_bool, the type the frontend shows as a flag (and the type of
+   *  checkbox( ) and radiobutton( ), which take it by reference) */
+  dynproFlag(s, name, text) {
+    if (kind(s) !== "Data" || this.insideBegin(s) || !this.isDynproFlag(name)) return text;
+    const typed = text.replace(/\bVALUE\s+'X'/i, "VALUE abap_true").replace(new RegExp(`^(DATA\\s+${name})(?:\\(1\\))?\\s*(?:TYPE\\s+(?:c(?:\\s+LENGTH\\s+1)?|char1|flag|xfeld|boolean|boole_d|abap_boolean))?(?=\\s*(?:VALUE\\b|\\.))`, "i"), "$1 TYPE abap_bool");
+    if (typed !== text) this.map(s, "`TYPE abap_bool` - a checkbox or radio button of the dynpro");
+    return typed;
+  }
+
+  /** a checkbox or radio button of a dynpro, a variable of its own */
+  isDynproFlag(name) {
+    if (!this.dynpro) return false;
+    this.dynproFlags ??= new Set(this.dynpro.screens.flatMap((d) => d.fields)
+      .filter((f) => ["CHECK", "RADIO"].includes(f.type) && !f.name.includes("-")).map((f) => lc(f.name)));
+    return this.dynproFlags.has(name);
+  }
+
+  /** the roots of the dynpro fields - gs_data of GS_DATA-CARRID */
+  dynproFieldRoots() {
+    return new Set((this.dynpro?.screens ?? []).flatMap((d) => d.fields).filter((f) => f.name && f.type !== "OKCODE")
+      .map((f) => lc(f.name.split("-")[0])));
+  }
+
+  /** dynpro_screen( ), dynpro_pbo( ), dynpro_pai( ) - the screens and their flow logic */
+  dynproMethods() {
+    const { screens } = this.dynpro;
+    const call = (c) => {
+      const f = this.forms.find((x) => x.module?.name === c.module);
+      return this.screenForms().has(f.name) ? `${f.method}( current_screen( ) ).` : `${f.method}( ).`;
+    };
+    const methods = [];
+    methods.push({ name: "dynpro_screen", body: caseBody("dynnr", screens.map((d) => ({ field: d.screen, body: this.dynproLayout(d) }))) });
+    const pbo = screens.filter((d) => d.pbo.length);
+    if (pbo.length) methods.push({ name: "dynpro_pbo", body: caseBody("dynnr", pbo.map((d) => ({ field: d.screen, body: d.pbo.map(call) }))) });
+    const leftCheck = ["IF screen_left( ) = abap_true.", "  RETURN.", "ENDIF."];
+    const pai = screens.filter((d) => d.pai.length || d.okcode);
+    if (pai.length) {
+      methods.push({
+        name: "dynpro_pai",
+        body: caseBody("dynnr", pai.map((d) => {
+          const body = [];
+          if (d.okcode && this.globalData.has(d.okcode.split("-")[0])) body.push(`${d.okcode} = ucomm.`);
+          const exits = d.pai.filter((c) => c.cond === "exit");
+          if (exits.length) {
+            body.push("\" AT EXIT-COMMAND - the functions that leave", "IF ucomm = `BACK` OR ucomm = `EXIT` OR ucomm = `CANC` OR ucomm = `CANCEL`.");
+            for (const c of exits) body.push(`  ${call(c)}`, ...leftCheck.map((l) => `  ${l}`));
+            body.push("ENDIF.");
+          }
+          const rest = d.pai.filter((c) => c.cond !== "exit");
+          rest.forEach((c, i) => {
+            const line = call(c);
+            if (c.cond === "input") body.push(`IF ${lc(c.field)} IS NOT INITIAL.`, `  ${line}`, "ENDIF.");
+            else if (c.cond === "cursor") body.push("IF ucomm = `PICK`.", `  ${line}`, "ENDIF.");
+            else body.push(line);
+            if (i < rest.length - 1) body.push(...leftCheck);
+          });
+          return { field: d.screen, body };
+        })),
+      });
+    }
+    if (screens.some((d) => d.pov.length)) this.note("PROCESS ON VALUE-REQUEST of a dynpro - dropped, the field has the standard value help of its type; call the module from at_value_request( ) by hand");
+    if (screens.some((d) => d.poh)) this.note("PROCESS ON HELP-REQUEST of a dynpro - dropped, the field has the F1 help of its data element");
+    if (screens.some((d) => d.request)) this.note("FIELD ... MODULE ... ON REQUEST / ON CHAIN-REQUEST - the module runs on every roundtrip, not only when the field changed");
+    return methods;
+  }
+
+  /** the fields of a screen as a chain of the selection-screen builder:
+   *  line by line, a text before an input its label, frames blocks */
+  dynproLayout(d) {
+    const text = (t) => t.replace(/_/g, " ").trim();
+    const fields = d.fields.filter((f) => f.type !== "OKCODE" && f.line > 0).sort((a, b) => a.line - b.line || a.column - b.column);
+    const frames = fields.filter((f) => f.type === "FRAME");
+    const frameOf = (f) => frames.filter((r) => r !== f && f.line > r.line && f.line < r.line + r.height && f.column >= r.column && f.column < r.column + r.length)
+      .sort((a, b) => b.line - a.line)[0];
+    const chain = [];
+    const add = (l) => chain.push(l);
+    let frame;
+    const lines = [...new Set(fields.filter((f) => f.type !== "FRAME").map((f) => f.line))];
+    for (const ln of lines) {
+      const row = fields.filter((f) => f.line === ln && f.type !== "FRAME");
+      const fr = frameOf(row[0]);
+      if (fr !== frame) {
+        if (frame) add("block_end(");
+        if (fr) add(`block_begin( ${literal(text(fr.text))}`);
+        frame = fr;
+      }
+      // a text right before an input is its label
+      const items = [];
+      for (let i = 0; i < row.length; i++) {
+        const f = row[i];
+        if (f.type === "TEXT" && row[i + 1]?.type === "TEMPLATE" && text(f.text)) {
+          items.push({ ...row[i + 1], label: text(f.text) });
+          i++;
+        } else items.push(f);
+      }
+      const calls = items.map((f) => this.dynproField(f, fr)).filter(Boolean);
+      if (calls.length > 1) add("line_begin(");
+      calls.forEach((c) => add(c));
+      if (calls.length > 1) add("line_end(");
+    }
+    if (frame) add("block_end(");
+    if (!chain.length) return [];
+    // one call per line, the parameters of a call aligned under its first,
+    // each call closed by the next one - the house layout of a chain
+    const out = [];
+    chain.forEach((c, i) => {
+      const head = i === 0 ? "screen->" : "    )->";
+      const [first, ...more] = c.split("\n");
+      out.push(`${head}${first}`);
+      for (const m of more) out.push(`${" ".repeat(head.length)}${m}`);
+    });
+    out[out.length - 1] += out[out.length - 1].endsWith("(") ? " )." : " ).";
+    return out;
+  }
+
+  /** one field of a dynpro - a call of the selection-screen builder */
+  dynproField(f, frame) {
+    const text = (t) => t.replace(/_/g, " ").trim();
+    const name = lc(f.name);
+    const named = (method, params) => {
+      const list = params.filter(([, v]) => v !== undefined);
+      if (!list.length) return `${method}(`;
+      if (list.length === 1 && ["text", "title"].includes(list[0][0])) return `${method}( ${list[0][1]}`;
+      const width = Math.max(...list.map(([n]) => n.length));
+      const pad = " ".repeat(method.length + 2);
+      return list.map(([n, v], i) => `${i ? pad : `${method}( `}${n.padEnd(width)} = ${v}`).join("\n");
+    };
+    const modif = f.group1 ? literal(f.group1) : undefined;
+    const t = (s) => (s ? literal(s) : undefined);
+    switch (f.type) {
+      case "TEXT":
+        if (!text(f.text)) return undefined;
+        return named("comment", [["text", literal(text(f.text))], ["modif_id", modif]]);
+      case "TEMPLATE":
+        return named("parameter", [["val", name], ["text", t(f.label)],
+          ["obligatory", f.required && f.input ? "abap_true" : undefined],
+          ["read_only", f.input ? undefined : "abap_true"],
+          ["modif_id", modif], ["no_display", f.invisible ? "abap_true" : undefined]]);
+      case "CHECK":
+        return named("checkbox", [["val", name], ["text", t(text(f.text))], ["modif_id", modif]]);
+      case "RADIO":
+        return named("radiobutton", [["val", name], ["text", t(text(f.text))],
+          ["group", literal(f.cont === "RADIOGROUP" ? radioGroup(f.contName) : `RB${String(frame?.line ?? 0).padStart(2, "0")}`)], ["modif_id", modif]]);
+      case "PUSH": {
+        const icon = ICONS[lc(f.icon)];
+        return named("button", [["text", literal(text(f.text) || f.fcode)], ["event", literal(f.fcode)], ["icon", icon ? literal(icon) : undefined], ["modif_id", modif]]);
+      }
+      default:
+        return undefined;
+    }
+  }
+
+  /** CALL SCREEN, SET SCREEN, LEAVE SCREEN, LEAVE TO SCREEN and LEAVE
+   *  PROGRAM of a report with dynpros - true when the statement is done */
+  dynproStatement(s, b, k) {
+    if (!["CallScreen", "SetScreen", "Leave"].includes(k)) return false;
+    const out = b.out;
+    const t = lc(renderTokens(stmtTokens(s)));
+    const nr = /^(?:call\s+screen|set\s+screen|leave\s+to\s+screen)\s+['`]?(\d+)/.exec(t)?.[1]?.padStart(4, "0");
+    if (k === "CallScreen") {
+      out.push(`call_screen( ${literal(nr)} ).`);
+      this.map(s, "`call_screen( dynnr )` - the dynpro shows when the event block is done, what follows goes on in `after_call_screen( dynnr )`");
+      if (/\bstarting\s+at\b/.test(t)) this.note("CALL SCREEN ... STARTING AT - the dynpro shows on the page, not as a dialog box");
+      if (this.dynpro.continued.has(nr) && this.followedByCode(b)) {
+        this.refuse(s, `CALL SCREEN ${nr} a second time with statements after it - after_call_screen( ) goes on after one call per screen; port it by hand`);
+        return true;
+      }
+      this.dynpro.continued.add(nr);
+      this.continueIn(s, b, {
+        field: nr, method: "after_call_screen", ctx: { method: "after_call_screen" },
+        what: `CALL SCREEN ${nr}`, where: `after_call_screen( dynnr ) with dynnr ${nr}`,
+      });
+      return true;
+    }
+    const leave = b.ctx.method === "dynpro_pai" || b.ctx.form?.module ? ["RETURN."] : [];
+    if (k === "SetScreen") {
+      out.push(`set_screen( ${literal(nr)} ).`);
+      this.map(s, "`set_screen( dynnr )` - the next screen when the PAI is done");
+      return true;
+    }
+    if (/^leave\s+to\s+screen\s/.test(t)) {
+      out.push(`leave_to_screen( ${literal(nr)} ).`, ...leave);
+      this.map(s, `\`leave_to_screen( dynnr )\`${leave.length ? " and `RETURN` - the modules after it do not run" : ""}${nr === "0000" ? "; screen 0 goes back to where CALL SCREEN stood" : ""}`);
+      return true;
+    }
+    if (/^leave\s+screen$/.test(t)) {
+      out.push("leave_screen( ).", ...leave);
+      this.map(s, "`leave_screen( )` - the PAI ends, the next screen shows");
+      return true;
+    }
+    return false;
   }
 
   /** the grid, its container or its handler object - dropped */
@@ -1857,8 +2125,10 @@ class Converter {
         this.map(f.stmt, "dropped - the FORM only set up the ALV, which the alv( ) chain does now");
         continue;
       }
-      this.map(f.stmt, `private method \`${f.method}( )\``);
-      formMethods.push({ name: f.method, body: this.convertBody(f.body, { method: f.method, form: f, screenEvent: this.screenForms().has(f.name) }) });
+      this.map(f.stmt, f.module
+        ? `private method \`${f.method}( )\` - the module, called by ${f.module.io === "OUTPUT" ? "dynpro_pbo( )" : "dynpro_pai( )"} as the flow logic of the screen did`
+        : `private method \`${f.method}( )\``);
+      formMethods.push({ name: f.method, body: this.convertBody(f.body, { method: f.method, form: f, screenEvent: this.screenForms().has(f.name), ucommVar: f.okcode }) });
     }
     // AT PFnn without a status of the report's own: the keys on the toolbar
     // of the standard list status. With a SET PF-STATUS the report's status
@@ -1879,15 +2149,19 @@ class Converter {
       }
     }
 
+    if (this.dynpro) methods.push(...this.dynproMethods());
+
     // the continuations - a continuation may hold a call that cuts again
     if (this.continuations.length) {
       const dynnr = [];
       const ucomm = [];
+      const screen = [];
       while (this.continuations.length) {
         const c = this.continuations.shift();
-        (c.method === "at_user_command" ? ucomm : dynnr).push({ field: c.field, body: this.convertBody(c.stmts, c.ctx) });
+        ({ at_user_command: ucomm, after_call_screen: screen }[c.method] ?? dynnr).push({ field: c.field, body: this.convertBody(c.stmts, c.ctx) });
       }
       if (dynnr.length) methods.push({ name: "after_call_selection_screen", body: caseBody("dynnr", dynnr) });
+      if (screen.length) methods.push({ name: "after_call_screen", body: caseBody("dynnr", screen) });
       if (ucomm.length) {
         const body = ["\" the answers of the popups - the statements after the CALL FUNCTION", ...caseBody("ucomm", ucomm)];
         const existing = methods.find((m) => m.name === "at_user_command");
@@ -1925,7 +2199,7 @@ class Converter {
       "at_selection_screen_on_block", "at_selection_screen_on_radio", "at_selection_screen_on_end_of",
       "at_selection_screen_on_exit", "at_selection_screen_on_help", "at_selection_screen", "start_of_selection", "end_of_selection", "top_of_page",
       "top_of_page_line_selection", "end_of_page", "at_line_selection", "at_link_click", "at_user_command", "at_value_request",
-      "after_call_selection_screen"];
+      "after_call_selection_screen", "dynpro_screen", "dynpro_pbo", "dynpro_pai", "after_call_screen"];
     methods.sort((a, b) => order.indexOf(a.name) - order.indexOf(b.name));
     for (const m of methods) lines.push(`    METHODS ${m.name} REDEFINITION.`);
     lines.push("");
@@ -2276,7 +2550,7 @@ class Converter {
           const text = this.renderDeclGroup(group);
           if (text) push(text);
         } else {
-          push(this.renderDecl(s));
+          push(this.dynproFlag(s, name, this.renderDecl(s)));
         }
         if (sticky && stickyDepth === 0) sticky = undefined;
         continue;
@@ -2352,6 +2626,7 @@ class Converter {
     if (v) {
       const text = renderTokens(v.getTokens().slice(1)).trim();
       if (!/^IS\s+INITIAL$/i.test(text)) value = text;
+      if (this.isDynproFlag(name) && /^'X'$/i.test(text)) value = "abap_true";
     }
     if (kind(s) === "DataBegin") {
       const end = this.declEnd(this.stmts.indexOf(s));
@@ -3514,6 +3789,7 @@ class Converter {
         return;
       }
     }
+    if (this.dynpro && this.dynproStatement(s, b, k)) return;
     if (REFUSED[k]) {
       this.refuse(s, REFUSED[k]);
       return;
@@ -4105,7 +4381,19 @@ class Converter {
         ov.set(key(toks[i + 1]), null);
         ov.set(key(toks[i + 2]), null);
       }
-      if (t === "sy" && next === "-" && next2 === "ucomm" && !(ctx.userCommand || ctx.ucomm) && !this.ucommTodo?.has(s) && !DECL.has(kind(s))) {
+      // a checkbox or radio button of a dynpro is an abap_bool: 'X' and ' ' are abap_true and abap_false
+      if (this.isDynproFlag(t) && ["=", "<>", "eq", "ne"].includes(lc(next ?? ""))) {
+        const lit = toks[i + 2]?.getStr() ?? "";
+        if (/^'X'$/i.test(lit)) ov.set(key(toks[i + 2]), "abap_true");
+        else if (/^(' '|''|space)$/i.test(lit)) ov.set(key(toks[i + 2]), "abap_false");
+      }
+      if (ctx.ucommVar && t === "sy" && next === "-" && next2 === "ucomm") {
+        // a PAI module: the OK code field of its screen holds the function
+        ov.set(key(toks[i]), ctx.ucommVar);
+        ov.set(key(toks[i + 1]), null);
+        ov.set(key(toks[i + 2]), null);
+      }
+      if (t === "sy" && next === "-" && next2 === "ucomm" && !(ctx.userCommand || ctx.ucomm || ctx.ucommVar) && !this.ucommTodo?.has(s) && !DECL.has(kind(s))) {
         this.ucommTodo = new Set([...(this.ucommTodo ?? []), s]);
         this.todo(s, "sy-ucomm is not set by abap-cloud-gui - the user command arrives as ucomm in at_user_command( ); pass it to where it is read");
       }
@@ -4576,7 +4864,7 @@ class Converter {
     b.out.push(...lines);
     if (type === "`E`" || type === "`A`") {
       b.out.push("RETURN.");
-      if (b.ctx.form) this.todo(s, `MESSAGE TYPE ${type[1]} in FORM ${b.ctx.form.name}: the classic message ended the event block, RETURN here only leaves ${b.ctx.form.method}( ) - the runtime still stops the run, but the caller continues`);
+      if (b.ctx.form && !b.ctx.form.module) this.todo(s, `MESSAGE TYPE ${type[1]} in FORM ${b.ctx.form.name}: the classic message ended the event block, RETURN here only leaves ${b.ctx.form.method}( ) - the runtime still stops the run, but the caller continues`);
     }
     if (type === "`X`") this.todo(s, "MESSAGE TYPE X - a dump; message( ) shows it as an abort message instead");
   }
@@ -5740,6 +6028,50 @@ function tokenParents(s) {
 function underName(text) {
   const t = text.trim();
   return /^['`]/.test(t) ? unquote(t) : uc(t.replace(/\s+/g, ""));
+}
+
+/** the group of radiobutton( ) for a radio group of a dynpro - %A_ISNATV
+ *  (the name the screen painter generates) is RB_ISNATV */
+const radioGroup = (name) => name.replace(/^%A_?/, "RB_").slice(0, 10) || "RB1";
+
+// the fields of a dynpro the converter builds - texts, inputs, checkboxes,
+// radio buttons, frames, push buttons and the OK code field
+const DYNPRO_FIELDS = new Set(["TEXT", "TEMPLATE", "CHECK", "RADIO", "FRAME", "PUSH", "OKCODE"]);
+
+/**
+ * The flow logic of a dynpro: { pbo, pai, pov: [{ module, cond, field }],
+ * poh, request, problems } - cond "exit" for AT EXIT-COMMAND, "input" for
+ * ON INPUT (field), "cursor" for AT CURSOR-SELECTION; problems what has no
+ * counterpart (LOOP, CALL SUBSCREEN, FIELD ... VALUES / SELECT).
+ */
+function parseFlow(lines) {
+  const flow = { pbo: [], pai: [], pov: [], poh: false, request: false, problems: [] };
+  const source = lines.filter((l) => !/^\s*\*/.test(l)).map((l) => l.replace(/".*$/, "")).join(" ");
+  let section;
+  for (const raw of source.split(".")) {
+    const st = raw.replace(/\s+/g, " ").trim().toUpperCase();
+    if (!st) continue;
+    const process = /^PROCESS (BEFORE OUTPUT|AFTER INPUT|ON VALUE-REQUEST|ON HELP-REQUEST)$/.exec(st);
+    if (process) {
+      section = { "BEFORE OUTPUT": "pbo", "AFTER INPUT": "pai", "ON VALUE-REQUEST": "pov", "ON HELP-REQUEST": "poh" }[process[1]];
+      continue;
+    }
+    if (/^(CHAIN|ENDCHAIN)$/.test(st)) continue;
+    if (section === "poh") {
+      flow.poh = true;
+      continue;
+    }
+    const m = /^(?:FIELD ([\w-]+) )?MODULE ([\w/]+)(?: (AT EXIT-COMMAND|ON INPUT|ON REQUEST|ON CHAIN-INPUT|ON CHAIN-REQUEST|AT CURSOR-SELECTION|ON \*-INPUT))?$/.exec(st);
+    if (m && section) {
+      const cond = { "AT EXIT-COMMAND": "exit", "ON INPUT": m[1] ? "input" : undefined, "AT CURSOR-SELECTION": "cursor" }[m[3]];
+      if (/REQUEST|CHAIN-INPUT/.test(m[3] ?? "")) flow.request = true;
+      flow[section].push({ module: m[2].toLowerCase(), cond, field: m[1] });
+      continue;
+    }
+    if (/^FIELD:? [\w-]+(?:,? [\w-]+)*$/.test(st)) continue;
+    flow.problems.push(`${st.split(" ").slice(0, 3).join(" ")} in the flow logic`);
+  }
+  return flow;
 }
 
 /** CASE field. WHEN `A`. ... ENDCASE. */

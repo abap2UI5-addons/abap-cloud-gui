@@ -15,7 +15,7 @@ export const CATALOGUE = [
     id: "dynpro",
     title: "Dynpros: CALL SCREEN, MODULE, SET SCREEN, CONTROLS",
     match: /^(CALL SCREEN|SET SCREEN|MODULE\b|CONTROLS|CALL SUBSCREEN|CALL DIALOG|SET SCREEN of another|SET CURSOR|LOCAL\b)/,
-    why: "A dynpro is a screen of the SAP GUI with its own flow logic. A browser app has no screens of that kind: abap-cloud-gui has the selection screen, the list, the ALV and popups. The screen of one `cl_gui_alv_grid` is converted - its PBO modules go where `CALL SCREEN` stood, its PAI modules become `at_user_command( )`; any other screen is refused.",
+    why: "A dynpro is a screen of the SAP GUI with its own flow logic. A browser app has no screens of that kind: abap-cloud-gui has the selection screen, the list, the ALV and popups. Two kinds of screen are converted. A dynpro of fields - texts, inputs, checkboxes, radio buttons, frames and push buttons, read from the screens abapGit writes into the .prog.xml: the modules become methods, the flow logic `dynpro_pbo( )` and `dynpro_pai( )`, `CALL SCREEN` becomes `call_screen( )` and what follows it `after_call_screen( )`. And the screen of one `cl_gui_alv_grid` - its PBO modules go where `CALL SCREEN` stood, its PAI modules become `at_user_command( )`. A screen with a custom control, a subscreen, a table control or a tabstrip, or flow logic with LOOP or CALL SUBSCREEN, is refused.",
     rewrite: `Ask the user with the selection screen or a popup, and show the result as a list or an ALV:
 
 ${abap(`
@@ -36,7 +36,7 @@ IF sy-subrc = 0.
 ENDIF.
 `)}
 
-A module pool with a single screen of fields is on the roadmap (Stage 5).`,
+A screen with a table control, a subscreen or a tabstrip is on the roadmap (Stage 5).`,
   },
   {
     id: "call-transaction",

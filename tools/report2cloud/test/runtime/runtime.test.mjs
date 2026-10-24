@@ -206,6 +206,41 @@ test("zr2c_19_grid: cl_gui_alv_grid on a screen - the grid, its toolbar, the dou
   assert.ok(s.fields.some((f) => f.name === "P_CARRID"), "the selection screen");
 });
 
+test("zr2c_23_dynpro: a dynpro of fields - CALL SCREEN, PBO with status and LOOP AT SCREEN, PAI modules, SET SCREEN, LEAVE TO SCREEN", { skip }, async () => {
+  let s = await d.start("z2ui5_cl_cgui_r2c_23");
+  s = await d.act(s.session, { event: "CGUI_EXECUTE" });
+  assert.equal(s.title, "Booking on airline LH", "SET TITLEBAR of the PBO module");
+  assert.deepEqual(fieldsOf(s), ['P_CARRID="LH"', 'GV_CONNID="0000"*', "GV_SEATS=0", "GV_WINDOW=false", "GV_ECO=true", "GV_BUS=false"]);
+  for (const f of ["SAVE", "CHECK"]) assert.ok(actionsOf(s, f).length >= 1, `an action ${f}`);
+
+  // the required field first, then FIELD gv_connid MODULE check_connid ON INPUT
+  s = await d.act(s.session, { values: { GV_CONNID: "" }, event: "SAVE" });
+  assert.deepEqual(valueStates(s), ["error: Fill in the required field Connection"]);
+  s = await d.act(s.session, { values: { GV_CONNID: "9999" }, event: "CGUI_ENTER" });
+  assert.deepEqual(popover(s), ["error: No such connection"]);
+  // the push button; Save before the check is an error of user_command_0100
+  s = await d.act(s.session, { values: { GV_CONNID: "0400" }, event: "SAVE" });
+  assert.deepEqual(popover(s), ["error: Check the connection and enter the seats"]);
+  s = await d.act(s.session, { event: "CHECK" });
+  assert.deepEqual(toasts(s), ["The connection has seats"]);
+
+  // SET SCREEN 200, Back there is LEAVE TO SCREEN 100, Book is LEAVE TO SCREEN 0
+  s = await d.act(s.session, { values: { GV_SEATS: 2 }, event: "SAVE" });
+  assert.ok(s.texts.includes("Book the seats now?"), s.texts.join(" | "));
+  s = await d.act(s.session, { event: "CGUI_BACK" });
+  assert.ok(s.fields.some((f) => f.name === "GV_CONNID"), "screen 0100 again");
+  s = await d.act(s.session, { event: "SAVE" });
+  s = await d.act(s.session, { event: "BOOK" });
+  // what followed CALL SCREEN: after_call_screen( )
+  assert.deepEqual(d.lines(), ["Booked: 2 seat(s) on LH 0400"]);
+
+  // AT EXIT-COMMAND on screen 0100: nothing booked
+  s = await d.act(s.session, { event: "CGUI_BACK" });
+  s = await d.act(s.session, { event: "CGUI_EXECUTE" });
+  s = await d.act(s.session, { event: "CGUI_BACK" });
+  assert.deepEqual(d.lines(), ["Nothing booked"]);
+});
+
 test("zr2c_21_lclreport: a local report class that reads the selection screen, writes the list and calls a FORM", { skip }, async () => {
   let s = await d.start("z2ui5_cl_cgui_r2c_21");
   s = await d.act(s.session, { event: "CGUI_EXECUTE" });

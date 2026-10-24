@@ -47,7 +47,7 @@ test("refuses with file:row:col, exit code 2 and no class - --partial writes the
     const file = join(CORPUS, "zr2c_10_refused.prog.abap");
     const r = run(file, "--out", out);
     assert.equal(r.status, 2);
-    assert.ok(r.stderr.includes(`${file}:36:3 - CALL SCREEN - a dynpro has no counterpart`), r.stderr);
+    assert.ok(r.stderr.includes(`${file}:36:3 - CALL SCREEN - the dynpro is not converted`), r.stderr);
     assert.ok(!existsSync(join(out, "zcl_r2c_10_refused.clas.abap")));
     assert.match(readFileSync(join(out, "zcl_r2c_10_refused.migration.md"), "utf8"), /## Refused/);
 
@@ -94,7 +94,7 @@ test("--includes names the folder of the includes; a refusal in an include names
 test("coverage: the corpus as numbers - converted, refused, the reasons ranked", () => {
   const r = spawnSync(process.execPath, [join(HERE, "..", "coverage.mjs"), CORPUS], { encoding: "utf8" });
   assert.equal(r.status, 0, r.stderr);
-  assert.match(r.stdout, /^report2cloud coverage: 22 report\(s\) - 21 converted \(95 %\), 1 refused/);
+  assert.match(r.stdout, /^report2cloud coverage: 23 report\(s\) - 22 converted \(96 %\), 1 refused/);
   assert.match(r.stdout, /includes: 1 report\(s\) with includes inlined/);
   assert.match(r.stdout, /Refused - the next constructs to map \(reports affected\)\n(.*\n)*.*Dynpros: CALL SCREEN, MODULE, SET SCREEN, CONTROLS \[dynpro\]/);
   assert.match(r.stdout, /Objects to check for ABAP Cloud/);

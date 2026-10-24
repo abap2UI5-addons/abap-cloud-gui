@@ -808,7 +808,15 @@ CLASS ltcl_test IMPLEMENTATION.
     cl_abap_unit_assert=>assert_equals( act = mo_cut->mv_cgui_screen
                                         exp = `DYNPRO` ).
 
-    " SAVE leaves: what followed CALL SCREEN runs and the list shows
+    " SET SCREEN goes on to the next dynpro, on the same call
+    event( `NEXT` ).
+    cl_abap_unit_assert=>assert_equals( act = mo_cut->mv_cgui_dynpro
+                                        exp = `0200` ).
+    cl_abap_unit_assert=>assert_equals( act = lines( mo_cut->mt_cgui_dynpro_stack )
+                                        exp = 1 ).
+
+    " SAVE leaves: what followed CALL SCREEN runs - for the screen it
+    " called - and the list shows
     event( `SAVE` ).
     cl_abap_unit_assert=>assert_equals( act = mo_report->mv_after
                                         exp = `0100` ).

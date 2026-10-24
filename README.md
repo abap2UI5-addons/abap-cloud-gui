@@ -491,9 +491,15 @@ Stage 4 - in the browser, and with an agent
 
 Stage 5 - research
 
-- [ ] Simple dynpros: a module pool with one screen of fields, PBO / PAI
-      and a few function codes mapped onto `selection_screen( )` forms,
-      everything else still refused
+- [x] Simple dynpros: the screens of fields of the .prog.xml (texts,
+      inputs, checkboxes, radio buttons, frames, push buttons) built with
+      the selection-screen builder in `dynpro_screen( )`, the modules
+      methods called by `dynpro_pbo( )` / `dynpro_pai( )`, `CALL SCREEN`,
+      `SET SCREEN`, `LEAVE TO SCREEN` and the statements after the call in
+      `after_call_screen( )`
+- [ ] Table controls, subscreens and tabstrips on a dynpro, and the SAP GUI
+      controls of a custom control (text editor, HTML viewer, tree) as
+      stand-ins of the same methods and events
 
 Quality, through every stage
 

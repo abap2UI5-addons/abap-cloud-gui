@@ -8,6 +8,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync
 import { join } from "node:path";
 import { convert, defaultClassName, FRONTEND, RESERVED_METHODS, UNCATALOGUED } from "../lib/convert.mjs";
 import { corpus, convertEntry, SNAPSHOTS } from "./corpus.mjs";
+import { parseTextpool } from "../lib/textpool.mjs";
 
 const UPDATE = process.env.UPDATE_SNAPSHOTS === "1";
 const entries = corpus();
@@ -743,4 +744,48 @@ test("every refusal of the corpus and of the cases above has its entry in the ca
   assert.deepEqual([...UNCATALOGUED], [], "add an entry, or widen the pattern of one");
   const { result } = converted.get("zr2c_10_refused");
   assert.ok(result.refusals.every((r) => r.code !== "other"));
+});
+
+test("a dynpro of fields: the screens of the .prog.xml, the modules as methods, CALL SCREEN and what follows it", () => {
+  const cls = classOf("zr2c_23_dynpro");
+  const { result } = converted.get("zr2c_23_dynpro");
+  assert.equal(result.ok, true, result.refusals.map((x) => x.message).join("\n"));
+  assert.match(cls, /call_screen\( `0100` \)\.\n\n\s+ENDMETHOD\./);
+  assert.match(cls, /METHOD after_call_screen\.\n\n\s+CASE dynnr\.\n\s+WHEN `0100`\.\n\s+IF gv_booked = 'X'\./);
+  // the fields: a frame a block, a text before an input its label, an output field read-only
+  assert.match(cls, /screen->block_begin\( `Booking`\n\s+\)->parameter\( val {7}= p_carrid\n\s+text {6}= `Airline`\n\s+read_only = abap_true\n/);
+  assert.match(cls, /\)->parameter\( val {8}= gv_connid\n\s+text {7}= `Connection`\n\s+obligatory = abap_true\n/);
+  assert.match(cls, /\)->line_begin\(\n\s+\)->parameter\( val {6}= gv_seats\n(.*\n){2}\s+\)->button\( text {2}= `Check`\n\s+event = `CHECK`\n\s+\)->line_end\(/);
+  assert.match(cls, /\)->radiobutton\( val {3}= gv_bus\n\s+text {2}= `Business`\n\s+group = `RB_GV_ECO`\n\s+\)->block_end\( \)\./);
+  assert.match(cls, /screen->comment\( `Book the seats now\?`\n/);
+  // the flow logic: the PBO module gets the screen, the PAI the OK code and the order of the modules
+  assert.match(cls, /METHOD dynpro_pbo\.\n\n\s+CASE dynnr\.\n\s+WHEN `0100`\.\n\s+status_0100\( current_screen\( \) \)\./);
+  assert.match(cls, /WHEN `0100`\.\n\s+ok_code = ucomm\.\n\s+" AT EXIT-COMMAND - the functions that leave\n\s+IF ucomm = `BACK` OR ucomm = `EXIT` OR ucomm = `CANC` OR ucomm = `CANCEL`\.\n\s+exit_0100\( \)\.\n(.*\n){4}\s+IF gv_connid IS NOT INITIAL\.\n\s+check_connid\( \)\.\n\s+ENDIF\.\n\s+IF screen_left\( \) = abap_true\.\n\s+RETURN\.\n\s+ENDIF\.\n\s+user_command_0100\( \)\./);
+  // SET SCREEN, LEAVE TO SCREEN, sy-ucomm of a PAI module
+  assert.match(cls, /set_screen\( `0200` \)\./);
+  assert.match(cls, /METHOD user_command_0200\.\n\n\s+CASE ok_code\.\n\s+WHEN 'BOOK'\.\n\s+gv_booked = 'X'\.\n\s+leave_to_screen\( `0000` \)\.\n\s+RETURN\./);
+  assert.match(cls, /leave_to_screen\( `0100` \)\./);
+  assert.deepEqual(result.todos.map((t) => t.message), []);
+});
+
+test("a dynpro the converter does not build is refused at its modules - a control, LOOP, a screen in a variable, no .prog.xml", () => {
+  const xml = (container, flow) => `<abapGit><asx:abap><asx:values><DYNPROS><item><HEADER><PROGRAM>ZT</PROGRAM><SCREEN>0100</SCREEN><TYPE>N</TYPE></HEADER>
+<CONTAINERS><RPY_DYCATT><TYPE>SCREEN</TYPE><NAME>SCREEN</NAME></RPY_DYCATT>${container}</CONTAINERS>
+<FIELDS><RPY_DYFATC><CONT_TYPE>SCREEN</CONT_TYPE><TYPE>OKCODE</TYPE><NAME>OK_CODE</NAME></RPY_DYFATC></FIELDS>
+<FLOW_LOGIC>${flow.map((l) => `<RPY_DYFLOW><LINE>${l}</LINE></RPY_DYFLOW>`).join("")}</FLOW_LOGIC></item></DYNPROS></asx:values></asx:abap></abapGit>`;
+  const src = "REPORT zt.\nDATA ok_code TYPE sy-ucomm.\nSTART-OF-SELECTION.\n  CALL SCREEN 100.\nMODULE user_command_0100 INPUT.\n  LEAVE TO SCREEN 0.\nENDMODULE.\n";
+  const refused = (source, x) => convert(source, { file: "zt.prog.abap", className: "zcl_t", textpool: parseTextpool(x) }).refusals.map((r) => `${r.row}:${r.col} ${r.message.split(" - a dynpro of fields")[0]}`);
+  const pai = ["PROCESS AFTER INPUT.", "  MODULE user_command_0100."];
+  assert.deepEqual(refused(src, xml("", pai)), []);
+  assert.deepEqual(refused(src, xml("<RPY_DYCATT><TYPE>CUST_CTRL</TYPE><NAME>CONT</NAME></RPY_DYCATT>", pai)), [
+    "4:3 CALL SCREEN - the dynpro is not converted (a dynpro of fields is, from the .prog.xml - see the MODULE refusals); else build the screen as an abap2UI5 view or a popup",
+    "5:1 MODULE - screen 0100 has a custom control (a SAP GUI control) CONT",
+  ]);
+  assert.deepEqual(refused(src, xml("", ["PROCESS AFTER INPUT.", "  LOOP AT gt_x.", "  ENDLOOP.", "  MODULE user_command_0100."])), [
+    "4:3 CALL SCREEN - the dynpro is not converted (a dynpro of fields is, from the .prog.xml - see the MODULE refusals); else build the screen as an abap2UI5 view or a popup",
+    "5:1 MODULE - screen 0100: LOOP AT GT_X in the flow logic; screen 0100: ENDLOOP in the flow logic",
+  ]);
+  assert.match(refused(src.replace("CALL SCREEN 100", "CALL SCREEN gv_dynnr"), xml("", pai)).find((x) => x.startsWith("5:1")), /^5:1 MODULE - CALL SCREEN with a variable/);
+  assert.match(refused(src, undefined).find((x) => x.startsWith("5:1")), /^5:1 MODULE - the screens are in the \.prog\.xml \(--texts\), which was not passed/);
+  assert.match(refused(src, xml("", ["PROCESS AFTER INPUT.", "  MODULE user_command_0200."])).find((x) => x.startsWith("5:1")), /^5:1 MODULE - screen 0100 calls MODULE user_command_0200, which is not in the report/);
 });

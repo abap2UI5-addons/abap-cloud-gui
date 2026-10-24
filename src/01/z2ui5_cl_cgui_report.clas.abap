@@ -200,9 +200,11 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
     TYPES:
       "! a screen CALL SCREEN returns to - the selection screen, the output
       "! or a dynpro (dynnr)
+      " the screen and the dynpro CALL SCREEN came from, and the dynpro it called
       BEGIN OF ty_s_cgui_call,
         screen TYPE string,
         dynnr  TYPE string,
+        called TYPE string,
       END OF ty_s_cgui_call.
     TYPES ty_t_cgui_call TYPE STANDARD TABLE OF ty_s_cgui_call WITH EMPTY KEY.
 
@@ -405,7 +407,9 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
         ucomm TYPE string.
 
     "! after call_screen( ) - when the dynpro was left with
-    "! leave_to_screen( `0` ): what followed CALL SCREEN in the report
+    "! leave_to_screen( `0` ): what followed CALL SCREEN in the report;
+    "! dynnr is the screen call_screen( ) called, whichever screen SET
+    "! SCREEN went on to after it
     METHODS after_call_screen
       IMPORTING
         dynnr TYPE string.
@@ -647,7 +651,8 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
     "! LEAVE SCREEN - the PAI ends, the next screen shows
     METHODS leave_screen.
 
-    "! whether the PAI left the dynpro - its modules after that do not run
+    "! whether the PAI left the dynpro, or an error message stopped it -
+    "! its modules after that do not run
     METHODS screen_left
       RETURNING
         VALUE(result) TYPE abap_bool.
@@ -1226,10 +1231,12 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
       IMPORTING
         dynnr TYPE string.
 
-    "! the dynpro shown - dynpro_screen( ), its PBO, the page
+    "! the dynpro shown - dynpro_screen( ) and its PBO, before the page is
+    "! built: SET TITLEBAR and SET PF-STATUS of the PBO are its title and
+    "! its toolbar
     METHODS view_display_dynpro
-      IMPORTING
-        page TYPE REF TO z2ui5_cl_ui5_view_builder.
+      RETURNING
+        VALUE(result) TYPE REF TO z2ui5_cl_cgui_selscreen.
 
     "! the files the user picked in the upload dialog of upload_popup( ) -
     "! stored, and the F4 or Execute that opened it run again
@@ -1572,7 +1579,8 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
   METHOD call_screen.
 
     INSERT VALUE #( screen = mv_cgui_screen
-                    dynnr  = mv_cgui_dynpro ) INTO TABLE mt_cgui_dynpro_stack.
+                    dynnr  = mv_cgui_dynpro
+                    called = dynnr_norm( dynnr ) ) INTO TABLE mt_cgui_dynpro_stack.
     mv_cgui_dynpro = dynnr_norm( dynnr ).
     mv_cgui_screen = cs_screen-dynpro.
     CLEAR: mv_cgui_dynpro_next, mv_cgui_dynpro_left.
@@ -1600,7 +1608,7 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
 
   METHOD screen_left.
 
-    result = mv_cgui_dynpro_left.
+    result = xsdbool( mv_cgui_dynpro_left = abap_true OR mv_cgui_stop = abap_true ).
 
   ENDMETHOD.
 
@@ -1647,6 +1655,7 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
 
   METHOD dynpro_return.
 
+    DATA(lv_called) = dynnr.
     DATA(lv_top) = lines( mt_cgui_dynpro_stack ).
     IF lv_top = 0.
       mv_cgui_screen = cs_screen-selection.
@@ -1656,8 +1665,9 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
       DELETE mt_cgui_dynpro_stack INDEX lv_top.
       mv_cgui_screen = ls_call-screen.
       mv_cgui_dynpro = ls_call-dynnr.
+      lv_called = ls_call-called.
     ENDIF.
-    after_call_screen( dynnr ).
+    after_call_screen( lv_called ).
     " CALL SCREEN in START-OF-SELECTION: the list written after it shows
     IF mv_cgui_screen = cs_screen-selection AND ( mo_cgui_list IS BOUND OR mo_cgui_alv IS BOUND ).
       mv_cgui_screen = cs_screen-output.
@@ -1667,16 +1677,15 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
 
   METHOD view_display_dynpro.
 
-    DATA(screen) = z2ui5_cl_cgui_selscreen=>factory( client          = client
-                                                     value_help_auto = abap_true ).
+    result = z2ui5_cl_cgui_selscreen=>factory( client          = client
+                                               value_help_auto = abap_true ).
     dynpro_screen( dynnr  = mv_cgui_dynpro
-                   screen = screen ).
-    mo_cgui_screen = screen.
+                   screen = result ).
+    mo_cgui_screen = result.
     dynpro_pbo( mv_cgui_dynpro ).
     CLEAR mo_cgui_screen.
-    value_state_set( screen ).
-    mt_cgui_field = screen->get_fields( ).
-    screen->render( page ).
+    value_state_set( result ).
+    mt_cgui_field = result->get_fields( ).
 
   ENDMETHOD.
 
@@ -4697,7 +4706,8 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
 
     mv_cgui_screen = cs_screen-selection.
     mv_cgui_left = abap_true.
-    CLEAR: mt_cgui_level, mv_cgui_window.
+    " LEAVE PROGRAM on a dynpro - the screens called are gone as well
+    CLEAR: mt_cgui_level, mv_cgui_window, mt_cgui_dynpro_stack, mv_cgui_dynpro, mv_cgui_dynpro_next.
 
   ENDMETHOD.
 
@@ -5358,6 +5368,10 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
             )->a( n = `displayBlock` v = `true`
             )->a( n = `height`       v = `100%` ).
 
+    " the PBO of a dynpro runs first - its title is the title of the page
+    DATA(lo_dynpro) = COND #( WHEN mv_cgui_screen = cs_screen-dynpro AND mv_cgui_denied = abap_false
+                              THEN view_display_dynpro( ) ).
+
     DATA(page) = view->ele( `Page`
         )->a( n = `title`          t = mv_cgui_title
         )->a( n = `showNavButton`  b = xsdbool( mv_cgui_screen = cs_screen-output OR mv_cgui_screen = cs_screen-dynpro OR mv_cgui_called = abap_true )
@@ -5392,8 +5406,8 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
     " no authorization: nothing but the messages
     IF mv_cgui_denied = abap_true.
       CLEAR lv_window.
-    ELSEIF mv_cgui_screen = cs_screen-dynpro.
-      view_display_dynpro( page ).
+    ELSEIF lo_dynpro IS BOUND.
+      lo_dynpro->render( page ).
       lv_button_text = 'Continue'(046).
       lv_button_icon = `sap-icon://accept`.
       lv_button_ucomm = cs_ucomm-enter.
