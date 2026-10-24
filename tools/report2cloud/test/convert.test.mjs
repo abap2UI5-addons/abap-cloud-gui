@@ -9,6 +9,8 @@ import { join } from "node:path";
 import { convert, defaultClassName, FRONTEND, GUI, RESERVED_METHODS, UNCATALOGUED } from "../lib/convert.mjs";
 import { corpus, convertEntry, SNAPSHOTS } from "./corpus.mjs";
 import { parseTextpool } from "../lib/textpool.mjs";
+import { dependenciesOf, dependencyIndex } from "../lib/deps.mjs";
+import { tmpdir } from "node:os";
 
 const UPDATE = process.env.UPDATE_SNAPSHOTS === "1";
 const entries = corpus();
@@ -916,4 +918,30 @@ test("MESSAGE of an exception object is its text; MODULE x OUTPUT and MODULE x I
 test("SAP GUI controls: a control handed to a class of the report's own is refused - it takes a cl_gui_* object", () => {
   const src = "REPORT zt.\nDATA go_c TYPE REF TO cl_gui_custom_container.\nSTART-OF-SELECTION.\n  CREATE OBJECT go_c EXPORTING container_name = 'CC'.\n  zcl_my_button=>create( parent = go_c ).\n";
   assert.deepEqual(refusalOf(src).map((x) => x.replace(/^\d+:\d+ /, "")), ["SAP GUI controls: go_c, a SAP GUI control, is handed to a method that is no stand-in - it takes a cl_gui_* object - port this statement by hand"]);
+});
+
+test("the dependencies of a report type what it reads of them - an inline declaration of an event block read in another one", () => {
+  const src = "REPORT zt.\nINITIALIZATION.\n  DATA(lo_log) = zcl_app_factory=>create_logger( ).\nSTART-OF-SELECTION.\n  lo_log->add( `x` ).\n";
+  const factory = "CLASS zcl_app_factory DEFINITION PUBLIC CREATE PUBLIC.\n  PUBLIC SECTION.\n    CLASS-METHODS create_logger RETURNING VALUE(result) TYPE REF TO zcl_app_log.\nENDCLASS.\nCLASS zcl_app_factory IMPLEMENTATION.\n  METHOD create_logger.\n  ENDMETHOD.\nENDCLASS.\n";
+  const log = "CLASS zcl_app_log DEFINITION PUBLIC CREATE PUBLIC.\n  PUBLIC SECTION.\n    METHODS add IMPORTING t TYPE string.\nENDCLASS.\nCLASS zcl_app_log IMPLEMENTATION.\n  METHOD add.\n  ENDMETHOD.\nENDCLASS.\n";
+  assert.match(convert(src, { file: "zt.prog.abap", className: "zcl_t" }).refusals[0].message, /^lo_log is declared inline in an event block/);
+
+  const dir = join(tmpdir(), `r2c-deps-${process.pid}`);
+  mkdirSync(join(dir, "src", "sub"), { recursive: true });
+  try {
+    writeFileSync(join(dir, "src", "zcl_app_factory.clas.abap"), factory);
+    writeFileSync(join(dir, "src", "sub", "zcl_app_log.clas.abap"), log);
+    writeFileSync(join(dir, "src", "zcl_app_factory.clas.testclasses.abap"), "CLASS ltcl DEFINITION FOR TESTING. ENDCLASS.\n");
+    writeFileSync(join(dir, "src", "zcl_unused.clas.abap"), "CLASS zcl_unused DEFINITION PUBLIC. ENDCLASS.\n");
+    const index = dependencyIndex([dir]);
+    // what the report names, and what that names in turn - no test class, nothing unnamed
+    const deps = dependenciesOf(src, index);
+    assert.deepEqual(deps.map((d) => d.name).sort(), ["zcl_app_factory.clas.abap", "zcl_app_log.clas.abap"]);
+    assert.deepEqual(dependenciesOf(src, index, 1).map((d) => d.name), ["zcl_app_factory.clas.abap"]);
+    const r = convert(src, { file: "zt.prog.abap", className: "zcl_t", deps });
+    assert.deepEqual(r.refusals, []);
+    assert.match(r.files["zcl_t.clas.abap"], /DATA lo_log TYPE REF TO zcl_app_log\./);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });

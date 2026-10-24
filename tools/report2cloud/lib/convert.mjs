@@ -442,6 +442,7 @@ class Converter {
     // parse (lib/includes.mjs), or the report itself
     this.origin = opts.origin ?? ((row) => ({ file: this.file, row }));
     this.pool = opts.textpool ?? { title: "", symbols: new Map(), selection: new Map() };
+    this.deps = opts.deps ?? [];
     this.programName = opts.programName;
     this.className = opts.className;
     // classFor(program) names the class of another report of the input -
@@ -493,9 +494,14 @@ class Converter {
     const config = abaplint.Config.getDefault().get();
     config.syntax = { version: abaplint.Version.v758, errorNamespace: "." };
     const reg = new abaplint.Registry(new abaplint.Config(JSON.stringify(config)));
-    reg.addFile(new abaplint.MemoryFile(`${lc(name).replace(/\//g, "#")}.prog.abap`, this.source));
+    const progFile = `${lc(name).replace(/\//g, "#")}.prog.abap`;
+    reg.addFile(new abaplint.MemoryFile(progFile, this.source));
+    // the report's classes, interfaces and DDIC objects (lib/deps.mjs) - to
+    // type what the report reads of them, never converted
+    for (const d of this.deps) if (d.name !== progFile) reg.addFile(new abaplint.MemoryFile(d.name, d.text));
     reg.parse();
-    const file = reg.getFirstObject().getABAPFiles()[0];
+    this.program = reg.getObject("PROG", uc(name)) ?? reg.getFirstObject();
+    const file = this.program.getABAPFiles()[0];
     this.stmts = file.getStatements().filter((s) => kind(s) !== "Empty");
     this.registry = reg;
   }
@@ -564,7 +570,7 @@ class Converter {
     if (this.progTypes) return this.progTypes;
     this.progTypes = new Map();
     try {
-      const res = new abaplint.SyntaxLogic(this.registry, this.registry.getFirstObject()).run();
+      const res = new abaplint.SyntaxLogic(this.registry, this.program).run();
       const visit = (n) => {
         if (n.getIdentifier().stype === "program" || n.getIdentifier().stype === "Program" || /program/i.test(String(n.getIdentifier().stype))) {
           for (const [name, v] of Object.entries(n.getData().vars)) this.progTypes.set(lc(name), v.getType());

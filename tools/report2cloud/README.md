@@ -46,6 +46,10 @@ node tools/report2cloud/cli.mjs <report.prog.abap> [options]
   --texts <file>   the report's .prog.xml with its text pool (default: beside the source)
   --includes <dir> where the report's INCLUDEs are, as abapGit writes them: <include>.prog.abap
                    (default: beside the source; the includes are inlined before the conversion)
+  --deps <dir>     the classes, interfaces and DDIC objects of the report's repository, as abapGit
+                   writes them - they type what the report reads of them (default: the abapGit
+                   repository the report is in: STARTING_FOLDER of its .abapgit.xml, or its git
+                   repository)
   --report <file>  where to write the migration report (default: <out>/<class>.migration.md)
   --check          lint the class with abaplint - v750 and ABAP Cloud, in a scratch
                    copy of this repository (needs git and network for the dependencies)
@@ -81,7 +85,13 @@ source (or from `--includes`) and inlines them before the parse, recursively,
 so the class holds the whole report; a position in a refusal, a TODO or the
 mapping table names the include and its own line. `INCLUDE x IF FOUND.`
 without a file is dropped, as the compiler drops it; a plain `INCLUDE` without
-a file is refused, naming the file it looked for. Macros (`DEFINE`) are
+a file is refused, naming the file it looked for. The classes, interfaces and DDIC
+objects of the report's repository (`--deps`) are parsed beside it, never
+converted: they tell the types of what the report reads of them - a
+`DATA(lo_log) = zcl_app_factory=>create_logger( )` in INITIALIZATION, read in
+START-OF-SELECTION, is an attribute `TYPE REF TO zcl_app_log` of the class,
+where without them its type cannot be told and the statement is refused. Only
+the objects the report names go in, and what they name in turn. Macros (`DEFINE`) are
 expanded at every call, wherever they are defined.
 
 ### Measuring a code base
@@ -109,9 +119,9 @@ npm run report2cloud:web -- [--lint] [--limit n] [--json file] [--summary file] 
 measures the converter on the open-source ABAP of the web: the repositories
 of the community list of ABAP projects (`--list`, default the `list.json` of
 dotabap-list), cloned shallow and sparse into `build/web-corpus` - only
-`*.prog.abap` and `*.prog.xml`, read and never run, and none of it part of
-this repository. Every report is converted with the includes of its own
-repository; `--lint` lints the converted classes together (v750), where the
+the programs and the classes, interfaces and DDIC objects that type them,
+read and never run, and none of it part of this repository. Every report is
+converted with the includes and the dependencies of its own repository; `--lint` lints the converted classes together (v750), where the
 parser errors and redefinitions are the converter's and most other findings
 name a dependency the sparse clone does not have. A clone in the cache is
 kept, `--offline` uses the cache alone. The workflow

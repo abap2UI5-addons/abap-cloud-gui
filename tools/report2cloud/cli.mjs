@@ -17,6 +17,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
 import { convert, defaultClassName } from "./lib/convert.mjs";
 import { includesFrom, inlineIncludes } from "./lib/includes.mjs";
+import { dependenciesOf, dependencyIndex } from "./lib/deps.mjs";
 import { parseTextpool } from "./lib/textpool.mjs";
 import { migrationReport } from "./lib/report.mjs";
 
@@ -27,6 +28,9 @@ const USAGE = `usage: node tools/report2cloud/cli.mjs <report.prog.abap> [option
   --texts <file>   the report's .prog.xml with its text pool (default: beside the source)
   --includes <dir> where the report's INCLUDEs are, as abapGit writes them: <include>.prog.abap
                    (default: beside the source; the includes are inlined before the conversion)
+  --deps <dir>     the classes, interfaces and DDIC objects of the report's repository, as abapGit
+                   writes them - they type what the report reads of them (default: the abapGit
+                   repository the report is in, the folder above it with an .abapgit.xml)
   --report <file>  where to write the migration report (default: <out>/<class>.migration.md)
   --check          lint the class with abaplint - v750 and ABAP Cloud, in a scratch
                    copy of this repository (needs git and network for the dependencies)
@@ -41,13 +45,28 @@ function args(argv) {
     if (a === "--help" || a === "-h") opts.help = true;
     else if (a === "--check") opts.check = true;
     else if (a === "--partial") opts.partial = true;
-    else if (["--class", "--out", "--texts", "--includes", "--report", "--ddic"].includes(a)) {
+    else if (["--class", "--out", "--texts", "--includes", "--report", "--ddic", "--deps"].includes(a)) {
       if (argv[i + 1] === undefined) throw new Error(`${a} needs a value`);
       opts[a.slice(2)] = argv[++i];
     } else if (a.startsWith("--")) throw new Error(`unknown option ${a}`);
     else opts._.push(a);
   }
   return opts;
+}
+
+/** the abapGit repository of a file - its starting folder (STARTING_FOLDER
+ *  of .abapgit.xml), or the git repository it is in; undefined when it is
+ *  in none */
+function repositoryOf(file) {
+  for (let dir = dirname(resolve(file)); ; dir = dirname(dir)) {
+    const abapgit = join(dir, ".abapgit.xml");
+    if (existsSync(abapgit)) {
+      const start = /<STARTING_FOLDER>([^<]*)<\/STARTING_FOLDER>/.exec(readFileSync(abapgit, "utf8"))?.[1].replace(/^\/+|\/+$/g, "");
+      return start ? join(dir, start) : dir;
+    }
+    if (existsSync(join(dir, ".git"))) return dir;
+    if (dirname(dir) === dir) return undefined;
+  }
 }
 
 async function main() {
@@ -79,7 +98,9 @@ async function main() {
   const texts = opts.texts ?? (sibling !== file && existsSync(sibling) ? sibling : undefined);
   const textpool = texts ? parseTextpool(readFileSync(texts, "utf8")) : undefined;
   const m = /^(.+)\.prog\.abap$/i.exec(basename(file));
+  const depsDir = opts.deps ? resolve(opts.deps) : repositoryOf(file);
   const result = convert(source, {
+    deps: depsDir ? dependenciesOf(source, dependencyIndex([depsDir])) : undefined,
     file,
     className: opts.class,
     programName: m ? m[1].replace(/#/g, "/") : undefined,
