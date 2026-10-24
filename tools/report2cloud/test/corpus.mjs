@@ -17,6 +17,9 @@ export const HERE = dirname(fileURLToPath(import.meta.url));
 export const CORPUS = join(HERE, "corpus");
 export const SNAPSHOTS = join(HERE, "snapshots");
 export const DDIC = join(HERE, "ddic");
+/** src/03 - the corpus classes that run on ABAP Cloud too, as converted: the
+ *  test set to pull onto a system with abapGit */
+export const TEST_SET = join(HERE, "..", "..", "..", "src", "03");
 
 const isReport = (source) => /^\s*(REPORT|PROGRAM)\b/im.test(source);
 
@@ -54,4 +57,11 @@ export function convertEntry(entry) {
   });
   const report = migrationReport(result, { source: entry.file, texts: entry.texts, includes: entry.includes });
   return { result, report };
+}
+
+/** the conversions that belong into the test set src/03: converted, and
+ *  nothing the migration report names for the release (no table or API
+ *  that ABAP Cloud lacks) - a pull of the repository activates everywhere */
+export function inTestSet({ result }) {
+  return result.ok && result.release.length === 0;
 }

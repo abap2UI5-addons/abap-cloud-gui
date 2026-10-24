@@ -1,13 +1,13 @@
 // The conversion of the corpus: snapshots of every generated file and of
 // the migration report, the abapGit format of the files, and the mapping
 // table construct by construct. UPDATE_SNAPSHOTS=1 writes the snapshots
-// anew - review the diff before committing it.
+// anew, and the test set src/03 - review the diff before committing it.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { convert, defaultClassName, FRONTEND, GUI, RESERVED_METHODS, UNCATALOGUED } from "../lib/convert.mjs";
-import { corpus, convertEntry, SNAPSHOTS } from "./corpus.mjs";
+import { corpus, convertEntry, inTestSet, SNAPSHOTS, TEST_SET } from "./corpus.mjs";
 import { parseTextpool } from "../lib/textpool.mjs";
 import { dependenciesOf, dependencyIndex } from "../lib/deps.mjs";
 import { tmpdir } from "node:os";
@@ -39,6 +39,24 @@ for (const e of entries) {
     assert.deepEqual(readdirSync(dir).sort(), Object.keys(actual).sort(), "the generated files");
     for (const [name, text] of Object.entries(actual)) {
       assert.equal(text, readFileSync(join(dir, name), "utf8"), `${e.name}/${name} differs from its snapshot`);
+    }
+  });
+
+  test(`test set src/03: ${e.name}`, () => {
+    const c = converted.get(e.name);
+    const mine = readdirSync(TEST_SET).filter((f) => f.startsWith(`${c.result.className}.`)).sort();
+    if (UPDATE) {
+      for (const f of mine) rmSync(join(TEST_SET, f));
+      if (inTestSet(c)) for (const [name, text] of Object.entries(c.result.files)) writeFileSync(join(TEST_SET, name), text);
+      return;
+    }
+    if (!inTestSet(c)) {
+      assert.deepEqual(mine, [], `${e.name} needs ${c.result.release.map((x) => x.name).join(", ") || "its refusals fixed"} - not in src/03, which activates on ABAP Cloud too`);
+      return;
+    }
+    assert.deepEqual(mine, Object.keys(c.result.files).sort(), `src/03 holds the files of ${e.name} - run UPDATE_SNAPSHOTS=1 npm run test:report2cloud`);
+    for (const [name, text] of Object.entries(c.result.files)) {
+      assert.equal(readFileSync(join(TEST_SET, name), "utf8"), text, `src/03/${name} differs from the conversion`);
     }
   });
 

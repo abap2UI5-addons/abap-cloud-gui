@@ -277,6 +277,33 @@ Background" button: a report runs without a browser through
 | `z2ui5_cl_cgui_sample_07` | value helps — standard F4 from domain fixed values and value table, own F4 for a parameter and a select-option |
 | `z2ui5_cl_cgui_sample_11` | a dynpro — `CALL SCREEN`, PBO with status and `LOOP AT SCREEN`, PAI with a push button, `LEAVE TO SCREEN 0` and the list after the screen |
 
+
+### The converted reports: src/03
+
+`src/03` holds report classes as report2cloud writes them - the reports of
+its test corpus (`tools/report2cloud/test/corpus`) converted, not touched by
+hand: the test set to pull onto a system and run, `?app_start=z2ui5_cl_cgui_r2c_01`
+and so on. Only the reports that need nothing ABAP Cloud lacks are in it
+(no SFLIGHT, SPFLI, SCARR - those convert too, see the snapshots), so the
+repository installs on every target. The converter test keeps `src/03` equal
+to the conversion; `UPDATE_SNAPSHOTS=1 npm run test:report2cloud` writes it
+anew.
+
+| Class | Report |
+|---|---|
+| `z2ui5_cl_cgui_r2c_01` | `zr2c_01_hello` - The smallest report |
+| `z2ui5_cl_cgui_r2c_03` | `zr2c_03_forms` - An order simulation in FORMs |
+| `z2ui5_cl_cgui_r2c_06` | `zr2c_06_dynamic` - A dynamic selection screen |
+| `z2ui5_cl_cgui_r2c_08` | `zr2c_08_listformat` - The list statements |
+| `z2ui5_cl_cgui_r2c_09` | `zr2c_09_localclass` - A report with local classes |
+| `z2ui5_cl_cgui_r2c_11` | `zr2c_11_legacy` - Older statements |
+| `z2ui5_cl_cgui_r2c_12` | `zr2c_12_pages` - Pages of a list - LINE-COUNT, TOP-OF-PAGE with the page number |
+| `z2ui5_cl_cgui_r2c_13` | `zr2c_13_includes` - A report in three pieces, as a grown one is |
+| `z2ui5_cl_cgui_r2c_22` | `zr2c_22_files` - The files of the user |
+| `z2ui5_cl_cgui_r2c_23` | `zr2c_23_dynpro` - A dynpro of fields |
+| `z2ui5_cl_cgui_r2c_25` | `zr2c_25_textedit` - Notes of an airline on a dynpro with two SAP GUI controls |
+| `z2ui5_cl_cgui_r2c_26` | `zr2c_26_events` - The events of SAP GUI controls, handled by a local class |
+
 ## Converting existing reports: report2cloud
 
 A report that exists already does not have to be rewritten by hand.
