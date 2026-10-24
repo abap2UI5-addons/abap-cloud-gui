@@ -244,6 +244,12 @@ CLASS z2ui5_cl_cgui_alv DEFINITION PUBLIC FINAL CREATE PUBLIC.
     TYPES ty_t_lvc_roid TYPE STANDARD TABLE OF ty_s_lvc_roid WITH EMPTY KEY ##NEEDED.
 
     TYPES:
+      "! LVC_S_COL - e_column_id of the HOTSPOT_CLICK handler of the grid
+      BEGIN OF ty_s_lvc_col ##NEEDED,
+        fieldname TYPE c LENGTH 30,
+      END OF ty_s_lvc_col.
+
+    TYPES:
       BEGIN OF ty_s_hotspot,
         row    TYPE i,
         column TYPE string,

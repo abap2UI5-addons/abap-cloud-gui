@@ -3,6 +3,7 @@
 // the refusals with file:row:col, the TODOs, the objects whose release state
 // on ABAP Cloud has to be checked, the findings of abaplint when it ran, and
 // every mapped construct with its line.
+import { refusalLink, refusalOf } from "./refusals.mjs";
 
 const cell = (s) => String(s).replace(/\|/g, "\\|").replace(/\n/g, " ");
 
@@ -38,7 +39,10 @@ export function migrationReport(result, { source, texts, lint, includes } = {}) 
   if (result.refusals.length) {
     push("## Refused", "");
     push("These statements have no counterpart in an abap-cloud-gui report. Rewrite them in the report (or delete them) and convert again.", "");
-    for (const r of result.refusals) push(`- \`${at(source, r.row, r.col)}\` - ${r.message}`);
+    for (const r of result.refusals) {
+      const entry = refusalOf(r.message);
+      push(`- \`${at(source, r.row, r.col)}\` - ${r.message}${entry ? ` ([why, and the rewrite](${refusalLink(entry)}))` : ""}`);
+    }
     push("");
   }
 

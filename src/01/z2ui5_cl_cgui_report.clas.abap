@@ -43,6 +43,8 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
 
   PUBLIC SECTION.
     INTERFACES z2ui5_if_app.
+    "! the files of cl_gui_frontend_services - z2ui5_cl_cgui_frontend
+    INTERFACES z2ui5_if_cgui_files.
 
     CONSTANTS:
       BEGIN OF cs_ucomm,
@@ -63,6 +65,7 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
         popup_answer      TYPE string VALUE `CGUI_POPUP_ANSWER`,
         variant_saved     TYPE string VALUE `CGUI_VARIANT_SAVED`,
         print             TYPE string VALUE `CGUI_PRINT`,
+        enter             TYPE string VALUE `CGUI_ENTER`,
       END OF cs_ucomm.
 
     "! the prefix of the browser's local storage the variants are kept
@@ -193,6 +196,17 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
         w_lines  TYPE i,
       END OF ty_s_cgui_level.
     TYPES ty_t_cgui_level TYPE STANDARD TABLE OF ty_s_cgui_level WITH EMPTY KEY.
+
+    TYPES:
+      "! a screen CALL SCREEN returns to - the selection screen, the output
+      "! or a dynpro (dynnr)
+      " the screen and the dynpro CALL SCREEN came from, and the dynpro it called
+      BEGIN OF ty_s_cgui_call,
+        screen TYPE string,
+        dynnr  TYPE string,
+        called TYPE string,
+      END OF ty_s_cgui_call.
+    TYPES ty_t_cgui_call TYPE STANDARD TABLE OF ty_s_cgui_call WITH EMPTY KEY.
 
     " GET CURSOR FIELD f VALUE v LINE l OFFSET o - what was clicked
     TYPES:
@@ -371,6 +385,34 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
       IMPORTING
         dynnr  TYPE string
         screen TYPE REF TO z2ui5_cl_cgui_selscreen.
+
+    "! the fields of dynpro dynnr, written onto screen like the selection
+    "! screen - report2cloud writes it from the screen of the .prog.xml
+    METHODS dynpro_screen
+      IMPORTING
+        dynnr  TYPE string
+        screen TYPE REF TO z2ui5_cl_cgui_selscreen.
+
+    "! PROCESS BEFORE OUTPUT of dynpro dynnr - before it shows, every time;
+    "! current_screen( ) is its screen (LOOP AT SCREEN)
+    METHODS dynpro_pbo
+      IMPORTING
+        dynnr TYPE string.
+
+    "! PROCESS AFTER INPUT of dynpro dynnr - for every function: a push
+    "! button, a function of the status, Back (`BACK`), Enter (empty)
+    METHODS dynpro_pai
+      IMPORTING
+        dynnr TYPE string
+        ucomm TYPE string.
+
+    "! after call_screen( ) - when the dynpro was left with
+    "! leave_to_screen( `0` ): what followed CALL SCREEN in the report;
+    "! dynnr is the screen call_screen( ) called, whichever screen SET
+    "! SCREEN went on to after it
+    METHODS after_call_screen
+      IMPORTING
+        dynnr TYPE string.
 
     "! after call_selection_screen( ) - subrc 0 when the user confirmed,
     "! 4 when he cancelled, as sy-subrc after CALL SELECTION-SCREEN
@@ -588,6 +630,46 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
     "! LEAVE TO LIST-PROCESSING's way back - show the selection screen again
     METHODS leave_to_selection_screen.
 
+    "! CALL SCREEN dynnr - the dynpro of dynpro_screen( ) shows, its PBO
+    "! before, its PAI for every function; the statements after CALL SCREEN
+    "! belong into after_call_screen( ), which runs when it is left
+    METHODS call_screen
+      IMPORTING
+        dynnr TYPE clike.
+
+    "! SET SCREEN dynnr - the next screen after the PAI; `0` returns to the
+    "! screen of CALL SCREEN
+    METHODS set_screen
+      IMPORTING
+        dynnr TYPE clike.
+
+    "! LEAVE TO SCREEN dynnr - SET SCREEN and LEAVE SCREEN at once
+    METHODS leave_to_screen
+      IMPORTING
+        dynnr TYPE clike.
+
+    "! LEAVE SCREEN - the PAI ends, the next screen shows
+    METHODS leave_screen.
+
+    "! whether the PAI left the dynpro, or an error message stopped it -
+    "! its modules after that do not run
+    METHODS screen_left
+      RETURNING
+        VALUE(result) TYPE abap_bool.
+
+    "! the selection screen LOOP AT SCREEN changes outside of
+    "! at_selection_screen_output( screen ) - in a FORM or a method of a
+    "! local class called from there it is that screen; elsewhere (AT
+    "! SELECTION-SCREEN, START-OF-SELECTION) a screen built afresh, whose
+    "! changes are not shown - as MODIFY SCREEN outside of PBO is not
+    METHODS current_screen
+      RETURNING
+        VALUE(result) TYPE REF TO z2ui5_cl_cgui_selscreen.
+
+    "! the screen of at_selection_screen_output( ) while it runs - cleared
+    "! after it, so no roundtrip carries it
+    DATA mo_cgui_screen TYPE REF TO z2ui5_cl_cgui_selscreen.
+
     "! WINDOW STARTING AT x1 y1 ENDING AT x2 y2 - in at_line_selection( ):
     "! the secondary list is shown in a dialog box above the list it comes
     "! from. columns and lines - ENDING AT minus STARTING AT - size the box,
@@ -703,6 +785,9 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
     " returns
     DATA mt_cgui_run_msg       TYPE ty_t_cgui_msg.
     DATA mv_cgui_stop          TYPE abap_bool.
+    " leave_to_selection_screen( ) during the run - LEAVE PROGRAM, LEAVE TO
+    " SCREEN 0: no END-OF-SELECTION, no list
+    DATA mv_cgui_left          TYPE abap_bool.
     DATA mv_cgui_nav           TYPE abap_bool.
     DATA mv_cgui_value_field   TYPE string.
     " F4 on the upper limit of a select-option (HIGH) - and in a cell of
@@ -777,6 +862,19 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
     " the variant attributes of the fields shown: not ready for input, hidden
     DATA mt_cgui_var_protect   TYPE string_table.
     DATA mt_cgui_var_hide      TYPE string_table.
+    " the files the user uploaded (z2ui5_cl_cgui_frontend=>gui_upload( )
+    " reads them), the names file_open_dialog( ) answers on its second run
+    " and what runs again after the upload: the F4 of mv_cgui_pending_field
+    " or Execute
+    DATA mt_cgui_file          TYPE z2ui5_cl_cgui_file=>ty_t_file.
+    " the dynpro shown (CALL SCREEN), the screens it returns to, the next
+    " screen of the PAI and whether the PAI left it
+    DATA mv_cgui_dynpro        TYPE string.
+    DATA mt_cgui_dynpro_stack  TYPE ty_t_cgui_call.
+    DATA mv_cgui_dynpro_next   TYPE string.
+    DATA mv_cgui_dynpro_left   TYPE abap_bool.
+    DATA mt_cgui_file_pick     TYPE string_table.
+    DATA mv_cgui_file_rerun    TYPE string.
 
   PRIVATE SECTION.
 
@@ -784,6 +882,7 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
       BEGIN OF cs_screen,
         selection TYPE string VALUE `SELECTION`,
         output    TYPE string VALUE `OUTPUT`,
+        dynpro    TYPE string VALUE `DYNPRO`,
       END OF cs_screen.
 
     CONSTANTS:
@@ -799,6 +898,7 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
         filter_col     TYPE string VALUE `FILTER_COL`,
         filter         TYPE string VALUE `FILTER`,
         alv_f4         TYPE string VALUE `ALV_F4`,
+        file           TYPE string VALUE `FILE`,
       END OF cs_pending.
 
     TYPES:
@@ -1114,6 +1214,36 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
       IMPORTING
         col TYPE string.
 
+    "! a function on the dynpro: its PAI, then the next screen
+    METHODS on_dynpro_command
+      IMPORTING
+        ucomm TYPE string.
+
+    "! a screen number as four digits - 100 is 0100
+    METHODS dynnr_norm
+      IMPORTING
+        dynnr         TYPE clike
+      RETURNING
+        VALUE(result) TYPE string.
+
+    "! back from the dynpro to the screen of CALL SCREEN
+    METHODS dynpro_return
+      IMPORTING
+        dynnr TYPE string.
+
+    "! the dynpro shown - dynpro_screen( ) and its PBO, before the page is
+    "! built: SET TITLEBAR and SET PF-STATUS of the PBO are its title and
+    "! its toolbar
+    METHODS view_display_dynpro
+      RETURNING
+        VALUE(result) TYPE REF TO z2ui5_cl_cgui_selscreen.
+
+    "! the files the user picked in the upload dialog of upload_popup( ) -
+    "! stored, and the F4 or Execute that opened it run again
+    METHODS file_result
+      IMPORTING
+        field TYPE string.
+
     "! GET CURSOR and SY-LISEL of a click into the list
     METHODS cursor_from_list
       IMPORTING
@@ -1225,6 +1355,8 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
   METHOD z2ui5_if_app~main.
 
     me->client = client.
+    " cl_gui_frontend_services of the report - its files are the report's
+    z2ui5_cl_cgui_frontend=>set_files( me ).
     CLEAR mt_cgui_msg.
     mv_cgui_nav = abap_false.
     " the messages of the run stay while the popover opens and the user
@@ -1432,6 +1564,131 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
   METHOD after_call_selection_screen ##NEEDED.
   ENDMETHOD.
 
+  METHOD dynpro_screen ##NEEDED.
+  ENDMETHOD.
+
+  METHOD dynpro_pbo ##NEEDED.
+  ENDMETHOD.
+
+  METHOD dynpro_pai ##NEEDED.
+  ENDMETHOD.
+
+  METHOD after_call_screen ##NEEDED.
+  ENDMETHOD.
+
+  METHOD call_screen.
+
+    INSERT VALUE #( screen = mv_cgui_screen
+                    dynnr  = mv_cgui_dynpro
+                    called = dynnr_norm( dynnr ) ) INTO TABLE mt_cgui_dynpro_stack.
+    mv_cgui_dynpro = dynnr_norm( dynnr ).
+    mv_cgui_screen = cs_screen-dynpro.
+    CLEAR: mv_cgui_dynpro_next, mv_cgui_dynpro_left.
+
+  ENDMETHOD.
+
+  METHOD set_screen.
+
+    mv_cgui_dynpro_next = dynnr_norm( dynnr ).
+
+  ENDMETHOD.
+
+  METHOD leave_to_screen.
+
+    set_screen( dynnr ).
+    leave_screen( ).
+
+  ENDMETHOD.
+
+  METHOD leave_screen.
+
+    mv_cgui_dynpro_left = abap_true.
+
+  ENDMETHOD.
+
+  METHOD screen_left.
+
+    result = xsdbool( mv_cgui_dynpro_left = abap_true OR mv_cgui_stop = abap_true ).
+
+  ENDMETHOD.
+
+  METHOD on_dynpro_command.
+
+    DATA(lv_dynnr) = mv_cgui_dynpro.
+    CLEAR: mv_cgui_dynpro_next, mv_cgui_dynpro_left.
+    mv_cgui_stop = abap_false.
+    " the required fields, but for the functions that leave
+    IF ucomm <> `BACK` AND ucomm <> `EXIT` AND ucomm <> `CANC` AND ucomm <> `CANCEL`
+        AND check_obligatory( ) = abap_false.
+      RETURN.
+    ENDIF.
+    dynpro_pai( dynnr = lv_dynnr
+                ucomm = ucomm ).
+    " an error message keeps the dynpro, as on a classic screen
+    IF mv_cgui_stop = abap_true OR mv_cgui_screen <> cs_screen-dynpro.
+      mv_cgui_stop = abap_false.
+      RETURN.
+    ENDIF.
+
+    DATA(lv_next) = mv_cgui_dynpro_next.
+    IF lv_next IS INITIAL AND mt_cgui_pf IS INITIAL AND ( ucomm = `BACK` OR ucomm = `EXIT` OR ucomm = `CANC` ).
+      " no status of the report's own: Back of the runtime leaves
+      lv_next = `0000`.
+    ENDIF.
+    IF lv_next = `0000`.
+      dynpro_return( lv_dynnr ).
+    ELSEIF lv_next IS NOT INITIAL.
+      mv_cgui_dynpro = lv_next.
+    ENDIF.
+    CLEAR: mv_cgui_dynpro_next, mv_cgui_dynpro_left.
+
+  ENDMETHOD.
+
+  METHOD dynnr_norm.
+
+    DATA lv_dynnr TYPE n LENGTH 4.
+
+    lv_dynnr = condense( dynnr ).
+    result = lv_dynnr.
+
+  ENDMETHOD.
+
+  METHOD dynpro_return.
+
+    DATA(lv_called) = dynnr.
+    DATA(lv_top) = lines( mt_cgui_dynpro_stack ).
+    IF lv_top = 0.
+      mv_cgui_screen = cs_screen-selection.
+      CLEAR mv_cgui_dynpro.
+    ELSE.
+      DATA(ls_call) = mt_cgui_dynpro_stack[ lv_top ].
+      DELETE mt_cgui_dynpro_stack INDEX lv_top.
+      mv_cgui_screen = ls_call-screen.
+      mv_cgui_dynpro = ls_call-dynnr.
+      lv_called = ls_call-called.
+    ENDIF.
+    after_call_screen( lv_called ).
+    " CALL SCREEN in START-OF-SELECTION: the list written after it shows
+    IF mv_cgui_screen = cs_screen-selection AND ( mo_cgui_list IS BOUND OR mo_cgui_alv IS BOUND ).
+      mv_cgui_screen = cs_screen-output.
+    ENDIF.
+
+  ENDMETHOD.
+
+  METHOD view_display_dynpro.
+
+    result = z2ui5_cl_cgui_selscreen=>factory( client          = client
+                                               value_help_auto = abap_true ).
+    dynpro_screen( dynnr  = mv_cgui_dynpro
+                   screen = result ).
+    mo_cgui_screen = result.
+    dynpro_pbo( mv_cgui_dynpro ).
+    CLEAR mo_cgui_screen.
+    value_state_set( result ).
+    mt_cgui_field = result->get_fields( ).
+
+  ENDMETHOD.
+
   METHOD authority_check.
 
     result = abap_true.
@@ -1474,6 +1731,122 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
     IF sy-subrc = 0.
       GET REFERENCE OF <cell> INTO result.
     ENDIF.
+
+  ENDMETHOD.
+
+  METHOD z2ui5_if_cgui_files~upload_popup.
+
+    " the F4 that opened the dialog runs again - or Execute, while the
+    " selection screen is processed; elsewhere the files wait for the user
+    " to repeat what needs them
+    mv_cgui_file_rerun = COND #( WHEN mv_cgui_value_field IS NOT INITIAL THEN cs_pending-f4
+                                 WHEN mv_cgui_screen = cs_screen-selection THEN cs_ucomm-execute ).
+    IF mv_cgui_file_rerun = cs_ucomm-execute.
+      " the run stops here - it starts again with the files
+      mv_cgui_stop = abap_true.
+    ENDIF.
+    mv_cgui_pending_field = mv_cgui_value_field.
+    mv_cgui_pending_part = mv_cgui_value_part.
+    mv_cgui_pending_kind = cs_pending-file.
+    mv_cgui_nav = abap_true.
+    client->nav_app_call( z2ui5_cl_cgui_file=>factory( title    = title
+                                                       multiple = multiple
+                                                       filter   = filter ) ).
+
+  ENDMETHOD.
+
+  METHOD file_result.
+
+    DATA lo_popup TYPE REF TO z2ui5_cl_cgui_file.
+
+    TRY.
+        lo_popup = CAST #( client->get_app_prev( ) ).
+      CATCH cx_root.
+        RETURN.
+    ENDTRY.
+    DATA(ls_result) = lo_popup->result( ).
+    IF ls_result-confirmed = abap_false.
+      CLEAR mv_cgui_file_rerun.
+      RETURN.
+    ENDIF.
+
+    CLEAR mt_cgui_file_pick.
+    LOOP AT ls_result-files INTO DATA(ls_file).
+      DELETE mt_cgui_file WHERE name = ls_file-name.
+      INSERT ls_file INTO TABLE mt_cgui_file.
+      INSERT ls_file-name INTO TABLE mt_cgui_file_pick.
+    ENDLOOP.
+
+    DATA(lv_rerun) = mv_cgui_file_rerun.
+    CLEAR mv_cgui_file_rerun.
+    CASE lv_rerun.
+      WHEN cs_pending-f4.
+        mv_cgui_value_field = field.
+        mv_cgui_value_part = mv_cgui_pending_part.
+        CLEAR mv_cgui_pending_part.
+        at_value_request( field ).
+        CLEAR: mv_cgui_value_field, mv_cgui_value_part.
+      WHEN cs_ucomm-execute.
+        on_execute( ).
+      WHEN OTHERS.
+        message( replace( val  = 'File &1 uploaded'(045)
+                          sub  = `&1`
+                          with = concat_lines_of( table = mt_cgui_file_pick
+                                                  sep   = `, ` ) ) ).
+    ENDCASE.
+    " a second dialog of the same run opens the upload again
+    CLEAR mt_cgui_file_pick.
+
+  ENDMETHOD.
+
+  METHOD z2ui5_if_cgui_files~picked.
+
+    result = mt_cgui_file_pick.
+    CLEAR mt_cgui_file_pick.
+
+  ENDMETHOD.
+
+  METHOD z2ui5_if_cgui_files~names.
+
+    LOOP AT mt_cgui_file INTO DATA(ls_file).
+      INSERT ls_file-name INTO TABLE result.
+    ENDLOOP.
+
+  ENDMETHOD.
+
+  METHOD z2ui5_if_cgui_files~content.
+
+    CLEAR: content, found.
+    DATA(lv_name) = to_upper( z2ui5_cl_cgui_frontend=>file_name( name ) ).
+    LOOP AT mt_cgui_file INTO DATA(ls_file).
+      IF to_upper( ls_file-name ) = lv_name.
+        content = ls_file-content.
+        found = abap_true.
+        RETURN.
+      ENDIF.
+    ENDLOOP.
+
+  ENDMETHOD.
+
+  METHOD z2ui5_if_cgui_files~download.
+
+    client->follow_up_action( val   = client->cs_event-download_b64_file
+                              t_arg = VALUE #( ( |data:{ mime };base64,{ z2ui5_cl_cgui_context=>conv_encode_x_base64( content ) }| )
+                                               ( name ) ) ).
+
+  ENDMETHOD.
+
+  METHOD z2ui5_if_cgui_files~open_url.
+
+    client->follow_up_action( val   = client->cs_event-open_new_tab
+                              t_arg = VALUE #( ( url ) ) ).
+
+  ENDMETHOD.
+
+  METHOD z2ui5_if_cgui_files~clipboard.
+
+    client->follow_up_action( val   = client->cs_event-clipboard_copy
+                              t_arg = VALUE #( ( text ) ) ).
 
   ENDMETHOD.
 
@@ -1828,12 +2201,22 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
                            column = ls_hotspot-column
                            link   = abap_true ).
 
+      WHEN cs_ucomm-enter.
+        IF mv_cgui_screen = cs_screen-dynpro.
+          on_dynpro_command( `` ).
+        ENDIF.
+
       WHEN OTHERS.
         IF mv_cgui_pending_ucomm IS NOT INITIAL AND lv_event = mv_cgui_pending_ucomm.
           CLEAR mv_cgui_pending_ucomm.
         ENDIF.
 
-        at_user_command( lv_event ).
+        " a function on a dynpro is its PAI
+        IF mv_cgui_screen = cs_screen-dynpro.
+          on_dynpro_command( lv_event ).
+        ELSE.
+          at_user_command( lv_event ).
+        ENDIF.
 
     ENDCASE.
 
@@ -1948,6 +2331,12 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD on_back.
+
+    " Back on a dynpro is the function BACK of its PAI
+    IF mv_cgui_screen = cs_screen-dynpro.
+      on_dynpro_command( `BACK` ).
+      RETURN.
+    ENDIF.
 
     " ON EXIT-COMMAND - an error keeps the selection screen
     IF mv_cgui_screen = cs_screen-selection.
@@ -2122,6 +2511,9 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
 
       WHEN cs_pending-alv_f4.
         alv_f4_result( lv_col ).
+
+      WHEN cs_pending-file.
+        file_result( lv_field ).
 
       WHEN cs_pending-decide OR cs_pending-values.
         TRY.
@@ -3141,12 +3533,14 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
     CLEAR: mo_cgui_list, mo_cgui_alv, mr_cgui_alv, mr_cgui_alv_box, mv_cgui_alv_name, mt_cgui_level,
            mr_cgui_alv_page, mt_cgui_alv_index, mo_cgui_tree, mt_cgui_tree_view,
            mv_cgui_window, mv_cgui_window_title, mv_cgui_window_cols, mv_cgui_window_lines.
+    mv_cgui_left = abap_false.
     start_of_selection( ).
-    IF mv_cgui_stop = abap_true.
+    " CALL SCREEN: the dynpro shows, the rest follows when it is left
+    IF mv_cgui_stop = abap_true OR mv_cgui_left = abap_true OR mv_cgui_screen = cs_screen-dynpro.
       RETURN.
     ENDIF.
     end_of_selection( ).
-    IF mv_cgui_stop = abap_true.
+    IF mv_cgui_stop = abap_true OR mv_cgui_left = abap_true.
       RETURN.
     ENDIF.
     IF mo_cgui_list IS BOUND.
@@ -4311,7 +4705,20 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
   METHOD leave_to_selection_screen.
 
     mv_cgui_screen = cs_screen-selection.
-    CLEAR: mt_cgui_level, mv_cgui_window.
+    mv_cgui_left = abap_true.
+    " LEAVE PROGRAM on a dynpro - the screens called are gone as well
+    CLEAR: mt_cgui_level, mv_cgui_window, mt_cgui_dynpro_stack, mv_cgui_dynpro, mv_cgui_dynpro_next.
+
+  ENDMETHOD.
+
+  METHOD current_screen.
+
+    IF mo_cgui_screen IS BOUND.
+      result = mo_cgui_screen.
+      RETURN.
+    ENDIF.
+    result = z2ui5_cl_cgui_selscreen=>factory( client ).
+    selection_screen( result ).
 
   ENDMETHOD.
 
@@ -4961,9 +5368,13 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
             )->a( n = `displayBlock` v = `true`
             )->a( n = `height`       v = `100%` ).
 
+    " the PBO of a dynpro runs first - its title is the title of the page
+    DATA(lo_dynpro) = COND #( WHEN mv_cgui_screen = cs_screen-dynpro AND mv_cgui_denied = abap_false
+                              THEN view_display_dynpro( ) ).
+
     DATA(page) = view->ele( `Page`
         )->a( n = `title`          t = mv_cgui_title
-        )->a( n = `showNavButton`  b = xsdbool( mv_cgui_screen = cs_screen-output OR mv_cgui_called = abap_true )
+        )->a( n = `showNavButton`  b = xsdbool( mv_cgui_screen = cs_screen-output OR mv_cgui_screen = cs_screen-dynpro OR mv_cgui_called = abap_true )
         )->a( n = `navButtonPress` v = client->_event( cs_ucomm-back ) ).
 
     " the storage controls read the variants and the parameter IDs out of
@@ -4995,6 +5406,11 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
     " no authorization: nothing but the messages
     IF mv_cgui_denied = abap_true.
       CLEAR lv_window.
+    ELSEIF lo_dynpro IS BOUND.
+      lo_dynpro->render( page ).
+      lv_button_text = 'Continue'(046).
+      lv_button_icon = `sap-icon://accept`.
+      lv_button_ucomm = cs_ucomm-enter.
     ELSEIF mv_cgui_screen = cs_screen-output.
       IF lv_window = abap_true.
         view_display_window_base( page ).
@@ -5012,7 +5428,9 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
         screen->set_listbox_values( name   = lr_vrm->name
                                     values = lr_vrm->values ).
       ENDLOOP.
+      mo_cgui_screen = screen.
       at_selection_screen_output( screen ).
+      CLEAR mo_cgui_screen.
       variant_attributes_apply( screen ).
       value_state_set( screen ).
       mt_cgui_field = screen->get_fields( ).
@@ -5084,7 +5502,7 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
             )->a( n = `tooltip` t = ls_pf-tooltip
             )->a( n = `press`   v = client->_event( ls_pf-name ) ).
       ENDLOOP.
-      IF NOT line_exists( mt_cgui_excl_out[ table_line = cs_ucomm-print ] ).
+      IF mv_cgui_screen <> cs_screen-dynpro AND NOT line_exists( mt_cgui_excl_out[ table_line = cs_ucomm-print ] ).
         toolbar->tag( `Button`
             )->a( n = `text`  t = CONV #( 'Print'(034) )
             )->a( n = `icon`  v = `sap-icon://print`
@@ -5098,7 +5516,9 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
           )->a( n = `text`    t = lv_button_text
           )->a( n = `icon`    v = lv_button_icon
           )->a( n = `type`    v = `Emphasized`
-          )->a( n = `tooltip` v = COND #( WHEN lv_button_ucomm = cs_ucomm-execute THEN `F8` ELSE `F3` )
+          )->a( n = `tooltip` v = COND #( WHEN lv_button_ucomm = cs_ucomm-execute THEN `F8`
+                                          WHEN lv_button_ucomm = cs_ucomm-enter THEN `Enter`
+                                          ELSE `F3` )
           )->a( n = `press`   v = client->_event( lv_button_ucomm ) ).
     ENDIF.
 

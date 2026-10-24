@@ -4,9 +4,6 @@ CLASS z2ui5_cl_cgui_r2c_09 DEFINITION PUBLIC
   CREATE PUBLIC.
 
   PUBLIC SECTION.
-    " global data of the report
-    DATA go_calc TYPE REF TO lif_rounding.
-
     " selection screen
     DATA p_a   TYPE decfloat34.
     DATA p_b   TYPE decfloat34.
@@ -18,6 +15,10 @@ CLASS z2ui5_cl_cgui_r2c_09 DEFINITION PUBLIC
     METHODS start_of_selection REDEFINITION.
 
   PRIVATE SECTION.
+    " global data of the report typed with its local classes - local types
+    " can type the private section only
+    DATA go_calc TYPE REF TO lif_rounding.
+
 ENDCLASS.
 
 

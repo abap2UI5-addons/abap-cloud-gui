@@ -47,7 +47,7 @@ test("refuses with file:row:col, exit code 2 and no class - --partial writes the
     const file = join(CORPUS, "zr2c_10_refused.prog.abap");
     const r = run(file, "--out", out);
     assert.equal(r.status, 2);
-    assert.ok(r.stderr.includes(`${file}:36:3 - CALL SCREEN - a dynpro has no counterpart`), r.stderr);
+    assert.ok(r.stderr.includes(`${file}:36:3 - CALL SCREEN - the dynpro is not converted`), r.stderr);
     assert.ok(!existsSync(join(out, "zcl_r2c_10_refused.clas.abap")));
     assert.match(readFileSync(join(out, "zcl_r2c_10_refused.migration.md"), "utf8"), /## Refused/);
 
@@ -82,10 +82,10 @@ test("--includes names the folder of the includes; a refusal in an include names
     assert.match(readFileSync(join(out, "zcl_r2c_13_includes.clas.abap"), "utf8"), /METHOD fill_lines\./);
     // a refusal inside an include is reported at the include's own line
     const top = join(out, "zr2c_13_includes_top.prog.abap");
-    writeFileSync(top, `${readFileSync(join(CORPUS, "zr2c_13_includes_top.prog.abap"), "utf8")}\nSELECTION-SCREEN FUNCTION KEY 1.\n`);
+    writeFileSync(top, `${readFileSync(join(CORPUS, "zr2c_13_includes_top.prog.abap"), "utf8")}\nSELECTION-SCREEN INCLUDE BLOCKS b1.\n`);
     const inInclude = run(alone, "--out", out);
     assert.equal(inInclude.status, 2);
-    assert.ok(inInclude.stderr.includes(`${top}:21:1 - SELECTION-SCREEN FUNCTION KEY`), inInclude.stderr);
+    assert.ok(inInclude.stderr.includes(`${top}:21:1 - SELECTION-SCREEN INCLUDE`), inInclude.stderr);
   } finally {
     rmSync(out, { recursive: true, force: true });
   }
@@ -94,9 +94,9 @@ test("--includes names the folder of the includes; a refusal in an include names
 test("coverage: the corpus as numbers - converted, refused, the reasons ranked", () => {
   const r = spawnSync(process.execPath, [join(HERE, "..", "coverage.mjs"), CORPUS], { encoding: "utf8" });
   assert.equal(r.status, 0, r.stderr);
-  assert.match(r.stdout, /^report2cloud coverage: 19 report\(s\) - 18 converted \(95 %\), 1 refused/);
+  assert.match(r.stdout, /^report2cloud coverage: 23 report\(s\) - 22 converted \(96 %\), 1 refused/);
   assert.match(r.stdout, /includes: 1 report\(s\) with includes inlined/);
-  assert.match(r.stdout, /Refused - the next constructs to map \(reports affected\)\n(.*\n)*.*CALL SCREEN/);
+  assert.match(r.stdout, /Refused - the next constructs to map \(reports affected\)\n(.*\n)*.*Dynpros: CALL SCREEN, MODULE, SET SCREEN, CONTROLS \[dynpro\]/);
   assert.match(r.stdout, /Objects to check for ABAP Cloud/);
   assert.equal(spawnSync(process.execPath, [join(HERE, "..", "coverage.mjs")], { encoding: "utf8" }).status, 1);
 });

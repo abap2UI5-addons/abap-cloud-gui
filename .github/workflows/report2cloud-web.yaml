@@ -1,0 +1,41 @@
+name: report2cloud web corpus
+
+# The converter measured on the open-source ABAP of the web, once a week:
+# the repositories of the community list of ABAP projects cloned shallow and
+# sparse (only *.prog.abap and *.prog.xml - read, never run), every report
+# converted with its includes, the converted classes linted together
+# (tools/report2cloud/web.mjs). The job summary carries the share that
+# converts and the refusals ranked - the number the roadmap is ordered by.
+# Not a gate on pull requests: the corpus changes under the converter. It
+# fails when a report crashes the converter - a crash is a bug.
+
+on:
+  schedule:
+    - cron: '17 5 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: report2cloud-web
+  cancel-in-progress: true
+
+jobs:
+  web-corpus:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+    - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+      with:
+        node-version: '22'
+        cache: 'npm'
+    - run: npm ci
+    - run: npm run report2cloud:web -- --lint --summary "$GITHUB_STEP_SUMMARY" --json build/web-corpus.jsonl
+    - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+      if: always()
+      with:
+        name: web-corpus
+        path: build/web-corpus.jsonl
+        if-no-files-found: ignore

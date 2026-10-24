@@ -6,8 +6,9 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { convert, defaultClassName, RESERVED_METHODS } from "../lib/convert.mjs";
+import { convert, defaultClassName, FRONTEND, RESERVED_METHODS, UNCATALOGUED } from "../lib/convert.mjs";
 import { corpus, convertEntry, SNAPSHOTS } from "./corpus.mjs";
+import { parseTextpool } from "../lib/textpool.mjs";
 
 const UPDATE = process.env.UPDATE_SNAPSHOTS === "1";
 const entries = corpus();
@@ -256,8 +257,175 @@ test("refused: MESSAGE of a message class without MESSAGE-ID", () => {
   assert.match(refusalOf("REPORT zt.\nSTART-OF-SELECTION.\n  MESSAGE e001.\n")[0], /^3:3 MESSAGE without a message class/);
 });
 
-test("refused: LOOP AT SCREEN outside of AT SELECTION-SCREEN OUTPUT", () => {
-  assert.match(refusalOf("REPORT zt.\nPARAMETERS p TYPE i.\nAT SELECTION-SCREEN.\n  LOOP AT SCREEN.\n  ENDLOOP.\n")[0], /^4:3 LOOP AT SCREEN outside of AT SELECTION-SCREEN OUTPUT/);
+test("LOOP AT SCREEN outside of AT SELECTION-SCREEN OUTPUT loops at current_screen( ) - with a TODO", () => {
+  const r = convert("REPORT zt.\nPARAMETERS p TYPE i.\nAT SELECTION-SCREEN.\n  LOOP AT SCREEN.\n    screen-input = '0'.\n    MODIFY SCREEN.\n  ENDLOOP.\n", { file: "zt.prog.abap", className: "zcl_t" });
+  assert.deepEqual(r.refusals, []);
+  const cls = r.files["zcl_t.clas.abap"];
+  assert.match(cls, /DATA\(lt_screen\) = current_screen\( \)->loop_at_screen\( \)\./);
+  assert.match(cls, /current_screen\( \)->modify_screen\( ls_screen \)\./);
+  assert.ok(r.todos.some((t) => t.row === 4 && /its changes are not shown/.test(t.message)));
+});
+
+test("LOOP AT SCREEN in a method of a local class: the screen through current_screen( ) of the report", () => {
+  const r = convert("REPORT zt.\nPARAMETERS p TYPE i MODIF ID a.\nCLASS lcl DEFINITION.\n  PUBLIC SECTION.\n    CLASS-METHODS pbo.\nENDCLASS.\nCLASS lcl IMPLEMENTATION.\n  METHOD pbo.\n    LOOP AT SCREEN.\n      IF screen-group1 = 'A'.\n        screen-active = '0'.\n        MODIFY SCREEN.\n      ENDIF.\n    ENDLOOP.\n  ENDMETHOD.\nENDCLASS.\nAT SELECTION-SCREEN OUTPUT.\n  lcl=>pbo( ).\n", { file: "zt.prog.abap", className: "zcl_t" });
+  assert.deepEqual(r.refusals, []);
+  const imp = r.files["zcl_t.clas.locals_imp.abap"];
+  assert.match(imp, /DATA\(lt_screen\) = lcl_r2c=>app->current_screen\( \)->loop_at_screen\( \)\./);
+  assert.match(imp, /IF ls_screen-group1 = 'A'\./);
+  assert.match(imp, /lcl_r2c=>app->current_screen\( \)->modify_screen\( ls_screen \)\./);
+});
+
+test("LOOP AT SCREEN in a FORM of AT SELECTION-SCREEN OUTPUT: the FORM gets the screen", () => {
+  const src = "REPORT zt.\nPARAMETERS: p_a TYPE c AS CHECKBOX, p_b TYPE i MODIF ID b.\nAT SELECTION-SCREEN OUTPUT.\n  PERFORM hide.\nFORM hide.\n  PERFORM inner.\nENDFORM.\nFORM inner.\n  LOOP AT SCREEN.\n    IF screen-group1 = 'B' AND p_a = abap_true.\n      screen-active = '0'.\n      MODIFY SCREEN.\n    ENDIF.\n  ENDLOOP.\nENDFORM.\n";
+  const r = convert(src, { file: "zt.prog.abap", className: "zcl_t" });
+  assert.deepEqual(r.refusals, []);
+  const cls = r.files["zcl_t.clas.abap"];
+  assert.match(cls, /METHODS hide\s+IMPORTING\s+screen TYPE REF TO z2ui5_cl_cgui_selscreen\./);
+  assert.match(cls, /METHODS inner\s+IMPORTING\s+screen TYPE REF TO z2ui5_cl_cgui_selscreen\./);
+  assert.match(cls, /^\s+hide\( screen \)\.$/m);
+  assert.match(cls, /^\s+inner\( screen \)\.$/m);
+  assert.match(cls, /DATA\(lt_screen\) = screen->loop_at_screen\( \)\./);
+  // performed from elsewhere, the FORM changes a screen built afresh
+  const elsewhere = convert(src.replace("AT SELECTION-SCREEN OUTPUT.", "AT SELECTION-SCREEN."), { file: "zt.prog.abap", className: "zcl_t" });
+  assert.deepEqual(elsewhere.refusals, []);
+  assert.match(elsewhere.files["zcl_t.clas.abap"], /^\s+hide\( current_screen\( \) \)\.$/m);
+  assert.ok(elsewhere.todos.some((t) => t.row === 4 && /PERFORM hide outside of AT SELECTION-SCREEN OUTPUT/.test(t.message)));
+});
+
+test("a global named like a component of the report class is renamed - components and keywords are not", () => {
+  const r = convert("REPORT zt.\nTYPES: BEGIN OF ty, message TYPE string, END OF ty.\nDATA message TYPE string.\nDATA ls TYPE ty.\nSTART-OF-SELECTION.\n  message = 'Hello'.\n  ls-message = message.\n  WRITE: / message, ls-message.\n  MESSAGE message TYPE 'S'.\n", { file: "zt.prog.abap", className: "zcl_t" });
+  assert.deepEqual(r.refusals, []);
+  const cls = r.files["zcl_t.clas.abap"];
+  assert.match(cls, /DATA gv_message TYPE string\./);
+  assert.match(cls, /ls-message = gv_message\./);
+  assert.match(cls, /^\s+message TYPE string,$/m);
+  assert.match(cls, /message\( gv_message \)\./);
+  assert.ok(r.notes.some((n) => /renamed to gv_message/.test(n.text)));
+});
+
+test("DYNP_VALUES_READ / _UPDATE: the field names name attributes - ASSIGN (fieldname)", () => {
+  const src = "REPORT zt.\nPARAMETERS: p_dir TYPE string LOWER CASE, p_file TYPE string LOWER CASE.\nAT SELECTION-SCREEN ON VALUE-REQUEST FOR p_file.\n  DATA lt_fields TYPE STANDARD TABLE OF dynpread WITH DEFAULT KEY.\n  lt_fields = VALUE #( ( fieldname = 'P_DIR' ) ).\n  CALL FUNCTION 'DYNP_VALUES_READ'\n    EXPORTING\n      dyname     = sy-repid\n      dynumb     = sy-dynnr\n    TABLES\n      dynpfields = lt_fields\n    EXCEPTIONS\n      OTHERS     = 1.\n  p_file = lt_fields[ 1 ]-fieldvalue && '/a.txt'.\n  CALL FUNCTION 'DYNP_VALUES_UPDATE'\n    EXPORTING\n      dyname     = sy-repid\n      dynumb     = sy-dynnr\n    TABLES\n      dynpfields = lt_fields.\n";
+  const r = convert(src, { file: "zt.prog.abap", className: "zcl_t" });
+  assert.deepEqual(r.refusals, []);
+  const cls = r.files["zcl_t.clas.abap"];
+  assert.match(cls, /LOOP AT lt_fields ASSIGNING FIELD-SYMBOL\(<ls_r2c_dynp1>\)\.\s+ASSIGN \(<ls_r2c_dynp1>-fieldname\) TO FIELD-SYMBOL\(<lv_r2c_dynp1>\)\.\s+IF sy-subrc = 0\.\s+<ls_r2c_dynp1>-fieldvalue = <lv_r2c_dynp1>\./);
+  assert.match(cls, /<lv_r2c_dynp2> = <ls_r2c_dynp2>-fieldvalue\./);
+  assert.ok(r.todos.some((t) => t.row === 6 && /EXCEPTIONS are gone/.test(t.message)));
+  assert.ok(!r.todos.some((t) => t.row === 15));
+});
+
+test("declarations: the same DATA in two event blocks once, SELECT-OPTIONS FOR <fs>-comp typed by the field symbol", () => {
+  const r = convert("REPORT zt.\nTYPES: BEGIN OF ty, d TYPE d, END OF ty.\nFIELD-SYMBOLS <fs> TYPE ty.\nSELECT-OPTIONS s_d FOR <fs>-d.\nAT SELECTION-SCREEN OUTPUT.\n  DATA: lv_key TYPE string,\n        lv_err TYPE string.\n  lv_key = 'a'.\nAT SELECTION-SCREEN.\n  DATA: lv_key TYPE string,\n        lv_err TYPE string.\n  lv_err = lv_key.\n", { file: "zt.prog.abap", className: "zcl_t" });
+  assert.deepEqual(r.refusals, []);
+  const cls = r.files["zcl_t.clas.abap"];
+  assert.equal(cls.match(/^\s+lv_key TYPE string,$/gm).length, 1);
+  assert.match(cls, /DATA s_d TYPE RANGE OF ty-d\./);
+  assert.ok(r.notes.some((n) => /lv_key is declared twice the same way/.test(n.text)));
+});
+
+test("local classes: a chained DEFINITION DEFERRED copied once, a class a macro writes as it expands", () => {
+  const r = convert("REPORT zt.\nDEFINE gen.\n  CLASS lcl_&1 DEFINITION.\n    PUBLIC SECTION.\n      DATA value TYPE &2.\n  ENDCLASS.\nEND-OF-DEFINITION.\ngen: x i, y string.\nCLASS: lcl_a DEFINITION DEFERRED,\n       lcl_b DEFINITION DEFERRED.\nCLASS lcl_a DEFINITION.\n  PUBLIC SECTION.\n    CLASS-METHODS run.\nENDCLASS.\nCLASS lcl_b DEFINITION.\nENDCLASS.\nCLASS lcl_a IMPLEMENTATION.\n  METHOD run.\n    WRITE / 'a'.\n  ENDMETHOD.\nENDCLASS.\nDATA go_x TYPE REF TO lcl_x.\nSTART-OF-SELECTION.\n  lcl_a=>run( ).\n", { file: "zt.prog.abap", className: "zcl_t" });
+  assert.deepEqual(r.refusals, []);
+  const all = `${r.files["zcl_t.clas.locals_def.abap"] ?? ""}\n${r.files["zcl_t.clas.locals_imp.abap"]}`;
+  assert.equal(all.match(/CLASS: lcl_a\s+DEFINITION DEFERRED,\n\s+lcl_b\s+DEFINITION DEFERRED\./g).length, 1);
+  assert.match(all, /CLASS lcl_x DEFINITION\.\n\s+PUBLIC SECTION\.\n\s+DATA value TYPE i\./);
+  assert.match(all, /CLASS lcl_y DEFINITION\.\n\s+PUBLIC SECTION\.\n\s+DATA value TYPE string\./);
+  assert.doesNotMatch(all, /gen:/);
+});
+
+test("the ALV USER_COMMAND callback: fieldname is the hotspot column, value its cell, refresh is moot", () => {
+  const src = "REPORT zt.\nDATA gt_out TYPE STANDARD TABLE OF i WITH DEFAULT KEY.\nSTART-OF-SELECTION.\n  CALL FUNCTION 'REUSE_ALV_GRID_DISPLAY'\n    EXPORTING\n      i_callback_program      = sy-repid\n      i_callback_user_command = 'USER_COMMAND'\n    TABLES\n      t_outtab                = gt_out.\nFORM user_command USING r_ucomm LIKE sy-ucomm rs_selfield TYPE slis_selfield.\n  IF rs_selfield-fieldname = 'CARRID'.\n    WRITE / rs_selfield-value.\n  ENDIF.\n  rs_selfield-refresh = 'X'.\n  rs_selfield-row_stable = abap_true.\nENDFORM.\n";
+  const r = convert(src, { file: "zt.prog.abap", className: "zcl_t" });
+  assert.deepEqual(r.refusals, []);
+  const cls = r.files["zcl_t.clas.abap"];
+  assert.match(cls, /READ TABLE gt_out INDEX row ASSIGNING FIELD-SYMBOL\(<ls_r2c_row>\)\./);
+  assert.match(cls, /ASSIGN COMPONENT hide OF STRUCTURE <ls_r2c_row> TO FIELD-SYMBOL\(<lv_r2c_value>\)\./);
+  assert.match(cls, /IF hide = 'CARRID'\./);
+  assert.match(cls, /write\( lv_r2c_value \)/);
+  assert.doesNotMatch(cls, /refresh|row_stable/);
+  assert.ok(r.todos.some((t) => /column of a hotspot click/.test(t.message)));
+  assert.match(refusalOf(src.replace("rs_selfield-refresh = 'X'.", "WRITE / rs_selfield-sumindex."))[0], /rs_selfield-sumindex has no counterpart/);
+});
+
+test("the toolbar handler of the grid: MOVE ... TO ls_button-function is an assignment like any other", () => {
+  const src = readFileSync(new URL("./corpus/zr2c_19_grid.prog.abap", import.meta.url), "utf8");
+  const moved = src.replace("ls_button-function = 'FULL'.", "MOVE 'FULL' TO ls_button-function.").replace("ls_button-text = 'Full flights'.", "MOVE 'Full flights' TO ls_button-text.");
+  assert.notEqual(moved, src);
+  const a = convert(src, { file: "z.prog.abap", className: "zcl_t" });
+  const b = convert(moved, { file: "z.prog.abap", className: "zcl_t" });
+  assert.deepEqual(b.refusals, []);
+  assert.equal(b.files["zcl_t.clas.abap"], a.files["zcl_t.clas.abap"]);
+});
+
+test("the grid handlers: e_row_id, e_column_id used as a whole are rebuilt from row and column", () => {
+  const src = readFileSync(new URL("./corpus/zr2c_19_grid.prog.abap", import.meta.url), "utf8");
+  const v = src.replace("    READ TABLE gt_flight INDEX e_row_id-index INTO gs_flight.\n    IF e_column_id-fieldname = 'CONNID'.\n      MESSAGE |Connection { gs_flight-connid }| TYPE 'S'.\n    ENDIF.",
+    "    PERFORM show USING e_row_id e_column_id.\n    CASE e_column_id.\n      WHEN 'CONNID'.\n        MESSAGE 'Connection' TYPE 'S'.\n    ENDCASE.") +
+    "\nFORM show USING is_row TYPE lvc_s_row is_col TYPE lvc_s_col.\n  READ TABLE gt_flight INDEX is_row-index INTO gs_flight.\nENDFORM.\n";
+  assert.notEqual(v.indexOf("PERFORM show"), -1);
+  const r = convert(v, { file: "z.prog.abap", className: "zcl_t" });
+  assert.deepEqual(r.refusals, []);
+  const cls = r.files["zcl_t.clas.abap"];
+  assert.match(cls, /DATA\(e_row_id\) = VALUE z2ui5_cl_cgui_alv=>ty_s_lvc_row\( index = row \)\./);
+  assert.match(cls, /DATA\(e_column_id\) = VALUE z2ui5_cl_cgui_alv=>ty_s_lvc_col\( fieldname = column \)\./);
+  assert.match(cls, /is_row TYPE z2ui5_cl_cgui_alv=>ty_s_lvc_row\n\s+is_col TYPE z2ui5_cl_cgui_alv=>ty_s_lvc_col\./);
+});
+
+test("SELECT COUNT(*) without INTO is no short form; itab[] is a variable for a CHANGING parameter", () => {
+  const r = convert("REPORT zt.\nPARAMETERS p TYPE c LENGTH 40.\nDATA lr TYPE RANGE OF i.\nSTART-OF-SELECTION.\n  SELECT COUNT(*) FROM reposrc WHERE progname = p.\n  PERFORM fill CHANGING lr[].\nFORM fill CHANGING ct LIKE lr.\n  CLEAR ct.\nENDFORM.\n", { file: "zt.prog.abap", className: "zcl_t" });
+  assert.deepEqual(r.refusals, []);
+  const cls = r.files["zcl_t.clas.abap"];
+  assert.match(cls, /SELECT COUNT\(\*\) FROM reposrc WHERE progname = @p\./);
+  assert.match(cls, /ct = lr\[\] \)\./);
+});
+
+test("ON VALUE-REQUEST FOR s_x-low and FOR s_x-high: one WHEN, value_request_part( ) tells them apart", () => {
+  const src = "REPORT zt.\nDATA gv TYPE c LENGTH 10.\nSELECT-OPTIONS s_x FOR gv.\nAT SELECTION-SCREEN ON VALUE-REQUEST FOR s_x-low.\n  s_x-low = `A`.\nAT SELECTION-SCREEN ON VALUE-REQUEST FOR s_x-high.\n  s_x-high = `Z`.\n";
+  const r = convert(src, { file: "zt.prog.abap", className: "zcl_t" });
+  assert.deepEqual(r.refusals, []);
+  assert.match(r.files["zcl_t.clas.abap"], /WHEN `S_X`\.\n\s+IF value_request_part\( \) = z2ui5_cl_cgui_selscreen=>cs_part-high\.\n\s+ls_s_x-high = `Z`\.\n\s+ELSE\.\n\s+ls_s_x-low = `A`\.\n\s+ENDIF\./);
+  assert.ok(r.todos.some((t) => t.row === 4 && /wrote the line on the screen/.test(t.message)));
+  assert.match(refusalOf(`${src}AT SELECTION-SCREEN ON VALUE-REQUEST FOR s_x-high.\n  s_x-high = 'Y'.\n`)[0], /^8:1 a second ON VALUE-REQUEST for S_X/);
+});
+
+test("the files of the user: cl_gui_frontend_services and GUI_UPLOAD as z2ui5_cl_cgui_frontend, EXCEPTIONS kept", () => {
+  const cls = classOf("zr2c_22_files");
+  const { result } = converted.get("zr2c_22_files");
+  assert.equal(result.ok, true, result.refusals.map((x) => x.message).join("\n"));
+  assert.match(cls, /z2ui5_cl_cgui_frontend=>gui_upload\( EXPORTING  filename            = p_file\n(.*\n)*?\s+CHANGING   data_tab            = gt_seats\n\s+EXCEPTIONS file_open_error     = 1\n\s+OTHERS              = 2 \)\./);
+  assert.match(cls, /^\s+z2ui5_cl_cgui_frontend=>file_open_dialog\(\n\s+EXPORTING\n/m);
+  assert.match(cls, /lt_files  TYPE z2ui5_cl_cgui_frontend=>ty_t_file_table,/);
+  assert.match(cls, /lv_action = z2ui5_cl_cgui_frontend=>action_ok/);
+  assert.match(cls, /z2ui5_cl_cgui_frontend=>gui_download\(\n/);
+  assert.doesNotMatch(cls, /cl_gui_frontend_services|filetable/i);
+});
+
+test("cl_gui_frontend_services: a member or a parameter the browser has no counterpart for is refused", () => {
+  const src = "REPORT zt.\nDATA lv TYPE string.\nSTART-OF-SELECTION.\n  cl_gui_frontend_services=>get_gui_version( CHANGING version_table = lv ).\n  cl_gui_frontend_services=>gui_upload( EXPORTING filename = lv check_bom = abap_true CHANGING data_tab = lv ).\n  CALL FUNCTION 'GUI_UPLOAD' EXPORTING filename = lv no_auth_check = 'X' TABLES data_tab = lv.\n  cl_gui_cfw=>flush( ).\n";
+  assert.deepEqual(refusalOf(src).map((x) => x.split(";")[0]), [
+    "4:3 cl_gui_frontend_services - get_gui_version has no counterpart in the browser",
+    "5:3 cl_gui_frontend_services - gui_upload( check_bom = ... ) is not supported",
+    "6:3 CALL FUNCTION 'GUI_UPLOAD' - EXPORTING no_auth_check has no counterpart in z2ui5_cl_cgui_frontend=>gui_upload( )",
+  ]);
+});
+
+test("the table of z2ui5_cl_cgui_frontend in the converter is the class - its constants, methods, parameters, exceptions", () => {
+  const text = readFileSync(new URL("../../../src/01/z2ui5_cl_cgui_frontend.clas.abap", import.meta.url), "utf8");
+  const def = text.slice(0, text.indexOf("PROTECTED SECTION"));
+  const methods = {};
+  for (const m of def.matchAll(/^\s*CLASS-METHODS\s+(\w+)([^.]*)\./gim)) {
+    let section;
+    const params = [];
+    const exceptions = [];
+    for (const line of m[2].split("\n").map((l) => l.trim()).filter(Boolean)) {
+      if (/^(IMPORTING|EXPORTING|CHANGING|RETURNING|EXCEPTIONS)$/.test(line)) section = line;
+      else if (section === "EXCEPTIONS") exceptions.push(line.toLowerCase());
+      else if (section && section !== "RETURNING") params.push(line.split(/\s+/)[0].toLowerCase());
+    }
+    methods[m[1].toLowerCase()] = { params, exceptions };
+  }
+  const constants = [...def.matchAll(/^\s*CONSTANTS\s+(\w+)\s/gim)].map((m) => m[1].toLowerCase());
+  assert.deepEqual({ constants, methods }, FRONTEND);
 });
 
 test("a TABLES parameter used with its header line gets a work area of the method", () => {
@@ -272,20 +440,51 @@ test("a TABLES parameter used with its header line gets a work area of the metho
   assert.match(cls, /APPEND ls_tt TO tt\./);
 });
 
-test("refused: GUI_DOWNLOAD, PERFORM IN PROGRAM, FUNCTION KEY - a table with a header line and a popup no longer", () => {
+test("refused: BDC_OPEN_GROUP, PERFORM IN PROGRAM - a table with a header line, a popup and a function key no longer", () => {
   const r = refusalOf([
     "REPORT zt.",
     "DATA gt TYPE i OCCURS 0.",
     "SELECTION-SCREEN FUNCTION KEY 1.",
     "START-OF-SELECTION.",
-    "  CALL FUNCTION 'GUI_DOWNLOAD' EXPORTING filename = 'x'.",
+    "  CALL FUNCTION 'BDC_OPEN_GROUP' EXPORTING group = 'x'.",
     "  PERFORM x IN PROGRAM zother.",
   ].join("\n"));
   assert.deepEqual(r.map((x) => x.split(" - ")[0]), [
-    "3:1 SELECTION-SCREEN FUNCTION KEY",
-    "5:3 CALL FUNCTION 'GUI_DOWNLOAD'",
+    "5:3 CALL FUNCTION 'BDC_OPEN_GROUP'",
     "6:3 PERFORM of a FORM of another program, dynamic or ON COMMIT",
   ]);
+});
+
+test("the selection screen of a grown report: tabs on subscreens, function keys with text and icon, an own F1", () => {
+  const cls = classOf("zr2c_20_tabs");
+  const { result } = converted.get("zr2c_20_tabs");
+  assert.equal(result.ok, true, result.refusals.map((x) => x.message).join("\n"));
+  assert.match(cls, /screen->function_key\( number = 1\n\s+text   = 'Today'\n\s+\)->function_key\( number = 2\n\s+text   = 'Reset'\n\s+icon   = `sap-icon:\/\/refresh`/);
+  assert.match(cls, /\)->tabbed_block_begin\(\n\s+\)->tab\( tab_main\n\s+\)->parameter\( val  = p_carrid\n(.*\n)*?\s+\)->tab\( tab_opt\n\s+\)->parameter\( val          = p_max\n\s+text         = `Maximum flights`\n\s+help_request = abap_true\n(.*\n)*?\s+\)->tabbed_block_end\( \)\./);
+  assert.match(cls, /DATA tab_main TYPE c LENGTH 20\./);
+  assert.match(cls, /tab_main = 'Flights'\./);
+  assert.match(cls, /METHOD at_selection_screen_on_help\.\n\n\s+CASE field\.\n\s+WHEN `P_MAX`\.\n(.*\n)*?\s+WHEN OTHERS\.\n\s+super->at_selection_screen_on_help\( field \)\./);
+  // FC01 / FC02 arrive as user commands, AT SELECTION-SCREEN reads them as ucomm
+  assert.match(cls, /at_selection_screen_ucomm\( ucomm \)\./);
+  assert.match(cls, /WHEN 'FC02'\./);
+  assert.ok(!/sscrfields|smp_dyntxt|ls_text|tabs-activetab/i.test(cls));
+  assert.ok(result.todos.some((t) => /tabs-activetab/.test(t.message)));
+});
+
+test("a tab without DEFAULT SCREEN, a subscreen on no tab, a FUNCTION KEY without text", () => {
+  const r = convert([
+    "REPORT zt.",
+    "SELECTION-SCREEN FUNCTION KEY 3.",
+    "SELECTION-SCREEN BEGIN OF TABBED BLOCK tb FOR 5 LINES.",
+    "SELECTION-SCREEN TAB (10) t1 USER-COMMAND u1.",
+    "SELECTION-SCREEN END OF BLOCK tb.",
+    "SELECTION-SCREEN BEGIN OF SCREEN 300 AS SUBSCREEN.",
+    "PARAMETERS p_x TYPE i.",
+    "SELECTION-SCREEN END OF SCREEN 300.",
+  ].join("\n"), { file: "zt.prog.abap", className: "zcl_t" });
+  assert.deepEqual(r.refusals.map((x) => x.message.split(" - ")[0]), ["SELECTION-SCREEN TAB t1 without DEFAULT SCREEN"]);
+  assert.ok(r.todos.some((t) => /FUNCTION KEY 3: no sscrfields-functxt_03/.test(t.message)));
+  assert.ok(r.todos.some((t) => /subscreen 0300 is on no tab/.test(t.message)));
 });
 
 test("the synchronous popups: popup_to_decide( ) / popup_get_values_sval( ), the block cut at the call and continued in at_user_command( )", () => {
@@ -537,4 +736,56 @@ test("a global table with a header line is a table and a work area attribute, an
   assert.match(cls, /CLEAR wa_gt_sum\.\n\s+CLEAR gt_sum\./);
   // a FORM's own table: the work area right after it
   assert.match(cls, /DATA lt TYPE STANDARD TABLE OF i WITH DEFAULT KEY\.\n\s+DATA ls_lt LIKE LINE OF lt\.\n\s+ls_lt = 1\.\n\s+APPEND ls_lt TO lt\.\n\s+LOOP AT lt INTO ls_lt\.\n\s+write\( ls_lt \)/);
+});
+
+// ------------------------------------------- the catalogue of refusals
+
+test("every refusal of the corpus and of the cases above has its entry in the catalogue (lib/refusals.mjs)", () => {
+  assert.deepEqual([...UNCATALOGUED], [], "add an entry, or widen the pattern of one");
+  const { result } = converted.get("zr2c_10_refused");
+  assert.ok(result.refusals.every((r) => r.code !== "other"));
+});
+
+test("a dynpro of fields: the screens of the .prog.xml, the modules as methods, CALL SCREEN and what follows it", () => {
+  const cls = classOf("zr2c_23_dynpro");
+  const { result } = converted.get("zr2c_23_dynpro");
+  assert.equal(result.ok, true, result.refusals.map((x) => x.message).join("\n"));
+  assert.match(cls, /call_screen\( `0100` \)\.\n\n\s+ENDMETHOD\./);
+  assert.match(cls, /METHOD after_call_screen\.\n\n\s+CASE dynnr\.\n\s+WHEN `0100`\.\n\s+IF gv_booked = 'X'\./);
+  // the fields: a frame a block, a text before an input its label, an output field read-only
+  assert.match(cls, /screen->block_begin\( `Booking`\n\s+\)->parameter\( val {7}= p_carrid\n\s+text {6}= `Airline`\n\s+read_only = abap_true\n/);
+  assert.match(cls, /\)->parameter\( val {8}= gv_connid\n\s+text {7}= `Connection`\n\s+obligatory = abap_true\n/);
+  assert.match(cls, /\)->line_begin\(\n\s+\)->parameter\( val {6}= gv_seats\n(.*\n){2}\s+\)->button\( text {2}= `Check`\n\s+event = `CHECK`\n\s+\)->line_end\(/);
+  assert.match(cls, /\)->radiobutton\( val {3}= gv_bus\n\s+text {2}= `Business`\n\s+group = `RB_GV_ECO`\n\s+\)->block_end\( \)\./);
+  assert.match(cls, /screen->comment\( `Book the seats now\?`\n/);
+  // the flow logic: the PBO module gets the screen, the PAI the OK code and the order of the modules
+  assert.match(cls, /METHOD dynpro_pbo\.\n\n\s+CASE dynnr\.\n\s+WHEN `0100`\.\n\s+status_0100\( current_screen\( \) \)\./);
+  assert.match(cls, /WHEN `0100`\.\n\s+ok_code = ucomm\.\n\s+" AT EXIT-COMMAND - the functions that leave\n\s+IF ucomm = `BACK` OR ucomm = `EXIT` OR ucomm = `CANC` OR ucomm = `CANCEL`\.\n\s+exit_0100\( \)\.\n(.*\n){4}\s+IF gv_connid IS NOT INITIAL\.\n\s+check_connid\( \)\.\n\s+ENDIF\.\n\s+IF screen_left\( \) = abap_true\.\n\s+RETURN\.\n\s+ENDIF\.\n\s+user_command_0100\( \)\./);
+  // SET SCREEN, LEAVE TO SCREEN, sy-ucomm of a PAI module
+  assert.match(cls, /set_screen\( `0200` \)\./);
+  assert.match(cls, /METHOD user_command_0200\.\n\n\s+CASE ok_code\.\n\s+WHEN 'BOOK'\.\n\s+gv_booked = 'X'\.\n\s+leave_to_screen\( `0000` \)\.\n\s+RETURN\./);
+  assert.match(cls, /leave_to_screen\( `0100` \)\./);
+  assert.deepEqual(result.todos.map((t) => t.message), []);
+});
+
+test("a dynpro the converter does not build is refused at its modules - a control, LOOP, a screen in a variable, no .prog.xml", () => {
+  const xml = (container, flow) => `<abapGit><asx:abap><asx:values><DYNPROS><item><HEADER><PROGRAM>ZT</PROGRAM><SCREEN>0100</SCREEN><TYPE>N</TYPE></HEADER>
+<CONTAINERS><RPY_DYCATT><TYPE>SCREEN</TYPE><NAME>SCREEN</NAME></RPY_DYCATT>${container}</CONTAINERS>
+<FIELDS><RPY_DYFATC><CONT_TYPE>SCREEN</CONT_TYPE><TYPE>OKCODE</TYPE><NAME>OK_CODE</NAME></RPY_DYFATC></FIELDS>
+<FLOW_LOGIC>${flow.map((l) => `<RPY_DYFLOW><LINE>${l}</LINE></RPY_DYFLOW>`).join("")}</FLOW_LOGIC></item></DYNPROS></asx:values></asx:abap></abapGit>`;
+  const src = "REPORT zt.\nDATA ok_code TYPE sy-ucomm.\nSTART-OF-SELECTION.\n  CALL SCREEN 100.\nMODULE user_command_0100 INPUT.\n  LEAVE TO SCREEN 0.\nENDMODULE.\n";
+  const refused = (source, x) => convert(source, { file: "zt.prog.abap", className: "zcl_t", textpool: parseTextpool(x) }).refusals.map((r) => `${r.row}:${r.col} ${r.message.split(" - a dynpro of fields")[0]}`);
+  const pai = ["PROCESS AFTER INPUT.", "  MODULE user_command_0100."];
+  assert.deepEqual(refused(src, xml("", pai)), []);
+  assert.deepEqual(refused(src, xml("<RPY_DYCATT><TYPE>CUST_CTRL</TYPE><NAME>CONT</NAME></RPY_DYCATT>", pai)), [
+    "4:3 CALL SCREEN - the dynpro is not converted (a dynpro of fields is, from the .prog.xml - see the MODULE refusals); else build the screen as an abap2UI5 view or a popup",
+    "5:1 MODULE - screen 0100 has a custom control (a SAP GUI control) CONT",
+  ]);
+  assert.deepEqual(refused(src, xml("", ["PROCESS AFTER INPUT.", "  LOOP AT gt_x.", "  ENDLOOP.", "  MODULE user_command_0100."])), [
+    "4:3 CALL SCREEN - the dynpro is not converted (a dynpro of fields is, from the .prog.xml - see the MODULE refusals); else build the screen as an abap2UI5 view or a popup",
+    "5:1 MODULE - screen 0100: LOOP AT GT_X in the flow logic; screen 0100: ENDLOOP in the flow logic",
+  ]);
+  assert.match(refused(src.replace("CALL SCREEN 100", "CALL SCREEN gv_dynnr"), xml("", pai)).find((x) => x.startsWith("5:1")), /^5:1 MODULE - CALL SCREEN with a variable/);
+  assert.match(refused(src, undefined).find((x) => x.startsWith("5:1")), /^5:1 MODULE - the screens are in the \.prog\.xml \(--texts\), which was not passed/);
+  assert.match(refused(src, xml("", ["PROCESS AFTER INPUT.", "  MODULE user_command_0200."])).find((x) => x.startsWith("5:1")), /^5:1 MODULE - screen 0100 calls MODULE user_command_0200, which is not in the report/);
 });

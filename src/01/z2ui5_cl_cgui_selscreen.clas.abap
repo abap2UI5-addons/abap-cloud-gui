@@ -177,7 +177,9 @@ CLASS z2ui5_cl_cgui_selscreen DEFINITION PUBLIC FINAL CREATE PRIVATE.
     "! CHECK: on Execute the value must be a fixed value of the domain or a
     "! key of its value table. help - F1 (on by default): a help button
     "! beside the field when its data element has documentation, raising
-    "! cs_event-help_request
+    "! cs_event-help_request; help_request - the report answers F1 itself
+    "! (AT SELECTION-SCREEN ON HELP-REQUEST), the button is there either way.
+    "! read_only - an output field of a dynpro: shown, not ready for input
     METHODS parameter
       IMPORTING
         val            TYPE any
@@ -193,7 +195,9 @@ CLASS z2ui5_cl_cgui_selscreen DEFINITION PUBLIC FINAL CREATE PRIVATE.
         memory_id      TYPE clike     OPTIONAL
         value_check    TYPE abap_bool DEFAULT abap_false
         help           TYPE abap_bool DEFAULT abap_true
+        help_request   TYPE abap_bool DEFAULT abap_false
         matchcode      TYPE clike     OPTIONAL
+        read_only      TYPE abap_bool DEFAULT abap_false
       RETURNING
         VALUE(result)  TYPE REF TO z2ui5_cl_cgui_selscreen.
 
@@ -238,6 +242,7 @@ CLASS z2ui5_cl_cgui_selscreen DEFINITION PUBLIC FINAL CREATE PRIVATE.
         no_extension  TYPE abap_bool DEFAULT abap_false
         lower_case    TYPE abap_bool DEFAULT abap_false
         help          TYPE abap_bool DEFAULT abap_true
+        help_request  TYPE abap_bool DEFAULT abap_false
         memory_id      TYPE clike    OPTIONAL
         visible_length TYPE i        DEFAULT 0
         matchcode      TYPE clike    OPTIONAL
@@ -484,11 +489,14 @@ CLASS z2ui5_cl_cgui_selscreen DEFINITION PUBLIC FINAL CREATE PRIVATE.
     DATA mv_block_depth     TYPE i.
     DATA mv_block_no_int    TYPE i.
 
-    "! F1 of a field - its data element and whether it has documentation
+    "! F1 of a field - its data element and whether it has documentation;
+    "! own: the report answers F1 itself (AT SELECTION-SCREEN ON
+    "! HELP-REQUEST), so the field has the button either way
     METHODS help_check
       IMPORTING
         val  TYPE any
         help TYPE abap_bool
+        own  TYPE abap_bool DEFAULT abap_false
       CHANGING
         item TYPE ty_s_item.
 
@@ -675,6 +683,7 @@ CLASS z2ui5_cl_cgui_selscreen IMPLEMENTATION.
     ENDIF.
     ls_item-modif_id     = modif_id.
     ls_item-no_display   = no_display.
+    ls_item-read_only    = read_only.
     ls_item-visible_len  = visible_length.
     ls_item-user_command = user_command.
     ls_item-memory_id    = to_upper( memory_id ).
@@ -687,6 +696,7 @@ CLASS z2ui5_cl_cgui_selscreen IMPLEMENTATION.
     ENDIF.
     help_check( EXPORTING val  = val
                           help = help
+                          own  = help_request
                 CHANGING  item = ls_item ).
 
     DATA(lo_descr) = cl_abap_typedescr=>describe_by_data( val ).
@@ -900,6 +910,7 @@ CLASS z2ui5_cl_cgui_selscreen IMPLEMENTATION.
     ENDIF.
     help_check( EXPORTING val  = val
                           help = help
+                          own  = help_request
                 CHANGING  item = ls_item ).
 
     ls_item-text = text.
@@ -1237,7 +1248,7 @@ CLASS z2ui5_cl_cgui_selscreen IMPLEMENTATION.
       RETURN.
     ENDIF.
     item-dtel = z2ui5_cl_cgui_context=>rtti_get_dtel_name( val ).
-    item-help = z2ui5_cl_cgui_context=>dtel_docu_check( item-dtel ).
+    item-help = xsdbool( own = abap_true OR z2ui5_cl_cgui_context=>dtel_docu_check( item-dtel ) = abap_true ).
 
   ENDMETHOD.
 

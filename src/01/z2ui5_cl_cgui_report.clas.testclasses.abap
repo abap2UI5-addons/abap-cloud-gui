@@ -88,6 +88,11 @@ CLASS ltcl_report DEFINITION INHERITING FROM z2ui5_cl_cgui_report FINAL.
     DATA p_check     TYPE xsdboolean.
     DATA mv_block    TYPE string.
     DATA mv_window   TYPE abap_bool.
+    DATA mv_leave    TYPE abap_bool.
+    DATA mv_dynpro   TYPE abap_bool.
+    DATA mv_seats    TYPE i.
+    DATA mv_after    TYPE string.
+    DATA mv_pai      TYPE string.
     DATA mv_replace TYPE abap_bool.
     DATA mv_exit     TYPE string.
     DATA mv_exit_err TYPE abap_bool.
@@ -105,6 +110,10 @@ CLASS ltcl_report DEFINITION INHERITING FROM z2ui5_cl_cgui_report FINAL.
     METHODS at_value_request REDEFINITION.
     METHODS at_alv_value_request REDEFINITION.
     METHODS at_tree_node REDEFINITION.
+    METHODS dynpro_screen REDEFINITION.
+    METHODS dynpro_pbo REDEFINITION.
+    METHODS dynpro_pai REDEFINITION.
+    METHODS after_call_screen REDEFINITION.
 
 ENDCLASS.
 
@@ -154,6 +163,10 @@ CLASS ltcl_test DEFINITION FINAL FOR TESTING
     METHODS select_option_buffer FOR TESTING.
     METHODS select_option_complex FOR TESTING.
     METHODS secondary_list_and_back FOR TESTING.
+    METHODS leave_during_the_run FOR TESTING.
+    METHODS file_upload_and_download FOR TESTING.
+    METHODS current_screen_afresh FOR TESTING.
+    METHODS dynpro_call_and_leave FOR TESTING.
     METHODS alv_box_copy_selection FOR TESTING.
     METHODS url_values_screen_only FOR TESTING.
     METHODS url_skip_screen FOR TESTING.
@@ -250,7 +263,69 @@ CLASS ltcl_report IMPLEMENTATION.
 
   ENDMETHOD.
 
+  METHOD dynpro_screen.
+
+    IF dynnr = `0100`.
+      screen->parameter( val       = p_carrid
+                         text      = `Airline`
+                         read_only = abap_true
+          )->parameter( val        = mv_seats
+                        text       = `Seats`
+                        obligatory = abap_true
+                        modif_id   = `SEA`
+          )->button( text  = `Check`
+                     event = `CHECK` ).
+    ENDIF.
+
+  ENDMETHOD.
+
+  METHOD dynpro_pbo.
+
+    set_pf_status( VALUE #( ( name = `SAVE` text = `Save` ) ) ).
+    LOOP AT current_screen( )->loop_at_screen( ) INTO DATA(ls_screen) WHERE group1 = `SEA`.
+      ls_screen-intensified = abap_true.
+      current_screen( )->modify_screen( ls_screen ).
+    ENDLOOP.
+    mv_pai = |{ mv_pai }PBO{ dynnr };|.
+
+  ENDMETHOD.
+
+  METHOD dynpro_pai.
+
+    mv_pai = |{ mv_pai }PAI{ dynnr }:{ ucomm };|.
+    CASE ucomm.
+      WHEN `SAVE`.
+        leave_to_screen( `0` ).
+      WHEN `NEXT`.
+        set_screen( `0200` ).
+      WHEN `BACK`.
+        leave_to_screen( `0` ).
+    ENDCASE.
+
+  ENDMETHOD.
+
+  METHOD after_call_screen.
+
+    mv_after = dynnr.
+    list( )->new_line(
+        )->write( |Seats { mv_seats }| ).
+
+  ENDMETHOD.
+
   METHOD start_of_selection.
+
+    " CALL SCREEN - the rest comes in after_call_screen( )
+    IF mv_dynpro = abap_true.
+      call_screen( `100` ).
+      RETURN.
+    ENDIF.
+
+    " LEAVE PROGRAM after a message - back on the selection screen
+    IF mv_leave = abap_true.
+      message( `Unknown airline` ).
+      leave_to_selection_screen( ).
+      RETURN.
+    ENDIF.
 
     IF mv_tree = abap_true.
       DATA(lo_tree) = tree( ).
@@ -319,6 +394,27 @@ CLASS ltcl_report IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD at_value_request.
+
+    TYPES:
+      BEGIN OF ty_s_file,
+        filename TYPE c LENGTH 1024,
+      END OF ty_s_file.
+    DATA lt_file   TYPE STANDARD TABLE OF ty_s_file WITH DEFAULT KEY.
+    DATA lv_rc     TYPE i.
+    DATA lv_action TYPE i.
+
+    " F4 on the text - the file dialog of SAP GUI, converted
+    IF field = `P_TEXT`.
+      z2ui5_cl_cgui_frontend=>file_open_dialog( EXPORTING  file_filter = `Text (*.txt)|*.txt|`
+                                                CHANGING   file_table  = lt_file
+                                                           rc          = lv_rc
+                                                           user_action = lv_action
+                                                EXCEPTIONS OTHERS      = 1 ).
+      IF sy-subrc = 0 AND lv_action = z2ui5_cl_cgui_frontend=>action_ok AND lv_rc = 1.
+        p_text = lt_file[ 1 ]-filename.
+      ENDIF.
+      RETURN.
+    ENDIF.
 
     " F4 on the upper limit of the code - a hit list of its own
     IF field = `S_CODE` AND value_request_part( ) = z2ui5_cl_cgui_selscreen=>cs_part-high.
@@ -591,6 +687,159 @@ CLASS ltcl_test IMPLEMENTATION.
     event( `SOME_COMMAND` ).
     cl_abap_unit_assert=>assert_equals( act = lines( mo_report->s_code )
                                         exp = 2 ).
+
+  ENDMETHOD.
+
+  METHOD leave_during_the_run.
+
+    init( ).
+    mo_report->p_carrid = `LH`.
+    mo_report->mv_leave = abap_true.
+    event( z2ui5_cl_cgui_report=>cs_ucomm-execute ).
+    cl_abap_unit_assert=>assert_equals( act = mo_cut->mv_cgui_screen
+                                        exp = `SELECTION` ).
+    " the message of the report, and not the one of an empty list
+    cl_abap_unit_assert=>assert_true( xsdbool( line_exists( mo_cut->mt_cgui_msg[ text = `Unknown airline` ] ) ) ).
+    cl_abap_unit_assert=>assert_false( xsdbool( line_exists( mo_cut->mt_cgui_msg[ text = `List contains no data` ] ) ) ).
+
+  ENDMETHOD.
+
+  METHOD file_upload_and_download.
+
+    TYPES:
+      BEGIN OF ty_s_air,
+        carrid TYPE c LENGTH 3,
+        name   TYPE c LENGTH 20,
+      END OF ty_s_air.
+    DATA lt_air TYPE STANDARD TABLE OF ty_s_air WITH DEFAULT KEY.
+
+    init( ).
+    " F4 opens the upload - the dialog answers cancel the first time
+    event( name = z2ui5_cl_cgui_selscreen=>cs_event-value_request
+           args = VALUE #( ( `P_TEXT` ) ) ).
+    DATA(lo_file) = CAST z2ui5_cl_cgui_file( mo_client->mo_called ).
+    cl_abap_unit_assert=>assert_initial( mo_report->p_text ).
+
+    " the user picks a file in the browser and confirms
+    mo_client->mo_app = lo_file.
+    mo_client->mv_init = abap_true.
+    lo_file->z2ui5_if_app~main( mo_client ).
+    mo_client->mv_init = abap_false.
+    cl_abap_unit_assert=>assert_true( xsdbool( mo_client->mv_popup CS `FileUploader` ) ).
+    cl_abap_unit_assert=>assert_true( xsdbool( mo_client->mv_popup CS `fileType="txt"` ) ).
+    lo_file->mv_value = `data:text/plain;base64,` && z2ui5_cl_cgui_context=>conv_encode_x_base64(
+        z2ui5_cl_cgui_context=>conv_get_xstring_by_string( |LH\tLufthansa\r\nAA\tAmerican\r\n| ) ).
+    lo_file->mv_path = `C:\fakepath\airlines.txt`.
+    mo_client->mv_event = `CGUI_FILE_UPLOAD`.
+    lo_file->z2ui5_if_app~main( mo_client ).
+    mo_client->mv_event = `CGUI_FILE_OK`.
+    lo_file->z2ui5_if_app~main( mo_client ).
+    cl_abap_unit_assert=>assert_true( mo_client->mv_left ).
+
+    " back in the report: the F4 runs again, and the dialog answers the file
+    mo_client->mo_app = mo_report.
+    CLEAR: mo_client->mo_called, mo_client->mv_event.
+    mo_client->mo_prev = lo_file.
+    mo_client->mv_navigated = abap_true.
+    mo_cut->z2ui5_if_app~main( mo_client ).
+    mo_client->mv_navigated = abap_false.
+    cl_abap_unit_assert=>assert_equals( act = mo_report->p_text
+                                        exp = `airlines.txt` ).
+    cl_abap_unit_assert=>assert_not_bound( mo_client->mo_called ).
+
+    " gui_upload( ) reads it by its name, whatever the folder and the case
+    z2ui5_cl_cgui_frontend=>gui_upload( EXPORTING  filename            = `C:\any\AIRLINES.TXT`
+                                                   has_field_separator = abap_true
+                                        CHANGING   data_tab            = lt_air
+                                        EXCEPTIONS file_open_error     = 1
+                                                   OTHERS              = 2 ).
+    cl_abap_unit_assert=>assert_subrc( exp = 0 ).
+    cl_abap_unit_assert=>assert_equals( act = lt_air[ 2 ]-name
+                                        exp = `American` ).
+    z2ui5_cl_cgui_frontend=>gui_upload( EXPORTING  filename        = `missing.txt`
+                                        CHANGING   data_tab        = lt_air
+                                        EXCEPTIONS file_open_error = 1
+                                                   OTHERS          = 2 ).
+    cl_abap_unit_assert=>assert_subrc( exp = 1 ).
+
+    " gui_download( ) hands the file to the browser
+    lt_air = VALUE #( ( carrid = `LH` name = `Lufthansa` ) ).
+    CLEAR mo_client->mt_action.
+    z2ui5_cl_cgui_frontend=>gui_download( EXPORTING  filename              = `C:\out\list.csv`
+                                                     write_field_separator = abap_true
+                                          CHANGING   data_tab              = lt_air
+                                          EXCEPTIONS OTHERS                = 1 ).
+    cl_abap_unit_assert=>assert_subrc( exp = 0 ).
+    cl_abap_unit_assert=>assert_equals( act = mo_client->mt_action[ 1 ]
+                                        exp = |{ mo_client->z2ui5_if_client~cs_event-download_b64_file }:data:text/csv;base64,| &&
+                                              |{ z2ui5_cl_cgui_context=>conv_encode_x_base64(
+                                                     z2ui5_cl_cgui_context=>conv_get_xstring_by_string( |LH\tLufthansa\r\n| ) ) }\|list.csv| ).
+
+  ENDMETHOD.
+
+  METHOD dynpro_call_and_leave.
+
+    init( ).
+    mo_report->p_carrid = `LH`.
+    mo_report->mv_dynpro = abap_true.
+    event( z2ui5_cl_cgui_report=>cs_ucomm-execute ).
+
+    " the dynpro shows - its PBO ran, its fields and its status are on the page
+    cl_abap_unit_assert=>assert_equals( act = mo_cut->mv_cgui_screen
+                                        exp = `DYNPRO` ).
+    cl_abap_unit_assert=>assert_equals( act = mo_cut->mv_cgui_dynpro
+                                        exp = `0100` ).
+    cl_abap_unit_assert=>assert_equals( act = mo_report->mv_pai
+                                        exp = `PBO0100;` ).
+    cl_abap_unit_assert=>assert_true( xsdbool( mo_client->mv_view CS `Seats` AND mo_client->mv_view CS `EVENT:SAVE` ) ).
+    cl_abap_unit_assert=>assert_true( xsdbool( mo_client->mv_view CS `EVENT:CHECK` ) ).
+
+    " a push button: the required seats are checked first, no PAI
+    event( `CHECK` ).
+    cl_abap_unit_assert=>assert_equals( act = mo_report->mv_pai
+                                        exp = `PBO0100;PBO0100;` ).
+    cl_abap_unit_assert=>assert_true( xsdbool( line_exists( mo_cut->mt_cgui_msg[ type = `E` ] ) ) ).
+
+    " with the seats: PAI, the dynpro stays and its PBO runs again
+    mo_report->mv_seats = 2.
+    event( `CHECK` ).
+    cl_abap_unit_assert=>assert_equals( act = mo_report->mv_pai
+                                        exp = `PBO0100;PBO0100;PAI0100:CHECK;PBO0100;` ).
+    cl_abap_unit_assert=>assert_equals( act = mo_cut->mv_cgui_screen
+                                        exp = `DYNPRO` ).
+
+    " SET SCREEN goes on to the next dynpro, on the same call
+    event( `NEXT` ).
+    cl_abap_unit_assert=>assert_equals( act = mo_cut->mv_cgui_dynpro
+                                        exp = `0200` ).
+    cl_abap_unit_assert=>assert_equals( act = lines( mo_cut->mt_cgui_dynpro_stack )
+                                        exp = 1 ).
+
+    " SAVE leaves: what followed CALL SCREEN runs - for the screen it
+    " called - and the list shows
+    event( `SAVE` ).
+    cl_abap_unit_assert=>assert_equals( act = mo_report->mv_after
+                                        exp = `0100` ).
+    cl_abap_unit_assert=>assert_equals( act = mo_cut->mv_cgui_screen
+                                        exp = `OUTPUT` ).
+    cl_abap_unit_assert=>assert_true( xsdbool( mo_client->mv_view CS `Seats 2` ) ).
+
+    " Back on the list - the selection screen, the dynpro stack is empty
+    event( z2ui5_cl_cgui_report=>cs_ucomm-back ).
+    cl_abap_unit_assert=>assert_equals( act = mo_cut->mv_cgui_screen
+                                        exp = `SELECTION` ).
+    cl_abap_unit_assert=>assert_initial( mo_cut->mt_cgui_dynpro_stack ).
+
+  ENDMETHOD.
+
+  METHOD current_screen_afresh.
+
+    init( ).
+    " outside of at_selection_screen_output( ): a screen built afresh, with
+    " the fields of selection_screen( ) - and none kept in the app
+    DATA(lt_screen) = mo_cut->current_screen( )->loop_at_screen( ).
+    cl_abap_unit_assert=>assert_true( xsdbool( line_exists( lt_screen[ name = `P_CARRID` ] ) ) ).
+    cl_abap_unit_assert=>assert_not_bound( mo_cut->mo_cgui_screen ).
 
   ENDMETHOD.
 

@@ -273,6 +273,7 @@ Background" button: a report runs without a browser through
 | `z2ui5_cl_cgui_sample_05` | a complete report — select-option, F4 help, radio buttons for ALV or list, drilldown, reset with a confirmation popup, starts with the variant `DEFAULT` |
 | `z2ui5_cl_cgui_sample_06` | a dynamic selection screen — `MODIF ID`, `USER-COMMAND`, `LOOP AT SCREEN`, read-only and password fields, `NO-DISPLAY`, `AT SELECTION-SCREEN ON field` |
 | `z2ui5_cl_cgui_sample_07` | value helps — standard F4 from domain fixed values and value table, own F4 for a parameter and a select-option |
+| `z2ui5_cl_cgui_sample_11` | a dynpro — `CALL SCREEN`, PBO with status and `LOOP AT SCREEN`, PAI with a push button, `LEAVE TO SCREEN 0` and the list after the screen |
 
 ## Converting existing reports: report2cloud
 
@@ -374,10 +375,11 @@ Stage 0 - release, and the number to move
 
 - [ ] A release of this addon with report2cloud and the MCP server's
       `migrate_report`; the documentation's preview note goes
-- [ ] A corpus of real reports (own, and open-source ABAP), converted on
-      every change and weekly: the share that converts without a refusal,
-      and the share that starts in the transpiled runtime, as a line in the
-      job summary - the number every stage below is measured by
+- [x] A corpus of real reports: the open-source ABAP of the web, converted
+      weekly (`report2cloud:web`), the share that converts without a refusal
+      and the refusals ranked in the job summary - the number every stage
+      below is measured by
+- [ ] The share of the web corpus that starts in the transpiled runtime
 - [x] `report2cloud:coverage` - the measurement over a folder of reports
 - [x] Includes inlined from beside the report, macros expanded
 
@@ -405,9 +407,12 @@ Stage 1 - the converter: the constructs that stop the most reports
 - [x] `cl_gui_alv_grid` in a container with its simple handlers (hotspot,
       double click, toolbar, user command) as `alv( )`, the screen's PBO and
       PAI modules resolved - the ALV every report since 2005 is written with
-- [ ] `AT SELECTION-SCREEN ON HELP-REQUEST`, `SELECTION-SCREEN FUNCTION KEY`,
-      `TABBED BLOCK` and `BEGIN OF SCREEN` on the runtime's own counterparts
-- [ ] A documentation page per refusal: why, and the rewrite that unblocks it
+- [x] `AT SELECTION-SCREEN ON HELP-REQUEST`, `SELECTION-SCREEN FUNCTION KEY`,
+      `TABBED BLOCK` and `BEGIN OF SCREEN` (`AS WINDOW` and `AS SUBSCREEN`)
+      on the runtime's own counterparts
+- [x] A documentation page per refusal: why, and the rewrite that unblocks it
+      ([tools/report2cloud/docs/refusals.md](tools/report2cloud/docs/refusals.md),
+      linked from every refusal of the migration report)
 
 Stage 2 - the runtime: what a report's user sees
 
@@ -431,8 +436,9 @@ Output
       hotspot per column, toolbar with own functions, editable cells
 - [ ] ALV: a chart over the grid - the columns as series, the layout's
       sort and filter applied
-- [ ] List: `WRITE AT` positions and `UNDER`, monospace columns,
-      secondary lists (`sy-lsind`)
+- [x] List: `WRITE AT` positions and `UNDER`, columns that line up
+      (every item of a positioned line in a box of its width), secondary
+      lists (`sy-lsind`, `set_lsind( )`)
 - [ ] Print as PDF; "Execute in background" as an application job with the
       list as a file or a mail
 
@@ -456,7 +462,8 @@ Navigation and transactions
 - [ ] Command field instead of a plain input: transaction codes, `/n`, `/o`
 - [ ] Command palette (`Cmd+K` / `Ctrl+K`) to search and start reports
 - [ ] Input history: the last entries of a field, opened with the space bar
-- [ ] Keyboard shortcuts: F8 Execute, F3 Back, `AT PFnn`
+- [x] Keyboard shortcuts: F8 Execute, F3 Back, `AT PFnn` and the function
+      keys of a GUI status (`set_pf_status( shortcuts = )`)
 - [ ] Transaction logic: start with a variant, prefill the last entries,
       create a draft
 - [ ] `SET` / `GET PARAMETER ID` with user parameters (like SU3), system
@@ -484,9 +491,15 @@ Stage 4 - in the browser, and with an agent
 
 Stage 5 - research
 
-- [ ] Simple dynpros: a module pool with one screen of fields, PBO / PAI
-      and a few function codes mapped onto `selection_screen( )` forms,
-      everything else still refused
+- [x] Simple dynpros: the screens of fields of the .prog.xml (texts,
+      inputs, checkboxes, radio buttons, frames, push buttons) built with
+      the selection-screen builder in `dynpro_screen( )`, the modules
+      methods called by `dynpro_pbo( )` / `dynpro_pai( )`, `CALL SCREEN`,
+      `SET SCREEN`, `LEAVE TO SCREEN` and the statements after the call in
+      `after_call_screen( )`
+- [ ] Table controls, subscreens and tabstrips on a dynpro, and the SAP GUI
+      controls of a custom control (text editor, HTML viewer, tree) as
+      stand-ins of the same methods and events
 
 Quality, through every stage
 

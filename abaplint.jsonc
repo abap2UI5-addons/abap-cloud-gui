@@ -56,7 +56,12 @@
     "exporting": true,
     "omit_parameter_name": true,
     "prefix_is_current_class": true,
-    "unused_variables": true,
+    // z2ui5_cl_cgui_frontend keeps the whole signature of
+    // CL_GUI_FRONTEND_SERVICES - a converted call passes what the classic
+    // one did, used or not - and its constants
+    "unused_variables": {
+      "exclude": ["z2ui5_cl_cgui_frontend"]
+    },
     "unused_types": true,
     "unused_methods": true,
     "use_new": true,
@@ -94,7 +99,10 @@
     "check_text_elements": true,
     "check_transformation_exists": true,
     "classic_exceptions_overlap": true,
-    "clear_exporting_parameters": true,
+    // clipboard_export( ) of CL_GUI_FRONTEND_SERVICES reads its EXPORTING data
+    "clear_exporting_parameters": {
+      "exclude": ["z2ui5_cl_cgui_frontend"]
+    },
     "cloud_types": true,
     "colon_missing_space": true,
     "constant_classes": true,
@@ -300,7 +308,11 @@
     "unsecure_fae": true,
     "unused_ddic": true,
     "unused_macros": true,
-    "use_class_based_exceptions": true,
+    // z2ui5_cl_cgui_frontend stands in for CL_GUI_FRONTEND_SERVICES, whose
+    // classic exceptions the converted reports catch with EXCEPTIONS
+    "use_class_based_exceptions": {
+      "exclude": ["z2ui5_cl_cgui_frontend"]
+    },
     "use_message_class": true,
     "when_others_last": true,
     "xml_bom": true

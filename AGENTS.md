@@ -14,7 +14,7 @@ list, ALV grid, messages. Language of code, comments, commits and docs:
 | Path | Content |
 |---|---|
 | `src/01` | the framework: `z2ui5_cl_cgui_report` (report runtime), `_selscreen`, `_list`, `_alv`, `_tree`, `_layout` (the layout dialog of the ALV), `_popup`, `_range`, `_select`, `_variant` (selection variants), `_context` (RTTI and conversion helpers), `z2ui5_cx_cgui_error`; the two stores: `z2ui5_if_cgui_variant_store` with `z2ui5_cl_cgui_variant_db` (table `Z2UI5_CGUI_VAR`, data elements `Z2UI5_CGUI_VAR_*`) and `z2ui5_if_cgui_layout_store` with `z2ui5_cl_cgui_layout_db` (table `Z2UI5_CGUI_LAY`) |
-| `src/02` | samples `z2ui5_cl_cgui_sample_01` … `_10` |
+| `src/02` | samples `z2ui5_cl_cgui_sample_01` … `_11` |
 | `tools/report2cloud` | `report2cloud`, a Node CLI (no ABAP object) that converts a classic report into a report class of this addon - THE generator of this repository, see below |
 | `scripts/unit.mjs` | `npm run unit` - the ABAP Unit tests in the transpiled backend, tables included |
 | `.github/abaplint` | the Cloud and 7.02 gate configs; `abaplint.jsonc` at the root is the v750 inner loop |
@@ -193,7 +193,12 @@ It is the only converter and the only generator of this repository - there
 is no ABAP tooling on the stack. `npm run report2cloud:coverage -- <dir>`
 (`coverage.mjs`) is the measurement over a folder of reports: converted,
 refused and why, ranked - the README's roadmap is ordered by it, so run it
-on a real corpus before picking the next construct to map.
+on a real corpus before picking the next construct to map. `npm run
+report2cloud:web` (`web.mjs`) is that corpus: the reports of the
+open-source ABAP repositories of the dotabap list, cloned sparse into
+`build/web-corpus` (read, never run, never committed - a test case taken
+from it is rewritten by hand), measured weekly by
+`.github/workflows/report2cloud-web.yaml`.
 
 - **It writes against the API of `src/01` as it is.** A change to a
   signature of `z2ui5_cl_cgui_report`, `_selscreen`, `_list` or `_alv`
@@ -244,7 +249,8 @@ on a real corpus before picking the next construct to map.
   way); a token of an expanded macro stands at the call's position and
   keeps its body position as `vrow` / `vcol`, which `renderTokens( )` reads
   the spacing from.
-- CI: `.github/workflows/report2cloud.yaml`.
+- CI: `.github/workflows/report2cloud.yaml`; the weekly web corpus
+  `.github/workflows/report2cloud-web.yaml`.
 
 ## Verifying at runtime
 

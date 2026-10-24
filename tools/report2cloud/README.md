@@ -100,6 +100,24 @@ to map, and the converted share is the number to move. `--json` writes a line
 per report for a diff between two runs. A measurement, not a gate - the exit
 code is 0 whatever the numbers.
 
+### The web corpus
+
+```
+npm run report2cloud:web -- [--lint] [--limit n] [--json file] [--summary file] [--offline]
+```
+
+measures the converter on the open-source ABAP of the web: the repositories
+of the community list of ABAP projects (`--list`, default the `list.json` of
+dotabap-list), cloned shallow and sparse into `build/web-corpus` - only
+`*.prog.abap` and `*.prog.xml`, read and never run, and none of it part of
+this repository. Every report is converted with the includes of its own
+repository; `--lint` lints the converted classes together (v750), where the
+parser errors and redefinitions are the converter's and most other findings
+name a dependency the sparse clone does not have. A clone in the cache is
+kept, `--offline` uses the cache alone. The workflow
+`.github/workflows/report2cloud-web.yaml` runs it weekly and writes the
+summary into the job summary; it fails when a report crashes the converter.
+
 ## An example
 
 ```abap
@@ -239,6 +257,8 @@ class `ZR2C` must exist in the target system.
 | `SELECTION-SCREEN BEGIN OF LINE`, `END OF LINE` | `line_begin( )`, `line_end( )`; a `COMMENT ... FOR FIELD` that opens the line is its label |
 | `SELECTION-SCREEN COMMENT ... TEXT-001 / field [MODIF ID m]` | `screen->comment( )` - a field name declares that field (`TYPE c LENGTH n`), set in `initialization( )` as before |
 | `SELECTION-SCREEN PUSHBUTTON ... USER-COMMAND u` | `screen->button( text event = )` |
+| `SELECTION-SCREEN FUNCTION KEY n` and `sscrfields-functxt_0n = ...` | `screen->function_key( number text icon )` - the text from the assignment (a text, or an `SMP_DYNTXT` with `icon_id`, `icon_text`, `text`), which goes with the `SMP_DYNTXT` variable; the button raises `FC0n`, which arrives in `at_user_command( )` and, when `AT SELECTION-SCREEN` reads `sscrfields-ucomm`, there. Without an assignment the button reads `FC0n` and a TODO says so |
+| `SELECTION-SCREEN BEGIN OF TABBED BLOCK tb`, `TAB (n) t USER-COMMAND u DEFAULT SCREEN s`, `END OF BLOCK tb`, `BEGIN OF SCREEN s AS SUBSCREEN` | `screen->tabbed_block_begin( )`, `tab( t )` with the fields of subscreen `s` after it, `tabbed_block_end( )`; `t` is a field (`TYPE c LENGTH n`) set in `initialization( )` as before. The tabs switch in the browser: a click raises no `u`, and `tb-activetab` / `tb-dynnr` are dropped with a TODO |
 | `SELECTION-SCREEN SKIP / ULINE / POSITION` | dropped (the form lays out the fields) |
 | text symbols `TEXT-001`, `'text'(001)` | the text of the text pool as a literal; a TODO when it is unknown |
 | selection texts | `text =` of the field; none for a text taken from the DDIC (the screen shows the DDIC label as well) |
@@ -250,12 +270,17 @@ class `ZR2C` must exist in the target system.
 | `INITIALIZATION`, `LOAD-OF-PROGRAM` | `initialization( )` |
 | `AT SELECTION-SCREEN OUTPUT` | `at_selection_screen_output( screen )` |
 | `LOOP AT SCREEN` ... `MODIFY SCREEN` ... `ENDLOOP` | `DATA(lt_screen) = screen->loop_at_screen( ).` `LOOP AT lt_screen INTO DATA(ls_screen).` ... `screen->modify_screen( ls_screen ).` - `screen-name/group1/active/input/required/invisible` become `ls_screen-*`, `'0'`/`'1'` become `abap_false`/`abap_true`, `'S_X-LOW'` becomes `'S_X'` |
+| `LOOP AT SCREEN` in a FORM `AT SELECTION-SCREEN OUTPUT` performs | the FORM method gets `IMPORTING screen TYPE REF TO z2ui5_cl_cgui_selscreen`, the PERFORM passes it - also through FORMs in between |
+| `LOOP AT SCREEN` in a method of a local class, in another event block | `current_screen( )->loop_at_screen( )` - the screen of `at_selection_screen_output( )` while it runs; elsewhere one built afresh, whose changes are not shown (a TODO), as `MODIFY SCREEN` outside of PBO is not |
+| `CALL FUNCTION 'DYNP_VALUES_READ'` / `'DYNP_VALUES_UPDATE'` with `TABLES dynpfields = lt` | `LOOP AT lt ASSIGNING ...` `ASSIGN (<ls>-fieldname) TO ...` - the fields are attributes, every event brings their values along |
+| a global `DATA message` / `list` / ... - a name of the runtime | renamed in the source first, to `gv_message` (a note of the migration report) |
 | `AT SELECTION-SCREEN ON p` | `at_selection_screen_on( field )`, `CASE field. WHEN \`P\`.` |
 | `AT SELECTION-SCREEN ON BLOCK b` | `at_selection_screen_on_block( block )`, `CASE block. WHEN \`B\`.` - a TODO when the block holds another block (the runtime raises the event for the blocks that hold fields themselves) |
 | `AT SELECTION-SCREEN ON RADIOBUTTON GROUP g` | `at_selection_screen_on_radio( group )`, `CASE group. WHEN \`G\`.` - an error marks the first button |
 | `AT SELECTION-SCREEN ON END OF s` | `at_selection_screen_on_end_of( field )`, `CASE field. WHEN \`S\`.` - the multiple selection left with OK; an error opens it again |
 | `AT SELECTION-SCREEN ON EXIT-COMMAND` | `at_selection_screen_on_exit( ucomm )`, `sy-ucomm` is `ucomm` - `CGUI_BACK`, not `BACK` / `%EX` / `RW` (a TODO when the block reads it) |
-| `AT SELECTION-SCREEN ON VALUE-REQUEST FOR p` (or `s-low`/`s-high`) | `at_value_request( field )`, `WHEN OTHERS. super->at_value_request( field ).`; the field gets `value_help = abap_true` |
+| `AT SELECTION-SCREEN ON VALUE-REQUEST FOR p` (or `s-low`/`s-high`) | `at_value_request( field )`, `WHEN OTHERS. super->at_value_request( field ).`; the field gets `value_help = abap_true`. A block for `s-low` and one for `s-high`: one `WHEN`, `IF value_request_part( ) = z2ui5_cl_cgui_selscreen=>cs_part-high` |
+| `AT SELECTION-SCREEN ON HELP-REQUEST FOR p` (or `s-low`/`s-high`) | `at_selection_screen_on_help( field )`, `WHEN OTHERS. super->at_selection_screen_on_help( field ).`; the field gets `help_request = abap_true`, so it has the F1 button whether its data element has documentation or not |
 | `F4IF_INT_TABLE_VALUE_REQUEST` with `retfield` and `value_tab` | `value_help_popup( tab = col = )` - the popup writes the picked value into the field |
 | `AT SELECTION-SCREEN` | `at_selection_screen( )`. When it reads `sy-ucomm` / `sscrfields-ucomm`, its body becomes `at_selection_screen_ucomm( ucomm )`, called by `at_selection_screen( )` with `ONLI` and by `at_user_command( )` with the user command - a push button or `USER-COMMAND` runs it as in the classic report |
 | `START-OF-SELECTION`, statements before the first event | `start_of_selection( )` |
@@ -280,7 +305,12 @@ class `ZR2C` must exist in the target system.
 | `REUSE_ALV_GRID_DISPLAY` / `REUSE_ALV_LIST_DISPLAY` with `TABLES t_outtab = t` | `alv( t )`, `i_grid_title` is `set_title( )`, a field catalog built with `wa-fieldname`, `wa-seltext_*`, `wa-no_out`, `APPEND wa TO fcat` or `APPEND VALUE #( ) TO fcat` gives column texts and hidden columns; `REUSE_ALV_FIELDCATALOG_MERGE`, the layout and a FORM that only built them are dropped, as is the `IF sy-subrc` after the call |
 | `cl_gui_alv_grid` in a container (`cl_gui_custom_container`, `cl_gui_docking_container`, `cl_gui_container=>default_screen`), `set_table_for_first_display( CHANGING it_outtab = t it_fieldcatalog = f EXPORTING is_layout = l )` | `alv( t )` with the LVC field catalog (`fieldname`, `coltext` / `scrtext_*`, `no_out`, `hotspot` as `set_column_hotspot( )`, `do_sum` as `set_column_sum( )`) and `grid_title` of the layout as `set_title( )`. The grid, the container and the handler object go, with their `CREATE OBJECT`, `SET HANDLER`, `refresh_table_display( )` and the other tuning calls; an `IF go_container IS INITIAL` keeps the branch that creates the grid |
 | `CALL SCREEN n` with the grid, `MODULE ... OUTPUT`, `MODULE ... INPUT` | the PBO modules in place of `CALL SCREEN` - the grid shows when the event block is done; the PAI modules are `at_user_command( ucomm )` with the OK code field as `ucomm` (`CLEAR ok_code` and `save_ok = ok_code` go, `LEAVE TO SCREEN 0` / `SET SCREEN 0` are `leave_to_selection_screen( )`). One screen per report; statements after `CALL SCREEN` get a TODO |
-| the handler class of the grid (`METHODS ... FOR EVENT ... OF cl_gui_alv_grid`) | its methods become methods of the report class: `DOUBLE_CLICK` `at_line_selection( )` (`e_row-index` is `row`, the chain gets `set_line_selection( )`), `HOTSPOT_CLICK` `at_link_click( row column )`, `USER_COMMAND` `at_user_command( )` (`e_ucomm` is `ucomm`), `TOOLBAR` the buttons appended to `e_object->mt_toolbar` as `add_function( )` in the chain. `get_selected_rows( IMPORTING et_index_rows = r )` is `get_selected_rows( )` of the runtime, the chain gets `set_selection_mode( )`; `LVC_T_ROW` / `LVC_T_ROID` become the row types of `z2ui5_cl_cgui_alv` |
+| a dynpro of fields - `CALL SCREEN n`, `MODULE ... OUTPUT / INPUT`, the screens of the .prog.xml | `call_screen( dynnr )`; the statements after it go on in `after_call_screen( dynnr )`. The fields of the screen are `dynpro_screen( )` - a text before an input is its label, a frame a block, an output field `read_only`, a required field `obligatory`, GROUP1 `modif_id`, a push button `button( )` with its function code. The modules are private methods: `dynpro_pbo( )` calls the PBO modules, `dynpro_pai( )` sets the OK code field to ucomm and calls the PAI modules in their order - `AT EXIT-COMMAND` for Back, Exit and Cancel, `FIELD f MODULE m ON INPUT` when f is not initial - and stops after a module that left the screen or sent an error message. `SET SCREEN`, `LEAVE SCREEN`, `LEAVE TO SCREEN` are `set_screen( )`, `leave_screen( )`, `leave_to_screen( )`; sy-ucomm in a PAI module is the OK code field. `PROCESS ON VALUE-REQUEST` / `ON HELP-REQUEST` are dropped |
+| the handler class of the grid (`METHODS ... FOR EVENT ... OF cl_gui_alv_grid`) | its methods become methods of the report class: `DOUBLE_CLICK` `at_line_selection( )` (`e_row-index` is `row`, the chain gets `set_line_selection( )`), `HOTSPOT_CLICK` `at_link_click( row column )`, `USER_COMMAND` `at_user_command( )` (`e_ucomm` is `ucomm`), `TOOLBAR` the buttons appended to `e_object->mt_toolbar` as `add_function( )` in the chain. `get_selected_rows( IMPORTING et_index_rows = r )` is `get_selected_rows( )` of the runtime, the chain gets `set_selection_mode( )`; `LVC_T_ROW` / `LVC_T_ROID` / `LVC_S_COL` become the types of `z2ui5_cl_cgui_alv`; `e_row_id`, `e_column_id`, `es_row_no` used as a whole (passed to a FORM, `CASE e_column_id`) are declared from `row` and `column`. `MOVE ... TO ls_button-function` in the toolbar handler is an assignment like `=` |
+| the `USER_COMMAND` callback of `REUSE_ALV_GRID_DISPLAY` | `at_line_selection( )`: `rs_selfield-tabindex` is `row`, `-fieldname` the column of a hotspot (`hide`), `-value` that cell of the output table; `-refresh`, `-row_stable`, `-col_stable` are dropped (the ALV is drawn anew on every roundtrip), `-exit = 'X'` is `leave_to_selection_screen( )` |
+| `cl_gui_frontend_services=>...` (also `CALL METHOD`) | `z2ui5_cl_cgui_frontend=>...( )` - the same methods, parameters and classic exceptions, for the files in the browser: `file_open_dialog` in an F4 opens an upload and the F4 runs again with the picked file (Execute, when the dialog opened during the run), `gui_upload` reads it by its name (ASC split at the line ends and with `has_field_separator` at the tab, BIN in the lines' length), `gui_download` is a download of the browser, the save and folder dialogs answer at once, `execute` opens a URL, `clipboard_export` the clipboard; `FILETABLE` is `z2ui5_cl_cgui_frontend=>ty_t_file_table`, `cl_gui_cfw=>flush( )` is dropped |
+| `CALL FUNCTION 'GUI_UPLOAD'` / `'GUI_DOWNLOAD'` | `z2ui5_cl_cgui_frontend=>gui_upload( )` / `gui_download( )`: `EXPORTING` and `IMPORTING` as they were, `TABLES data_tab` as `CHANGING`, the `EXCEPTIONS` kept - `sy-subrc` after the call is the classic one |
+| `SELECT COUNT(*) FROM t WHERE ...` without `INTO` | copied with the host variables escaped - it sets `sy-dbcnt`, no work area involved |
 | `i_callback_user_command = 'USER_COMMAND'` | `set_line_selection( )`, and the callback FORM is the body of `at_line_selection( )`: its ucomm is `&IC1`, `rs_selfield-tabindex` is `row` |
 | `MESSAGE 'text' / TEXT-001 / v TYPE t` | `message( text type )`, `S` without type |
 | `MESSAGE e001(cls) WITH ...`, `MESSAGE ID ... TYPE ... NUMBER ... WITH ...` | `MESSAGE ... INTO DATA(lv_message).` `message( text = lv_message type = )` - the message class stays the source of the text |
@@ -289,7 +319,12 @@ class `ZR2C` must exist in the target system.
 | `MESSAGE ... INTO` | copied; the short form `MESSAGE s013 ... INTO` gets the message class of `MESSAGE-ID` (`s013(zr2c)`) - a class has no `MESSAGE-ID` |
 | `FORM f TABLES t STRUCTURE s USING [VALUE(]u[)] TYPE x CHANGING c TYPE y` | private method `f IMPORTING u CHANGING t c`: a `USING` parameter the FORM writes becomes `CHANGING`; `TABLES` gets a table type of its own (`ty_t_s`); an untyped parameter is `TYPE any` with a TODO |
 | `PERFORM f TABLES ... USING ... CHANGING ...` | `f( a )`, `f( p1 = a p2 = b )` or `f( EXPORTING ... CHANGING ... )` with the parameter names of the FORM |
-| `LEAVE LIST-PROCESSING` | `leave_to_selection_screen( )` |
+| `LEAVE LIST-PROCESSING`, `LEAVE PROGRAM`, `LEAVE TO SCREEN 0` | `leave_to_selection_screen( )` (and `RETURN` for the two that end the report) - the run ends there, without `END-OF-SELECTION` and without the message of an empty list; `LEAVE SCREEN` is dropped |
+| `SET CURSOR FIELD f` | `set_cursor_field( f )`; `OFFSET`, `LINE` and a cursor on the list are dropped with a note |
+| `CALL FUNCTION 'SAPGUI_PROGRESS_INDICATOR'`, `cl_progress_indicator=>progress_indicate( )` | dropped - the browser shows a busy indicator while the server works |
+| `SELECT ... FROM dbtab` without `INTO`, with `TABLES dbtab` | `SELECT ... FROM dbtab INTO @dbtab` (a field list `INTO CORRESPONDING FIELDS OF @dbtab`) - the `TABLES` work area is an attribute of the class |
+| `DATA(x) = ...` in an event block, read by another block, a FORM or a local class | an attribute `x` of the class, assigned where the report declared it (event blocks open no scope); the type from the constructor expression (`NEW`, `VALUE`, `CONV`, `CAST`) or from abaplint's syntax check - refused when neither tells it |
+| `F4IF_INT_TABLE_VALUE_REQUEST` in a FORM | `value_help_popup( )` as in `AT SELECTION-SCREEN ON VALUE-REQUEST`, with a TODO: the picked value goes into the field of the value request the FORM is called from |
 | `SUBMIT report WITH p = v WITH s IN range WITH s op v [SIGN x] WITH SELECTION-TABLE t [VIA SELECTION-SCREEN] [USING SELECTION-SET v] AND RETURN` | `submit( report = the class values = VALUE #( ... ) via_selection_screen = using_variant = )` - the class of a report beside the input (or in the corpus), else the name report2cloud would give it and a TODO to convert it; `p = v` is a parameter value, every other comparison a range line, `IN range` the lines of `range_lines_get( )`, `WITH SELECTION-TABLE` those of `selection_table_get( )` - the runtime takes the kind from the attribute of the called class. Back returns to the caller; statements after the `SUBMIT` run before the called class starts (a TODO) |
 | `SUBMIT report ...` without `AND RETURN` | `submit( )` and `RETURN` - the classic ended the caller |
 | `SELECTION-SCREEN BEGIN OF SCREEN n [AS WINDOW] [TITLE t]` ... `END OF SCREEN n` | `selection_screen_dynnr( dynnr screen )`, `CASE dynnr. WHEN \`n\`.` with the fields' chain; the screen is a dialog either way |
@@ -306,42 +341,43 @@ class `ZR2C` must exist in the target system.
 | `SET PF-STATUS 'S' [EXCLUDING f]` | `set_pf_status( functions shortcuts excluding )` - the buttons of the application toolbar of status `S` with their text, icon (the UI5 icon of the `ICON_` name, where the converter knows one) and tooltip, and the function keys of the status as keyboard shortcuts (`F5`, `Shift+F2`, ...), read from the GUI status abapGit writes into the `.prog.xml` (`<CUA>`); Back, Exit, Cancel, Choose, print and the page keys are the runtime's own. Every function arrives in `at_user_command( )` with its code. `EXCLUDING` leaves out a function (a literal or a table of codes); `SET PF-STATUS space` empties the toolbar. Without the `.prog.xml`, for a status named by a field or `OF PROGRAM`, a TODO |
 | `SET TITLEBAR 'T' [WITH a b ...]` | `set_title( )` with the text of title `T` from the `.prog.xml`, `&1` ... `&9` (and a bare `&`, in turn) replaced by the values in a string template; without the `.prog.xml` a TODO |
 | `AT PFnn` | a `WHEN \`PFnn\`` of `at_user_command( )`; without a `SET PF-STATUS` in the report `initialization( )` sets a toolbar with a button per key and the key (`F5`, `Shift+F1` for `PF13`, ...) as a shortcut, as the standard list status had them |
-| local classes and interfaces | `.clas.locals_imp.abap`; their definitions go to `.clas.locals_def.abap` when the class is typed with them |
+| local classes and interfaces | `.clas.locals_imp.abap`; their definitions go to `.clas.locals_def.abap` when the class is typed with them, with the types and constants of the report they are typed with. A method that writes the list, calls a FORM or uses a global of the report is converted like an event block: the report's data through the instance (`lcl_r2c=>app->gv`, set at the start of every event method), its types and constants through the class, `list( )`, `message( )` and the FORMs through the instance - the class declares the local class a `LOCAL FRIEND`. A global typed with a local class is a private attribute (local types can type the private section only); a local class whose instance the report keeps implements `if_serializable_object` |
 | ABAP SQL (`SELECT`, `INSERT`, `UPDATE`, `MODIFY`, `DELETE` on the database) | strict mode, as ABAP Cloud requires: host variables escaped with `@`, the field list, `ORDER BY` and `GROUP BY` separated by commas - syntax only, the parser tells a host variable from a column |
 | everything else | copied as written, comments included (`*` comments become `"` comments) |
 
 ## Refused
+
+Every refusal has its section in [docs/refusals.md](docs/refusals.md) - why it has no counterpart, and the rewrite in the classic report that unblocks it; the migration report links each refusal there. The page is written from `lib/refusals.mjs` (`npm run report2cloud:docs`).
 
 Each of these stops the conversion with `file:row:col` and the reason; all of
 them are collected, so one run lists everything there is to do.
 
 | Construct | Why |
 |---|---|
-| `CALL SCREEN`, `MODULE`, `SET SCREEN`, `LEAVE TO SCREEN`, `CALL SUBSCREEN`, `CONTROLS` - but for the screen of one `cl_gui_alv_grid` | dynpros have no counterpart in a browser app |
-| `SELECTION-SCREEN TABBED BLOCK / INCLUDE / FUNCTION KEY`, `SET CURSOR` | not converted; abap-cloud-gui has tabbed blocks, `function_key( )` and `set_cursor_field( )` - port them by hand |
+| `CALL SCREEN`, `MODULE`, `SET SCREEN`, `LEAVE TO SCREEN`, `CALL SUBSCREEN`, `CONTROLS` - but for a dynpro of fields and the screen of one `cl_gui_alv_grid`; a screen with a custom control, a subscreen, a table control or a tabstrip, flow logic with `LOOP` or `CALL SUBSCREEN`, a screen number in a variable | dynpros of that kind have no counterpart in a browser app yet |
+| `SELECTION-SCREEN INCLUDE`, `SET CURSOR`, a `TAB` without `DEFAULT SCREEN` of this report | not converted; abap-cloud-gui has `set_cursor_field( )` - port them by hand. A tab whose subscreen the program sets at runtime (`tb-dynnr`) has no counterpart |
 | `CALL SELECTION-SCREEN n` of a screen the report does not declare, a second call of the same screen with statements after it | the class calls the screens of `selection_screen_dynnr( )`, and `after_call_selection_screen( )` goes on after one call per screen |
 | `SUBMIT ... EXPORTING LIST TO MEMORY`, `TO SAP-SPOOL`, `VIA JOB`, `WITH-FREE SELECTIONS`, `USING SELECTION-SCREEN n` / `SELECTION-SETS OF PROGRAM` | the list of the called report is not in memory, there is no spool and no job from a browser app; the class has its standard selection screen and its own variants only |
-| `AT SELECTION-SCREEN ON HELP-REQUEST` | `at_selection_screen_on_help( )` runs from the F1 button, which a field only has when its data element has documentation - the block would not run for the other fields |
 | `AT SELECTION-SCREEN ON BLOCK b` / `ON RADIOBUTTON GROUP g` / `ON END OF s` of a block, group or select-option the report does not declare | |
 | `CALL TRANSACTION` (with or without `USING` - batch input) | no SAP GUI transaction can be started; call the released API instead |
 | `EXEC SQL` | native SQL is not available on ABAP Cloud |
 | `ASSIGN ('(PROG)FIELD')`, `LOOP AT SCREEN ASSIGNING` | field symbols to screen or foreign program fields |
-| `LOOP AT SCREEN` / `MODIFY SCREEN` outside of `AT SELECTION-SCREEN OUTPUT`, `screen-group2`, `screen-intensified`, ... read in a condition | only the screen of `at_selection_screen_output( screen )` and its six fields exist (an assignment to another field is dropped with a TODO) |
+| a `LOOP AT SCREEN` inside another, `screen-group2`, `screen-group3`, ... read in a condition | the screen has one loop at a time and the fields `name`, `group1`, `active`, `input`, `required`, `invisible`, `intensified` and `length` (an assignment to another field is dropped with a TODO) |
 | `TOP-OF-PAGE` / `TOP-OF-PAGE DURING LINE-SELECTION` / `END-OF-PAGE` with more than output | the runtime writes header and footer once and repeats them on every page; only a fixed one is converted |
 | `GET CURSOR`, `READ LINE`, `MODIFY LINE` | not converted - abap-cloud-gui has `get_cursor( )`, `list( )->read_line( )` / `modify_line( )`; port them by hand |
 | `SCROLL LIST`, `SET USER-COMMAND`, `NEW-PAGE PRINT ON`, `PRINT-CONTROL` | the list has no scroll position or print control |
 | a global of the report named like a method or attribute of `z2ui5_cl_cgui_report` (`tree`, `format`, `window`, ...) | the global becomes an attribute of the class - rename it in the source first |
-| `LEAVE TO LIST-PROCESSING`, `LEAVE PROGRAM`, `LEAVE TO TRANSACTION` | the list is shown after `start_of_selection( )`; there is nothing to leave |
+| `LEAVE TO LIST-PROCESSING`, `LEAVE TO TRANSACTION`, `LEAVE TO SCREEN n` | the list is shown after `start_of_selection( )`; there are no screens or transactions to go to |
 | `NODES`, `GET`, `REJECT` | logical databases |
 | `INCLUDE` without its file beside the report | the include was not found as `<include>.prog.abap` - put it there, or name its folder with `--includes` |
-| `SELECT` without `INTO` | the short form reads into the `TABLES` work area, which classes do not have |
+| `SELECT` without `INTO` of a table without `TABLES`, or with a join | the short form reads into the `TABLES` work area - add `INTO` |
 | a `TABLES` parameter without a type used with its header line | a work area needs a line type - give the parameter a `STRUCTURE` or a table `TYPE` |
 | `MESSAGE` without message class, `MESSAGE ... RAISING` | |
 | `PERFORM ... IN PROGRAM`, `PERFORM f(prog)`, `IF FOUND`, `ON COMMIT`, a `PERFORM` whose parameters do not match the FORM, a literal passed to a parameter the FORM changes | only FORMs of this report, called as methods |
 | `POPUP_TO_CONFIRM_WITH_MESSAGE`, `POPUP_TO_DECIDE_WITH_MESSAGE`, `POPUP_TO_DECIDE_LIST`, `POPUP_GET_VALUES_DB_CHECKED` | the popups with a T100 message, a list or a DDIC check - `popup_to_decide( )` / `popup_get_values( )` and `at_user_command( )` by hand; the four plain ones are converted (see the mapping) |
-| `GUI_DOWNLOAD`, `GUI_UPLOAD`, `cl_gui_frontend_services` and the SAP GUI controls but `cl_gui_alv_grid` | there is no SAP GUI frontend and no dynpro container |
+| the SAP GUI controls but `cl_gui_alv_grid`; of `cl_gui_frontend_services` what the browser has no counterpart for (the registry, the GUI version, an option `z2ui5_cl_cgui_frontend` does not take) | there is no SAP GUI frontend and no dynpro container |
 | the `DATA_CHANGED` and other handlers of the grid but the four above, a method of `cl_gui_alv_grid` without a counterpart, a handler class with other methods, a handler that uses `me->` or `sender` | an edited cell arrives in `at_data_changed( row column )` - port these by hand |
-| other `REUSE_ALV_*` / `LVC_*` function modules, `F4IF_INT_TABLE_VALUE_REQUEST` outside of an F4, `DYNP_VALUES_READ` / `_UPDATE`, `BDC_*` | |
+| other `REUSE_ALV_*` / `LVC_*` function modules, `F4IF_INT_TABLE_VALUE_REQUEST` outside of an F4, `DYNP_VALUES_READ` / `_UPDATE` without `TABLES dynpfields`, `BDC_*` | |
 | a local class that reads a global of the report, or calls `PERFORM` or `WRITE` | a local class of the generated class cannot reach the report's attributes, FORMs or list |
 | `GENERATE SUBROUTINE POOL`, `INSERT REPORT`, OLE, contexts, ... | not available |
 
@@ -407,6 +443,7 @@ of the samples: one call per line, the parameters aligned.
 |---|---|
 | `cli.mjs` | the command line |
 | `coverage.mjs` | the measurement over a folder of reports |
+| `web.mjs` | the measurement over the open-source reports of the web (`report2cloud:web`) |
 | `lib/convert.mjs` | the converter |
 | `lib/includes.mjs` | the INCLUDEs of a report, inlined from the files beside it, with where every line came from |
 | `lib/abap.mjs` | helpers over the syntax tree, the token renderer |
@@ -451,8 +488,10 @@ npm run test:report2cloud:runtime                                          # the
   levels (`WINDOW`, `sy-lsind` read and set), a `cl_gui_alv_grid` in a
   custom container on screen 100 with an LVC field catalog, a handler class
   for `DOUBLE_CLICK`, `HOTSPOT_CLICK`, `TOOLBAR` and `USER_COMMAND` and the
-  PBO and PAI modules - and one with `CALL SCREEN`, batch input, native SQL
-  and dynpro modules that must be refused. A report `zr2c_NN_name` becomes the class
+  PBO and PAI modules, the selection screen of a grown report (a tabbed
+  block on two subscreens, two function keys - one with an icon - and an
+  own F1) - and one with `CALL SCREEN`, batch input, native SQL and dynpro
+  modules that must be refused. A report `zr2c_NN_name` becomes the class
   `z2ui5_cl_cgui_r2c_NN`, a name the repository's `object_naming` accepts.
 - `test/convert.test.mjs` - the snapshots of every generated file and
   migration report (`test/snapshots/`), the abapGit format of the files, the
