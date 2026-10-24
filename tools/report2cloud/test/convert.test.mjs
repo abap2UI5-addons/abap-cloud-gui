@@ -413,7 +413,8 @@ test("the table of z2ui5_cl_cgui_frontend in the converter is the class - its co
   const text = readFileSync(new URL("../../../src/01/z2ui5_cl_cgui_frontend.clas.abap", import.meta.url), "utf8");
   const def = text.slice(0, text.indexOf("PROTECTED SECTION"));
   const methods = {};
-  for (const m of def.matchAll(/^\s*CLASS-METHODS\s+(\w+)([^.]*)\./gim)) {
+  // a signature ends with the period at the end of its line - not at the one of DEFAULT '*.*'
+  for (const m of def.matchAll(/^\s*CLASS-METHODS\s+(\w+)([\s\S]*?)\.\s*$/gim)) {
     let section;
     const params = [];
     const exceptions = [];
@@ -807,4 +808,41 @@ test("a report with a selection screen keeps its INITIALIZATION; an IF of the so
   const r = convert(src, { file: "zt.prog.abap", className: "zcl_t" });
   assert.match(r.files["zcl_t.clas.abap"], /METHOD initialization\.\n\n\s+p = 1\./);
   assert.match(r.files["zcl_t.clas.abap"], /IF p = 2\.\n\s+ENDIF\./);
+});
+
+test("the grid of REUSE_ALV_GRID_DISPLAY_LVC: GET_GLOBALS_FROM_SLVC_FULLSCR, CHECK on the grid and check_changed_data( ) go", () => {
+  const src = `REPORT zt.
+DATA gt TYPE STANDARD TABLE OF scarr WITH DEFAULT KEY.
+START-OF-SELECTION.
+  SELECT * FROM scarr INTO TABLE gt.
+  CALL FUNCTION 'REUSE_ALV_GRID_DISPLAY_LVC'
+    EXPORTING
+      i_structure_name = 'SCARR'
+    TABLES
+      t_outtab         = gt.
+FORM flush_alv.
+  DATA lo_grid TYPE REF TO cl_gui_alv_grid.
+  CALL FUNCTION 'GET_GLOBALS_FROM_SLVC_FULLSCR'
+    IMPORTING
+      e_grid = lo_grid.
+  CHECK: lo_grid IS NOT INITIAL.
+  IF ( lo_grid IS INITIAL ).
+    RETURN.
+  ENDIF.
+  lo_grid->check_changed_data( ).
+ENDFORM.
+`;
+  const r = convert(src, { file: "zt.prog.abap", className: "zcl_t" });
+  assert.deepEqual(r.refusals.map((x) => x.message), []);
+  const cls = r.files["zcl_t.clas.abap"];
+  assert.doesNotMatch(cls, /lo_grid|GET_GLOBALS_FROM_SLVC_FULLSCR|check_changed_data/i);
+  assert.ok(r.mapped.some((m) => /GET_GLOBALS_FROM_SLVC_FULLSCR - the grid of the ALV display is alv\( \)/.test(m.target)));
+  assert.ok(r.mapped.some((m) => /CHECK on the grid object/.test(m.target)));
+});
+
+test("cl_gui_frontend_services=>directory_list_files( files_only ) is z2ui5_cl_cgui_frontend's, with its EXCEPTIONS", () => {
+  const src = "REPORT zt.\nDATA gt TYPE STANDARD TABLE OF file_info WITH DEFAULT KEY.\nDATA gv_n TYPE i.\nSTART-OF-SELECTION.\n  cl_gui_frontend_services=>directory_list_files( EXPORTING directory = 'C:\\' files_only = abap_true CHANGING file_table = gt count = gv_n EXCEPTIONS cntl_error = 1 OTHERS = 2 ).\n  WRITE gv_n.\n";
+  const r = convert(src, { file: "zt.prog.abap", className: "zcl_t" });
+  assert.deepEqual(r.refusals.map((x) => x.message), []);
+  assert.match(r.files["zcl_t.clas.abap"], /z2ui5_cl_cgui_frontend=>directory_list_files\(/);
 });

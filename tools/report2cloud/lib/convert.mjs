@@ -202,8 +202,8 @@ export const FRONTEND = {
       exceptions: ["get_sapworkdir_failed", "cntl_error", "error_no_gui", "not_supported_by_gui"] },
     get_system_directory: { params: ["system_directory"],
       exceptions: ["cntl_error", "error_no_gui", "not_supported_by_gui"] },
-    directory_list_files: { params: ["directory", "filter"],
-      exceptions: [] },
+    directory_list_files: { params: ["directory", "filter", "files_only", "directories_only", "file_table", "count"],
+      exceptions: ["cntl_error", "directory_list_files_failed", "wrong_parameter", "error_no_gui", "not_supported_by_gui"] },
     directory_get_current: { params: ["current_directory"],
       exceptions: ["directory_get_current_failed", "cntl_error", "error_no_gui", "not_supported_by_gui"] },
     file_exist: { params: ["file"],
@@ -1199,8 +1199,18 @@ class Converter {
       if (form && this.gridVars.has(form[1])) return { action: "drop", reason: "SET HANDLER of the grid - its handlers are methods of the class" };
     }
     // IF go_container IS INITIAL - the grid is created once: the branch stays
+    // the grid of REUSE_ALV_GRID_DISPLAY(_LVC) - for check_changed_data( ), which goes too
+    if (k === "CallFunction" && /^call\s+function\s+'get_globals_from_slvc_fullscr'/.test(flat)) {
+      const e = /\be_grid\s*=\s*([\w/]+)/.exec(flat);
+      if (e && objs.has(e[1])) return { action: "drop", reason: "GET_GLOBALS_FROM_SLVC_FULLSCR - the grid of the ALV display is alv( ), there is no object to get" };
+    }
+    // CHECK go_grid IS NOT INITIAL - the grid is always there
+    if (k === "Check" && /^check\s*:?\s*\(?\s*(not\s+)?([\w/]+)\s+is\s+(not\s+)?(initial|bound)\s*\)?$/.test(flat)) {
+      const m = /([\w/]+)\s+is\s/.exec(flat);
+      if (objs.has(m[1])) return { action: "drop", reason: "CHECK on the grid object - alv( ) needs none" };
+    }
     if (k === "If") {
-      const m = /^if\s+(not\s+)?([\w/]+)\s+is\s+(not\s+)?(initial|bound)$/.exec(flat);
+      const m = /^if\s+\(?\s*(not\s+)?([\w/]+)\s+is\s+(not\s+)?(initial|bound)\s*\)?$/.exec(flat);
       if (m && objs.has(m[2])) {
         const created = (!!m[1] !== !!m[3]) === (m[4] === "bound");   // the branch for the first time
         let depth = 0;
