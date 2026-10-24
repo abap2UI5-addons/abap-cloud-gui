@@ -295,6 +295,15 @@ CLASS z2ui5_cl_cgui_alv DEFINITION PUBLIC FINAL CREATE PUBLIC.
       RETURNING
         VALUE(result) TYPE REF TO z2ui5_cl_cgui_alv.
 
+    "! the columns tab shows, in their order, each with its name and its text
+    "! (set_column_text( ), else the DDIC label) - the loop over
+    "! get_columns( )->get( ) of CL_SALV_TABLE
+    METHODS get_columns
+      IMPORTING
+        tab           TYPE STANDARD TABLE
+      RETURNING
+        VALUE(result) TYPE z2ui5_cl_cgui_context=>ty_t_comp.
+
     METHODS set_column_hidden
       IMPORTING
         name          TYPE clike
@@ -2915,6 +2924,12 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
       WHEN OTHERS.
         result = abap_false.
     ENDCASE.
+
+  ENDMETHOD.
+
+  METHOD get_columns.
+
+    result = columns_visible( tab ).
 
   ENDMETHOD.
 

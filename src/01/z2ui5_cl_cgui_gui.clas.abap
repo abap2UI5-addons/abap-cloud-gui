@@ -13,6 +13,15 @@ CLASS z2ui5_cl_cgui_gui DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
     CONSTANTS true  TYPE i VALUE 1.
     CONSTANTS false TYPE i VALUE 0.
 
+    TYPES:
+      "! CNTL_SIMPLE_EVENT(S) - the events set_registered_events( ) of a
+      "! control takes; ABAP Cloud has not the DDIC types
+      BEGIN OF ty_s_simple_event,
+        eventid    TYPE i,
+        appl_event TYPE abap_bool,
+      END OF ty_s_simple_event.
+    TYPES ty_t_simple_events TYPE STANDARD TABLE OF ty_s_simple_event WITH DEFAULT KEY.
+
     "! the report the controls belong to - z2ui5_cl_cgui_report sets it at
     "! the start of every roundtrip
     CLASS-METHODS set_report

@@ -822,6 +822,8 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
     " returns
     DATA mt_cgui_run_msg       TYPE ty_t_cgui_msg.
     DATA mv_cgui_stop          TYPE abap_bool.
+    " the run is on: a control created now is on the list it writes
+    DATA mv_cgui_in_run        TYPE abap_bool.
     " leave_to_selection_screen( ) during the run - LEAVE PROGRAM, LEAVE TO
     " SCREEN 0: no END-OF-SELECTION, no list
     DATA mv_cgui_left          TYPE abap_bool.
@@ -945,6 +947,12 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
       IMPORTING
         dynnr TYPE string
         node  TYPE REF TO z2ui5_cl_ui5_view_builder.
+
+    "! a control on the list of the run (cl_gui_container=>default_screen,
+    "! a docking container created during the run) - the list shows it
+    METHODS gui_on_list
+      RETURNING
+        VALUE(result) TYPE abap_bool.
 
     "! the screen a docking container without dynnr sits on - the one shown
     METHODS gui_screen
@@ -1485,9 +1493,9 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
 
     DATA(ls_control) = control.
     ls_control-id = lines( mt_cgui_gui ) + 1.
-    " a docking container sits on the screen it is created for
-    IF ls_control-kind = z2ui5_if_cgui_gui=>cs_kind-container AND ls_control-parent IS INITIAL
-        AND ls_control-name IS INITIAL AND ls_control-dynnr IS INITIAL.
+    " a docking container sits on the screen it is created for, and so
+    " does a control on the screen itself (cl_gui_container=>default_screen)
+    IF ls_control-parent IS INITIAL AND ls_control-name IS INITIAL AND ls_control-dynnr IS INITIAL.
       ls_control-dynnr = gui_screen( ).
     ELSEIF ls_control-dynnr IS NOT INITIAL AND ls_control-dynnr CO `0123456789`.
       ls_control-dynnr = dynnr_norm( ls_control-dynnr ).
@@ -1681,20 +1689,28 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
   METHOD gui_docked.
 
     LOOP AT mt_cgui_gui INTO DATA(ls_control)
-         WHERE kind = z2ui5_if_cgui_gui=>cs_kind-container AND parent = 0 AND name IS INITIAL
-           AND dynnr = dynnr AND freed = abap_false.
+         WHERE parent = 0 AND name IS INITIAL AND dynnr = dynnr AND freed = abap_false.
       gui_render( id   = ls_control-id
                   node = node ).
     ENDLOOP.
 
   ENDMETHOD.
 
+  METHOD gui_on_list.
+
+    LOOP AT mt_cgui_gui TRANSPORTING NO FIELDS WHERE parent = 0 AND dynnr = `LIST` AND freed = abap_false.
+      result = abap_true.
+      RETURN.
+    ENDLOOP.
+
+  ENDMETHOD.
+
   METHOD gui_screen.
 
-    result = SWITCH #( mv_cgui_screen
-                       WHEN cs_screen-dynpro THEN mv_cgui_dynpro
-                       WHEN cs_screen-selection THEN `1000`
-                       ELSE `LIST` ).
+    " during the run the controls are created for the list it writes
+    result = COND #( WHEN mv_cgui_screen = cs_screen-dynpro THEN mv_cgui_dynpro
+                     WHEN mv_cgui_screen = cs_screen-selection AND mv_cgui_in_run = abap_false THEN `1000`
+                     ELSE `LIST` ).
 
   ENDMETHOD.
 
@@ -2646,6 +2662,10 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
         ENDIF.
 
       WHEN OTHERS.
+        " the answer of a popup the run opened on the selection screen: the
+        " rest of START-OF-SELECTION follows in at_user_command( )
+        DATA(lv_run_answer) = xsdbool( mv_cgui_pending_ucomm IS NOT INITIAL AND lv_event = mv_cgui_pending_ucomm
+                                       AND mv_cgui_screen = cs_screen-selection ).
         IF mv_cgui_pending_ucomm IS NOT INITIAL AND lv_event = mv_cgui_pending_ucomm.
           CLEAR mv_cgui_pending_ucomm.
         ENDIF.
@@ -2661,6 +2681,13 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
           on_dynpro_command( lv_event ).
         ELSE.
           at_user_command( lv_event ).
+          " what the rest of the run wrote shows - unless it opened the
+          " next popup
+          IF lv_run_answer = abap_true AND mv_cgui_nav = abap_false
+              AND ( mo_cgui_alv IS BOUND OR mo_cgui_tree IS BOUND OR gui_on_list( ) = abap_true
+                 OR ( mo_cgui_list IS BOUND AND mo_cgui_list->has_content( ) = abap_true ) ).
+            mv_cgui_screen = cs_screen-output.
+          ENDIF.
         ENDIF.
 
     ENDCASE.
@@ -3978,11 +4005,13 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
   METHOD run.
 
     " a run that stops for a dialog (z2ui5_cx_cgui_stop) starts again from it
+    mv_cgui_in_run = abap_true.
     TRY.
         result = run_steps( ).
       CATCH z2ui5_cx_cgui_stop.
         mv_cgui_stop = abap_true.
     ENDTRY.
+    mv_cgui_in_run = abap_false.
 
   ENDMETHOD.
 
@@ -4000,6 +4029,10 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
            mv_cgui_window, mv_cgui_window_title, mv_cgui_window_cols, mv_cgui_window_lines,
            mt_cgui_grid, mv_cgui_grid, mr_cgui_grid_fieldcat, mr_cgui_grid_layout.
     mv_cgui_left = abap_false.
+    " the controls of the list of the run before - the run creates its own
+    LOOP AT mt_cgui_gui ASSIGNING FIELD-SYMBOL(<control>) WHERE parent = 0 AND dynnr = `LIST`.
+      <control>-freed = abap_true.
+    ENDLOOP.
     start_of_selection( ).
     " CALL SCREEN: the dynpro shows, the rest follows when it is left
     IF mv_cgui_stop = abap_true OR mv_cgui_left = abap_true OR mv_cgui_screen = cs_screen-dynpro.
@@ -4015,7 +4048,7 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
       mo_cgui_list->footer_end( ).
     ENDIF.
 
-    IF mo_cgui_alv IS NOT BOUND AND mo_cgui_tree IS NOT BOUND
+    IF mo_cgui_alv IS NOT BOUND AND mo_cgui_tree IS NOT BOUND AND gui_on_list( ) = abap_false
         AND ( mo_cgui_list IS NOT BOUND OR mo_cgui_list->has_content( ) = abap_false ).
       message( 'List contains no data'(020) ).
       RETURN.
@@ -6115,6 +6148,11 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD view_display_output.
+
+    " the controls on the list - cl_gui_container=>default_screen, a
+    " docking container of the run - above what it writes
+    gui_docked( dynnr = `LIST`
+                node  = page ).
 
     " a grid of the report shows the ALV in its container
     IF mo_cgui_alv IS BOUND AND mv_cgui_grid IS INITIAL.

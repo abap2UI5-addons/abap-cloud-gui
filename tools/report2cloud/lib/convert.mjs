@@ -139,6 +139,7 @@ const colorConst = (c) => `z2ui5_cl_cgui_list=>cs_color-${c}`;
 // WRITE ... AS ICON with an icon of type pool ICON - the UI5 icon that shows
 // the same, from the icons that exist in UI5 1.71
 const ICONS = {
+  icon_increase: "sap-icon://add", icon_decrease: "sap-icon://less",
   icon_okay: "sap-icon://accept", icon_checked: "sap-icon://accept", icon_cancel: "sap-icon://decline",
   icon_incomplete: "sap-icon://decline", icon_green_light: "sap-icon://status-positive",
   icon_yellow_light: "sap-icon://status-critical", icon_red_light: "sap-icon://status-negative",
@@ -166,6 +167,8 @@ const LVC_TYPES = {
   lvc_s_col: "z2ui5_cl_cgui_alv=>ty_s_lvc_col",
   // the file table of cl_gui_frontend_services=>file_open_dialog( )
   filetable: "z2ui5_cl_cgui_frontend=>ty_t_file_table", file_table: "z2ui5_cl_cgui_frontend=>ty_s_file_table",
+  // the events a SAP GUI control registers - set_registered_events( )
+  cntl_simple_events: "z2ui5_cl_cgui_gui=>ty_t_simple_events", cntl_simple_event: "z2ui5_cl_cgui_gui=>ty_s_simple_event",
 };
 
 // the statements that open and close a block
@@ -1456,6 +1459,12 @@ class Converter {
       const m = /type\s+ref\s+to\s+(cl_gui_\w+)\b/.exec(t);
       if (m && guiClass(m[1])) this.guiVars.set(lc(declName(x)), guiClass(m[1]));
     }
+    // a control on the screen itself (cl_gui_container=>default_screen,
+    // screen0 - also the container of cl_abap_browser): the list of the run
+    // shows it, no dynpro is needed - "%screen" is no variable of the report
+    if ([...all, ...this.locals.flatMap((u) => u.stmts)].some((x) => /\bcl_gui_container\s*=>\s*(default_screen|screen0)\b/.test(lc(renderTokens(stmtTokens(x)))))) {
+      this.guiVars.set("%screen", "z2ui5_cl_cgui_gui_container");
+    }
   }
 
   /** the event handlers of the local classes: method -> [{ cls, event, of }] */
@@ -1493,10 +1502,8 @@ class Converter {
     for (const m of children(s, "MethodSource")) {
       const text = render(m);
       const arrow = /^(.*?)\s*(->|=>)\s*([\w/]+)$/.exec(text);
-      if (arrow?.[2] === "=>") {
-        this.refuse(s, "SAP GUI controls: SET HANDLER of a static method - the stand-ins call the handler of an object; make it an instance method");
-        return;
-      }
+      // a static method: the stand-in calls it by its class
+      const staticOf = arrow?.[2] === "=>" ? lc(arrow[1]) : undefined;
       const handler = arrow ? arrow[1] : "me";
       const method = lc(arrow ? arrow[3] : text);
       if (!cls) {
@@ -1508,12 +1515,12 @@ class Converter {
         this.refuse(s, `SAP GUI controls: SET HANDLER ${method} - no handler FOR EVENT of the control in a local class, or an event its stand-in ${cls} does not raise`);
         return;
       }
-      if (handler === "me" && !b.ctx.local) {
+      if (handler === "me" && !b.ctx.local && !staticOf) {
         this.refuse(s, `SAP GUI controls: SET HANDLER ${method} outside of a local class - the handler is an object; name it`);
         return;
       }
       lines.push(renderNamedCall(`${target}->set_handler`, [
-        { name: "handler", value: handler },
+        staticOf ? this.staticHandler(staticOf) : { name: "handler", value: handler },
         { name: "method", value: literal(uc(method)) },
         { name: "event", value: literal(uc(candidates[0].event)) },
         ...(activation ? [{ name: "activation", value: activation }] : []),
@@ -1521,6 +1528,21 @@ class Converter {
     }
     b.out.push(...lines);
     this.map(s, `\`${target}->set_handler( )\` - the stand-in keeps the handler and calls it for the event of the browser`);
+  }
+
+  /** the handler parameter of SET HANDLER lcl=>m: an object of the local
+   *  class when it can be created without parameters - a static method is
+   *  called through an object too, and RTTI finds its class by the object;
+   *  else the class by its absolute name (a system resolves it, the
+   *  transpiled runtime does not) or by its name (a global class) */
+  staticHandler(cls) {
+    const def = this.locals.find((u) => u.kind === "ClassDefinition" && lc(nodeText(child(u.stmts[0], "ClassName") ?? u.stmts[0].getChildren()[1])) === cls);
+    if (!def) return { name: "class", value: literal(uc(cls)) };
+    const head = lc(renderTokens(stmtTokens(def.stmts[0])));
+    const ctor = def.stmts.find((x) => kind(x) === "MethodDef" && lc(nodeText(child(x, "MethodName") ?? x)) === "constructor");
+    const mandatory = ctor && /\bimporting\b/i.test(renderTokens(stmtTokens(ctor))) && !/^[^.]*importing(?:\s+\S+\s+type\s+\S+\s+(?:optional|default\s+\S+))+\s*\.?$/i.test(renderTokens(stmtTokens(ctor)));
+    if (!/\babstract\b|\bcreate\s+(private|protected)\b/.test(head) && !mandatory) return { name: "handler", value: `NEW ${cls}( )` };
+    return { name: "class", value: literal(`\\CLASS-POOL=${uc(this.className)}\\CLASS=${uc(cls)}`) };
   }
 
   /** the SAP GUI control classes of a statement that have no stand-in -
@@ -1643,7 +1665,8 @@ class Converter {
     // the parameters and exceptions named: of one of the methods called
     const known = new Set(["others", "error_message", ...used.flatMap((m) => [...m.params, ...m.exceptions])]);
     const flat = toks.join(" ");
-    const head = /^(?:data\s*\(\s*[\w/]+\s*\)|[\w/-]+)\s*=(?!=)/.exec(flat);
+    // the target of an assignment - an attribute of a class too (lcl=>x)
+    const head = /^(?:data\s*\(\s*[\w/]+\s*\)|[\w/-]+(?:\s*(?:=>|->)\s*[\w/-]+)*)\s*=(?![=>])/.exec(flat);
     // the components of a VALUE #( ... ) or another constructor expression
     // are no parameters
     const body = withoutConstructorArgs(head ? flat.slice(head[0].length) : flat);
@@ -2160,6 +2183,19 @@ class Converter {
         this.salv.set(m[1], { table: tab[1], tableTok, settings: [], lineSelection: false, displayed: false, stmt: s });
         this.alvPlan.set(s, { action: "drop", reason: "cl_salv_table=>factory( ) - alv( ) at display( )" });
         continue;
+      }
+
+      // LOOP AT x->get_columns( )->get( ) ASSIGNING <c> - the texts of every
+      // column, from its name and its DDIC text: a loop over the columns of
+      // the grid after alv( )
+      if (k === "Loop") {
+        const each = this.salvColumnLoop(s, seq, si);
+        if (each) {
+          this.salv.get(each.salv).settings.push({ m: "for_each_column", texts: each.texts });
+          for (let j = si; j <= each.end; j++) this.alvPlan.set(seq[j], { action: "drop", reason: "the texts of every column - a LOOP over get_columns( ) of the grid after alv( )" });
+          si = each.end;
+          continue;
+        }
       }
 
       // a call chain over a SALV object: x->get_columns( )->get_column( 'A' )->set_long_text( ... )
@@ -5175,6 +5211,12 @@ class Converter {
         ov.set(key(toks[i]), "z2ui5_cl_cgui_demo_output");
         continue;
       }
+      // cl_abap_browser=>show_html( ) - the stand-in that shows the
+      // document in a dialog box or in its container
+      if (t === "cl_abap_browser" && toks[i + 1]?.getStr() === "=>" && ABAP_BROWSER.includes(lc(toks[i + 2]?.getStr() ?? ""))) {
+        ov.set(key(toks[i]), "z2ui5_cl_cgui_abap_browser");
+        continue;
+      }
       if (t === "if_demo_output") {
         ov.set(key(toks[i]), "z2ui5_if_cgui_demo_output");
         continue;
@@ -6093,7 +6135,62 @@ class Converter {
     for (const st of settings.filter((x) => x.m === "add_function")) items.push({ method: "add_function", params: st.params });
     if (settings.some((x) => x.m === "set_selection_mode")) items.push({ method: "set_selection_mode", params: [] });
     if (lineSelection) items.push({ method: "set_line_selection", params: [] });
-    return renderChain({ items, head: "" });
+    // a loop over the columns: the text set last, long over medium over short
+    const each = settings.filter((x) => x.m === "for_each_column");
+    if (!each.length) return renderChain({ items, head: "" });
+    const chain = renderChain({ items, head: "" });
+    chain[0] = `DATA(lo_alv) = ${chain[0]}`;
+    const best = each.flatMap((x) => x.texts).reduce((a, b) => ((rank[b.rank] ?? 3) >= (rank[a.rank] ?? 3) ? b : a));
+    return [...chain,
+      `LOOP AT lo_alv->get_columns( ${lc(table)} ) INTO DATA(ls_column).`,
+      `  lo_alv->set_column_text( name = ls_column-name`,
+      `                           text = ${best.expr} ).`,
+      "ENDLOOP."];
+  }
+
+  /** LOOP AT salv->get_columns( )->get( ) ASSIGNING <c> | INTO c with a
+   *  body that only sets the texts of the column (<c>-r_column, or a
+   *  variable of it), from its name (get_columnname( )) and its DDIC texts
+   *  (get_long_text( ), ...) - { salv, end, texts: [{ rank, expr }] } with
+   *  expr in terms of ls_column-name and ls_column-label; undefined else */
+  salvColumnLoop(s, seq, si) {
+    const flat = lc(renderTokens(stmtTokens(s)));
+    const m = /^loop\s+at\s+([\w/]+)\s*->\s*get_columns\s*\(\s*\)\s*->\s*get\s*\(\s*\)\s+(?:assigning\s+(?:field-symbol\s*\(\s*)?(<\w+>)\s*\)?|into\s+(?:data\s*\(\s*)?(\w+)\s*\)?)\s*\.?$/.exec(flat);
+    if (!m || !this.salv.has(m[1])) return undefined;
+    const row = m[2] ?? m[3];
+    const refs = new Set([`${row}-r_column`]);
+    const texts = [];
+    let depth = 0;
+    for (let j = si + 1; j < seq.length; j++) {
+      const x = seq[j];
+      const k = kind(x);
+      if (k === "Loop") depth++;
+      if (k === "EndLoop") {
+        if (depth-- === 0) return texts.length ? { salv: m[1], end: j, texts } : undefined;
+        return undefined;
+      }
+      if (k === "Comment") continue;
+      const t = renderTokens(stmtTokens(x)).replace(/\s+/g, " ").trim();
+      // DATA(o_col) = <c>-r_column.
+      const alias = /^data\s*\(\s*(\w+)\s*\)\s*=\s*(\S+)\s*\.?$/i.exec(t);
+      if (alias && refs.has(lc(alias[2]))) {
+        refs.add(lc(alias[1]));
+        continue;
+      }
+      // o_col->set_long_text( expr ).
+      const set = /^(\S+?)\s*->\s*set_(long|medium|short)_text\s*\(\s*(.*)\s*\)\s*\.?$/i.exec(t);
+      if (!set || !refs.has(lc(set[1]))) return undefined;
+      let expr = set[3].trim();
+      for (const r of refs) {
+        const esc = r.replace(/[<>-]/g, (c) => `\\${c}`);
+        expr = expr.replace(new RegExp(`${esc}\\s*->\\s*get_columnname\\s*\\(\\s*\\)`, "gi"), "ls_column-name")
+          .replace(new RegExp(`${esc}\\s*->\\s*get_(long|medium|short)_text\\s*\\(\\s*\\)`, "gi"), "ls_column-label");
+      }
+      // anything else of the column is no text of it
+      if ([...refs].some((r) => expr.toLowerCase().includes(r))) return undefined;
+      texts.push({ rank: `set_${lc(set[2])}_text`, expr: expr || "``" });
+    }
+    return undefined;
   }
 
   /** an argument written in the report - a TEXT-001 becomes its text */
@@ -7005,6 +7102,10 @@ function caseBody(param, entries) {
 }
 
 /** whether z2ui5_cl_cgui_frontend has a constant or method of that name */
+// the members of z2ui5_cl_cgui_abap_browser - the ones of cl_abap_browser it has
+const ABAP_BROWSER = ["show_html", "show_url", "show_xml", "close_browser", "html_line", "html_table", "small", "medium", "large",
+  "xlarge", "landscape", "portrait", "topleft", "topright", "middle", "bottomleft", "bottomright", "navigate_off", "navigate_html"];
+
 // the static methods of z2ui5_cl_cgui_demo_output - the methods of
 // cl_demo_output it has
 const DEMO_OUTPUT = ["new", "write", "write_data", "write_text", "write_html", "write_json", "begin_section", "next_section",
