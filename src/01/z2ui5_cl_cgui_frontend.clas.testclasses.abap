@@ -16,6 +16,7 @@ CLASS ltcl_test DEFINITION FINAL FOR TESTING
     METHODS text_into_lines FOR TESTING.
     METHODS table_as_text FOR TESTING.
     METHODS url_of_bytes FOR TESTING.
+    METHODS bytes_lines_base64 FOR TESTING.
 
 ENDCLASS.
 
@@ -105,6 +106,44 @@ CLASS ltcl_test IMPLEMENTATION.
                                                       OTHERS               = 2 ).
     cl_abap_unit_assert=>assert_equals( exp = 1
                                         act = sy-subrc ).
+
+  ENDMETHOD.
+
+  METHOD bytes_lines_base64.
+
+    TYPES ty_line TYPE x LENGTH 4.
+    DATA lt_bin TYPE STANDARD TABLE OF ty_line WITH EMPTY KEY.
+    DATA lv_length TYPE i.
+    DATA lv_back TYPE xstring.
+    DATA lv_b64 TYPE string.
+
+    " six bytes are two lines of four, the last one filled up
+    z2ui5_cl_cgui_frontend=>scms_xstring_to_binary( EXPORTING buffer        = CONV xstring( '4D616E214D61' )
+                                                    IMPORTING output_length = lv_length
+                                                    CHANGING  binary_tab    = lt_bin ).
+    cl_abap_unit_assert=>assert_equals( exp = 6
+                                        act = lv_length ).
+    cl_abap_unit_assert=>assert_equals( exp = 2
+                                        act = lines( lt_bin ) ).
+    " and back, cut at the length
+    z2ui5_cl_cgui_frontend=>scms_binary_to_xstring( EXPORTING  input_length = lv_length
+                                                               binary_tab   = lt_bin
+                                                    IMPORTING  buffer       = lv_back
+                                                    EXCEPTIONS OTHERS       = 1 ).
+    cl_abap_unit_assert=>assert_equals( exp = CONV xstring( '4D616E214D61' )
+                                        act = lv_back ).
+
+    z2ui5_cl_cgui_frontend=>ssfc_base64_encode( EXPORTING  bindata = lv_back
+                                                IMPORTING  b64data = lv_b64
+                                                EXCEPTIONS OTHERS  = 1 ).
+    cl_abap_unit_assert=>assert_equals( exp = `TWFuIU1h`
+                                        act = lv_b64 ).
+    CLEAR lv_back.
+    z2ui5_cl_cgui_frontend=>ssfc_base64_decode( EXPORTING  b64data = lv_b64
+                                                IMPORTING  bindata = lv_back
+                                                EXCEPTIONS OTHERS  = 1 ).
+    cl_abap_unit_assert=>assert_equals( exp = CONV xstring( '4D616E214D61' )
+                                        act = lv_back ).
 
   ENDMETHOD.
 

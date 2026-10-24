@@ -913,6 +913,9 @@ test("SAP GUI controls: a member, a parameter or an event the stand-ins do not h
   const head = "REPORT zt.\nDATA go_c TYPE REF TO cl_gui_custom_container.\nDATA go_e TYPE REF TO cl_gui_textedit.\nSTART-OF-SELECTION.\n  CREATE OBJECT go_c EXPORTING container_name = 'CC'.\n";
   const refused = (body) => refusalOf(`${head}${body}`).map((x) => x.replace(/^\d+:\d+ /, ""));
   assert.deepEqual(refused("  CREATE OBJECT go_e EXPORTING parent = go_c.\n  go_e->set_textstream( 'x' ).\n"), []);
+  // NEW #( ) of a control: the constructor of the class it is assigned to
+  assert.deepEqual(refused("  go_e = NEW #( parent = go_c wordwrap_mode = cl_gui_textedit=>wordwrap_at_windowborder ).\n"), []);
+  assert.deepEqual(refused("  go_e = NEW #( parent = go_c colour = 1 ).\n"), ["SAP GUI controls: colour is no parameter of the method called in the stand-in - port this statement by hand"]);
   assert.deepEqual(refused("  go_e->set_comments_string( ).\n"), ["SAP GUI controls: go_e->set_comments_string has no counterpart in z2ui5_cl_cgui_gui_textedit - port this statement by hand"]);
   assert.deepEqual(refused("  go_e->set_textstream( text = 'x' colour = 1 ).\n"), ["SAP GUI controls: colour is no parameter of the method called in the stand-in - port this statement by hand"]);
   assert.deepEqual(refusalOf(`${head}DATA go_p TYPE REF TO cl_gui_simple_tree.\n`).map((x) => x.replace(/^\d+:\d+ /, "")), ["SAP GUI controls: cl_gui_simple_tree has no counterpart - the containers, cl_gui_textedit, cl_gui_html_viewer, cl_gui_toolbar, cl_gui_picture and cl_gui_alv_grid have (z2ui5_cl_cgui_gui*)"]);

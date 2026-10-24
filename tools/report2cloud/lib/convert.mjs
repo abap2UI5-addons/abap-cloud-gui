@@ -185,6 +185,16 @@ const GUI_CONTROL = /\bcl_gui_(alv_grid|custom_container|docking_container|split
 export const FRONTEND = {
   constants: ["action_ok", "action_cancel", "filetype_all", "filetype_text", "filetype_excel", "filetype_xml", "filetype_html"],
   methods: {
+    scms_binary_to_xstring: { params: ["input_length", "first_line", "last_line", "binary_tab", "buffer"],
+      exceptions: ["failed"] },
+    scms_xstring_to_binary: { params: ["buffer", "append_to_table", "output_length", "binary_tab"],
+      exceptions: [] },
+    scms_string_to_xstring: { params: ["text", "mimetype", "encoding", "buffer"],
+      exceptions: ["failed"] },
+    ssfc_base64_encode: { params: ["bindata", "binleng", "b64data"],
+      exceptions: ["ssf_krn_error", "ssf_krn_noop", "ssf_krn_nomemory", "ssf_krn_opinv", "ssf_krn_input_data_error", "ssf_krn_invalid_par", "ssf_krn_invalid_parlen"] },
+    ssfc_base64_decode: { params: ["b64data", "b64leng", "b64_strict", "bindata"],
+      exceptions: ["ssf_krn_error", "ssf_krn_noop", "ssf_krn_nomemory", "ssf_krn_opinv", "ssf_krn_input_data_error", "ssf_krn_invalid_par", "ssf_krn_invalid_parlen"] },
     dp_create_url: { params: ["type", "subtype", "size", "date", "time", "description", "lifetime", "cacheable", "send_data_as_string", "data", "url"],
       exceptions: ["dp_invalid_parameter", "dp_error_put_table", "dp_error_general"] },
     url_content: { params: ["url"],
@@ -235,7 +245,11 @@ export const FRONTEND = {
 };
 
 // the function modules of the frontend, as methods of z2ui5_cl_cgui_frontend
-const FRONTEND_FUNCTIONS = { GUI_UPLOAD: "gui_upload", GUI_DOWNLOAD: "gui_download", DP_CREATE_URL: "dp_create_url" };
+const FRONTEND_FUNCTIONS = { GUI_UPLOAD: "gui_upload", GUI_DOWNLOAD: "gui_download", DP_CREATE_URL: "dp_create_url",
+  SCMS_BINARY_TO_XSTRING: "scms_binary_to_xstring", SCMS_XSTRING_TO_BINARY: "scms_xstring_to_binary",
+  SCMS_STRING_TO_XSTRING: "scms_string_to_xstring", SSFC_BASE64_ENCODE: "ssfc_base64_encode", SSFC_BASE64_DECODE: "ssfc_base64_decode" };
+// the TABLES parameters of FRONTEND_FUNCTIONS that are CHANGING of the method - the others it only reads
+const FRONTEND_TABLES_OUT = new Set(["GUI_UPLOAD.data_tab", "GUI_DOWNLOAD.data_tab", "SCMS_XSTRING_TO_BINARY.binary_tab"]);
 
 /**
  * The stand-ins of the SAP GUI controls (src/01/z2ui5_cl_cgui_gui*) - the
@@ -252,6 +266,7 @@ export const GUI = {
     cl_gui_docking_container: "z2ui5_cl_cgui_gui_container",
     cl_gui_splitter_container: "z2ui5_cl_cgui_gui_container",
     cl_gui_dialogbox_container: "z2ui5_cl_cgui_gui_container",
+    cl_gui_gos_container: "z2ui5_cl_cgui_gui_container",
     cl_gui_easy_splitter_container: "z2ui5_cl_cgui_gui_easy_split",
     cl_gui_textedit: "z2ui5_cl_cgui_gui_textedit",
     cl_gui_html_viewer: "z2ui5_cl_cgui_gui_html_viewer",
@@ -266,6 +281,8 @@ export const GUI = {
       attributes: [],
       events: [],
       methods: {
+        compute_metric_from_dynp: { params: ["metric", "x_or_y", "in"],
+          exceptions: [] },
         set_report: { params: ["report"],
           exceptions: [] },
         get_report: { params: [],
@@ -1682,6 +1699,8 @@ class Converter {
       }
       // NEW cl_gui_alv_grid( i_parent = NEW cl_gui_custom_container( ... ) ) - both
       if (t === "new" && guiClass(toks[i + 1])) ctors.push(guiClass(toks[i + 1]));
+      // go_x = NEW #( ... ) - the class of the control assigned to
+      if (t === "new" && toks[i + 1] === "#" && toks[1] === "=" && i === 2 && this.guiVars.has(toks[0])) ctors.push(this.guiVars.get(toks[0]));
     }
     // CREATE OBJECT go_x [TYPE cl_gui_y]: the constructor of its class
     if (kind(s) === "CreateObject") {
@@ -5256,6 +5275,12 @@ class Converter {
         ov.set(key(toks[i]), "z2ui5_cl_cgui_abap_browser");
         continue;
       }
+      // cl_gui_cfw=>compute_metric_from_dynp( ) - the size it computes is
+      // the value it is given: the browser lays the controls out itself
+      if (t === "cl_gui_cfw" && toks[i + 1]?.getStr() === "=>" && lc(toks[i + 2]?.getStr() ?? "") === "compute_metric_from_dynp") {
+        ov.set(key(toks[i]), "z2ui5_cl_cgui_gui");
+        continue;
+      }
       if (t === "if_demo_output") {
         ov.set(key(toks[i]), "z2ui5_if_cgui_demo_output");
         continue;
@@ -6051,7 +6076,7 @@ class Converter {
           return;
         }
         // TABLES data_tab is CHANGING, TABLES fieldnames a table it reads
-        const section = keyword === "TABLES" ? (name === "data_tab" ? "CHANGING" : "EXPORTING") : keyword;
+        const section = keyword === "TABLES" ? (FRONTEND_TABLES_OUT.has(`${fm}.${name}`) ? "CHANGING" : "EXPORTING") : keyword;
         sections[section].push({ name: shown, value });
       }
     }
@@ -6067,7 +6092,8 @@ class Converter {
     if (!lines.length) lines.push(head.trimEnd());
     lines[lines.length - 1] += " ).";
     b.out.push(...lines);
-    if (fm === "DP_CREATE_URL") this.note("DP_CREATE_URL is z2ui5_cl_cgui_frontend=>dp_create_url( ) - the URL names a data URI of the bytes, which the picture and the HTML viewer of the browser show");
+    if (/^(SCMS|SSFC)_/.test(fm)) this.note("SCMS_*_TO_* and SSFC_BASE64_* are methods of z2ui5_cl_cgui_frontend - bytes, lines of bytes, text and base64 converted in plain ABAP, the function modules are not released for ABAP Cloud");
+    else if (fm === "DP_CREATE_URL") this.note("DP_CREATE_URL is z2ui5_cl_cgui_frontend=>dp_create_url( ) - the URL names a data URI of the bytes, which the picture and the HTML viewer of the browser show");
     else this.note("cl_gui_frontend_services is z2ui5_cl_cgui_frontend - a file the user picks is uploaded in the browser (file_open_dialog( ) in an F4 opens the upload, the F4 runs again with the file), gui_download( ) is a download of the browser");
     this.map(s, `\`z2ui5_cl_cgui_frontend=>${method}( )\` - the function module as the method of the frontend services, its EXCEPTIONS kept`);
   }
