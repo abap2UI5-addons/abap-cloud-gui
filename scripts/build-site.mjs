@@ -41,11 +41,14 @@ await build({
   inject: [join(ROOT, "site", "shims", "buffer.mjs")],
 });
 
-// a report with includes of its own is no example - the page has no includes
+// a report with includes of its own is no example - the page has no includes;
+// neither is an include
 const examples = [];
 for (const f of readdirSync(CORPUS).filter((x) => x.endsWith(".prog.abap")).sort()) {
   const source = readFileSync(join(CORPUS, f), "utf8");
   if (/^\s*include\s/im.test(source)) continue;
+  // an include of a report is no report of its own
+  if (!/^\s*(?:report|program)\s/im.test(source)) continue;
   const name = f.replace(/\.prog\.abap$/, "");
   const xml = join(CORPUS, `${name}.prog.xml`);
   const textpool = existsSync(xml) ? parseTextpool(readFileSync(xml, "utf8")) : undefined;
