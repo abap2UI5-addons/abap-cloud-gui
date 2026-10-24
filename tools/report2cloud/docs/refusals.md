@@ -27,7 +27,7 @@ A refused statement has no counterpart in an abap-cloud-gui report. The converte
 | [TOP-OF-PAGE and END-OF-PAGE with logic, or twice](#page-events) | `page-events` |
 | [AT SELECTION-SCREEN ON ... of a field, block or group that does not exist](#selscreen-event-field) | `selscreen-event-field` |
 | [An inline declaration of an event block, used in another one, of a type that cannot be told](#inline-global) | `inline-global` |
-| [A field of the selection screen typed at runtime: TYPE (name), FOR (name)](#dynamic-screen-type) | `dynamic-screen-type` |
+| [A field of the selection screen typed at runtime (TYPE (name), FOR (name)) or with a local type](#dynamic-screen-type) | `dynamic-screen-type` |
 | [SELECTION-SCREEN INCLUDE and other screen statements](#selscreen) | `selscreen` |
 | [CALL SELECTION-SCREEN of a screen the report does not have, or twice](#call-selection-screen) | `call-selection-screen` |
 | [SUBMIT forms without a counterpart](#submit) | `submit` |
@@ -381,9 +381,9 @@ INITIALIZATION.
 
 <a id="dynamic-screen-type"></a>
 
-## A field of the selection screen typed at runtime: TYPE (name), FOR (name)
+## A field of the selection screen typed at runtime (TYPE (name), FOR (name)) or with a local type
 
-**Why.** Every field of the selection screen becomes an attribute of the class - typed when the class is written. A type taken from a variable at runtime has nothing to type it with.
+**Why.** Every field of the selection screen becomes a public attribute of the class - typed when the class is written. A type taken from a variable at runtime has nothing to type it with, and a type of a local class (`lcl_x=>ty_name`) cannot type a public attribute: the local types of a class pool only reach its private section.
 
 **Rewrite.**
 

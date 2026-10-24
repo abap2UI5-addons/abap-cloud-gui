@@ -100,6 +100,24 @@ to map, and the converted share is the number to move. `--json` writes a line
 per report for a diff between two runs. A measurement, not a gate - the exit
 code is 0 whatever the numbers.
 
+### The web corpus
+
+```
+npm run report2cloud:web -- [--lint] [--limit n] [--json file] [--summary file] [--offline]
+```
+
+measures the converter on the open-source ABAP of the web: the repositories
+of the community list of ABAP projects (`--list`, default the `list.json` of
+dotabap-list), cloned shallow and sparse into `build/web-corpus` - only
+`*.prog.abap` and `*.prog.xml`, read and never run, and none of it part of
+this repository. Every report is converted with the includes of its own
+repository; `--lint` lints the converted classes together (v750), where the
+parser errors and redefinitions are the converter's and most other findings
+name a dependency the sparse clone does not have. A clone in the cache is
+kept, `--offline` uses the cache alone. The workflow
+`.github/workflows/report2cloud-web.yaml` runs it weekly and writes the
+summary into the job summary; it fails when a report crashes the converter.
+
 ## An example
 
 ```abap
@@ -422,6 +440,7 @@ of the samples: one call per line, the parameters aligned.
 |---|---|
 | `cli.mjs` | the command line |
 | `coverage.mjs` | the measurement over a folder of reports |
+| `web.mjs` | the measurement over the open-source reports of the web (`report2cloud:web`) |
 | `lib/convert.mjs` | the converter |
 | `lib/includes.mjs` | the INCLUDEs of a report, inlined from the files beside it, with where every line came from |
 | `lib/abap.mjs` | helpers over the syntax tree, the token renderer |

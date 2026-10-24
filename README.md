@@ -374,10 +374,11 @@ Stage 0 - release, and the number to move
 
 - [ ] A release of this addon with report2cloud and the MCP server's
       `migrate_report`; the documentation's preview note goes
-- [ ] A corpus of real reports (own, and open-source ABAP), converted on
-      every change and weekly: the share that converts without a refusal,
-      and the share that starts in the transpiled runtime, as a line in the
-      job summary - the number every stage below is measured by
+- [x] A corpus of real reports: the open-source ABAP of the web, converted
+      weekly (`report2cloud:web`), the share that converts without a refusal
+      and the refusals ranked in the job summary - the number every stage
+      below is measured by
+- [ ] The share of the web corpus that starts in the transpiled runtime
 - [x] `report2cloud:coverage` - the measurement over a folder of reports
 - [x] Includes inlined from beside the report, macros expanded
 

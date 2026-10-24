@@ -37,8 +37,9 @@ function args(argv) {
 }
 
 /** every .prog.abap under dir, recursively */
-function programs(dir, out = []) {
+export function programs(dir, out = []) {
   for (const name of readdirSync(dir).sort()) {
+    if (name === ".git") continue;
     const path = join(dir, name);
     if (statSync(path).isDirectory()) programs(path, out);
     else if (name.endsWith(".prog.abap")) out.push(path);
@@ -46,15 +47,17 @@ function programs(dir, out = []) {
   return out;
 }
 
-const isReport = (source) => /^\s*(REPORT|PROGRAM)\b/im.test(source);
+export const isReport = (source) => /^\s*(REPORT|PROGRAM)\b/im.test(source);
 
 // A refusal's reason without what is particular to one report - the name
 // in quotes, a number - so the same reason counts as one line.
 const reasonOf = (message) => message.split(" - ")[0].replace(/'[^']*'/g, "'…'").replace(/`[^`]*`/g, "`…`").replace(/\b\d+\b/g, "n").trim();
 const todoOf = (message) => message.replace(/'[^']*'/g, "'…'").replace(/`[^`]*`/g, "`…`").replace(/\b[A-Z][A-Z0-9_/]{2,}\b/g, "…").replace(/(?:…, )+…/g, "…").replace(/\b\d+\b/g, "n").trim();
 
-/** the coverage of the reports in `files`; read(name) answers an include */
-export function coverage(files, { read } = {}) {
+/** the coverage of the reports in `files`; read(name) answers an include,
+ *  className(file) names the class (default: zcl_ + the report name), and
+ *  with keep the generated files of every converted report are in its row */
+export function coverage(files, { read, className, keep = false } = {}) {
   const rows = [];
   for (const file of files) {
     const raw = readFileSync(file, "utf8");
@@ -74,6 +77,7 @@ export function coverage(files, { read } = {}) {
       const reader = read ?? includesFrom([dir]);
       result = convert(includes.source, {
         file, programName: m ? m[1].replace(/#/g, "/") : undefined, textpool, origin: includes.origin,
+        className: className?.(file),
         classFor: (program) => (reader(program) !== undefined ? defaultClassName(program) : undefined),
       });
     } catch (e) {
@@ -94,13 +98,14 @@ export function coverage(files, { read } = {}) {
       mapped: result.mapped.length,
       includes: includes.included.length,
       missing: includes.missing,
+      ...(keep && result.ok ? { files: result.files } : {}),
     });
   }
   return rows;
 }
 
 /** the counts of `key` over the rows: how many reports carry it at least once */
-function ranked(rows, key) {
+export function ranked(rows, key) {
   const byReports = new Map();
   for (const row of rows) for (const k of new Set(row[key] ?? [])) byReports.set(k, (byReports.get(k) ?? 0) + 1);
   return [...byReports].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
