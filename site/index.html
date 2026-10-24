@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>abap-cloud-gui</title>
+  <meta name="description" content="Write abap2UI5 apps like classic ABAP reports - and convert the reports you have with report2cloud, here in the browser.">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="top">
+    <div class="wrap top-row">
+      <a class="brand" href="#">abap-cloud-gui</a>
+      <nav>
+        <a href="#why">Why</a>
+        <a href="#how">How</a>
+        <a href="#playground">Playground</a>
+        <a href="https://github.com/abap2UI5-addons/abap-cloud-gui">GitHub</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero wrap">
+      <p class="eyebrow">An addon of abap2UI5</p>
+      <h1>Classic ABAP reports, as UI5 apps - on ABAP Cloud and down to 7.02</h1>
+      <p class="lead">Selection screen, <code>WRITE</code> list, ALV grid, <code>START-OF-SELECTION</code>,
+        <code>AT LINE-SELECTION</code>, <code>MESSAGE</code>: write a class that reads like a report and get
+        an app in the browser. The reports you have already convert with <strong>report2cloud</strong> -
+        try it below, nothing leaves your browser.</p>
+      <p class="actions">
+        <a class="button primary" href="#playground">Try the converter</a>
+        <a class="button" href="https://github.com/abap2UI5-addons/abap-cloud-gui#installation">Install with abapGit</a>
+      </p>
+    </section>
+
+    <section id="why" class="wrap grid3">
+      <div class="card">
+        <h2>No SAP GUI on ABAP Cloud</h2>
+        <p>No selection screens, no lists, no <code>CL_SALV_TABLE</code>. A report of ten minutes on premise
+          turns into RAP, CDS and a Fiori app. abap-cloud-gui keeps the report model and renders it with abap2UI5.</p>
+      </div>
+      <div class="card">
+        <h2>The concepts you know</h2>
+        <p>Event blocks are methods of the same name, <code>PARAMETERS</code> and <code>SELECT-OPTIONS</code> are
+          attributes, <code>write( )</code> writes the list, <code>alv( )</code> shows a grid - with drilldown,
+          value helps, variants and messages. No UI5 knowledge needed.</p>
+      </div>
+      <div class="card">
+        <h2>Converted, not rewritten</h2>
+        <p>report2cloud turns a <code>.prog.abap</code> into a report class: FORMs into methods, the list and the
+          ALV into their counterparts, dynpros and SAP GUI controls into stand-ins. What it cannot convert it
+          refuses with the line - it never guesses.</p>
+      </div>
+    </section>
+
+    <section id="how" class="wrap">
+      <h2>A report as a class</h2>
+      <pre class="code"><code>CLASS zcl_hello DEFINITION PUBLIC INHERITING FROM z2ui5_cl_cgui_report FINAL CREATE PUBLIC.
+  PUBLIC SECTION.
+    DATA p_name  TYPE string.
+    DATA p_times TYPE i.
+  PROTECTED SECTION.
+    METHODS selection_screen REDEFINITION.
+    METHODS start_of_selection REDEFINITION.
+ENDCLASS.
+
+CLASS zcl_hello IMPLEMENTATION.
+  METHOD selection_screen.
+    screen->parameter( val = p_name text = `Your name` obligatory = abap_true
+        )->parameter( val = p_times text = `Lines` ).
+  ENDMETHOD.
+
+  METHOD start_of_selection.
+    write( |Hello { p_name }!| )->uline( ).
+    DO p_times TIMES.
+      write( |Line { sy-index }| )->new_line( ).
+    ENDDO.
+  ENDMETHOD.
+ENDCLASS.</code></pre>
+      <p>Start it like any abap2UI5 app (<code>?app_start=zcl_hello</code>): the selection screen comes up,
+        <strong>Execute</strong> runs the report and shows the list, <strong>Back</strong> returns.</p>
+    </section>
+
+    <section id="playground" class="wrap">
+      <h2>report2cloud playground</h2>
+      <p>Paste a classic report, or pick an example, and convert it. The converter runs in this page - the
+        same code as <code>npm run report2cloud</code>. Includes and the repository's DDIC are not there, so a
+        report that needs them converts with TODOs.</p>
+
+      <div class="toolbar">
+        <label>Example
+          <select id="example"></select>
+        </label>
+        <label>Class name
+          <input id="classname" placeholder="zcl_ + the report name" spellcheck="false">
+        </label>
+        <button id="convert" class="button primary" type="button">Convert</button>
+      </div>
+
+      <div class="panes">
+        <div class="pane">
+          <div class="pane-head">Report <span class="muted">.prog.abap</span></div>
+          <textarea id="source" wrap="off" spellcheck="false" aria-label="ABAP report source"></textarea>
+        </div>
+        <div class="pane">
+          <div class="pane-head">
+            <div id="tabs" class="tabs" role="tablist"></div>
+            <button id="copy" class="link" type="button">Copy</button>
+          </div>
+          <pre id="output" class="output" tabindex="0"><span class="muted">The generated class appears here.</span></pre>
+        </div>
+      </div>
+
+      <div id="status" class="status" role="status"></div>
+      <div id="findings" class="findings"></div>
+    </section>
+
+    <section class="wrap grid3">
+      <div class="card">
+        <h2>Measured on the web</h2>
+        <p>Every week the converter runs over the open-source ABAP of the web - the share that converts, the
+          refusals ranked, and how many of the converted reports start in the transpiled runtime.</p>
+      </div>
+      <div class="card">
+        <h2>Checked like code</h2>
+        <p>abaplint against ABAP Cloud and 7.02, the abap2UI5 linter, ABAP Unit in a transpiled runtime, and
+          a runtime test that drives every converted sample report through the UI5 protocol.</p>
+      </div>
+      <div class="card">
+        <h2>Open source</h2>
+        <p>MIT licensed, installed with abapGit, part of
+          <a href="https://github.com/abap2UI5-addons">abap2UI5-addons</a>. Issues and pull requests welcome.</p>
+      </div>
+    </section>
+  </main>
+
+  <footer class="wrap foot">
+    <a href="https://github.com/abap2UI5-addons/abap-cloud-gui">abap2UI5-addons/abap-cloud-gui</a> ·
+    <a href="https://github.com/abap2UI5/abap2UI5">abap2UI5</a> ·
+    <a href="https://github.com/abap2UI5-addons/abap-cloud-gui/blob/main/tools/report2cloud/README.md">report2cloud</a>
+  </footer>
+
+  <script type="module" src="playground.js"></script>
+</body>
+</html>

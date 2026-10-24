@@ -67,3 +67,24 @@ test("the summary: crashes listed, lint findings ranked by kind", () => {
   assert.match(md, /2 finding\(s\), 1 parser error\(s\)/);
   assert.match(md, /- `c`: boom/);
 });
+
+test("the summary with --start: the funnel, and where the reports stopped, ranked", () => {
+  const md = markdown({
+    rows: [{ file: "a", ok: true }, { file: "b", ok: true }, { file: "c", ok: true }],
+    repos: 1,
+    failed: [],
+    started: {
+      funnel: { converted: 3, checked: 2, built: 2, started: 1 },
+      stages: [
+        { file: "a", stage: "check", ok: false, error: "check_syntax: Class \"zcl_dep\" not found" },
+        { file: "b", stage: "start", ok: false, error: "no first screen within the time" },
+        { file: "c", stage: "start", ok: true },
+      ],
+    },
+  });
+  assert.match(md, /\*\*1 of 3 converted reports start \(33 %\)\*\* - 2 pass the syntax check of the transpile, 2 build\./);
+  assert.match(md, /\| started \| 1 \|/);
+  assert.match(md, /\| 1 \| check: check_syntax: Class … not found \|/);
+  assert.match(md, /\| 1 \| start: no first screen within the time \|/);
+  assert.match(markdown({ rows: [], repos: 0, failed: [], started: { error: "no mcp-server checkout" } }), /Not started in the transpiled runtime: no mcp-server checkout/);
+});

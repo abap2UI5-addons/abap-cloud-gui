@@ -17,6 +17,7 @@ list, ALV grid, messages. Language of code, comments, commits and docs:
 | `src/02` | samples `z2ui5_cl_cgui_sample_01` … `_11` |
 | `tools/report2cloud` | `report2cloud`, a Node CLI (no ABAP object) that converts a classic report into a report class of this addon - THE generator of this repository, see below |
 | `scripts/unit.mjs` | `npm run unit` - the ABAP Unit tests in the transpiled backend, tables included |
+| `site/`, `scripts/build-site.mjs` | `npm run site` - the GitHub Pages site: the page about the addon and the report2cloud playground, the converter bundled for the browser with esbuild (`.github/workflows/pages.yaml` deploys `build/site` from main). The converter stays browser-safe: no `node:` import in `tools/report2cloud/lib/convert.mjs` and what it imports (`report.mjs`, `refusals.mjs`, `abap.mjs`, `abapgit.mjs`, `textpool.mjs`) - file access belongs to the CLI |
 | `.github/abaplint` | the Cloud and 7.02 gate configs; `abaplint.jsonc` at the root is the v750 inner loop |
 
 Naming: every class is `Z2UI5_CL_CGUI_*` / `Z2UI5_CX_CGUI_*`, every interface

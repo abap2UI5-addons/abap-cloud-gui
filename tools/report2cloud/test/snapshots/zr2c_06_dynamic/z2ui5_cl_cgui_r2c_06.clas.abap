@@ -25,7 +25,7 @@ CLASS z2ui5_cl_cgui_r2c_06 DEFINITION PUBLIC
     DATA p_expert TYPE abap_bool.
     DATA p_plant  TYPE c LENGTH 4.
     DATA p_token  TYPE c LENGTH 32.
-    DATA b_reset  TYPE c LENGTH 20.
+    DATA b_reset  TYPE c LENGTH 83.
 
   PROTECTED SECTION.
     METHODS initialization REDEFINITION.

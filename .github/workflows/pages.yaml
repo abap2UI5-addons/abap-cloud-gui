@@ -1,0 +1,64 @@
+name: pages
+
+# The site of the repository on GitHub Pages: the page that presents the
+# addon and the report2cloud playground - the converter bundled for the
+# browser (npm run site, scripts/build-site.mjs). A pull request builds it,
+# a push to main deploys it. The repository's Pages source must be "GitHub
+# Actions" (Settings > Pages).
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'site/**'
+      - 'tools/report2cloud/lib/**'
+      - 'tools/report2cloud/test/corpus/**'
+      - 'scripts/build-site.mjs'
+      - 'package-lock.json'
+      - '.github/workflows/pages.yaml'
+  pull_request:
+    paths:
+      - 'site/**'
+      - 'tools/report2cloud/lib/**'
+      - 'scripts/build-site.mjs'
+      - 'package-lock.json'
+      - '.github/workflows/pages.yaml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+    - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+      with:
+        node-version: '22'
+        cache: 'npm'
+    - run: npm ci
+    - run: npm run site
+    - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+      with:
+        path: build/site
+
+  deploy:
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+    - id: deployment
+      uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1

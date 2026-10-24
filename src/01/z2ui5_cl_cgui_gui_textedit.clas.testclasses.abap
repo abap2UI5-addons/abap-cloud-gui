@@ -51,6 +51,9 @@ CLASS ltcl_gui IMPLEMENTATION.
   METHOD z2ui5_if_cgui_gui~custom_render ##NEEDED.
   ENDMETHOD.
 
+  METHOD z2ui5_if_cgui_gui~list ##NEEDED.
+  ENDMETHOD.
+
   METHOD z2ui5_if_cgui_gui~grid_display.
 
     FIELD-SYMBOLS <from> TYPE any.

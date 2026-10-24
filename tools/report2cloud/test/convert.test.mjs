@@ -951,6 +951,61 @@ test("SAP GUI controls: a grid in a local class is the grid stand-in - VALUE #( 
   assert.match(convert(other, { file: "zt.prog.abap", className: "zcl_t" }).refusals[0]?.message ?? "", /refresh_table_display\( \) - the grid shows a copy of its table/);
 });
 
+test("what the syntax check of the web corpus found: MESSAGE of an exception of a multi-line CATCH or a local class, DATA( ) in a local class, the fields a SELECTION-SCREEN declares, a label set at runtime", () => {
+  const src = [
+    "REPORT zt.",
+    "DATA lv_result TYPE i.",
+    "SELECTION-SCREEN BEGIN OF BLOCK b1 WITH FRAME TITLE b1_title.",
+    "SELECTION-SCREEN COMMENT 1(20) sc_t001.",
+    "PARAMETERS p_x TYPE c.",
+    "SELECTION-SCREEN END OF BLOCK b1.",
+    "CLASS lcl DEFINITION.",
+    "  PUBLIC SECTION.",
+    "    DATA error TYPE REF TO cx_root.",
+    "    METHODS run.",
+    "ENDCLASS.",
+    "CLASS lcl IMPLEMENTATION.",
+    "  METHOD run.",
+    "    DATA(lv_result) = 2.",
+    "    b1_title = 'Title'.",
+    "    %_p_x_%_app_%-text = 'Mark'.",
+    "    TRY.",
+    "      CATCH cx_sy_zerodivide INTO error.",
+    "        MESSAGE error TYPE 'W'.",
+    "    ENDTRY.",
+    "  ENDMETHOD.",
+    "ENDCLASS.",
+    "INITIALIZATION.",
+    "  NEW lcl( )->run( ).",
+    "START-OF-SELECTION.",
+    "  TRY.",
+    "    CATCH cx_sy_zerodivide",
+    "          cx_sy_arithmetic_overflow",
+    "    INTO DATA(lx).",
+    "      MESSAGE lx TYPE 'E'.",
+    "  ENDTRY.",
+    "",
+  ].join("\n");
+  const r = convert(src, { file: "zt.prog.abap", className: "zcl_t" });
+  assert.deepEqual(r.refusals.map((x) => x.message), []);
+  const cls = r.files["zcl_t.clas.abap"];
+  const imp = r.files["zcl_t.clas.locals_imp.abap"];
+  assert.match(cls, /message\( text = lx->get_text\( \)/);
+  assert.match(imp, /lcl_r2c=>app->message\( text = error->get_text\( \)/);
+  // the local variable of the method, not the report's global
+  assert.match(imp, /DATA\(lv_result\) = 2\./);
+  assert.match(imp, /lcl_r2c=>app->b1_title = 'Title'\./);
+  // a comment field is c LENGTH 83, as in the classic
+  assert.match(cls, /DATA sc_t001\s+TYPE c LENGTH 83\./);
+  // the label set at runtime: a global, shown while set
+  assert.match(cls, /DATA gv_label_p_x\s+TYPE string\./);
+  assert.match(imp, /lcl_r2c=>app->gv_label_p_x = 'Mark'\./);
+  assert.match(cls, /text\s*= gv_label_p_x/);
+  // a comment in a chain of TYPES does not cut it in two
+  const chain = convert("REPORT zt.\nTYPES: BEGIN OF ty_s,\n         a TYPE i, \"one\n         b TYPE string, \"two\n       END OF ty_s.\nDATA gs TYPE ty_s.\nSTART-OF-SELECTION.\n  WRITE gs-b.\n", { file: "zt.prog.abap", className: "zcl_t" });
+  assert.match(chain.files["zcl_t.clas.abap"], /BEGIN OF ty_s,\n\s+a TYPE i,\n\s+b TYPE string,\n\s+END OF ty_s\./);
+});
+
 test("MESSAGE of an exception object is its text; MODULE x OUTPUT and MODULE x INPUT are two methods", () => {
   const r = convert("REPORT zt.\nSTART-OF-SELECTION.\n  TRY.\n      RAISE EXCEPTION TYPE cx_sy_zerodivide.\n    CATCH cx_root INTO DATA(lx).\n      MESSAGE lx TYPE 'I'.\n  ENDTRY.\n", { file: "zt.prog.abap", className: "zcl_t" });
   assert.match(r.files["zcl_t.clas.abap"], /message\( text = lx->get_text\( \)\n\s+type = `I` \)\./);
@@ -1004,4 +1059,43 @@ test("a name every JavaScript object has - constructor, toString - is no SAP GUI
   const text = Object.values(r.files).join("\n");
   assert.doesNotMatch(text, /native code|function Object/);
   assert.match(text, /METHODS constructor\./);
+});
+
+test("cl_demo_output and if_demo_output are the stand-in that writes into the list - a method it does not have stays and is named for the release", () => {
+  const r = convert(`REPORT zdemo.
+DATA itab TYPE STANDARD TABLE OF i WITH DEFAULT KEY.
+DATA out TYPE REF TO if_demo_output.
+START-OF-SELECTION.
+  APPEND 1 TO itab.
+  cl_demo_output=>begin_section( 'Numbers' ).
+  cl_demo_output=>write( itab ).
+  out = cl_demo_output=>new( ).
+  out->write_text( 'x' )->line( )->display( ).
+  cl_demo_output=>display( itab ).
+  cl_demo_output=>write_xml( '<a/>' ).`, { file: "zdemo.prog.abap" });
+  assert.equal(r.ok, true);
+  const cls = r.files["zcl_demo.clas.abap"];
+  assert.match(cls, /DATA out\s+TYPE REF TO z2ui5_if_cgui_demo_output\./);
+  assert.match(cls, /z2ui5_cl_cgui_demo_output=>begin_section\( 'Numbers' \)\./);
+  assert.match(cls, /out = z2ui5_cl_cgui_demo_output=>new\( \)\./);
+  assert.match(cls, /z2ui5_cl_cgui_demo_output=>display\( itab \)\./);
+  assert.match(cls, /cl_demo_output=>write_xml/);
+  assert.deepEqual(r.release.map((x) => x.name), ["CL_DEMO_OUTPUT"]);
+});
+
+test("the converter runs in the browser too - no node: import in convert.mjs and what it imports (the playground of the site)", () => {
+  const lib = new URL("../lib/", import.meta.url);
+  const seen = new Set();
+  const walk = (file) => {
+    if (seen.has(file)) return;
+    seen.add(file);
+    const text = readFileSync(new URL(file, lib), "utf8");
+    for (const m of text.matchAll(/^import\s[^;]*?from\s+"([^"]+)"/gms)) {
+      assert.ok(!m[1].startsWith("node:"), `${file} imports ${m[1]}`);
+      if (m[1].startsWith("./")) walk(m[1].slice(2));
+    }
+  };
+  walk("convert.mjs");
+  walk("report.mjs");
+  assert.ok(seen.has("abap.mjs") && seen.has("refusals.mjs"));
 });

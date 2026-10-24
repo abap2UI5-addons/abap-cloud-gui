@@ -17,7 +17,8 @@
     "test:report2cloud": "node --test \"tools/report2cloud/test/*.test.mjs\"",
     "report2cloud:docs": "node tools/report2cloud/docs.mjs",
     "test:report2cloud:runtime": "node --test --test-concurrency=1 \"tools/report2cloud/test/runtime/*.test.mjs\"",
-    "unit": "node scripts/unit.mjs"
+    "unit": "node scripts/unit.mjs",
+    "site": "node scripts/build-site.mjs"
   },
   "repository": {
     "type": "git",
@@ -28,7 +29,8 @@
     "@abap2ui5/linter": "^0.8.5",
     "@abap2ui5/linter-render": "^0.8.5",
     "@abaplint/cli": "^2.120.75",
-    "@abaplint/core": "^2.120.75"
+    "@abaplint/core": "^2.120.75",
+    "esbuild": "0.28.1"
   },
   "engines": {
     "node": ">=22"

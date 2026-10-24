@@ -1137,6 +1137,10 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
       RETURNING
         VALUE(result) TYPE abap_bool.
 
+    METHODS run_steps
+      RETURNING
+        VALUE(result) TYPE abap_bool.
+
     METHODS check_screen
       RETURNING
         VALUE(result) TYPE abap_bool.
@@ -1468,6 +1472,12 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
     ENDIF.
 
     messages_display( ).
+
+  ENDMETHOD.
+
+  METHOD z2ui5_if_cgui_gui~list.
+
+    result = list( ).
 
   ENDMETHOD.
 
@@ -2153,6 +2163,7 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
     IF mv_cgui_file_rerun = cs_ucomm-execute.
       " the run stops here - it starts again with the files
       mv_cgui_stop = abap_true.
+      rerun = abap_true.
     ENDIF.
     mv_cgui_pending_field = mv_cgui_value_field.
     mv_cgui_pending_part = mv_cgui_value_part.
@@ -3965,6 +3976,17 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD run.
+
+    " a run that stops for a dialog (z2ui5_cx_cgui_stop) starts again from it
+    TRY.
+        result = run_steps( ).
+      CATCH z2ui5_cx_cgui_stop.
+        mv_cgui_stop = abap_true.
+    ENDTRY.
+
+  ENDMETHOD.
+
+  METHOD run_steps.
 
     CLEAR mt_cgui_run_msg.
     IF check_screen( ) = abap_false.

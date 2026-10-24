@@ -207,6 +207,7 @@ CLASS ltcl_test DEFINITION FINAL FOR TESTING
     METHODS tree_expand_and_node FOR TESTING.
     METHODS draft_serializable FOR TESTING.
     METHODS draft_references FOR TESTING.
+    METHODS demo_output_into_list FOR TESTING.
     METHODS serialize
       IMPORTING
         step TYPE string.
@@ -721,6 +722,35 @@ CLASS ltcl_test IMPLEMENTATION.
 
   ENDMETHOD.
 
+  METHOD demo_output_into_list.
+
+    TYPES:
+      BEGIN OF ty_s_air,
+        carrid TYPE c LENGTH 3,
+        seats  TYPE i,
+      END OF ty_s_air.
+    DATA lt_air TYPE STANDARD TABLE OF ty_s_air WITH DEFAULT KEY.
+
+    z2ui5_cl_cgui_gui=>set_report( mo_cut ).
+    lt_air = VALUE #( ( carrid = `LH` seats = 120 ) ( carrid = `AA` seats = 8 ) ).
+    z2ui5_cl_cgui_demo_output=>begin_section( `Flights` ).
+    z2ui5_cl_cgui_demo_output=>write_text( `Seats per airline` ).
+    z2ui5_cl_cgui_demo_output=>write( data = lt_air
+                                      name = `LT_AIR` ).
+    z2ui5_cl_cgui_demo_output=>new( )->write_html( `<p>a <b>bold</b> end</p>` )->line( ).
+    z2ui5_cl_cgui_demo_output=>display( 42 ).
+
+    DATA(lt_text) = mo_cut->list( )->to_text( ).
+    DELETE lt_text WHERE table_line IS INITIAL.
+    " a section is a heading, a table its columns under the component names,
+    " html its text, line( ) a ULINE - after the page header of the report
+    cl_abap_unit_assert=>assert_equals(
+        act = concat_lines_of( table = lt_text sep = `|` )
+        exp = |HEADER\|Flights\|Seats per airline\|LT_AIR\|CARRID SEATS\|LH     120  \|AA     8    \| a  bold  end\||
+           && |{ repeat( val = `-` occ = 80 ) }\|42| ).
+
+  ENDMETHOD.
+
   METHOD file_upload_and_download.
 
     TYPES:
@@ -773,11 +803,25 @@ CLASS ltcl_test IMPLEMENTATION.
     cl_abap_unit_assert=>assert_subrc( exp = 0 ).
     cl_abap_unit_assert=>assert_equals( act = lt_air[ 2 ]-name
                                         exp = `American` ).
-    z2ui5_cl_cgui_frontend=>gui_upload( EXPORTING  filename        = `missing.txt`
-                                        CHANGING   data_tab        = lt_air
-                                        EXCEPTIONS file_open_error = 1
-                                                   OTHERS          = 2 ).
-    cl_abap_unit_assert=>assert_subrc( exp = 1 ).
+    " a name the browser has no file of - a path of the PC: the upload
+    " dialog opens for it, the run stops and Execute runs again with the file
+    CLEAR mo_client->mo_called.
+    TRY.
+        z2ui5_cl_cgui_frontend=>gui_upload( EXPORTING  filename        = `C:\data\missing.txt`
+                                            CHANGING   data_tab        = lt_air
+                                            EXCEPTIONS file_open_error = 1
+                                                       OTHERS          = 2 ).
+        cl_abap_unit_assert=>fail( `the run goes on without the file` ).
+      CATCH z2ui5_cx_cgui_stop ##NO_HANDLER.
+    ENDTRY.
+    cl_abap_unit_assert=>assert_initial( lt_air ).
+    lo_file = CAST z2ui5_cl_cgui_file( mo_client->mo_called ).
+    mo_client->mo_app = lo_file.
+    mo_client->mv_init = abap_true.
+    lo_file->z2ui5_if_app~main( mo_client ).
+    mo_client->mv_init = abap_false.
+    mo_client->mo_app = mo_report.
+    cl_abap_unit_assert=>assert_true( xsdbool( mo_client->mv_popup CS `title="missing.txt"` ) ).
 
     " gui_download( ) hands the file to the browser
     lt_air = VALUE #( ( carrid = `LH` name = `Lufthansa` ) ).

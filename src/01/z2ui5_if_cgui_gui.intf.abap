@@ -143,4 +143,10 @@ INTERFACE z2ui5_if_cgui_gui PUBLIC.
       name TYPE string
       node TYPE REF TO z2ui5_cl_ui5_view_builder.
 
+  "! the list output of the run - where the stand-in of cl_demo_output
+  "! (z2ui5_cl_cgui_demo_output) writes
+  METHODS list
+    RETURNING
+      VALUE(result) TYPE REF TO z2ui5_cl_cgui_list.
+
 ENDINTERFACE.
