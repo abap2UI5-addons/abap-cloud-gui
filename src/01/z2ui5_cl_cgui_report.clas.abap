@@ -1489,6 +1489,12 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
 
   ENDMETHOD.
 
+  METHOD z2ui5_if_cgui_gui~cursor.
+
+    result = CORRESPONDING #( get_cursor( ) ).
+
+  ENDMETHOD.
+
   METHOD z2ui5_if_cgui_gui~control_add.
 
     DATA(ls_control) = control.

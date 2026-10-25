@@ -125,18 +125,16 @@ ENDLOOP.
   },
   {
     id: "list-read",
-    title: "Reading the list back: GET CURSOR, READ LINE, MODIFY LINE",
+    title: "Reading the list back: READ LINE, MODIFY LINE, GET CURSOR outside of a line selection",
     match: /^(GET CURSOR|READ LINE|MODIFY LINE)/,
-    why: "These statements work on the list as the SAP GUI shows it. The runtime has counterparts - `get_cursor( )` in `at_line_selection( )`, `list( )->read_line( )`, `read_value( )`, `modify_line( )` - but the converter does not map them yet.",
+    why: "These statements work on the list as the SAP GUI shows it. `GET CURSOR FIELD / VALUE / LINE / OFFSET` in `AT LINE-SELECTION` is converted to `z2ui5_cl_cgui_gui=>get_cursor_field( )`; the runtime has counterparts of the others too - `list( )->read_line( )`, `read_value( )`, `modify_line( )` - but the converter does not map them yet.",
     rewrite: abap(`
 * before
 AT LINE-SELECTION.
-  GET CURSOR FIELD lv_field VALUE lv_value.
+  READ LINE sy-lilli FIELD VALUE gv_flag.
 
 * after - in at_line_selection( row hide ) of the class
-DATA(ls_cursor) = get_cursor( ).
-lv_field = ls_cursor-field.
-lv_value = ls_cursor-value.
+gv_flag = list( )->read_value( get_cursor( )-line ).
 `) + "\n\nOften the data the line was written from is the better source: keep it in an internal table and read the row with `HIDE` or `row`.",
   },
   {

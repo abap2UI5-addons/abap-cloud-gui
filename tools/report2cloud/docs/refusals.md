@@ -14,7 +14,7 @@ A refused statement has no counterpart in an abap-cloud-gui report. The converte
 | [Fields of another program: ASSIGN ('(PROG)FIELD')](#foreign-field) | `foreign-field` |
 | [The SAP GUI frontend: controls, the frontend services the browser has no counterpart for](#sap-gui) | `sap-gui` |
 | [Desktop integration and system calls: OLE, CALL 'C-function', EDITOR-CALL, GENERATE](#desktop) | `desktop` |
-| [Reading the list back: GET CURSOR, READ LINE, MODIFY LINE](#list-read) | `list-read` |
+| [Reading the list back: READ LINE, MODIFY LINE, GET CURSOR outside of a line selection](#list-read) | `list-read` |
 | [List control without a counterpart: SCROLL LIST, SET USER-COMMAND, print control](#list-control) | `list-control` |
 | [LEAVE PROGRAM, LEAVE TO TRANSACTION, LEAVE TO SCREEN](#leave) | `leave` |
 | [PERFORM of another program, dynamic or ON COMMIT](#perform-foreign) | `perform-foreign` |
@@ -180,21 +180,19 @@ Remove the statement, or replace it by what it was used for: a file export for E
 
 <a id="list-read"></a>
 
-## Reading the list back: GET CURSOR, READ LINE, MODIFY LINE
+## Reading the list back: READ LINE, MODIFY LINE, GET CURSOR outside of a line selection
 
-**Why.** These statements work on the list as the SAP GUI shows it. The runtime has counterparts - `get_cursor( )` in `at_line_selection( )`, `list( )->read_line( )`, `read_value( )`, `modify_line( )` - but the converter does not map them yet.
+**Why.** These statements work on the list as the SAP GUI shows it. `GET CURSOR FIELD / VALUE / LINE / OFFSET` in `AT LINE-SELECTION` is converted to `z2ui5_cl_cgui_gui=>get_cursor_field( )`; the runtime has counterparts of the others too - `list( )->read_line( )`, `read_value( )`, `modify_line( )` - but the converter does not map them yet.
 
 **Rewrite.**
 
 ```abap
 * before
 AT LINE-SELECTION.
-  GET CURSOR FIELD lv_field VALUE lv_value.
+  READ LINE sy-lilli FIELD VALUE gv_flag.
 
 * after - in at_line_selection( row hide ) of the class
-DATA(ls_cursor) = get_cursor( ).
-lv_field = ls_cursor-field.
-lv_value = ls_cursor-value.
+gv_flag = list( )->read_value( get_cursor( )-line ).
 ```
 
 Often the data the line was written from is the better source: keep it in an internal table and read the row with `HIDE` or `row`.

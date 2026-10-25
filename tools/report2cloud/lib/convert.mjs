@@ -52,6 +52,11 @@ const DECL = new Set(["Data", "DataBegin", "DataEnd", "Type", "TypeBegin", "Type
   "Ranges", "FieldSymbol", "TypePools", "TypePool", "Nodes", "Controls", "StaticBegin", "StaticEnd", "Static",
   "TypeEnum", "TypeEnumBegin", "TypeEnumEnd"]);
 
+// statements converted in one place only - refused anywhere else
+const REFUSED_LIST = {
+  GetCursor: "GET CURSOR outside of AT LINE-SELECTION, or with LENGTH / AREA - get_cursor( ) returns the field, value, line and offset of the click of a line selection - port it by hand",
+};
+
 // statements with no counterpart - refused wherever they stand
 const REFUSED = {
   CallScreen: "CALL SCREEN - the dynpro is not converted (a dynpro of fields is, from the .prog.xml - see the MODULE refusals); else build the screen as an abap2UI5 view or a popup",
@@ -65,7 +70,6 @@ const REFUSED = {
   Get: "GET - logical database events have no counterpart; read the data with ABAP SQL",
   Reject: "REJECT - logical database statement",
   Controls: "CONTROLS - table controls and tabstrips belong to dynpros",
-  GetCursor: "GET CURSOR - not converted; in at_line_selection( ) get_cursor( ) returns field, value, line and offset - port it by hand",
   ReadLine: "READ LINE - not converted; list( )->read_line( ) / read_value( ) read the list back - port it by hand, or keep the data in an internal table",
   ModifyLine: "MODIFY LINE - not converted; list( )->modify_line( ) changes a written line - port it by hand",
   SetUserCommand: "SET USER-COMMAND - triggers no event here",
@@ -185,6 +189,16 @@ const GUI_CONTROL = /\bcl_gui_(alv_grid|custom_container|docking_container|split
 export const FRONTEND = {
   constants: ["action_ok", "action_cancel", "filetype_all", "filetype_text", "filetype_excel", "filetype_xml", "filetype_html"],
   methods: {
+    scms_binary_to_xstring: { params: ["input_length", "first_line", "last_line", "binary_tab", "buffer"],
+      exceptions: ["failed"] },
+    scms_xstring_to_binary: { params: ["buffer", "append_to_table", "output_length", "binary_tab"],
+      exceptions: [] },
+    scms_string_to_xstring: { params: ["text", "mimetype", "encoding", "buffer"],
+      exceptions: ["failed"] },
+    ssfc_base64_encode: { params: ["bindata", "binleng", "b64data"],
+      exceptions: ["ssf_krn_error", "ssf_krn_noop", "ssf_krn_nomemory", "ssf_krn_opinv", "ssf_krn_input_data_error", "ssf_krn_invalid_par", "ssf_krn_invalid_parlen"] },
+    ssfc_base64_decode: { params: ["b64data", "b64leng", "b64_strict", "bindata"],
+      exceptions: ["ssf_krn_error", "ssf_krn_noop", "ssf_krn_nomemory", "ssf_krn_opinv", "ssf_krn_input_data_error", "ssf_krn_invalid_par", "ssf_krn_invalid_parlen"] },
     dp_create_url: { params: ["type", "subtype", "size", "date", "time", "description", "lifetime", "cacheable", "send_data_as_string", "data", "url"],
       exceptions: ["dp_invalid_parameter", "dp_error_put_table", "dp_error_general"] },
     url_content: { params: ["url"],
@@ -235,7 +249,11 @@ export const FRONTEND = {
 };
 
 // the function modules of the frontend, as methods of z2ui5_cl_cgui_frontend
-const FRONTEND_FUNCTIONS = { GUI_UPLOAD: "gui_upload", GUI_DOWNLOAD: "gui_download", DP_CREATE_URL: "dp_create_url" };
+const FRONTEND_FUNCTIONS = { GUI_UPLOAD: "gui_upload", GUI_DOWNLOAD: "gui_download", DP_CREATE_URL: "dp_create_url",
+  SCMS_BINARY_TO_XSTRING: "scms_binary_to_xstring", SCMS_XSTRING_TO_BINARY: "scms_xstring_to_binary",
+  SCMS_STRING_TO_XSTRING: "scms_string_to_xstring", SSFC_BASE64_ENCODE: "ssfc_base64_encode", SSFC_BASE64_DECODE: "ssfc_base64_decode" };
+// the TABLES parameters of FRONTEND_FUNCTIONS that are CHANGING of the method - the others it only reads
+const FRONTEND_TABLES_OUT = new Set(["GUI_UPLOAD.data_tab", "GUI_DOWNLOAD.data_tab", "SCMS_XSTRING_TO_BINARY.binary_tab"]);
 
 /**
  * The stand-ins of the SAP GUI controls (src/01/z2ui5_cl_cgui_gui*) - the
@@ -252,6 +270,7 @@ export const GUI = {
     cl_gui_docking_container: "z2ui5_cl_cgui_gui_container",
     cl_gui_splitter_container: "z2ui5_cl_cgui_gui_container",
     cl_gui_dialogbox_container: "z2ui5_cl_cgui_gui_container",
+    cl_gui_gos_container: "z2ui5_cl_cgui_gui_container",
     cl_gui_easy_splitter_container: "z2ui5_cl_cgui_gui_easy_split",
     cl_gui_textedit: "z2ui5_cl_cgui_gui_textedit",
     cl_gui_html_viewer: "z2ui5_cl_cgui_gui_html_viewer",
@@ -266,6 +285,10 @@ export const GUI = {
       attributes: [],
       events: [],
       methods: {
+        get_cursor_field: { params: ["field", "value", "line", "offset"],
+          exceptions: ["not_on_field"] },
+        compute_metric_from_dynp: { params: ["metric", "x_or_y", "in"],
+          exceptions: [] },
         set_report: { params: ["report"],
           exceptions: [] },
         get_report: { params: [],
@@ -1682,6 +1705,8 @@ class Converter {
       }
       // NEW cl_gui_alv_grid( i_parent = NEW cl_gui_custom_container( ... ) ) - both
       if (t === "new" && guiClass(toks[i + 1])) ctors.push(guiClass(toks[i + 1]));
+      // go_x = NEW #( ... ) - the class of the control assigned to
+      if (t === "new" && toks[i + 1] === "#" && toks[1] === "=" && i === 2 && this.guiVars.has(toks[0])) ctors.push(this.guiVars.get(toks[0]));
     }
     // CREATE OBJECT go_x [TYPE cl_gui_y]: the constructor of its class
     if (kind(s) === "CreateObject") {
@@ -2259,7 +2284,7 @@ class Converter {
               case "salv.get_functions": ctx = { ...ctx, level: "functions" }; break;
               case "salv.get_event": ctx = { ...ctx, level: "event" }; break;
               case "salv.get_sorts": case "salv.get_aggregations": case "salv.get_layout": case "salv.get_selections":
-              case "salv.get_filters":
+              case "salv.get_filters": case "salv.get_print": case "salv.get_functional_settings":
                 ctx = { ...ctx, level: "other" }; break;
               case "salv.display":
                 salv.displayed = true;
@@ -2552,6 +2577,9 @@ class Converter {
       const at = ch.findIndex((c) => isToken(c) && uc(c.get().getStr()) === "UNDER");
       if (at >= 0 && ch[at + 1]) this.underTargets.add(underName(nodeText(ch[at + 1])));
     }
+    // GET CURSOR FIELD asks for the name of the field clicked - every WRITE
+    // of a data object then writes it with its name
+    this.cursorField = this.stmts.some((x) => kind(x) === "GetCursor" && words(x).includes("FIELD"));
     const pub = [];          // PUBLIC SECTION
     const methods = [];      // { name, def, body: string[] }
     this.methodDefs = [];    // PRIVATE methods
@@ -4885,6 +4913,28 @@ class Converter {
       case "CallSelectionScreen":
         this.callSelectionScreen(s, b);
         return;
+      case "GetCursor": {
+        // GET CURSOR FIELD f VALUE v LINE l OFFSET o in AT LINE-SELECTION -
+        // the field, value, line and offset of the click
+        const parts = new Map();
+        let word;
+        for (const c of s.getChildren()) {
+          if (isToken(c)) word = uc(c.getFirstToken().getStr());
+          else if (kind(c) === "Target" && word) parts.set(word, nodeText(c, this.rewrites(s, b.ctx)));
+        }
+        const known = ["FIELD", "VALUE", "LINE", "OFFSET"];
+        if (!b.ctx.lineSelection || !parts.size || [...parts.keys()].some((w) => !known.includes(w))) {
+          this.refuse(s, REFUSED_LIST.GetCursor);
+          return;
+        }
+        const head = "z2ui5_cl_cgui_gui=>get_cursor_field( ";
+        const width = Math.max(...[...parts.keys()].map((w) => w.length));
+        const lines = [...parts].map(([w, target], i) => `${i === 0 ? `${head}IMPORTING  ` : `${" ".repeat(head.length)}           `}${lc(w).padEnd(width)} = ${target}`);
+        lines.push(`${" ".repeat(head.length)}EXCEPTIONS ${"not_on_field".padEnd(width)} = 4 ).`);
+        out.push(...lines);
+        this.map(s, "`z2ui5_cl_cgui_gui=>get_cursor_field( )` - the field, value, line and offset of the click of the line selection, sy-subrc 4 off a field");
+        return;
+      }
       case "SetCursor": {
         const w = words(s);
         const src = child(s, "Source");
@@ -5254,6 +5304,12 @@ class Converter {
       // document in a dialog box or in its container
       if (t === "cl_abap_browser" && toks[i + 1]?.getStr() === "=>" && ABAP_BROWSER.includes(lc(toks[i + 2]?.getStr() ?? ""))) {
         ov.set(key(toks[i]), "z2ui5_cl_cgui_abap_browser");
+        continue;
+      }
+      // cl_gui_cfw=>compute_metric_from_dynp( ) - the size it computes is
+      // the value it is given: the browser lays the controls out itself
+      if (t === "cl_gui_cfw" && toks[i + 1]?.getStr() === "=>" && lc(toks[i + 2]?.getStr() ?? "") === "compute_metric_from_dynp") {
+        ov.set(key(toks[i]), "z2ui5_cl_cgui_gui");
         continue;
       }
       if (t === "if_demo_output") {
@@ -5648,7 +5704,9 @@ class Converter {
         const g = s.getChildren()[underAt + 1];
         item.params.push({ name: "under", value: literal(underName(nodeText(g))) });
       }
-      if (this.underTargets?.has(underName(nodeText(src)))) item.params.push({ name: "name", value: literal(underName(nodeText(src))) });
+      if (this.underTargets?.has(underName(nodeText(src))) || (this.cursorField && /^[a-z_][\w-]*$/i.test(nodeText(src).trim()))) {
+        item.params.push({ name: "name", value: literal(underName(nodeText(src))) });
+      }
       if (color || !b.runtimeColor) {
         if (c !== "none") item.params.push({ name: "color", value: colorConst(c) });
       } else {
@@ -6051,7 +6109,7 @@ class Converter {
           return;
         }
         // TABLES data_tab is CHANGING, TABLES fieldnames a table it reads
-        const section = keyword === "TABLES" ? (name === "data_tab" ? "CHANGING" : "EXPORTING") : keyword;
+        const section = keyword === "TABLES" ? (FRONTEND_TABLES_OUT.has(`${fm}.${name}`) ? "CHANGING" : "EXPORTING") : keyword;
         sections[section].push({ name: shown, value });
       }
     }
@@ -6067,7 +6125,8 @@ class Converter {
     if (!lines.length) lines.push(head.trimEnd());
     lines[lines.length - 1] += " ).";
     b.out.push(...lines);
-    if (fm === "DP_CREATE_URL") this.note("DP_CREATE_URL is z2ui5_cl_cgui_frontend=>dp_create_url( ) - the URL names a data URI of the bytes, which the picture and the HTML viewer of the browser show");
+    if (/^(SCMS|SSFC)_/.test(fm)) this.note("SCMS_*_TO_* and SSFC_BASE64_* are methods of z2ui5_cl_cgui_frontend - bytes, lines of bytes, text and base64 converted in plain ABAP, the function modules are not released for ABAP Cloud");
+    else if (fm === "DP_CREATE_URL") this.note("DP_CREATE_URL is z2ui5_cl_cgui_frontend=>dp_create_url( ) - the URL names a data URI of the bytes, which the picture and the HTML viewer of the browser show");
     else this.note("cl_gui_frontend_services is z2ui5_cl_cgui_frontend - a file the user picks is uploaded in the browser (file_open_dialog( ) in an F4 opens the upload, the F4 runs again with the file), gui_download( ) is a download of the browser");
     this.map(s, `\`z2ui5_cl_cgui_frontend=>${method}( )\` - the function module as the method of the frontend services, its EXCEPTIONS kept`);
   }
@@ -6881,9 +6940,12 @@ function salvChain(s) {
   let i = 0;
   let target;
   if (k === "Move") {
-    if (toks[1] !== "=" && toks[1] !== "?=") return undefined;
-    target = lc(toks[0]);
-    i = 2;
+    // DATA(x) = ... - an inline declaration of the target
+    const inline = lc(toks[0]) === "data" && toks[1] === "(" && toks[3] === ")";
+    const at = inline ? 4 : 1;
+    if (toks[at] !== "=" && toks[at] !== "?=") return undefined;
+    target = lc(toks[inline ? 2 : 0]);
+    i = at + 1;
     // CAST cl_salv_column_table( x->get_column( 'A' ) )
     if (lc(toks[i]) === "cast" && toks[i + 2] === "(") {
       const inner = toks.slice(i + 3, -1);

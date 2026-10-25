@@ -43,6 +43,29 @@ CLASS z2ui5_cl_cgui_gui DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
       END OF ty_s_simple_event.
     TYPES ty_t_simple_events TYPE STANDARD TABLE OF ty_s_simple_event WITH DEFAULT KEY.
 
+    "! cl_gui_cfw=>compute_metric_from_dynp( ) - a size in characters of the
+    "! screen in pixels or mm; the browser lays the controls out itself,
+    "! the size is the one given
+    CLASS-METHODS compute_metric_from_dynp
+      IMPORTING
+        metric TYPE i
+        x_or_y TYPE c
+        in     TYPE i
+      RETURNING
+        VALUE(out) TYPE i.
+
+    "! GET CURSOR FIELD f VALUE v LINE l OFFSET o of a line selection - the
+    "! field clicked, its value, line and offset; not_on_field (sy-subrc 4)
+    "! when the click was on no field of a WRITE, or no report runs
+    CLASS-METHODS get_cursor_field
+      EXPORTING
+        field  TYPE any
+        value  TYPE any
+        line   TYPE any
+        offset TYPE any
+      EXCEPTIONS
+        not_on_field.
+
     "! the report the controls belong to - z2ui5_cl_cgui_report sets it at
     "! the start of every roundtrip
     CLASS-METHODS set_report
@@ -145,6 +168,28 @@ ENDCLASS.
 
 
 CLASS z2ui5_cl_cgui_gui IMPLEMENTATION.
+
+  METHOD get_cursor_field.
+
+    IF go_report IS NOT BOUND.
+      RAISE not_on_field.
+    ENDIF.
+    DATA(ls_cursor) = go_report->cursor( ).
+    field = ls_cursor-field.
+    value = ls_cursor-value.
+    line = ls_cursor-line.
+    offset = ls_cursor-offset.
+    IF ls_cursor-field IS INITIAL.
+      RAISE not_on_field.
+    ENDIF.
+
+  ENDMETHOD.
+
+  METHOD compute_metric_from_dynp.
+
+    out = in.
+
+  ENDMETHOD.
 
   METHOD set_report.
 

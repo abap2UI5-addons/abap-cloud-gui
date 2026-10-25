@@ -172,6 +172,18 @@ test("CL_SALV_TABLE: one alv( ) chain with title, column texts, hidden columns; 
   assert.ok(!/TRY\./.test(abap));
 });
 
+test("CL_SALV_TABLE: a column of an inline CAST - DATA(x) = CAST cl_salv_column_table( o->get_columns( )->get_column( ) )", () => {
+  const src = "REPORT zt.\nTYPES: BEGIN OF ty, a TYPE i, b TYPE i, END OF ty.\nDATA gt TYPE STANDARD TABLE OF ty WITH DEFAULT KEY.\nDATA go TYPE REF TO cl_salv_table.\nSTART-OF-SELECTION.\n"
+    + "  cl_salv_table=>factory( IMPORTING r_salv_table = go CHANGING t_table = gt ).\n"
+    + "  DATA(lo_col) = CAST cl_salv_column_table( go->get_columns( )->get_column( 'A' ) ).\n"
+    + "  lo_col->set_long_text( 'Amount' ).\n"
+    + "  DATA(lo_print) = go->get_print( ).\n"
+    + "  go->display( ).\n";
+  const r = convert(src, { file: "zt.prog.abap", className: "zcl_t" });
+  assert.deepEqual(r.refusals.map((x) => x.message), []);
+  assert.match(r.files["zcl_t.clas.abap"], /alv\( gt\n {8}\)->set_column_text\( name = `A`\n {28}text = 'Amount' \)\./);
+});
+
 test("REUSE_ALV_GRID_DISPLAY: field catalog, title, USER_COMMAND callback as at_line_selection", () => {
   const abap = classOf("zr2c_05_reuse");
   assert.match(abap, /alv\( gt_scarr\n {8}\)->set_title\( 'Airlines'/);
@@ -913,6 +925,9 @@ test("SAP GUI controls: a member, a parameter or an event the stand-ins do not h
   const head = "REPORT zt.\nDATA go_c TYPE REF TO cl_gui_custom_container.\nDATA go_e TYPE REF TO cl_gui_textedit.\nSTART-OF-SELECTION.\n  CREATE OBJECT go_c EXPORTING container_name = 'CC'.\n";
   const refused = (body) => refusalOf(`${head}${body}`).map((x) => x.replace(/^\d+:\d+ /, ""));
   assert.deepEqual(refused("  CREATE OBJECT go_e EXPORTING parent = go_c.\n  go_e->set_textstream( 'x' ).\n"), []);
+  // NEW #( ) of a control: the constructor of the class it is assigned to
+  assert.deepEqual(refused("  go_e = NEW #( parent = go_c wordwrap_mode = cl_gui_textedit=>wordwrap_at_windowborder ).\n"), []);
+  assert.deepEqual(refused("  go_e = NEW #( parent = go_c colour = 1 ).\n"), ["SAP GUI controls: colour is no parameter of the method called in the stand-in - port this statement by hand"]);
   assert.deepEqual(refused("  go_e->set_comments_string( ).\n"), ["SAP GUI controls: go_e->set_comments_string has no counterpart in z2ui5_cl_cgui_gui_textedit - port this statement by hand"]);
   assert.deepEqual(refused("  go_e->set_textstream( text = 'x' colour = 1 ).\n"), ["SAP GUI controls: colour is no parameter of the method called in the stand-in - port this statement by hand"]);
   assert.deepEqual(refusalOf(`${head}DATA go_p TYPE REF TO cl_gui_simple_tree.\n`).map((x) => x.replace(/^\d+:\d+ /, "")), ["SAP GUI controls: cl_gui_simple_tree has no counterpart - the containers, cl_gui_textedit, cl_gui_html_viewer, cl_gui_toolbar, cl_gui_picture and cl_gui_alv_grid have (z2ui5_cl_cgui_gui*)"]);
