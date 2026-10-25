@@ -52,6 +52,11 @@ const DECL = new Set(["Data", "DataBegin", "DataEnd", "Type", "TypeBegin", "Type
   "Ranges", "FieldSymbol", "TypePools", "TypePool", "Nodes", "Controls", "StaticBegin", "StaticEnd", "Static",
   "TypeEnum", "TypeEnumBegin", "TypeEnumEnd"]);
 
+// statements converted in one place only - refused anywhere else
+const REFUSED_LIST = {
+  GetCursor: "GET CURSOR outside of AT LINE-SELECTION, or with LENGTH / AREA - get_cursor( ) returns the field, value, line and offset of the click of a line selection - port it by hand",
+};
+
 // statements with no counterpart - refused wherever they stand
 const REFUSED = {
   CallScreen: "CALL SCREEN - the dynpro is not converted (a dynpro of fields is, from the .prog.xml - see the MODULE refusals); else build the screen as an abap2UI5 view or a popup",
@@ -65,7 +70,6 @@ const REFUSED = {
   Get: "GET - logical database events have no counterpart; read the data with ABAP SQL",
   Reject: "REJECT - logical database statement",
   Controls: "CONTROLS - table controls and tabstrips belong to dynpros",
-  GetCursor: "GET CURSOR - not converted; in at_line_selection( ) get_cursor( ) returns field, value, line and offset - port it by hand",
   ReadLine: "READ LINE - not converted; list( )->read_line( ) / read_value( ) read the list back - port it by hand, or keep the data in an internal table",
   ModifyLine: "MODIFY LINE - not converted; list( )->modify_line( ) changes a written line - port it by hand",
   SetUserCommand: "SET USER-COMMAND - triggers no event here",
@@ -281,6 +285,8 @@ export const GUI = {
       attributes: [],
       events: [],
       methods: {
+        get_cursor_field: { params: ["field", "value", "line", "offset"],
+          exceptions: ["not_on_field"] },
         compute_metric_from_dynp: { params: ["metric", "x_or_y", "in"],
           exceptions: [] },
         set_report: { params: ["report"],
@@ -2571,6 +2577,9 @@ class Converter {
       const at = ch.findIndex((c) => isToken(c) && uc(c.get().getStr()) === "UNDER");
       if (at >= 0 && ch[at + 1]) this.underTargets.add(underName(nodeText(ch[at + 1])));
     }
+    // GET CURSOR FIELD asks for the name of the field clicked - every WRITE
+    // of a data object then writes it with its name
+    this.cursorField = this.stmts.some((x) => kind(x) === "GetCursor" && words(x).includes("FIELD"));
     const pub = [];          // PUBLIC SECTION
     const methods = [];      // { name, def, body: string[] }
     this.methodDefs = [];    // PRIVATE methods
@@ -4904,6 +4913,28 @@ class Converter {
       case "CallSelectionScreen":
         this.callSelectionScreen(s, b);
         return;
+      case "GetCursor": {
+        // GET CURSOR FIELD f VALUE v LINE l OFFSET o in AT LINE-SELECTION -
+        // the field, value, line and offset of the click
+        const parts = new Map();
+        let word;
+        for (const c of s.getChildren()) {
+          if (isToken(c)) word = uc(c.getFirstToken().getStr());
+          else if (kind(c) === "Target" && word) parts.set(word, nodeText(c, this.rewrites(s, b.ctx)));
+        }
+        const known = ["FIELD", "VALUE", "LINE", "OFFSET"];
+        if (!b.ctx.lineSelection || !parts.size || [...parts.keys()].some((w) => !known.includes(w))) {
+          this.refuse(s, REFUSED_LIST.GetCursor);
+          return;
+        }
+        const head = "z2ui5_cl_cgui_gui=>get_cursor_field( ";
+        const width = Math.max(...[...parts.keys()].map((w) => w.length));
+        const lines = [...parts].map(([w, target], i) => `${i === 0 ? `${head}IMPORTING  ` : `${" ".repeat(head.length)}           `}${lc(w).padEnd(width)} = ${target}`);
+        lines.push(`${" ".repeat(head.length)}EXCEPTIONS ${"not_on_field".padEnd(width)} = 4 ).`);
+        out.push(...lines);
+        this.map(s, "`z2ui5_cl_cgui_gui=>get_cursor_field( )` - the field, value, line and offset of the click of the line selection, sy-subrc 4 off a field");
+        return;
+      }
       case "SetCursor": {
         const w = words(s);
         const src = child(s, "Source");
@@ -5673,7 +5704,9 @@ class Converter {
         const g = s.getChildren()[underAt + 1];
         item.params.push({ name: "under", value: literal(underName(nodeText(g))) });
       }
-      if (this.underTargets?.has(underName(nodeText(src)))) item.params.push({ name: "name", value: literal(underName(nodeText(src))) });
+      if (this.underTargets?.has(underName(nodeText(src))) || (this.cursorField && /^[a-z_][\w-]*$/i.test(nodeText(src).trim()))) {
+        item.params.push({ name: "name", value: literal(underName(nodeText(src))) });
+      }
       if (color || !b.runtimeColor) {
         if (c !== "none") item.params.push({ name: "color", value: colorConst(c) });
       } else {

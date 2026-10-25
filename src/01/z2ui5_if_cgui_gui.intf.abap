@@ -17,6 +17,15 @@ INTERFACE z2ui5_if_cgui_gui PUBLIC.
     END OF cs_kind.
 
   TYPES:
+    "! GET CURSOR - the field of a WRITE clicked, its value, line and offset
+    BEGIN OF ty_s_cursor,
+      field  TYPE string,
+      value  TYPE string,
+      line   TYPE i,
+      offset TYPE i,
+    END OF ty_s_cursor.
+
+  TYPES:
     "! a button of a toolbar
     BEGIN OF ty_s_button,
       fcode    TYPE string,
@@ -151,5 +160,11 @@ INTERFACE z2ui5_if_cgui_gui PUBLIC.
   METHODS list
     RETURNING
       VALUE(result) TYPE REF TO z2ui5_cl_cgui_list.
+
+  "! the click of the line selection - the field, value, line and offset
+  "! z2ui5_cl_cgui_gui=>get_cursor_field( ) answers GET CURSOR with
+  METHODS cursor
+    RETURNING
+      VALUE(result) TYPE ty_s_cursor.
 
 ENDINTERFACE.

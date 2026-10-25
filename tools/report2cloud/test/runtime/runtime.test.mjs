@@ -712,3 +712,17 @@ test("zr2c_43_base64: SCMS_* and SSFC_BASE64_ENCODE as methods of the frontend, 
   assert.ok(bound, "a text area bound to the control");
   assert.equal(bound[1].split("/").reduce((o, k) => o?.[k], d.state().models.MAIN?.data), "U2VlIHlvdSBhdCBub29u");
 });
+
+test("zr2c_44_cursor: GET CURSOR FIELD VALUE LINE in AT LINE-SELECTION - the field written, its value and its line", { skip }, async () => {
+  let s = await d.start("z2ui5_cl_cgui_r2c_44");
+  if (!actionsOf(s, "CGUI_LINE_SELECTION").length) s = await d.act(s.session, { event: "CGUI_EXECUTE" });
+  const clicks = actionsOf(s, "CGUI_LINE_SELECTION");
+  assert.equal(clicks.length, 6, "a name and a height on each of three lines");
+  s = await d.act(s.session, { event: clicks[2].id });
+  // the line is the line of the list of the runtime - the classic counts its page header too
+  assert.match(d.lines().filter((l) => l.trim() !== "").join("\n"), /^Line (\d+): GS_PEAK-NAME = Watzmann$/);
+  const second = Number(/^Line (\d+)/.exec(d.lines().find((l) => l.startsWith("Line")))[1]);
+  s = await d.act(s.session, { event: "CGUI_BACK" });
+  s = await d.act(s.session, { event: actionsOf(s, "CGUI_LINE_SELECTION")[5].id });
+  assert.deepEqual(d.lines().filter((l) => l.trim() !== ""), [`Line ${second + 1}: GS_PEAK-HEIGHT = 1493`]);
+});

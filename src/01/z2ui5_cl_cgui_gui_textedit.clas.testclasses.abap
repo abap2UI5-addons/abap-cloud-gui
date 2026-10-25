@@ -54,6 +54,14 @@ CLASS ltcl_gui IMPLEMENTATION.
   METHOD z2ui5_if_cgui_gui~list ##NEEDED.
   ENDMETHOD.
 
+  METHOD z2ui5_if_cgui_gui~cursor.
+
+    result = VALUE #( field = `GS_PEAK-NAME`
+                      value = `Watzmann`
+                      line  = 2 ).
+
+  ENDMETHOD.
+
   METHOD z2ui5_if_cgui_gui~grid_display.
 
     FIELD-SYMBOLS <from> TYPE any.
@@ -195,6 +203,7 @@ CLASS ltcl_test DEFINITION FINAL
     METHODS toolbar_buttons FOR TESTING.
     METHODS grid FOR TESTING.
     METHODS sapevent_links FOR TESTING.
+    METHODS cursor_field FOR TESTING.
 
 ENDCLASS.
 
@@ -508,6 +517,27 @@ CLASS ltcl_test IMPLEMENTATION.
 
     lo_grid->get_selected_rows( IMPORTING et_index_rows = lt_index ).
     cl_abap_unit_assert=>assert_equals( act = lt_index[ 1 ]-index exp = 2 ).
+
+  ENDMETHOD.
+
+  METHOD cursor_field.
+
+    DATA lv_field TYPE c LENGTH 30.
+    DATA lv_value TYPE c LENGTH 30.
+    DATA lv_line TYPE i.
+
+    " GET CURSOR FIELD f VALUE v LINE l - the click the report answers
+    z2ui5_cl_cgui_gui=>get_cursor_field( IMPORTING  field        = lv_field
+                                                    value        = lv_value
+                                                    line         = lv_line
+                                         EXCEPTIONS not_on_field = 4 ).
+    cl_abap_unit_assert=>assert_subrc( ).
+    cl_abap_unit_assert=>assert_equals( exp = 'GS_PEAK-NAME'
+                                        act = lv_field ).
+    cl_abap_unit_assert=>assert_equals( exp = 'Watzmann'
+                                        act = lv_value ).
+    cl_abap_unit_assert=>assert_equals( exp = 2
+                                        act = lv_line ).
 
   ENDMETHOD.
 
