@@ -2284,7 +2284,7 @@ class Converter {
               case "salv.get_functions": ctx = { ...ctx, level: "functions" }; break;
               case "salv.get_event": ctx = { ...ctx, level: "event" }; break;
               case "salv.get_sorts": case "salv.get_aggregations": case "salv.get_layout": case "salv.get_selections":
-              case "salv.get_filters":
+              case "salv.get_filters": case "salv.get_print": case "salv.get_functional_settings":
                 ctx = { ...ctx, level: "other" }; break;
               case "salv.display":
                 salv.displayed = true;
@@ -6940,9 +6940,12 @@ function salvChain(s) {
   let i = 0;
   let target;
   if (k === "Move") {
-    if (toks[1] !== "=" && toks[1] !== "?=") return undefined;
-    target = lc(toks[0]);
-    i = 2;
+    // DATA(x) = ... - an inline declaration of the target
+    const inline = lc(toks[0]) === "data" && toks[1] === "(" && toks[3] === ")";
+    const at = inline ? 4 : 1;
+    if (toks[at] !== "=" && toks[at] !== "?=") return undefined;
+    target = lc(toks[inline ? 2 : 0]);
+    i = at + 1;
     // CAST cl_salv_column_table( x->get_column( 'A' ) )
     if (lc(toks[i]) === "cast" && toks[i + 2] === "(") {
       const inner = toks.slice(i + 3, -1);
