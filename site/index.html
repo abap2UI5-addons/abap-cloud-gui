@@ -84,12 +84,16 @@ ENDCLASS.</code></pre>
 
     <section id="playground" class="wrap">
       <h2>report2cloud playground</h2>
-      <p>Paste a classic report, or pick an example, and convert it. The converter runs in this page - the
-        same code as <code>npm run report2cloud</code>. Includes and the repository's DDIC are not there, so a
-        report that needs them converts with TODOs.</p>
+      <p>Paste a classic report of your own, or pick an example, and it is converted as you type. The converter
+        runs in this page - the same code as <code>npm run report2cloud</code>; nothing is sent anywhere.
+        Includes and the repository's DDIC are not there, so a report that needs them converts with TODOs.</p>
 
       <div class="toolbar">
-        <label>Example
+        <div class="segmented" role="group" aria-label="Source">
+          <button id="mode-own" class="seg" type="button" aria-pressed="true">Your own report</button>
+          <button id="mode-example" class="seg" type="button" aria-pressed="false">Examples</button>
+        </div>
+        <label id="example-label" hidden>Example
           <select id="example"></select>
         </label>
         <label>Class name
@@ -100,13 +104,25 @@ ENDCLASS.</code></pre>
 
       <div class="panes">
         <div class="pane">
-          <div class="pane-head">Report <span class="muted">.prog.abap</span></div>
-          <textarea id="source" wrap="off" spellcheck="false" aria-label="ABAP report source"></textarea>
+          <div class="pane-head">Report <span class="muted">.prog.abap</span>
+            <button id="clear" class="link" type="button">Clear</button>
+          </div>
+          <textarea id="source" wrap="off" spellcheck="false" aria-label="ABAP report source"
+            placeholder="Paste a classic report here - REPORT zmy_report. PARAMETERS ... START-OF-SELECTION. WRITE ...&#10;&#10;It is converted as you type (Ctrl+Enter converts at once)."></textarea>
+          <details id="texts" class="texts">
+            <summary>Text pool <span class="muted">.prog.xml, optional - the selection texts and text symbols</span></summary>
+            <textarea id="textpool" wrap="off" spellcheck="false" aria-label="abapGit .prog.xml of the report"
+              placeholder="Paste the .prog.xml abapGit wrote for the report - its TPOOL gives the fields their labels"></textarea>
+          </details>
         </div>
         <div class="pane">
           <div class="pane-head">
             <div id="tabs" class="tabs" role="tablist"></div>
-            <button id="copy" class="link" type="button">Copy</button>
+            <span class="head-actions">
+              <button id="copy" class="link" type="button">Copy</button>
+              <button id="download" class="link" type="button">Download</button>
+              <button id="download-all" class="link" type="button">All files</button>
+            </span>
           </div>
           <pre id="output" class="output" tabindex="0"><span class="muted">The generated class appears here.</span></pre>
         </div>

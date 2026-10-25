@@ -1,10 +1,13 @@
 // The report2cloud playground of the site - the converter of
 // tools/report2cloud, bundled for the browser (scripts/build-site.mjs).
-// A report is converted in the page; nothing is sent anywhere. The examples
-// are the reports of the converter's own corpus (examples.json, written by
-// the build with their text pools).
+// A report is converted in the page; nothing is sent anywhere. Your own
+// report is converted as it is typed or pasted, with the text pool of its
+// .prog.xml when that is pasted too, and kept in this browser (localStorage)
+// for the next visit. The examples are the reports of the converter's own
+// corpus (examples.json, written by the build with their text pools).
 import { convert, defaultClassName } from "../tools/report2cloud/lib/convert.mjs";
 import { migrationReport } from "../tools/report2cloud/lib/report.mjs";
+import { parseTextpool } from "../tools/report2cloud/lib/textpool.mjs";
 
 const $ = (id) => document.getElementById(id);
 const source = $("source");
@@ -14,7 +17,10 @@ const status = $("status");
 const findings = $("findings");
 const example = $("example");
 const classname = $("classname");
+const textpoolXml = $("textpool");
+const STORE = "report2cloud.own";
 
+let mode = "own";
 let examples = [];
 let files = {};
 let current = "";
@@ -48,14 +54,32 @@ const rowOf = (x) => el("span", { class: "row" }, x.row ? `${x.row}:${x.col ?? 1
 function run() {
   const text = source.value;
   const name = /^\s*(?:report|program)\s+([\w/]+)/im.exec(text)?.[1]?.toLowerCase() ?? "zreport";
-  const chosen = examples.find((e) => e.name === example.value && e.source === text);
+  if (!text.trim()) {
+    files = {};
+    tabs.replaceChildren();
+    output.replaceChildren(el("span", { class: "muted" }, "The generated class appears here."));
+    status.className = "status";
+    status.textContent = "";
+    findings.replaceChildren();
+    return;
+  }
+  const chosen = mode === "example" ? examples.find((e) => e.name === example.value && e.source === text) : undefined;
+  let textpool = chosen?.textpool;
+  if (mode === "own" && textpoolXml.value.trim()) {
+    try {
+      textpool = parseTextpool(textpoolXml.value);
+    } catch {
+      textpool = undefined;
+    }
+  }
+  if (!classname.value.trim()) classname.placeholder = defaultClassName(name);
   let result;
   try {
     result = convert(text, {
       file: `${name.replace(/\//g, "#")}.prog.abap`,
       programName: name,
       className: classname.value.trim() || undefined,
-      textpool: chosen?.textpool,
+      textpool,
     });
   } catch (e) {
     status.className = "status bad";
@@ -87,9 +111,84 @@ function run() {
   list("Mapped", result.mapped, (m) => el("li", {}, rowOf(m), el("code", {}, m.classic.slice(0, 90)), " → ", m.target));
 }
 
-$("convert").onclick = run;
+// your own report: kept in this browser - an empty or blocked storage is no error
+const save = () => {
+  if (mode !== "own") return;
+  try {
+    localStorage.setItem(STORE, JSON.stringify({ source: source.value, textpool: textpoolXml.value, classname: classname.value }));
+  } catch {
+    /* no storage in this context */
+  }
+};
+const load = () => {
+  try {
+    return JSON.parse(localStorage.getItem(STORE) ?? "null");
+  } catch {
+    return null;
+  }
+};
+
+// converted as it is typed or pasted - a pause of a moment first
+let timer;
+const later = () => {
+  clearTimeout(timer);
+  timer = setTimeout(() => {
+    save();
+    run();
+  }, 350);
+};
+
+// the buttons and fields of a mode - without touching the source
+function showMode(next) {
+  mode = next;
+  $("mode-own").setAttribute("aria-pressed", String(mode === "own"));
+  $("mode-example").setAttribute("aria-pressed", String(mode === "example"));
+  $("example-label").hidden = mode !== "example";
+  $("texts").hidden = mode !== "own";
+}
+
+function setMode(next) {
+  showMode(next);
+  if (mode === "own") {
+    const kept = load();
+    source.value = kept?.source ?? "";
+    textpoolXml.value = kept?.textpool ?? "";
+    classname.value = kept?.classname ?? "";
+    run();
+    source.focus();
+  } else {
+    example.onchange();
+  }
+}
+
+$("mode-own").onclick = () => setMode("own");
+$("mode-example").onclick = () => setMode("example");
+$("convert").onclick = () => {
+  save();
+  run();
+};
+$("clear").onclick = () => {
+  showMode("own");
+  source.value = "";
+  textpoolXml.value = "";
+  classname.value = "";
+  save();
+  run();
+  source.focus();
+};
+source.addEventListener("input", () => {
+  // an example edited is your own report from now on
+  if (mode === "example") showMode("own");
+  later();
+});
+textpoolXml.addEventListener("input", later);
+classname.addEventListener("input", later);
 source.addEventListener("keydown", (e) => {
-  if ((e.ctrlKey || e.metaKey) && e.key === "Enter") run();
+  if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+    clearTimeout(timer);
+    save();
+    run();
+  }
 });
 $("copy").onclick = async () => {
   try {
@@ -99,6 +198,23 @@ $("copy").onclick = async () => {
   } catch {
     /* no clipboard in this context - the text can be selected by hand */
   }
+};
+
+// the files as abapGit wants them beside each other - one download each
+const download = (name) => {
+  const a = el("a", { href: URL.createObjectURL(new Blob([files[name]], { type: "text/plain" })), download: name });
+  document.body.append(a);
+  a.click();
+  setTimeout(() => {
+    URL.revokeObjectURL(a.href);
+    a.remove();
+  }, 0);
+};
+$("download").onclick = () => {
+  if (files[current] !== undefined) download(current);
+};
+$("download-all").onclick = () => {
+  Object.keys(files).forEach((f, i) => setTimeout(() => download(f), i * 250));
 };
 example.onchange = () => {
   const e = examples.find((x) => x.name === example.value);
@@ -117,7 +233,7 @@ try {
   examples = [];
 }
 example.replaceChildren(...examples.map((e) => el("option", { value: e.name }, `${e.name} - ${e.title}`)));
-if (examples.length) {
-  example.value = examples[0].name;
-  example.onchange();
-}
+if (examples.length) example.value = examples[0].name;
+$("mode-example").disabled = !examples.length;
+// your own report when one was kept, else the first example
+setMode(load()?.source?.trim() || !examples.length ? "own" : "example");
