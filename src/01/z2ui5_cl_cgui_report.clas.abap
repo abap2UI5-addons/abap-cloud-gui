@@ -443,6 +443,15 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
     "! an event of a SAP GUI control, before its handlers run (SET HANDLER)
     METHODS at_gui_event.
 
+    "! the CLASS-DATA of the local classes of the report into attributes of
+    "! the report - at the end of every roundtrip. A roundtrip is a session
+    "! of its own on a system: the static attributes of a class start
+    "! initial, only the app is kept (serialized) from one to the next
+    METHODS cgui_statics_keep.
+
+    "! and back into the CLASS-DATA - at the start of every roundtrip
+    METHODS cgui_statics_restore.
+
     "! after call_screen( ) - when the dynpro was left with
     "! leave_to_screen( `0` ): what followed CALL SCREEN in the report;
     "! dynnr is the screen call_screen( ) called, whichever screen SET
@@ -1451,6 +1460,7 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
     " cl_gui_frontend_services of the report - its files are the report's
     z2ui5_cl_cgui_frontend=>set_files( me ).
     z2ui5_cl_cgui_gui=>set_report( me ).
+    cgui_statics_restore( ).
     CLEAR mt_cgui_msg.
     mv_cgui_nav = abap_false.
     " the messages of the run stay while the popover opens and the user
@@ -1480,6 +1490,7 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
     ENDIF.
 
     messages_display( ).
+    cgui_statics_keep( ).
 
   ENDMETHOD.
 
@@ -2030,6 +2041,12 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD at_gui_event ##NEEDED.
+  ENDMETHOD.
+
+  METHOD cgui_statics_keep ##NEEDED.
+  ENDMETHOD.
+
+  METHOD cgui_statics_restore ##NEEDED.
   ENDMETHOD.
 
   METHOD after_call_screen ##NEEDED.

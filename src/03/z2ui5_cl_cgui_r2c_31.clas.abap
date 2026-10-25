@@ -12,8 +12,16 @@ CLASS z2ui5_cl_cgui_r2c_31 DEFINITION PUBLIC
     METHODS initialization REDEFINITION.
     METHODS start_of_selection REDEFINITION.
     METHODS at_gui_event REDEFINITION.
+    METHODS cgui_statics_keep REDEFINITION.
+    METHODS cgui_statics_restore REDEFINITION.
 
   PRIVATE SECTION.
+    " the CLASS-DATA of the local classes between two roundtrips
+    " lcl_counter=>gv_count
+    DATA mr_cgui_static1 TYPE REF TO data.
+    " lcl_counter=>go_html
+    DATA mr_cgui_static2 TYPE REF TO data.
+
 ENDCLASS.
 
 
@@ -54,6 +62,38 @@ CLASS z2ui5_cl_cgui_r2c_31 IMPLEMENTATION.
   METHOD at_gui_event.
 
     lcl_r2c=>app = me.
+
+  ENDMETHOD.
+
+  METHOD cgui_statics_keep.
+
+    lcl_r2c=>app = me.
+
+    " the CLASS-DATA of the local classes - kept with the app until the next roundtrip
+    FIELD-SYMBOLS <lv_cgui_static> TYPE any.
+    CREATE DATA mr_cgui_static1 LIKE lcl_counter=>gv_count.
+    ASSIGN mr_cgui_static1->* TO <lv_cgui_static>.
+    <lv_cgui_static> = lcl_counter=>gv_count.
+    CREATE DATA mr_cgui_static2 LIKE lcl_counter=>go_html.
+    ASSIGN mr_cgui_static2->* TO <lv_cgui_static>.
+    <lv_cgui_static> = lcl_counter=>go_html.
+
+  ENDMETHOD.
+
+  METHOD cgui_statics_restore.
+
+    lcl_r2c=>app = me.
+
+    " the CLASS-DATA of the local classes - as the last roundtrip left them
+    FIELD-SYMBOLS <lv_cgui_static> TYPE any.
+    IF mr_cgui_static1 IS BOUND.
+      ASSIGN mr_cgui_static1->* TO <lv_cgui_static>.
+      lcl_counter=>gv_count = <lv_cgui_static>.
+    ENDIF.
+    IF mr_cgui_static2 IS BOUND.
+      ASSIGN mr_cgui_static2->* TO <lv_cgui_static>.
+      lcl_counter=>go_html = <lv_cgui_static>.
+    ENDIF.
 
   ENDMETHOD.
 

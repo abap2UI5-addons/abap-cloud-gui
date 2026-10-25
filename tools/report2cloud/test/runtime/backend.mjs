@@ -237,11 +237,13 @@ export async function buildBackend({ files = {}, ddic, seed = [], sources = ["sr
 }
 
 /** Serve a build on 127.0.0.1:`port` in a child process (host.mjs).
+ *  freshStatics: a regular expression of class names (CLAS-<pool>-<local
+ *  class) whose CLASS-DATA is cleared before every request (host.mjs).
  *  Resolves { url, stop, log }. */
-export function startBackend({ build, port }) {
+export function startBackend({ build, port, freshStatics }) {
   return new Promise((resolveStart, reject) => {
     const child = spawn(process.execPath, [join(HERE, "host.mjs"), build.runtimeDir, build.apps], {
-      env: { ...process.env, PORT: String(port) },
+      env: { ...process.env, PORT: String(port), ...(freshStatics ? { FRESH_STATICS: freshStatics } : {}) },
       stdio: ["ignore", "pipe", "pipe"],
     });
     const log = [];

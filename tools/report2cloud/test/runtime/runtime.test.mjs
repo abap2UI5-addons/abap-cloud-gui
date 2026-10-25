@@ -47,7 +47,9 @@ before(async () => {
   const log = [];
   build = await buildBackend({ files, ddic: DDIC, seed: seedSql(), onLine: (l) => log.push(l) });
   assert.ok(build.ok, `the backend did not build: ${build.reason}\n${log.slice(-30).join("\n")}`);
-  backend = await startBackend({ build, port: PORT });
+  // the CLASS-DATA of the local classes of the reports cleared before every
+  // request - a roundtrip is a session of its own on a system
+  backend = await startBackend({ build, port: PORT, freshStatics: "^CLAS-Z2UI5_CL_CGUI_R2C_\\d+-" });
   d = await createDriver({ mcp: mcp.dir, url: backend.url });
 }, { timeout: 20 * 60_000 });
 
@@ -725,4 +727,25 @@ test("zr2c_44_cursor: GET CURSOR FIELD VALUE LINE in AT LINE-SELECTION - the fie
   s = await d.act(s.session, { event: "CGUI_BACK" });
   s = await d.act(s.session, { event: actionsOf(s, "CGUI_LINE_SELECTION")[5].id });
   assert.deepEqual(d.lines().filter((l) => l.trim() !== ""), [`Line ${second + 1}: GS_PEAK-HEIGHT = 1493`]);
+});
+
+test("zr2c_45_salvlocal: a SALV kept by a local class - a function of its own over the rows selected, double click and link to the handlers, the statics kept", { skip }, async () => {
+  let s = await d.start("z2ui5_cl_cgui_r2c_45");
+  if (!s.tables.length) s = await d.act(s.session, { event: "CGUI_EXECUTE" });
+  const [t] = s.tables;
+  assert.ok(t, "the grid of the SALV");
+  assert.match(t.label, /^Packing list/);
+  assert.deepEqual(t.rows.map((r) => r.NAME), ["Tent", "Sleeping bag", "Stove"]);
+  assert.ok(t.columns.some((c) => c.name === "WEIGHT" && /Weight \(g\)/.test(c.label)), t.columns.map((c) => c.label).join(" "));
+  // the function added - a button that raises added_function
+  assert.ok(actionsOf(s, "WEIGH").length >= 1, "a button WEIGH");
+  // two rows selected, then the button: the handler reads them through get_selected_rows( )
+  s = await d.act(s.session, { values: { [`${t.path}/0/ZZSELKZ`]: true, [`${t.path}/2/ZZSELKZ`]: true }, event: "WEIGH" });
+  assert.deepEqual(toasts(s), ["2 item(s), 2750 g"]);
+  // a double click on the second row - double_click with the row
+  s = await d.act(s.session, { event: "CGUI_ALV_LINE_SELECTION", args: [`${t.path}/1`] });
+  assert.deepEqual(toasts(s), ["Sleeping bag in row 2"]);
+  // the item is a hotspot - link_click with row and column
+  s = await d.act(s.session, { event: "CGUI_ALV_HOTSPOT", args: [`${t.path}/2`, "ITEM"] });
+  assert.deepEqual(toasts(s), ["Item 003 (ITEM)"]);
 });

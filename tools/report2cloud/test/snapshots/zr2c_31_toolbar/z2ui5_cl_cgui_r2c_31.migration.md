@@ -5,7 +5,7 @@
 | Source | `zr2c_31_toolbar.prog.abap` |
 | Text pool | `zr2c_31_toolbar.prog.xml` |
 | Result | **converted** - `z2ui5_cl_cgui_r2c_31.clas.abap`, `z2ui5_cl_cgui_r2c_31.clas.locals_imp.abap`, `z2ui5_cl_cgui_r2c_31.clas.xml` |
-| Mapped | 7 construct(s) |
+| Mapped | 8 construct(s) |
 | TODO | 0 |
 | Release state to check | 0 object(s) |
 
@@ -26,6 +26,7 @@ Layout, formatting and behaviour of the classic report that the list, the ALV or
 |---|---|---|
 | 8 | `REPORT zr2c_31_toolbar` | the class, `INHERITING FROM z2ui5_cl_cgui_report` |
 | 10 | `CLASS lcl_counter DEFINITION` | locals_imp |
+| 12 | `CLASS-DATA gv_count TYPE i` | `cgui_statics_keep( )` / `cgui_statics_restore( )` - the CLASS-DATA of the local classes kept with the app between two roundtrips |
 | 19 | `CLASS lcl_counter IMPLEMENTATION` | locals_imp |
 | 41 | `global data - the report restarted after its list` | `CLEAR` of 2 global data object(s) at the start of `start_of_selection( )` |
 | 43 | `START-OF-SELECTION` | `start_of_selection( )` |

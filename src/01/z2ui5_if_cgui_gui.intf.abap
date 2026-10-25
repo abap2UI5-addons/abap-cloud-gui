@@ -14,6 +14,7 @@ INTERFACE z2ui5_if_cgui_gui PUBLIC.
       toolbar   TYPE string VALUE `TOOLBAR`,
       grid      TYPE string VALUE `GRID`,
       picture   TYPE string VALUE `PICTURE`,
+      salv      TYPE string VALUE `SALV`,
     END OF cs_kind.
 
   TYPES:

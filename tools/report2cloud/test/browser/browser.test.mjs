@@ -41,7 +41,8 @@ before(async () => {
   const log = [];
   build = await buildBackend({ files, ddic: DDIC, seed: seedSql(), onLine: (l) => log.push(l) });
   assert.ok(build.ok, `the backend did not build: ${build.reason}\n${log.slice(-30).join("\n")}`);
-  backend = await startBackend({ build, port: PORT });
+  // the CLASS-DATA of the local classes cleared before every request, as on a system
+  backend = await startBackend({ build, port: PORT, freshStatics: "^CLAS-Z2UI5_CL_CGUI_R2C_\\d+-" });
 }, { timeout: 20 * 60_000 });
 
 after(async () => {
