@@ -191,6 +191,7 @@ CLASS ltcl_test DEFINITION FINAL FOR TESTING
     METHODS f4_keeps_other_lines FOR TESTING.
     METHODS popups_of_the_project FOR TESTING.
     METHODS short_api FOR TESTING.
+    METHODS input_history FOR TESTING.
     METHODS popup_values_of_an_sval FOR TESTING.
     METHODS alv_layout_default FOR TESTING.
     METHODS alv_layout_without_store FOR TESTING.
@@ -1157,6 +1158,40 @@ CLASS ltcl_test IMPLEMENTATION.
     cl_abap_unit_assert=>assert_equals( act = mo_cut->get_parameter_id( `zcgui_test` )
                                         exp = `LH` ).
     cl_abap_unit_assert=>assert_true( xsdbool( mo_report->mv_cgui_spa CS `ZCGUI_TEST=LH` ) ).
+
+  ENDMETHOD.
+
+  METHOD input_history.
+
+    DATA(lv_tab) = cl_abap_char_utilities=>horizontal_tab.
+
+    " two runs: the latest entry first, each once
+    init( ).
+    mo_report->p_carrid = `LH`.
+    event( z2ui5_cl_cgui_report=>cs_ucomm-execute ).
+    event( z2ui5_cl_cgui_report=>cs_ucomm-back ).
+    mo_report->p_carrid = `UA`.
+    event( z2ui5_cl_cgui_report=>cs_ucomm-execute ).
+    event( z2ui5_cl_cgui_report=>cs_ucomm-back ).
+    mo_report->p_carrid = `LH`.
+    event( z2ui5_cl_cgui_report=>cs_ucomm-execute ).
+
+    cl_abap_unit_assert=>assert_true( xsdbool( mo_report->mv_cgui_history CS |P_CARRID{ lv_tab }LH{ lv_tab }UA| ) ).
+    cl_abap_unit_assert=>assert_false( xsdbool( mo_report->mv_cgui_history CS |UA{ lv_tab }LH| ) ).
+
+    " a new start with set_prefill_last( ): the empty field takes LH
+    DATA(lv_history) = mo_report->mv_cgui_history.
+    mo_report = NEW #( ).
+    mo_cut = mo_report.
+    mo_client = NEW #( ).
+    mo_client->mo_app = mo_report.
+    mo_cut->set_prefill_last( ).
+    init( ).
+    mo_report->mv_cgui_history = lv_history.
+    event( z2ui5_cl_cgui_report=>cs_ucomm-variants_loaded ).
+
+    cl_abap_unit_assert=>assert_equals( act = mo_report->p_carrid
+                                        exp = `LH` ).
 
   ENDMETHOD.
 

@@ -82,6 +82,12 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
     CONSTANTS cv_cgui_spa_prefix TYPE string VALUE `z2ui5_cgui_spa`.
     CONSTANTS cv_cgui_spa_key    TYPE string VALUE `PARAMETERS`.
 
+    "! the browser's local storage of the input history - the last entries
+    "! of every field, the key is the name of the report class
+    CONSTANTS cv_cgui_history_prefix TYPE string VALUE `z2ui5_cgui_history`.
+    "! how many entries of a field the history keeps
+    CONSTANTS cv_cgui_history_size   TYPE i VALUE 10.
+
     "! the id of the footer button the message popover opens on, and of the
     "! popover itself
     CONSTANTS cv_cgui_messages_id TYPE string VALUE `cgui_messages`.
@@ -155,6 +161,9 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
     "! the parameter IDs of the browser - ID=value lines, bound to the
     "! storage control that reads them
     DATA mv_cgui_spa TYPE string.
+    "! the input history in the browser - a line per field: NAME, a tab,
+    "! the entries apart by tabs, the latest first
+    DATA mv_cgui_history TYPE string.
 
     DATA mt_cgui_so  TYPE ty_t_cgui_so.
     DATA mt_cgui_tab TYPE ty_t_cgui_tab.
@@ -588,6 +597,13 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
         type  TYPE clike DEFAULT `S`
         field TYPE clike OPTIONAL.
 
+    "! the selection screen starts with the last entries of the fields:
+    "! an empty field takes the latest entry of its input history (a
+    "! variant to start with and the URL still win) - in initialization( )
+    METHODS set_prefill_last
+      IMPORTING
+        val TYPE abap_bool DEFAULT abap_true.
+
     "! the short API of the messages, in the style of abap2UI5:
     "! _msg( )->e( `No flights found` ) is message( text = ... type = `E` );
     "! the methods chain
@@ -846,6 +862,7 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
     DATA mt_cgui_level         TYPE ty_t_cgui_level.
     DATA mt_cgui_field         TYPE z2ui5_cl_cgui_selscreen=>ty_t_field.
     DATA mt_cgui_msg           TYPE ty_t_cgui_msg.
+    DATA mv_cgui_prefill TYPE abap_bool.
     " the message boxes of _msg_box( ) - shown at the end of the roundtrip
     DATA mt_cgui_box           TYPE ty_t_cgui_msg.
     " the messages of the run, I, W, E and A - what the message popover
@@ -1131,6 +1148,25 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
         values TYPE z2ui5_if_client=>ty_t_name_value.
 
     METHODS on_storage_loaded.
+
+    TYPES:
+      BEGIN OF ty_s_cgui_history,
+        name   TYPE string,
+        values TYPE string_table,
+      END OF ty_s_cgui_history.
+    TYPES ty_t_cgui_history TYPE STANDARD TABLE OF ty_s_cgui_history WITH EMPTY KEY.
+
+    "! the input history of mv_cgui_history
+    METHODS history_get
+      RETURNING
+        VALUE(result) TYPE ty_t_cgui_history.
+
+    "! the entries of the fields of this run into the history - the latest
+    "! first, each once, cv_cgui_history_size of them - and to the browser
+    METHODS history_store.
+
+    "! set_prefill_last( ): an empty field takes its latest entry
+    METHODS history_apply.
 
     METHODS auto_execute.
 
@@ -3628,12 +3664,146 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
 
   ENDMETHOD.
 
+  METHOD set_prefill_last.
+
+    mv_cgui_prefill = val.
+
+  ENDMETHOD.
+
+  METHOD history_get.
+
+    DATA lt_line TYPE string_table.
+
+    SPLIT mv_cgui_history AT cl_abap_char_utilities=>newline INTO TABLE lt_line.
+    LOOP AT lt_line INTO DATA(lv_line) WHERE table_line IS NOT INITIAL.
+      SPLIT lv_line AT cl_abap_char_utilities=>horizontal_tab INTO TABLE DATA(lt_part).
+      IF lines( lt_part ) < 2.
+        CONTINUE.
+      ENDIF.
+      DATA(ls_history) = VALUE ty_s_cgui_history( name = to_upper( lt_part[ 1 ] ) ).
+      LOOP AT lt_part INTO DATA(lv_part) FROM 2 WHERE table_line IS NOT INITIAL.
+        INSERT lv_part INTO TABLE ls_history-values.
+      ENDLOOP.
+      INSERT ls_history INTO TABLE result.
+    ENDLOOP.
+
+  ENDMETHOD.
+
+  METHOD history_store.
+
+    DATA lt_line TYPE string_table.
+    DATA lv_value TYPE string.
+    FIELD-SYMBOLS <field_val> TYPE any.
+    FIELD-SYMBOLS <range>     TYPE STANDARD TABLE.
+    FIELD-SYMBOLS <low>       TYPE any.
+
+    DATA(lt_history) = history_get( ).
+    " the fields a user types into - no radio button, no NO-DISPLAY
+    LOOP AT mt_cgui_field REFERENCE INTO DATA(lr_field) WHERE no_display = abap_false AND group IS INITIAL.
+      DATA(lr_val) = attri_assign( lr_field->name ).
+      IF lr_val IS NOT BOUND.
+        CONTINUE.
+      ENDIF.
+      CLEAR lv_value.
+      IF lr_field->kind = z2ui5_cl_cgui_selscreen=>cs_field_kind-select_option.
+        ASSIGN lr_val->* TO <range>.
+        READ TABLE <range> ASSIGNING FIELD-SYMBOL(<line>) INDEX 1.
+        IF sy-subrc = 0.
+          ASSIGN COMPONENT `LOW` OF STRUCTURE <line> TO <low>.
+          IF sy-subrc = 0 AND <low> IS NOT INITIAL.
+            lv_value = condense( CONV string( <low> ) ).
+          ENDIF.
+        ENDIF.
+      ELSE.
+        ASSIGN lr_val->* TO <field_val>.
+        " a checkbox - a field of one character - has no history
+        DATA(lo_type) = cl_abap_typedescr=>describe_by_data( <field_val> ).
+        IF <field_val> IS NOT INITIAL
+            AND NOT ( lo_type->type_kind = cl_abap_typedescr=>typekind_char
+                      AND lo_type->length <= cl_abap_char_utilities=>charsize ).
+          lv_value = condense( CONV string( <field_val> ) ).
+        ENDIF.
+      ENDIF.
+      " a tab or a line end would break the history apart
+      IF lv_value IS INITIAL OR lv_value CA |{ cl_abap_char_utilities=>horizontal_tab }{ cl_abap_char_utilities=>newline }|.
+        CONTINUE.
+      ENDIF.
+      READ TABLE lt_history ASSIGNING FIELD-SYMBOL(<history>) WITH KEY name = lr_field->name.
+      IF sy-subrc <> 0.
+        INSERT VALUE #( name = lr_field->name ) INTO TABLE lt_history ASSIGNING <history>.
+      ENDIF.
+      DELETE <history>-values WHERE table_line = lv_value.
+      INSERT lv_value INTO <history>-values INDEX 1.
+      WHILE lines( <history>-values ) > cv_cgui_history_size.
+        DELETE <history>-values INDEX lines( <history>-values ).
+      ENDWHILE.
+    ENDLOOP.
+
+    LOOP AT lt_history INTO DATA(ls_history).
+      INSERT concat_lines_of( table = VALUE string_table( ( ls_history-name ) ( LINES OF ls_history-values ) )
+                              sep   = cl_abap_char_utilities=>horizontal_tab ) INTO TABLE lt_line.
+    ENDLOOP.
+    DATA(lv_history) = concat_lines_of( table = lt_line sep = cl_abap_char_utilities=>newline ).
+    IF lv_history = mv_cgui_history.
+      RETURN.
+    ENDIF.
+    mv_cgui_history = lv_history.
+    IF client IS BOUND AND mv_cgui_batch = abap_false.
+      client->follow_up_action( val   = client->cs_event-store_data
+                                t_arg = VALUE #( ( z2ui5_cl_cgui_variant=>storage_json( prefix = cv_cgui_history_prefix
+                                                                                        key    = variant_key( )
+                                                                                        val    = mv_cgui_history ) ) ) ).
+    ENDIF.
+
+  ENDMETHOD.
+
+  METHOD history_apply.
+
+    FIELD-SYMBOLS <field_val> TYPE any.
+    FIELD-SYMBOLS <range>     TYPE STANDARD TABLE.
+
+    LOOP AT history_get( ) INTO DATA(ls_history).
+      READ TABLE mt_cgui_field INTO DATA(ls_field) WITH KEY name = ls_history-name.
+      IF sy-subrc <> 0 OR ls_history-values IS INITIAL.
+        CONTINUE.
+      ENDIF.
+      DATA(lr_val) = attri_assign( ls_field-name ).
+      IF lr_val IS NOT BOUND.
+        CONTINUE.
+      ENDIF.
+      ASSIGN lr_val->* TO <field_val>.
+      IF <field_val> IS NOT INITIAL.
+        CONTINUE.
+      ENDIF.
+      DATA(lv_value) = ls_history-values[ 1 ].
+      IF ls_field-kind = z2ui5_cl_cgui_selscreen=>cs_field_kind-select_option.
+        ASSIGN lr_val->* TO <range>.
+        z2ui5_cl_cgui_range=>rows_to_range( EXPORTING rows  = VALUE #( ( sign = `I` option = `EQ` low = lv_value ) )
+                                            IMPORTING error = DATA(lv_error)
+                                            CHANGING  range = <range> ).
+        IF lv_error IS NOT INITIAL.
+          CLEAR <range>.
+        ENDIF.
+        CONTINUE.
+      ENDIF.
+      TRY.
+          <field_val> = lv_value.
+        CATCH cx_root ##NO_HANDLER.
+      ENDTRY.
+    ENDLOOP.
+
+  ENDMETHOD.
+
   METHOD on_storage_loaded.
 
     " the storage controls have put what the browser holds into
     " mv_cgui_variants and mv_cgui_spa: the parameter IDs fill empty fields,
-    " the start variant overwrites them, the URL wins over both
+    " then the last entries (set_prefill_last( )), the start variant
+    " overwrites them, the URL wins over both
     memory_id_apply( ).
+    IF mv_cgui_prefill = abap_true.
+      history_apply( ).
+    ENDIF.
 
     IF mv_cgui_variant_start IS NOT INITIAL.
       DATA(lv_start) = mv_cgui_variant_start.
@@ -4089,6 +4259,7 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
     ENDIF.
 
     memory_id_store( ).
+    history_store( ).
 
     CLEAR: mo_cgui_list, mo_cgui_alv, mr_cgui_alv, mr_cgui_alv_box, mv_cgui_alv_name, mt_cgui_level,
            mr_cgui_alv_page, mt_cgui_alv_index, mo_cgui_tree, mt_cgui_tree_view,
@@ -6017,6 +6188,14 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
           )->a( n = `finished` v = client->_event( val    = cs_ucomm-variants_loaded
                                                    s_ctrl = VALUE #( check_queue_last = abap_true ) ) ).
     ENDIF.
+    " the input history of this report - read once, written by history_store( )
+    page->tag( n = `Storage` ns = `z2ui5`
+        )->a( n = `type`     v = `local`
+        )->a( n = `prefix`   v = cv_cgui_history_prefix
+        )->a( n = `key`      t = variant_key( )
+        )->a( n = `value`    v = client->_bind( mv_cgui_history )
+        )->a( n = `finished` v = client->_event( val    = cs_ucomm-variants_loaded
+                                                 s_ctrl = VALUE #( check_queue_last = abap_true ) ) ).
     page->tag( n = `Storage` ns = `z2ui5`
         )->a( n = `type`     v = `local`
         )->a( n = `prefix`   v = cv_cgui_spa_prefix
@@ -6064,6 +6243,10 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
       mt_cgui_fkey = screen->get_function_keys( ).
       so_buffer_prepare( screen ).
       tab_binding_prepare( screen ).
+      LOOP AT history_get( ) INTO DATA(ls_history).
+        screen->set_history( name   = ls_history-name
+                             values = ls_history-values ).
+      ENDLOOP.
       screen->render( page ).
       gui_docked( dynnr = `1000`
                   node  = page ).

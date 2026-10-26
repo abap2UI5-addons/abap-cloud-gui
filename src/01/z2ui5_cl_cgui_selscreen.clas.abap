@@ -293,6 +293,13 @@ CLASS z2ui5_cl_cgui_selscreen DEFINITION PUBLIC FINAL CREATE PRIVATE.
       RETURNING
         VALUE(result) TYPE REF TO z2ui5_cl_cgui_selscreen.
 
+    "! the last entries of field name, the latest first - offered as
+    "! suggestions of its input (the input history of the SAP GUI)
+    METHODS set_history
+      IMPORTING
+        name   TYPE clike
+        values TYPE string_table.
+
     "! VRM_SET_VALUES - the values of the listbox of field name
     METHODS set_listbox_values
       IMPORTING
@@ -499,6 +506,12 @@ CLASS z2ui5_cl_cgui_selscreen DEFINITION PUBLIC FINAL CREATE PRIVATE.
     DATA mv_value_help_auto TYPE abap_bool.
     DATA mv_preview         TYPE abap_bool.
     DATA mt_listbox         TYPE ty_t_listbox.
+    TYPES:
+      BEGIN OF ty_s_history,
+        name   TYPE string,
+        values TYPE string_table,
+      END OF ty_s_history.
+    DATA mt_history         TYPE STANDARD TABLE OF ty_s_history WITH EMPTY KEY.
     DATA mt_tab_bind        TYPE ty_t_tab_bind.
     DATA mt_function_key    TYPE ty_t_function_key.
     " BEGIN OF BLOCK ... NO INTERVALS - the blocks open that have it
@@ -785,6 +798,17 @@ CLASS z2ui5_cl_cgui_selscreen IMPLEMENTATION.
 
     INSERT VALUE #( kind = cs_kind-tabbed_end ) INTO TABLE mt_item.
     result = me.
+
+  ENDMETHOD.
+
+  METHOD set_history.
+
+    DATA(lv_name) = to_upper( name ).
+    DELETE mt_history WHERE name = lv_name.
+    IF values IS NOT INITIAL.
+      INSERT VALUE #( name   = lv_name
+                      values = values ) INTO TABLE mt_history.
+    ENDIF.
 
   ENDMETHOD.
 
@@ -1477,7 +1501,8 @@ CLASS z2ui5_cl_cgui_selscreen IMPLEMENTATION.
                         item = item ).
 
       WHEN OTHERS.
-        node->tag( `Input`
+        " ele( ): the input itself - its suggestions are children of it
+        DATA(lo_input) = node->ele( `Input`
             )->a( n = `value`    v = item-bind
             )->a( n = `required` b = item-required
             )->a( n = `editable` b = xsdbool( item-read_only = abap_false ) ).
@@ -1500,6 +1525,18 @@ CLASS z2ui5_cl_cgui_selscreen IMPLEMENTATION.
           node->a( n = `showValueHelp`    b = abap_true
               )->a( n = `valueHelpRequest` v = client->_event( val = cs_event-value_request
                                                                arg = item-name ) ).
+        ENDIF.
+        " the last entries of the field - suggested from its first character
+        READ TABLE mt_history INTO DATA(ls_history) WITH KEY name = item-name.
+        IF sy-subrc = 0 AND item-invisible = abap_false AND item-read_only = abap_false.
+          node->a( n = `xmlns:core`     v = `sap.ui.core` ).
+          node->a( n = `showSuggestion` b = abap_true ).
+          DATA(lo_items) = lo_input->ele( `suggestionItems` ).
+          LOOP AT ls_history-values INTO DATA(lv_value).
+            lo_items->tag( n = `Item` ns = `core`
+                )->a( n = `key`  t = lv_value
+                )->a( n = `text` t = lv_value ).
+          ENDLOOP.
         ENDIF.
 
     ENDCASE.

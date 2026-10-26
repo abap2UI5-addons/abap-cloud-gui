@@ -172,6 +172,15 @@ _popup( )->decide( question = `Which copy?` options = VALUE #( ( `Original` ) ( 
 not in the popover, an error does not stop the run - and `_popup( )` has the
 popups of the report: the answer comes as `at_user_command( ucomm )`.
 
+### The last entries
+
+Every field remembers what was run with it: the last ten values - of a
+parameter, or the first line of a select-option - stay in the browser's local
+storage, one history per report, and the field suggests them as the user
+types. `set_prefill_last( )` in `initialization( )` goes one step further: an
+empty field starts with its latest entry. A parameter ID fills a field first,
+a start variant and the URL win over the history.
+
 ### A dynamic selection screen
 
 `MODIF ID`, `USER-COMMAND` and `LOOP AT SCREEN` work as in a classic report:
@@ -530,11 +539,13 @@ Navigation and transactions
 - [ ] Launchpad tiles and intent navigation for a converted class
 - [ ] Command field instead of a plain input: transaction codes, `/n`, `/o`
 - [ ] Command palette (`Cmd+K` / `Ctrl+K`) to search and start reports
-- [ ] Input history: the last entries of a field, opened with the space bar
+- [x] Input history: the last ten entries of a field, in the browser's local
+      storage, suggested as the user types
 - [x] Keyboard shortcuts: F8 Execute, F3 Back, `AT PFnn` and the function
       keys of a GUI status (`set_pf_status( shortcuts = )`)
-- [ ] Transaction logic: start with a variant, prefill the last entries,
-      create a draft
+- [x] Transaction logic: start with a variant, prefill the last entries
+      (`set_prefill_last( )`)
+- [ ] Transaction logic: create a draft
 - [ ] `SET` / `GET PARAMETER ID` with user parameters (like SU3), system
       parameters and customizing parameters
 

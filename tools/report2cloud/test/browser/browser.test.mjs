@@ -63,3 +63,33 @@ test("on a phone the selection screens fit the width - select-options, lines of 
   const rows = await browserRun(phone, { url: backend.url, execute: false, themes: true, viewport: { width: 390, height: 844 }, onLine: (l) => t.diagnostic(l) });
   assert.deepEqual(rows.filter((r) => !r.ok).map((r) => `${r.cls}: ${r.errors.join("; ")}`), []);
 });
+
+test("the input history - a value run once is offered as a suggestion on the next start, in the browser's local storage", { skip, timeout: 10 * 60_000 }, async (t) => {
+  const hello = classes.filter((c) => /_r2c_01$/.test(c));
+  const rows = await browserRun(hello, {
+    url: backend.url,
+    execute: false,
+    onLine: (l) => t.diagnostic(l),
+    check: async (page, errors, cls) => {
+      const input = page.locator("input.sapMInputBaseInner").first();
+      await input.fill("Ada Lovelace");
+      await input.press("Tab");
+      await page.locator(".sapMBtn").filter({ hasText: /^\s*Execute/ }).first().click({ timeout: 10_000 });
+      await page.waitForLoadState("networkidle", { timeout: 10_000 }).catch(() => {});
+      await page.waitForTimeout(500);
+      // the same browser - the next start of the report
+      await page.goto(`${backend.url.replace(/\/$/, "")}/?app_start=${cls}`, { waitUntil: "domcontentloaded" });
+      await page.waitForFunction(() => document.querySelectorAll("input.sapMInputBaseInner").length > 0, null, { timeout: 60_000 });
+      await page.waitForLoadState("networkidle", { timeout: 10_000 }).catch(() => {});
+      await page.waitForTimeout(500);
+      const offered = await page.evaluate(() => {
+        const byId = (id) => sap.ui.core.Element.getElementById?.(id) ?? sap.ui.getCore().byId(id);
+        return [...document.querySelectorAll(".sapMInput")].map((e) => byId(e.id))
+          .filter((c) => c?.getSuggestionItems)
+          .flatMap((c) => c.getSuggestionItems().map((i) => i.getText()));
+      });
+      if (!offered.includes("Ada Lovelace")) errors.push(`no suggestion of the last entry - offered: ${JSON.stringify(offered)}`);
+    },
+  });
+  assert.deepEqual(rows.filter((r) => !r.ok).map((r) => `${r.cls}: ${r.errors.join("; ")}`), []);
+});

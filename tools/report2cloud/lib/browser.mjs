@@ -127,13 +127,15 @@ async function settle(page) {
  * Start every app of `classes` on the backend at `url` in Chromium. Resolves
  * [{ cls, ok, booted, executed, errors }]. execute: press Execute when the
  * first screen is a selection screen (a button with the text Execute).
+ * check(page, errors, cls): awaited with the page of each app, after Execute -
+ * the caller drives it further; an error it pushes fails the app.
  * after(row): awaited after each app - an error it pushes fails the app.
  * themes: the built themes from the CDN (sdk.openui5.org, the release of
  * the packages) - a layout is judged themed only.
  * viewport: the size of the page ({ width, height }); below 600px wide it is
  * a phone, and a page wider than it fails the app.
  */
-export async function browserRun(classes, { url, execute = true, timeoutMs = 60_000, viewport, themes = false, after = async () => {}, onLine = () => {} } = {}) {
+export async function browserRun(classes, { url, execute = true, timeoutMs = 60_000, viewport, themes = false, check = async () => {}, after = async () => {}, onLine = () => {} } = {}) {
   const { chromium } = await import("playwright");
   // the Chromium of this Playwright, else REPORT2CLOUD_CHROMIUM or one
   // installed beside it (a sandbox with a browser of another release)
@@ -168,6 +170,7 @@ export async function browserRun(classes, { url, execute = true, timeoutMs = 60_
               executed = true;
             }
           }
+          if (booted) await check(page, errors, cls);
           // on a phone the screen fits the width - no page that scrolls sideways
           if (themes && !(await page.evaluate(() => /72/.test(getComputedStyle(document.body).fontFamily)))) {
             errors.push("the theme did not load - the layout is that of no theme");
