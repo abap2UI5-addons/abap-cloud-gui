@@ -711,11 +711,14 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
 
     "! the transport request popup - the modifiable requests of the user;
     "! on a pick or "No Transport" at_user_command( ) runs with ucomm,
-    "! get_transport( ) returns the answer
+    "! get_transport( ) returns the answer (with then: `1` picked, `A` not)
+    "! then names a PUBLIC method of the report with IMPORTING answer TYPE
+    "! string - it runs instead of at_user_command( ) with the answer
     METHODS popup_transport
       IMPORTING
-        ucomm TYPE clike
-        title TYPE clike OPTIONAL.
+        ucomm TYPE clike OPTIONAL
+        title TYPE clike OPTIONAL
+        then  TYPE clike OPTIONAL.
 
     "! the answer of popup_transport( ) - confirmed, local (no transport),
     "! the request and the task of the user
@@ -723,31 +726,41 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
       RETURNING
         VALUE(result) TYPE z2ui5_cl_cgui_transport=>ty_s_result.
 
-    "! POPUP_TO_CONFIRM - on Yes, at_user_command( ) runs with ucomm
+    "! POPUP_TO_CONFIRM - on Yes, at_user_command( ) runs with ucomm; with
+    "! then the method runs on both answers, answer `1` for Yes, `A` for No
+    "! then names a PUBLIC method of the report with IMPORTING answer TYPE
+    "! string - it runs instead of at_user_command( ) with the answer
     METHODS popup_to_confirm
       IMPORTING
         question TYPE clike
-        ucomm    TYPE clike
-        title    TYPE clike DEFAULT `Confirm`.
+        ucomm    TYPE clike OPTIONAL
+        title    TYPE clike DEFAULT `Confirm`
+        then     TYPE clike OPTIONAL.
 
     "! POPUP_TO_DECIDE - on an answer at_user_command( ) runs with ucomm,
     "! popup_answer( ) returns `1`, `2`, ... for the option or `A` for cancel
+    "! then names a PUBLIC method of the report with IMPORTING answer TYPE
+    "! string - it runs instead of at_user_command( ) with the answer
     METHODS popup_to_decide
       IMPORTING
         question TYPE clike
         options  TYPE string_table
-        ucomm    TYPE clike
-        title    TYPE clike OPTIONAL.
+        ucomm    TYPE clike OPTIONAL
+        title    TYPE clike OPTIONAL
+        then     TYPE clike OPTIONAL.
 
     "! POPUP_GET_VALUES - on OK at_user_command( ) runs with ucomm and
     "! popup_values( ) returns the fields with what the user entered
+    "! then names a PUBLIC method of the report with IMPORTING answer TYPE
+    "! string - it runs instead of at_user_command( ) with the answer
     METHODS popup_get_values
       IMPORTING
         fields  TYPE z2ui5_cl_cgui_popup=>ty_t_field
-        ucomm   TYPE clike
+        ucomm   TYPE clike                         OPTIONAL
         title   TYPE clike                         OPTIONAL
         text    TYPE clike                         OPTIONAL
-        listbox TYPE z2ui5_cl_cgui_popup=>ty_t_listbox OPTIONAL.
+        listbox TYPE z2ui5_cl_cgui_popup=>ty_t_listbox OPTIONAL
+        then    TYPE clike                         OPTIONAL.
 
     "! POPUP_GET_VALUES with its SVAL table: fieldname is the name, fieldtext
     "! the label (the field name when empty), value the start value,
@@ -755,9 +768,10 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
     METHODS popup_get_values_sval
       IMPORTING
         sval  TYPE STANDARD TABLE
-        ucomm TYPE clike
+        ucomm TYPE clike OPTIONAL
         title TYPE clike OPTIONAL
-        text  TYPE clike OPTIONAL.
+        text  TYPE clike OPTIONAL
+        then  TYPE clike OPTIONAL.
 
     "! what the user entered in the last popup_get_values_sval( ), written
     "! back into the SVAL table by fieldname - an empty table is filled
@@ -862,6 +876,17 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
         values               TYPE z2ui5_cl_cgui_variant=>ty_t_value OPTIONAL
         via_selection_screen TYPE abap_bool DEFAULT abap_false
         using_variant        TYPE clike     OPTIONAL.
+
+    "! CALL TRANSACTION code [AND SKIP FIRST SCREEN] - the transaction of
+    "! the catalog (set_catalog( )) starts its report class with its
+    "! variant, else code is taken as the class; Back returns here.
+    "! skip_first runs it straight away with the values - SET PARAMETER ID
+    "! fills the fields with a MEMORY ID as before
+    METHODS call_transaction
+      IMPORTING
+        code       TYPE clike
+        skip_first TYPE abap_bool DEFAULT abap_false
+        values     TYPE z2ui5_cl_cgui_variant=>ty_t_value OPTIONAL.
 
     "! SET PARAMETER ID - kept in the browser's local storage for every
     "! report (there is no SAP memory on ABAP Cloud)
@@ -989,6 +1014,8 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
     DATA mv_cgui_pending_kind  TYPE string.
     DATA mv_cgui_pending_col   TYPE string.
     DATA mv_cgui_pending_ucomm TYPE string.
+    " the method a popup with then calls back with its answer
+    DATA mv_cgui_then          TYPE string.
     DATA mv_cgui_on_field      TYPE string.
     DATA mv_cgui_variant       TYPE string.
     DATA mv_cgui_variant_start TYPE string.
@@ -1584,6 +1611,19 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
     METHODS user_command
       IMPORTING
         ucomm TYPE string.
+
+    "! the event a popup leaves with - ucomm, or with then the one of the
+    "! callback (kept in mv_cgui_then)
+    METHODS popup_event
+      IMPORTING
+        ucomm         TYPE clike
+        then          TYPE clike
+      RETURNING
+        VALUE(result) TYPE string.
+
+    "! the rest of a run on the selection screen wrote something: the
+    "! output shows - unless it opened the next popup
+    METHODS run_answer_output.
 
     "! start a report: code - a transaction of the catalog or a report
     "! class; new_window - in a new browser tab
@@ -3211,6 +3251,9 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
           CATCH cx_root.
             CLEAR ms_cgui_transport.
         ENDTRY.
+        mv_cgui_answer = COND #( WHEN ms_cgui_transport-confirmed = abap_true
+                                 THEN z2ui5_cl_cgui_popup=>cs_answer-ok
+                                 ELSE z2ui5_cl_cgui_popup=>cs_answer-cancel ).
 
       WHEN cs_pending-range.
         on_range_result( lv_field ).
@@ -3927,6 +3970,27 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
       CLEAR mv_cgui_pending_ucomm.
     ENDIF.
 
+    " the answer of a popup with then: its method, not at_user_command( )
+    IF ucomm = cs_ucomm-popup_answer AND mv_cgui_then IS NOT INITIAL.
+      DATA(lv_then) = mv_cgui_then.
+      CLEAR mv_cgui_then.
+      TRY.
+          CALL METHOD (lv_then)
+            EXPORTING
+              answer = popup_answer( ).
+        CATCH cx_sy_dyn_call_error.
+          message( text = replace( val  = 'No public method &1( answer ) for the popup'(061)
+                                   sub  = `&1`
+                                   with = lv_then )
+                   type = `E` ).
+          RETURN.
+      ENDTRY.
+      IF lv_run_answer = abap_true.
+        run_answer_output( ).
+      ENDIF.
+      RETURN.
+    ENDIF.
+
     " a function of the toolbar of a grid: its event user_command
     READ TABLE mt_cgui_grid INTO DATA(ls_grid) WITH KEY id = mv_cgui_grid.
     IF sy-subrc = 0 AND line_exists( ls_grid-functions[ fcode = ucomm ] ).
@@ -3938,14 +4002,32 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
       on_dynpro_command( ucomm ).
     ELSE.
       at_user_command( ucomm ).
-      " what the rest of the run wrote shows - unless it opened the
-      " next popup
-      IF lv_run_answer = abap_true AND mv_cgui_nav = abap_false
-          AND ( mo_cgui_alv IS BOUND OR mo_cgui_tree IS BOUND OR gui_on_list( ) = abap_true
-             OR ( mo_cgui_list IS BOUND AND mo_cgui_list->has_content( ) = abap_true ) ).
-        mv_cgui_screen = cs_screen-output.
+      IF lv_run_answer = abap_true.
+        run_answer_output( ).
       ENDIF.
     ENDIF.
+
+  ENDMETHOD.
+
+  METHOD run_answer_output.
+
+    IF mv_cgui_nav = abap_false
+        AND ( mo_cgui_alv IS BOUND OR mo_cgui_tree IS BOUND OR gui_on_list( ) = abap_true
+           OR ( mo_cgui_list IS BOUND AND mo_cgui_list->has_content( ) = abap_true ) ).
+      mv_cgui_screen = cs_screen-output.
+    ENDIF.
+
+  ENDMETHOD.
+
+  METHOD popup_event.
+
+    CLEAR mv_cgui_then.
+    IF then IS INITIAL.
+      result = ucomm.
+      RETURN.
+    ENDIF.
+    mv_cgui_then = to_upper( condense( CONV string( then ) ) ).
+    result = cs_ucomm-popup_answer.
 
   ENDMETHOD.
 
@@ -5891,7 +5973,8 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
 
     popup_to_confirm( question = question
                       ucomm    = ucomm
-                      title    = COND #( WHEN title IS INITIAL THEN `Confirm` ELSE title ) ).
+                      title    = COND #( WHEN title IS INITIAL THEN `Confirm` ELSE title )
+                      then     = then ).
 
   ENDMETHOD.
 
@@ -5900,23 +5983,30 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
     popup_to_decide( question = question
                      options  = options
                      ucomm    = ucomm
-                     title    = title ).
+                     title    = title
+                     then     = then ).
 
   ENDMETHOD.
 
   METHOD z2ui5_if_cgui_dialogs~popup_transport.
 
     popup_transport( ucomm = ucomm
-                     title = title ).
+                     title = title
+                     then  = then ).
 
   ENDMETHOD.
 
   METHOD popup_transport.
 
-    CLEAR ms_cgui_transport.
+    CLEAR: ms_cgui_transport, mv_cgui_answer.
+    DATA(lv_event) = popup_event( ucomm = ucomm
+                                  then  = then ).
     mv_cgui_pending_kind = cs_pending-transport.
+    IF then IS NOT INITIAL.
+      mv_cgui_pending_ucomm = lv_event.
+    ENDIF.
     mv_cgui_nav = abap_true.
-    client->nav_app_call( z2ui5_cl_cgui_transport=>factory( event = ucomm
+    client->nav_app_call( z2ui5_cl_cgui_transport=>factory( event = lv_event
                                                             title = title ) ).
 
   ENDMETHOD.
@@ -5932,7 +6022,8 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
     popup_get_values( fields = fields
                       ucomm  = ucomm
                       title  = title
-                      text   = text ).
+                      text   = text
+                      then   = then ).
 
   ENDMETHOD.
 
@@ -6014,38 +6105,52 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
 
   METHOD popup_to_confirm.
 
+    DATA(lv_event) = popup_event( ucomm = ucomm
+                                  then  = then ).
+    DATA(lv_cancel) = cs_ucomm-cancel.
+    " with then both answers go to the method - the answer as of decide
+    IF then IS NOT INITIAL.
+      CLEAR mv_cgui_answer.
+      mv_cgui_pending_kind = cs_pending-decide.
+      mv_cgui_pending_ucomm = lv_event.
+      lv_cancel = lv_event.
+    ENDIF.
     mv_cgui_nav = abap_true.
     client->nav_app_call( z2ui5_cl_cgui_popup=>confirm( question     = question
                                                         title        = title
-                                                        event        = ucomm
-                                                        event_cancel = cs_ucomm-cancel ) ).
+                                                        event        = lv_event
+                                                        event_cancel = lv_cancel ) ).
 
   ENDMETHOD.
 
   METHOD popup_to_decide.
 
     CLEAR mv_cgui_answer.
+    DATA(lv_event) = popup_event( ucomm = ucomm
+                                  then  = then ).
     mv_cgui_pending_kind = cs_pending-decide.
-    mv_cgui_pending_ucomm = ucomm.
+    mv_cgui_pending_ucomm = lv_event.
     mv_cgui_nav = abap_true.
     client->nav_app_call( z2ui5_cl_cgui_popup=>decide( question = question
                                                        options  = options
                                                        title    = title
-                                                       event    = ucomm ) ).
+                                                       event    = lv_event ) ).
 
   ENDMETHOD.
 
   METHOD popup_get_values.
 
-    CLEAR mt_cgui_popup_values.
+    CLEAR: mt_cgui_popup_values, mv_cgui_answer.
+    DATA(lv_event) = popup_event( ucomm = ucomm
+                                  then  = then ).
     mv_cgui_pending_kind = cs_pending-values.
-    mv_cgui_pending_ucomm = ucomm.
+    mv_cgui_pending_ucomm = lv_event.
     mv_cgui_nav = abap_true.
     client->nav_app_call( z2ui5_cl_cgui_popup=>get_values( fields  = fields
                                                            title   = title
                                                            text    = text
                                                            listbox = listbox
-                                                           event   = ucomm ) ).
+                                                           event   = lv_event ) ).
 
   ENDMETHOD.
 
@@ -6086,7 +6191,8 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
     popup_get_values( fields = lt_field
                       ucomm  = ucomm
                       title  = title
-                      text   = text ).
+                      text   = text
+                      then   = then ).
 
   ENDMETHOD.
 
@@ -6283,6 +6389,46 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
     lo_app->mv_cgui_skip = xsdbool( via_selection_screen = abap_false ).
     IF using_variant IS NOT INITIAL.
       lo_app->mv_cgui_variant_start = using_variant.
+    ENDIF.
+
+    mv_cgui_nav = abap_true.
+    client->nav_app_call( lo_app ).
+
+  ENDMETHOD.
+
+  METHOD call_transaction.
+
+    DATA lo_app TYPE REF TO z2ui5_cl_cgui_report.
+
+    DATA(lv_code) = to_upper( condense( CONV string( code ) ) ).
+    DATA(lv_report) = lv_code.
+    DATA(lv_variant) = ``.
+    IF mo_cgui_catalog IS BOUND.
+      DATA(lt_tcode) = mo_cgui_catalog->get( ).
+      LOOP AT lt_tcode INTO DATA(ls_tcode).
+        IF to_upper( ls_tcode-code ) = lv_code.
+          lv_report = to_upper( ls_tcode-report ).
+          lv_variant = ls_tcode-variant.
+          EXIT.
+        ENDIF.
+      ENDLOOP.
+    ENDIF.
+
+    TRY.
+        CREATE OBJECT lo_app TYPE (lv_report).
+      CATCH cx_sy_create_object_error cx_sy_move_cast_error.
+        message( text = replace( val  = 'Transaction &1 does not exist'(051)
+                                 sub  = `&1`
+                                 with = lv_code )
+                 type = `E` ).
+        RETURN.
+    ENDTRY.
+
+    lo_app->mt_cgui_submit = values.
+    lo_app->mv_cgui_called = abap_true.
+    lo_app->mv_cgui_skip = skip_first.
+    IF lv_variant IS NOT INITIAL.
+      lo_app->mv_cgui_variant_start = lv_variant.
     ENDIF.
 
     mv_cgui_nav = abap_true.

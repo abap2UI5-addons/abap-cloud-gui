@@ -21,26 +21,30 @@ INTERFACE z2ui5_if_cgui_dialogs PUBLIC.
   METHODS popup_to_confirm
     IMPORTING
       question TYPE clike
-      ucomm    TYPE clike
-      title    TYPE clike OPTIONAL.
+      ucomm    TYPE clike OPTIONAL
+      title    TYPE clike OPTIONAL
+      then     TYPE clike OPTIONAL.
 
   METHODS popup_to_decide
     IMPORTING
       question TYPE clike
       options  TYPE string_table
-      ucomm    TYPE clike
-      title    TYPE clike OPTIONAL.
+      ucomm    TYPE clike OPTIONAL
+      title    TYPE clike OPTIONAL
+      then     TYPE clike OPTIONAL.
 
   METHODS popup_get_values
     IMPORTING
       fields TYPE z2ui5_cl_cgui_popup=>ty_t_field
-      ucomm  TYPE clike
+      ucomm  TYPE clike OPTIONAL
       title  TYPE clike OPTIONAL
-      text   TYPE clike OPTIONAL.
+      text   TYPE clike OPTIONAL
+      then   TYPE clike OPTIONAL.
 
   METHODS popup_transport
     IMPORTING
-      ucomm TYPE clike
-      title TYPE clike OPTIONAL.
+      ucomm TYPE clike OPTIONAL
+      title TYPE clike OPTIONAL
+      then  TYPE clike OPTIONAL.
 
 ENDINTERFACE.

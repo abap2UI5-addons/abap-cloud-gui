@@ -63,7 +63,7 @@ const REFUSED = {
   CallScreen: "CALL SCREEN - the dynpro is not converted (a dynpro of fields is, from the .prog.xml - see the MODULE refusals); else build the screen as an abap2UI5 view or a popup",
   SetScreen: "SET SCREEN - dynpro flow logic has no counterpart",
   CallDialog: "CALL DIALOG - dialog modules have no counterpart",
-  CallTransaction: "CALL TRANSACTION - no SAP GUI transaction can be started from a browser app (batch input with USING is no API on ABAP Cloud either); call the released API of the application instead",
+  CallTransaction: "CALL TRANSACTION ... USING - batch input plays the screens of a transaction, there are none in a browser app and batch input is no API on ABAP Cloud; call the released API of the application instead",
   ExecSQL: "EXEC SQL - native SQL is not available on ABAP Cloud; use ABAP SQL on a released CDS view",
   Module: "MODULE - the .prog.xml has no screens (DYNPROS); a dynpro of fields is converted from them",
   Include: "INCLUDE - no such include beside the report (as <include>.prog.abap, the name abapGit writes); put it there, or name its folder with --includes",
@@ -966,7 +966,7 @@ const BASE_METHODS = ["cgui_run_in_background", "at_roundtrip_start",
   "_msg", "_msg_box", "_popup", "set_prefill_last", "set_fresh_start", "set_job", "set_log", "messages_from_log", "log_display", "set_command_field", "set_catalog", "okcode_execute", "set_cursor_field", "set_selscreen_status", "list", "alv", "tree", "get_selected_rows", "lsind", "message",
   "message_t100", "messages_from_bapiret", "popup_to_confirm", "popup_to_decide",
   "popup_get_values", "popup_get_values_sval", "popup_values_sval", "popup_answer", "popup_values", "value_help_popup", "vrm_set_values",
-  "leave_to_selection_screen", "window", "call_selection_screen", "submit", "set_parameter_id", "get_parameter_id",
+  "leave_to_selection_screen", "window", "call_selection_screen", "submit", "call_transaction", "set_parameter_id", "get_parameter_id",
   "set_line_count", "set_pf_status", "set_title", "set_variant", "set_variant_store", "set_layout_store", "get_link",
   "current_screen", "dynpro_screen", "dynpro_pbo", "dynpro_pai", "after_call_screen",
   "call_screen", "set_screen", "leave_to_screen", "leave_screen", "screen_left", "cgui_statics_keep", "cgui_statics_restore"];
@@ -2975,6 +2975,8 @@ class Converter {
   generate() {
     const cls = this.className;
     this.continuations = [];
+    // the callbacks of the popups - public methods on_popup_n( answer )
+    this.callbacks = [];
     // the fields a WRITE ... UNDER refers to - their WRITE gets their name
     this.underTargets = new Set();
     for (const x of this.stmts) {
@@ -3409,6 +3411,10 @@ class Converter {
       const screen = [];
       while (this.continuations.length) {
         const c = this.continuations.shift();
+        if (c.callback) {
+          this.callbacks.push({ name: c.method, body: this.convertBody(c.stmts, c.ctx) });
+          continue;
+        }
         ({ at_user_command: ucomm, after_call_screen: screen }[c.method] ?? dynnr).push({ field: c.field, body: this.convertBody(c.stmts, c.ctx) });
       }
       if (dynnr.length) methods.push({ name: "after_call_selection_screen", body: caseBody("dynnr", dynnr) });
@@ -3466,6 +3472,14 @@ class Converter {
     lines.push("");
     lines.push("  PUBLIC SECTION.");
     lines.push(...pub.map((l) => indent(l, 4)));
+    if (this.callbacks.length) {
+      if (pub.length) lines.push("");
+      lines.push("    \" the answers of the popups - the statements after the CALL FUNCTION");
+      this.callbacks.forEach((c, i) => {
+        if (i > 0) lines.push("");
+        lines.push(`    METHODS ${c.name}`, "      IMPORTING", "        answer TYPE string.");
+      });
+    }
     lines.push("");
     lines.push("  PROTECTED SECTION.");
     const order = ["initialization", "selection_screen", "selection_screen_dynnr", "at_selection_screen_output", "at_selection_screen_on",
@@ -3492,7 +3506,7 @@ class Converter {
     lines.push("");
     lines.push("");
     lines.push(`CLASS ${cls} IMPLEMENTATION.`);
-    const impl = [...methods, ...(this.privateMethods ?? []), ...formMethods];
+    const impl = [...methods, ...this.callbacks, ...(this.privateMethods ?? []), ...formMethods];
     for (const m of impl) {
       lines.push("");
       lines.push(`  METHOD ${m.name}.`);
@@ -4716,6 +4730,30 @@ class Converter {
   }
 
   /**
+   * CALL TRANSACTION code [AND SKIP FIRST SCREEN] -> call_transaction( code
+   * skip_first ): the runtime starts the report class of the transaction -
+   * the catalog of the installation names it - and Back returns here. With
+   * USING (batch input) it stays refused. False when not converted.
+   */
+  callTransaction(s, b) {
+    if (batchInput(s)) return false;
+    const w = words(s);
+    const ov = this.rewrites(s, b.ctx, b);
+    const code = nodeText(child(s, "Source"), ov);
+    const skip = hasSeq(w, "SKIP", "FIRST", "SCREEN");
+    b.out.push(skip
+      ? renderNamedCall("call_transaction", [{ name: "code", value: code }, { name: "skip_first", value: "abap_true" }])
+      : renderNamedCall("call_transaction", [{ value: code }]));
+    if (w.includes("AUTHORITY")) this.note("CALL TRANSACTION ... WITH / WITHOUT AUTHORITY-CHECK - dropped, the called report class checks its own authorizations");
+    this.map(s, `\`call_transaction( )\` - the report class of the transaction${skip ? " runs straight away" : ""} (the catalog of set_catalog( ) names it, else the code is taken as the class), Back returns here`);
+    this.todo(s, `CALL TRANSACTION ${code}: the transaction must be in the catalog of the installation (set_catalog( )) with the class its report became - or the code be that class`);
+    if (this.followedByCode(b)) {
+      this.todo(s, "the statements after CALL TRANSACTION ran when the transaction came back - here they run before it starts (call_transaction( ) navigates when the method returns); move them to where they belong");
+    }
+    return true;
+  }
+
+  /**
    * CALL SELECTION-SCREEN nnnn [STARTING AT x y] -> call_selection_screen(
    * dynnr ): the screen opens as a dialog when the method returns, and its
    * answer (sy-subrc 0 or 4) arrives in after_call_selection_screen( dynnr
@@ -5058,7 +5096,8 @@ class Converter {
         return;
       }
     }
-    if (REFUSED[k]) {
+    // CALL TRANSACTION without batch input is call_transaction( )
+    if (REFUSED[k] && !(k === "CallTransaction" && !batchInput(s))) {
       this.refuse(s, REFUSED[k]);
       return;
     }
@@ -5276,6 +5315,9 @@ class Converter {
       case "Submit":
         this.submit(s, b);
         return;
+      case "CallTransaction":
+        if (this.callTransaction(s, b)) return;
+        break;
       case "CallSelectionScreen":
         this.callSelectionScreen(s, b);
         return;
@@ -6331,9 +6373,11 @@ class Converter {
    * POPUP_TO_DECIDE become popup_to_decide( ) with the two buttons as the
    * options (the answers 1, 2 and A are the classic ones), POPUP_GET_VALUES
    * becomes popup_get_values_sval( ) with its SVAL table. The popup opens
-   * when the method returns, and the answer arrives in at_user_command( )
-   * with a ucomm of its own - so the statements after the call, in their
-   * branch, go on there: the event block is cut at the call.
+   * when the method returns, and the answer arrives in a method of its own,
+   * on_popup_n( answer ), named by then - so the statements after the call,
+   * in their branch, go on there: the event block is cut at the call. Where
+   * it cannot be cut (a FORM, a loop), the popup gets a ucomm of its own
+   * for at_user_command( ) and a TODO.
    */
   popup(s, b, fm) {
     const out = b.out;
@@ -6347,6 +6391,7 @@ class Converter {
     const str = (v) => (/^'(?:[^']|'')*'$/.test(v) ? literal(unquote(v)) : /^`/.test(v) ? v : `|{ ${v} }|`);
     this.popupCount = (this.popupCount ?? 0) + 1;
     const ucomm = `POPUP_${this.popupCount}`;
+    const callback = `on_popup_${this.popupCount}`;
     const prologue = [];
     let params;
     let method = "popup_to_decide";
@@ -6397,7 +6442,9 @@ class Converter {
       prologue.push(`popup_values_sval( CHANGING sval = ${fields} ).`);
     }
     if (p.has("display_cancel_button") || p.has("cancel_display")) this.note(`${fm} with DISPLAY_CANCEL_BUTTON / CANCEL_DISPLAY - the popup of the runtime has a Cancel button either way (answer A)`);
-    out.push(renderNamedCall(method, params));
+    // the call names the callback; set back to the ucomm where nothing is cut
+    const at = out.length;
+    out.push(renderNamedCall(method, params.map((x) => (x.name === "ucomm" ? { name: "then", value: literal(uc(callback)) } : x))));
     // IF sy-subrc <> 0 right after the call checked its EXCEPTIONS - the
     // popup of the runtime raises none, the block is dropped
     const { branch } = this.tailOf(b);
@@ -6413,11 +6460,18 @@ class Converter {
       }
       this.map(branch[first], `dropped - the IF sy-subrc after ${fm} checked its EXCEPTIONS, ${method}( ) raises none`);
     }
-    this.map(s, `\`${method}( )\` - the answer arrives in \`at_user_command( )\` with ucomm \`${ucomm}\`, where the statements after the call go on`);
-    this.continueIn(s, b, {
-      field: ucomm, method: "at_user_command", ctx: { method: "at_user_command", userCommand: true }, prologue,
+    const cut = this.continueIn(s, b, {
+      method: callback, callback: true, ctx: { method: callback },
+      prologue: prologue.map((l) => l.replace(/\bpopup_answer\( \)/g, "answer")),
       what: `CALL FUNCTION '${fm}'`, where: `at_user_command( ) with ucomm ${ucomm} (popup_answer( ) is the answer)`,
     });
+    if (cut) {
+      this.map(s, `\`${method}( )\` - the answer arrives in \`${callback}( answer )\`, where the statements after the call go on`);
+      return;
+    }
+    out[at] = renderNamedCall(method, params);
+    if (prologue.length) out.push(...prologue.map((l) => `" TODO in at_user_command( ) with ucomm ${ucomm}: ${l}`));
+    this.map(s, `\`${method}( )\` - the answer arrives in \`at_user_command( )\` with ucomm \`${ucomm}\``);
   }
 
   /**
@@ -6426,23 +6480,29 @@ class Converter {
    * popup). The local data they use is declared anew there - with a TODO,
    * since a value set before the call is not there any more. Inside a
    * FORM, a loop, or when statements follow the block the call stands in,
-   * nothing is cut: a TODO says where to go on.
+   * nothing is cut: a TODO says where to go on. True when it was cut; a
+   * callback continuation becomes a public method callback( answer ).
    */
-  continueIn(s, b, { field, method, ctx, prologue = [], what, where, note }) {
+  continueIn(s, b, { field, method, ctx, prologue = [], what, where, note, callback = false }) {
     const { branch, after } = this.tailOf(b);
-    if (!branch.some((x) => kind(x) !== "Comment") && !after) return;
+    if (!branch.some((x) => kind(x) !== "Comment") && !after) {
+      if (!callback) return false;
+      // nothing follows - the callback holds the prologue only
+      this.continuations.push({ method, field, callback, stmts: [], ctx: { ...ctx, prologue } });
+      return true;
+    }
     const goOn = `the statements after it run before it shows - its answer arrives in ${where}; go on there`;
     if (b.ctx.form) {
       this.todo(s, `${what} in FORM ${b.ctx.form.name}: ${goOn}`);
-      return;
+      return false;
     }
     if (after) {
       this.todo(s, `${what}: statements follow the block it stands in, and ${goOn}`);
-      return;
+      return false;
     }
     if (b.blocks.some((k) => ["Loop", "Do", "While", "SelectLoop", "LoopAtScreen", "Provide"].includes(k))) {
       this.todo(s, `${what} inside a loop: the loop goes on before it shows - its answer arrives in ${where}; go on there`);
-      return;
+      return false;
     }
     // the local data of the block the continuation reads
     const before = b.stmts.slice(0, b.index);
@@ -6464,10 +6524,11 @@ class Converter {
     const names = decls.filter((x) => kind(x) === "Data").map((x) => lc(declName(x)));
     if (names.length) this.todo(s, `${what}: ${names.join(", ")} of the block ${names.length > 1 ? "are" : "is"} declared anew in ${method}( ) - a value set before the call is not there; make it global data if the continuation needs it`);
     if (inline.length) this.todo(s, `${what}: ${inline.join(", ")} ${inline.length > 1 ? "were" : "was"} declared inline before the call - declare ${inline.length > 1 ? "them" : "it"} in ${method}( ) or make ${inline.length > 1 ? "them" : "it"} global data`);
-    this.continuations.push({ method, field, stmts: [...decls, ...branch], ctx: { ...ctx, prologue } });
+    this.continuations.push({ method, field, callback, stmts: [...decls, ...branch], ctx: { ...ctx, prologue } });
     const first = branch.findIndex((x) => kind(x) !== "Comment");
-    if (first >= 0) this.map(branch[first], note ?? `\`${method}( )\` - WHEN \`${field}\`: the statements after ${what}`);
+    if (first >= 0) this.map(branch[first], note ?? (callback ? `\`${method}( answer )\` - the statements after ${what}` : `\`${method}( )\` - WHEN \`${field}\`: the statements after ${what}`));
     b.skipTo = b.index + 1 + branch.length;
+    return true;
   }
 
   /** what z2ui5_cl_cgui_frontend does not have of this statement's calls of
@@ -7635,7 +7696,7 @@ Object.setPrototypeOf(LVC_TYPES, null);
 
 // the methods of the runtime the converted code calls, besides BASE_METHODS
 const REPORT_CALLS = ["list", "write", "message", "message_t100", "messages_from_bapiret", "alv", "tree", "set_title",
-  "set_pf_status", "set_line_count", "leave_to_selection_screen", "submit", "call_selection_screen", "window",
+  "set_pf_status", "set_line_count", "leave_to_selection_screen", "submit", "call_transaction", "call_selection_screen", "window",
   "popup_to_confirm", "popup_to_decide", "popup_get_values", "popup_get_values_sval", "popup_values_sval",
   "popup_answer", "popup_values", "value_help_popup", "lsind", "set_lsind", "get_selected_rows", "get_cursor",
   "lisel", "set_parameter_id", "get_parameter_id", "set_cursor_field", "vrm_set_values", "current_screen",
@@ -7845,6 +7906,12 @@ function renderCall(method, imp, chg) {
   for (const p of chg) lines.push(`${pad}  ${p.name.padEnd(width)} = ${p.value}`);
   lines[lines.length - 1] += " ).";
   return lines.join("\n");
+}
+
+/** CALL TRANSACTION ... USING / OPTIONS FROM / MESSAGES INTO - batch input */
+function batchInput(s) {
+  const w = words(s);
+  return w.includes("USING") || w.includes("OPTIONS") || w.includes("MESSAGES");
 }
 
 function renderNamedCall(method, params) {

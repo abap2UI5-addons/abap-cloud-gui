@@ -2,7 +2,8 @@
 "! _popup( )->confirm( question = `Post the document?` ucomm = `POST` ) is
 "! POPUP_TO_CONFIRM, decide( ) POPUP_TO_DECIDE, get_values( )
 "! POPUP_GET_VALUES - the answer comes as at_user_command( ucomm ), as the
-"! popup methods of z2ui5_cl_cgui_report have it
+"! popup methods of z2ui5_cl_cgui_report have it, or with then = `ON_POST`
+"! as a call of the public method on_post( answer ) of the report
 CLASS z2ui5_cl_cgui_dialog DEFINITION PUBLIC FINAL CREATE PUBLIC.
 
   PUBLIC SECTION.
@@ -15,29 +16,34 @@ CLASS z2ui5_cl_cgui_dialog DEFINITION PUBLIC FINAL CREATE PUBLIC.
     METHODS confirm
       IMPORTING
         question TYPE clike
-        ucomm    TYPE clike
-        title    TYPE clike OPTIONAL.
+        ucomm    TYPE clike OPTIONAL
+        title    TYPE clike OPTIONAL
+        then     TYPE clike OPTIONAL.
 
     "! the transport request popup - at_user_command( ucomm ) when the
     "! user picked one or chose no transport, get_transport( ) the answer
     METHODS transport
       IMPORTING
-        ucomm TYPE clike
-        title TYPE clike OPTIONAL.
+        ucomm TYPE clike OPTIONAL
+        title TYPE clike OPTIONAL
+        then  TYPE clike OPTIONAL
+      PREFERRED PARAMETER ucomm.
 
     METHODS decide
       IMPORTING
         question TYPE clike
         options  TYPE string_table
-        ucomm    TYPE clike
-        title    TYPE clike OPTIONAL.
+        ucomm    TYPE clike OPTIONAL
+        title    TYPE clike OPTIONAL
+        then     TYPE clike OPTIONAL.
 
     METHODS get_values
       IMPORTING
         fields TYPE z2ui5_cl_cgui_popup=>ty_t_field
-        ucomm  TYPE clike
+        ucomm  TYPE clike OPTIONAL
         title  TYPE clike OPTIONAL
-        text   TYPE clike OPTIONAL.
+        text   TYPE clike OPTIONAL
+        then   TYPE clike OPTIONAL.
 
   PROTECTED SECTION.
   PRIVATE SECTION.
@@ -57,14 +63,16 @@ CLASS z2ui5_cl_cgui_dialog IMPLEMENTATION.
 
     mo_report->popup_to_confirm( question = question
                                  ucomm    = ucomm
-                                 title    = title ).
+                                 title    = title
+                                 then     = then ).
 
   ENDMETHOD.
 
   METHOD transport.
 
     mo_report->popup_transport( ucomm = ucomm
-                                title = title ).
+                                title = title
+                                then  = then ).
 
   ENDMETHOD.
 
@@ -73,7 +81,8 @@ CLASS z2ui5_cl_cgui_dialog IMPLEMENTATION.
     mo_report->popup_to_decide( question = question
                                 options  = options
                                 ucomm    = ucomm
-                                title    = title ).
+                                title    = title
+                                then     = then ).
 
   ENDMETHOD.
 
@@ -82,7 +91,8 @@ CLASS z2ui5_cl_cgui_dialog IMPLEMENTATION.
     mo_report->popup_get_values( fields = fields
                                  ucomm  = ucomm
                                  title  = title
-                                 text   = text ).
+                                 text   = text
+                                 then   = then ).
 
   ENDMETHOD.
 

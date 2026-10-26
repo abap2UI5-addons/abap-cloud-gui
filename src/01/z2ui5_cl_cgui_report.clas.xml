@@ -349,6 +349,12 @@
      <ENTRY>Application Log</ENTRY>
      <LENGTH>30</LENGTH>
     </item>
+    <item>
+     <ID>I</ID>
+     <KEY>061</KEY>
+     <ENTRY>No public method &amp;1( answer ) for the popup</ENTRY>
+     <LENGTH>86</LENGTH>
+    </item>
    </TPOOL>
   </asx:values>
  </asx:abap>

@@ -104,6 +104,12 @@ CLASS ltcl_report DEFINITION INHERITING FROM z2ui5_cl_cgui_report FINAL.
     DATA mv_replace TYPE abap_bool.
     DATA mv_exit     TYPE string.
     DATA mv_exit_err TYPE abap_bool.
+    DATA mv_then     TYPE string.
+
+    "! the callback of a popup with then = `ON_SURE`
+    METHODS on_sure
+      IMPORTING
+        answer TYPE string.
 
   PROTECTED SECTION.
     METHODS selection_screen REDEFINITION.
@@ -232,6 +238,8 @@ CLASS ltcl_test DEFINITION FINAL FOR TESTING
     METHODS application_log FOR TESTING.
     METHODS alv_chart FOR TESTING.
     METHODS transport_popup FOR TESTING.
+    METHODS popup_then FOR TESTING.
+    METHODS call_transaction FOR TESTING.
     METHODS roundtrip_start FOR TESTING.
     METHODS fresh_start FOR TESTING.
     METHODS popup_values_of_an_sval FOR TESTING.
@@ -444,6 +452,12 @@ CLASS ltcl_report IMPLEMENTATION.
               lines   = 10 ).
     ENDIF.
     write( |Detail { hide }| ).
+
+  ENDMETHOD.
+
+  METHOD on_sure.
+
+    mv_then = |{ mv_then }{ answer }|.
 
   ENDMETHOD.
 
@@ -1288,6 +1302,71 @@ CLASS ltcl_test IMPLEMENTATION.
     cl_abap_unit_assert=>assert_equals( act = mo_report->mv_ucomm
                                         exp = `TR` ).
     cl_abap_unit_assert=>assert_true( mo_cut->get_transport( )-local ).
+
+  ENDMETHOD.
+
+  METHOD call_transaction.
+
+    init( ).
+    " a transaction of the catalog: its class with its variant
+    mo_cut->set_catalog( NEW ltcl_catalog( ) ).
+    mo_cut->call_transaction( `zfly` ).
+    DATA(lo_called) = CAST z2ui5_cl_cgui_report( mo_client->mo_called ).
+    cl_abap_unit_assert=>assert_equals( act = cl_abap_typedescr=>describe_by_object_ref( lo_called )->get_relative_name( )
+                                        exp = `Z2UI5_CL_CGUI_SAMPLE_04` ).
+    cl_abap_unit_assert=>assert_equals( act = lo_called->mv_cgui_variant_start
+                                        exp = `MINE` ).
+    cl_abap_unit_assert=>assert_false( lo_called->mv_cgui_skip ).
+
+    " no transaction of the catalog: the class; AND SKIP FIRST SCREEN
+    mo_cut->call_transaction( code       = `LTCL_REPORT`
+                              skip_first = abap_true ).
+    lo_called = CAST z2ui5_cl_cgui_report( mo_client->mo_called ).
+    cl_abap_unit_assert=>assert_true( lo_called->mv_cgui_called ).
+    cl_abap_unit_assert=>assert_true( lo_called->mv_cgui_skip ).
+
+    " neither: an error, nothing starts
+    CLEAR mo_client->mo_called.
+    mo_cut->call_transaction( `ZGONE` ).
+    cl_abap_unit_assert=>assert_not_bound( mo_client->mo_called ).
+    cl_abap_unit_assert=>assert_true( mo_cut->mv_cgui_stop ).
+
+  ENDMETHOD.
+
+  METHOD popup_then.
+
+    init( ).
+    " then: on both answers on_sure( answer ) runs, not at_user_command( )
+    mo_cut->_popup( )->confirm( question = `Sure?`
+                                then     = `on_sure` ).
+    DATA(lo_popup) = CAST z2ui5_cl_cgui_popup( mo_client->mo_called ).
+    lo_popup->z2ui5_if_app~main( mo_client ).
+    " the Cancel button of the popup (its events are private)
+    mo_client->mv_event = `CGUI_POP_CANCEL`.
+    lo_popup->z2ui5_if_app~main( mo_client ).
+    mo_client->mo_prev = lo_popup.
+    mo_client->mv_event = z2ui5_cl_cgui_report=>cs_ucomm-popup_answer.
+    mo_client->mv_navigated = abap_true.
+    mo_cut->z2ui5_if_app~main( mo_client ).
+    mo_client->mv_navigated = abap_false.
+    cl_abap_unit_assert=>assert_equals( act = mo_report->mv_then
+                                        exp = `A` ).
+    cl_abap_unit_assert=>assert_initial( mo_report->mv_ucomm ).
+
+    " decide: the number of the option
+    mo_cut->popup_to_decide( question = `Which one?`
+                             options  = VALUE #( ( `First` ) ( `Second` ) )
+                             then     = `ON_SURE` ).
+    lo_popup = CAST z2ui5_cl_cgui_popup( mo_client->mo_called ).
+    mo_client->mv_event = `CGUI_POP_OPTION_2`.
+    lo_popup->z2ui5_if_app~main( mo_client ).
+    mo_client->mo_prev = lo_popup.
+    mo_client->mv_event = z2ui5_cl_cgui_report=>cs_ucomm-popup_answer.
+    mo_client->mv_navigated = abap_true.
+    mo_cut->z2ui5_if_app~main( mo_client ).
+    mo_client->mv_navigated = abap_false.
+    cl_abap_unit_assert=>assert_equals( act = mo_report->mv_then
+                                        exp = `A2` ).
 
   ENDMETHOD.
 

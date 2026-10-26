@@ -7,7 +7,7 @@ A refused statement has no counterpart in an abap-cloud-gui report. The converte
 | Refusal | |
 |---|---|
 | [Dynpros: CALL SCREEN, MODULE, SET SCREEN, CONTROLS](#dynpro) | `dynpro` |
-| [CALL TRANSACTION and batch input](#call-transaction) | `call-transaction` |
+| [CALL TRANSACTION ... USING and batch input](#call-transaction) | `call-transaction` |
 | [Native SQL: EXEC SQL](#native-sql) | `native-sql` |
 | [INCLUDE without its file](#include-missing) | `include-missing` |
 | [Logical databases: NODES, GET, REJECT, dynamic and free selections](#logical-database) | `logical-database` |
@@ -74,9 +74,9 @@ A screen with a table control, a subscreen or a tabstrip is on the roadmap (Stag
 
 <a id="call-transaction"></a>
 
-## CALL TRANSACTION and batch input
+## CALL TRANSACTION ... USING and batch input
 
-**Why.** No SAP GUI transaction can be started from a browser app, and batch input (`CALL TRANSACTION ... USING`, `BDC_*` sessions) plays a dynpro - there is none, and on ABAP Cloud batch input is no API at all.
+**Why.** Batch input (`CALL TRANSACTION ... USING`, `BDC_*` sessions) plays the screens of a transaction - there are none in a browser app, and on ABAP Cloud batch input is no API at all. A plain `CALL TRANSACTION` is converted: `call_transaction( )` starts the report class the catalog names.
 
 **Rewrite.**
 
@@ -93,7 +93,7 @@ MODIFY ENTITIES OF i_salesordertp
 COMMIT ENTITIES.
 ```
 
-To open another app, a converted report can `submit( )` its class.
+To open another app, a converted report can `submit( )` its class or `call_transaction( )` a transaction of the catalog.
 
 <a id="native-sql"></a>
 

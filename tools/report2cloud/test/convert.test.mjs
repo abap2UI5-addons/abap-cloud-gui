@@ -248,13 +248,32 @@ test("refusals: every statement without a counterpart, with file, row and column
   assert.deepEqual(result.files, {}, "no class is written");
   assert.deepEqual(result.refusals.map((r) => `${r.row}:${r.col} ${r.message.split(" - ")[0]}`), [
     "26:3 ASSIGN of a field of another program ('(PROG)FIELD')",
-    "28:3 CALL TRANSACTION",
+    "28:3 CALL TRANSACTION ... USING",
     "32:3 EXEC SQL",
     "36:3 CALL SCREEN",
     "38:1 MODULE",
     "42:1 MODULE",
   ]);
   assert.match(result.draft["z2ui5_cl_cgui_r2c_10.clas.abap"], /" report2cloud refused \(line 36\): CALL SCREEN 100/);
+});
+
+test("CALL TRANSACTION [AND SKIP FIRST SCREEN] -> call_transaction( ), the class of the catalog; USING stays refused", () => {
+  const r = convert([
+    "REPORT zt.",
+    "DATA gv_tcode TYPE c LENGTH 20 VALUE 'ZFLY'.",
+    "START-OF-SELECTION.",
+    "  SET PARAMETER ID 'CAR' FIELD 'LH'.",
+    "  CALL TRANSACTION 'ZFLY' AND SKIP FIRST SCREEN.",
+    "  CALL TRANSACTION gv_tcode WITH AUTHORITY-CHECK.",
+  ].join("\n"), { file: "zt.prog.abap", className: "zcl_t" });
+  assert.equal(r.ok, true, r.refusals.map((x) => x.message).join("\n"));
+  const cls = r.draft["zcl_t.clas.abap"];
+  assert.match(cls, /call_transaction\( code       = 'ZFLY'\n\s+skip_first = abap_true \)\./);
+  assert.match(cls, /call_transaction\( gv_tcode \)\./);
+  assert.ok(r.todos.some((t) => /the transaction must be in the catalog/.test(t.message)));
+  assert.ok(r.todos.some((t) => /the statements after CALL TRANSACTION ran when the transaction came back/.test(t.message)));
+  const u = convert("REPORT zt.\nDATA gt TYPE STANDARD TABLE OF i WITH DEFAULT KEY.\nSTART-OF-SELECTION.\n  CALL TRANSACTION 'VA02' USING gt MODE 'N'.", { file: "zt.prog.abap", className: "zcl_t" });
+  assert.equal(u.ok, false);
 });
 
 test("SUBMIT ... AND RETURN starts the class of the called report with the values, CALL SELECTION-SCREEN goes on in after_call_selection_screen( )", () => {
@@ -522,20 +541,23 @@ test("a tab without DEFAULT SCREEN, a subscreen on no tab, a FUNCTION KEY withou
   assert.ok(r.todos.some((t) => /subscreen 0300 is on no tab/.test(t.message)));
 });
 
-test("the synchronous popups: popup_to_decide( ) / popup_get_values_sval( ), the block cut at the call and continued in at_user_command( )", () => {
+test("the synchronous popups: popup_to_decide( ) / popup_get_values_sval( ), the block cut at the call and continued in the callback on_popup_n( answer )", () => {
   const cls = classOf("zr2c_16_popups");
   const { result } = converted.get("zr2c_16_popups");
   assert.equal(result.ok, true);
   // POPUP_TO_DECIDE in AT LINE-SELECTION: the two lines joined, the options, the CASE on the answer continued
-  assert.match(cls, /METHOD at_line_selection\.\n\n(.*\n)*?\s+popup_to_decide\( question = 'Book the flight' && ` ` && gs_flight-connid\n\s+options  = VALUE #\( \( `Book now` \) \( `Waiting list` \) \)\n\s+ucomm    = `POPUP_1`\n\s+title    = 'Booking' \)\.\n\n\s+ENDMETHOD\./);
-  assert.match(cls, /WHEN `POPUP_1`\.\n\s+lv_answer = popup_answer\( \)\.\n\s+CASE lv_answer\.\n\s+WHEN '1'\.\n\s+book\( gs_flight \)\./);
+  assert.match(cls, /METHOD at_line_selection\.\n\n(.*\n)*?\s+popup_to_decide\( question = 'Book the flight' && ` ` && gs_flight-connid\n\s+options  = VALUE #\( \( `Book now` \) \( `Waiting list` \) \)\n\s+then     = `ON_POPUP_1`\n\s+title    = 'Booking' \)\.\n\n\s+ENDMETHOD\./);
+  // the callbacks are public methods - the runtime calls them by name
+  assert.match(cls, /PUBLIC SECTION\.\n(.*\n)*?\s+METHODS on_popup_1\n\s+IMPORTING\n\s+answer TYPE string\.\n(.*\n)*?\s+PROTECTED SECTION\./);
+  assert.ok(!/METHODS at_user_command REDEFINITION/.test(cls) || /CASE ucomm/.test(cls));
+  assert.match(cls, /METHOD on_popup_1\.\n\n\s+lv_answer = answer\.\n\s+CASE lv_answer\.\n\s+WHEN '1'\.\n\s+book\( gs_flight \)\./);
   // POPUP_TO_CONFIRM inside a WHEN: the branch continued, the IF sy-subrc of the EXCEPTIONS dropped, the other WHEN kept
-  assert.match(cls, /WHEN 'CANCEL'\.\n\s+popup_to_decide\( question = 'Cancel all bookings of this run\?'\n\s+options  = VALUE #\( \( `Cancel them` \) \( `Keep them` \) \)\n\s+ucomm    = `POPUP_2`\n\s+title    = 'Cancel bookings' \)\.\n\s+WHEN 'PASSENGER'\./);
-  assert.match(cls, /WHEN `POPUP_2`\.\n\s+gv_answer = popup_answer\( \)\.\n\s+IF gv_answer = '1'\./);
+  assert.match(cls, /WHEN 'CANCEL'\.\n\s+popup_to_decide\( question = 'Cancel all bookings of this run\?'\n\s+options  = VALUE #\( \( `Cancel them` \) \( `Keep them` \) \)\n\s+then     = `ON_POPUP_2`\n\s+title    = 'Cancel bookings' \)\.\n\s+WHEN 'PASSENGER'\./);
+  assert.match(cls, /METHOD on_popup_2\.\n\n\s+gv_answer = answer\.\n\s+IF gv_answer = '1'\./);
   assert.ok(!/sy-subrc/.test(cls));
   assert.ok(!/could not be shown/.test(cls));
-  // POPUP_GET_VALUES in a FORM: converted, not cut - a TODO
-  assert.match(cls, /popup_get_values_sval\( sval  = lt_fields\n\s+ucomm = `POPUP_3`\n\s+title = 'Passenger' \)\./);
+  // POPUP_GET_VALUES in a FORM: converted, not cut - the ucomm, a TODO, the answer lines as TODOs
+  assert.match(cls, /popup_get_values_sval\( sval  = lt_fields\n\s+ucomm = `POPUP_3`\n\s+title = 'Passenger' \)\.\n\s+" TODO in at_user_command\( \) with ucomm POPUP_3: lv_rc = /);
   assert.ok(result.todos.some((t) => /POPUP_GET_VALUES' in FORM passenger/.test(t.message)));
   assert.ok(result.mapped.some((m) => /dropped - the IF sy-subrc after POPUP_TO_CONFIRM/.test(m.target)));
 });
@@ -559,9 +581,10 @@ test("a popup at the top of an event block: the answer and the SVAL values first
     "  ENDIF.",
   ].join("\n"), { file: "zt.prog.abap", className: "zcl_t" });
   const cls = r.draft["zcl_t.clas.abap"];
-  assert.match(cls, /WHEN `POPUP_1`\.\n\s+lv_rc = SWITCH #\( popup_answer\( \) WHEN 'A' THEN 'A' ELSE space \)\.\n\s+popup_values_sval\( CHANGING sval = lt_fields \)\.\n\s+IF lv_rc = 'A'\./);
+  assert.match(cls, /METHOD on_popup_1\.\n\n(.*\n)*?\s+lv_rc = SWITCH #\( answer WHEN 'A' THEN 'A' ELSE space \)\.\n\s+popup_values_sval\( CHANGING sval = lt_fields \)\.\n\s+IF lv_rc = 'A'\./);
   // the second popup is cut out of the first continuation
-  assert.match(cls, /WHEN `POPUP_2`\.\n\s+lv_rc = SWITCH #\( popup_answer\( \) WHEN '1' THEN 'J' WHEN '2' THEN 'N' ELSE 'A' \)\.\n\s+IF lv_rc = 'J'\./);
+  assert.match(cls, /then\s+= `ON_POPUP_2`/);
+  assert.match(cls, /METHOD on_popup_2\.\n\n\s+lv_rc = SWITCH #\( answer WHEN '1' THEN 'J' WHEN '2' THEN 'N' ELSE 'A' \)\.\n\s+IF lv_rc = 'J'\./);
   assert.ok(r.todos.some((t) => /lv_n was declared inline before the call/.test(t.message)));
 });
 
