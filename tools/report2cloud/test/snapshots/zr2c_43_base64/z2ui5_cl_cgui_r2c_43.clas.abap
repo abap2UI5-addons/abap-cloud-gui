@@ -49,14 +49,6 @@ CLASS z2ui5_cl_cgui_r2c_43 IMPLEMENTATION.
 
   METHOD start_of_selection.
 
-    " every run starts with the global data of a fresh start - the classic report restarted after its list
-    CLEAR: go_edit,
-           lv_bytes,
-           lv_back,
-           lv_b64,
-           lv_length,
-           lt_bin.
-
     z2ui5_cl_cgui_frontend=>scms_string_to_xstring( EXPORTING  text   = p_text
                                                     IMPORTING  buffer = lv_bytes
                                                     EXCEPTIONS failed = 1

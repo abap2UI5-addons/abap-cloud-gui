@@ -5,7 +5,7 @@
 | Source | `zr2c_39_textedit.prog.abap` |
 | Text pool | `zr2c_39_textedit.prog.xml` |
 | Result | **converted** - `z2ui5_cl_cgui_r2c_39.clas.abap`, `z2ui5_cl_cgui_r2c_39.clas.locals_def.abap`, `z2ui5_cl_cgui_r2c_39.clas.locals_imp.abap`, `z2ui5_cl_cgui_r2c_39.clas.xml` |
-| Mapped | 10 construct(s) |
+| Mapped | 9 construct(s) |
 | TODO | 0 |
 | Release state to check | 0 object(s) |
 
@@ -27,7 +27,6 @@ Layout, formatting and behaviour of the classic report that the list, the ALV or
 | 8 | `REPORT zr2c_39_textedit` | the class, `INHERITING FROM z2ui5_cl_cgui_report` |
 | 10 | `CLASS lcl_note DEFINITION` | locals_def |
 | 19 | `PARAMETERS p_text TYPE string LOWER CASE DEFAULT 'Buy milk'` | attribute `p_text`, `screen->parameter( )` |
-| 21 | `global data - the report restarted after its list` | `CLEAR` of 1 global data object(s) at the start of `start_of_selection( )` |
 | 23 | `CLASS lcl_note IMPLEMENTATION` | locals_imp |
 | 30 | `SET HANDLER on_function FOR mo_tool` | `mo_tool->set_handler( )` - the stand-in keeps the handler and calls it for the event of the browser |
 | 38 | `cl_gui_cfw=>flush( )` | dropped - cl_gui_cfw=>flush( ): the controls of SAP GUI, nothing to flush in the browser |

@@ -38,10 +38,6 @@ CLASS z2ui5_cl_cgui_r2c_31 IMPLEMENTATION.
 
   METHOD start_of_selection.
 
-    " every run starts with the global data of a fresh start - the classic report restarted after its list
-    CLEAR: go_toolbar,
-           lt_event.
-
     go_toolbar = NEW z2ui5_cl_cgui_gui_toolbar( parent = z2ui5_cl_cgui_gui_container=>default_screen ).
     go_toolbar->add_button( fcode = 'UP'   icon = `sap-icon://add` butn_type = z2ui5_cl_cgui_gui_toolbar=>cntb_btype_button text = 'Up' ).
     go_toolbar->add_button( fcode = 'DOWN' icon = `sap-icon://less` butn_type = z2ui5_cl_cgui_gui_toolbar=>cntb_btype_button text = 'Down' ).

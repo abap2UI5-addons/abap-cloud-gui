@@ -5,7 +5,7 @@
 | Source | `zr2c_30_salvcolumns.prog.abap` |
 | Text pool | `zr2c_30_salvcolumns.prog.xml` |
 | Result | **converted** - `z2ui5_cl_cgui_r2c_30.clas.abap`, `z2ui5_cl_cgui_r2c_30.clas.xml` |
-| Mapped | 13 construct(s) |
+| Mapped | 12 construct(s) |
 | TODO | 0 |
 | Release state to check | 0 object(s) |
 
@@ -18,7 +18,6 @@ The class uses no database table, DDIC type, function module, class or message c
 | Line | Classic | abap-cloud-gui |
 |---|---|---|
 | 8 | `REPORT zr2c_30_salvcolumns` | the class, `INHERITING FROM z2ui5_cl_cgui_report` |
-| 18 | `global data - the report restarted after its list` | `CLEAR` of 1 global data object(s) at the start of `start_of_selection( )` |
 | 20 | `PARAMETERS p_pass TYPE i DEFAULT 50` | attribute `p_pass`, `screen->parameter( )` |
 | 22 | `START-OF-SELECTION` | `start_of_selection( )` |
 | 31 | `cl_salv_table=>factory( IMPORTING r_salv_table = DATA(lo_salv) CHAN...` | dropped - cl_salv_table=>factory( ) - alv( ) at display( ) |

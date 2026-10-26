@@ -34,10 +34,6 @@ CLASS z2ui5_cl_cgui_r2c_46 IMPLEMENTATION.
 
   METHOD start_of_selection.
 
-    " every run starts with the global data of a fresh start - the classic report restarted after its list
-    CLEAR: gt_node,
-           gs_node.
-
     add( iv_level = 1
          iv_name  = 'Airlines'
          iv_text  = '' ).

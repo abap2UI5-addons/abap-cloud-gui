@@ -5,7 +5,7 @@
 | Source | `zr2c_40_sapevent.prog.abap` |
 | Text pool | `zr2c_40_sapevent.prog.xml` |
 | Result | **converted** - `z2ui5_cl_cgui_r2c_40.clas.abap`, `z2ui5_cl_cgui_r2c_40.clas.locals_def.abap`, `z2ui5_cl_cgui_r2c_40.clas.locals_imp.abap`, `z2ui5_cl_cgui_r2c_40.clas.xml` |
-| Mapped | 8 construct(s) |
+| Mapped | 7 construct(s) |
 | TODO | 0 |
 | Release state to check | 0 object(s) |
 
@@ -28,7 +28,6 @@ Layout, formatting and behaviour of the classic report that the list, the ALV or
 | 10 | `CLASS lcl_menu DEFINITION` | locals_def |
 | 16 | `CLASS lcl_menu IMPLEMENTATION` | locals_imp |
 | 18 | `MESSAGE \|You picked { action }\| TYPE 'S'` | `message( )` |
-| 22 | `global data - the report restarted after its list` | `CLEAR` of 5 global data object(s) at the start of `start_of_selection( )` |
 | 25 | `START-OF-SELECTION` | `start_of_selection( )` |
 | 35 | `SET HANDLER go_menu->on_sapevent FOR go_html` | `go_html->set_handler( )` - the stand-in keeps the handler and calls it for the event of the browser |
 | 43 | `WRITE space` | `write( )` |

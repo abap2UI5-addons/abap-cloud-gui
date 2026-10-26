@@ -48,11 +48,6 @@ CLASS z2ui5_cl_cgui_r2c_17 IMPLEMENTATION.
 
   METHOD start_of_selection.
 
-    " every run starts with the global data of a fresh start - the classic report restarted after its list
-    CLEAR: gt_flight,
-           gs_flight,
-           gt_excl.
-
     " without the right to change, the list has no Delete
     IF p_edit IS INITIAL.
       APPEND 'DELE' TO gt_excl.

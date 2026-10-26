@@ -54,12 +54,6 @@ CLASS z2ui5_cl_cgui_r2c_35 IMPLEMENTATION.
 
   METHOD start_of_selection.
 
-    " every run starts with the global data of a fresh start - the classic report restarted after its list
-    CLEAR: lt_weekday,
-           lv_between,
-           lv_next,
-           lv_last.
-
     lt_weekday = VALUE #( ( `Monday` ) ( `Tuesday` ) ( `Wednesday` ) ( `Thursday` )
                           ( `Friday` ) ( `Saturday` ) ( `Sunday` ) ).
 

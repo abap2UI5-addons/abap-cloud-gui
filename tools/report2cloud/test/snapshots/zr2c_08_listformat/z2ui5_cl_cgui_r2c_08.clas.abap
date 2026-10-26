@@ -53,11 +53,6 @@ CLASS z2ui5_cl_cgui_r2c_08 IMPLEMENTATION.
 
     DATA lv_color TYPE string.
 
-    " every run starts with the global data of a fresh start - the classic report restarted after its list
-    CLEAR: gt_task,
-           gs_task,
-           gv_open.
-
     gt_task = VALUE #( ( id = 1 title = 'Write the report'   done = abap_true  due = '20260110' )
                        ( id = 2 title = 'Convert the report' done = abap_false due = '20260120' )
                        ( id = 3 title = 'Test the class'     done = abap_false due = '20260130' ) ).

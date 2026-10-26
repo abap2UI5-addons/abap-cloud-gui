@@ -48,12 +48,6 @@ CLASS z2ui5_cl_cgui_r2c_11 IMPLEMENTATION.
 
     FIELD-SYMBOLS <gv_number> TYPE i.
 
-    " every run starts with the global data of a fresh start - the classic report restarted after its list
-    CLEAR: gt_numbers,
-           gv_text,
-           gv_sum,
-           gv_sum_txt.
-
     DO 20 TIMES.
       IF z2ui5_cl_cgui_context=>range_check( val = sy-index range = s_range ) = abap_true.
         APPEND sy-index TO gt_numbers.

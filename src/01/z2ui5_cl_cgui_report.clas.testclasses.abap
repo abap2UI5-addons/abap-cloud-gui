@@ -80,6 +80,9 @@ CLASS ltcl_report DEFINITION INHERITING FROM z2ui5_cl_cgui_report FINAL.
     DATA mt_row      TYPE ty_t_row.
     DATA mv_alv      TYPE abap_bool.
     DATA mv_starts   TYPE i.
+    " a total of the runs - the classic report starts it at 100 every run
+    DATA mv_total    TYPE i VALUE 100.
+    DATA mv_inits    TYPE i.
     DATA mv_tree     TYPE abap_bool.
 
     DATA mv_end      TYPE abap_bool.
@@ -110,6 +113,7 @@ CLASS ltcl_report DEFINITION INHERITING FROM z2ui5_cl_cgui_report FINAL.
     METHODS at_line_selection REDEFINITION.
     METHODS at_user_command REDEFINITION.
     METHODS at_roundtrip_start REDEFINITION.
+    METHODS initialization REDEFINITION.
     METHODS at_selection_screen_on_block REDEFINITION.
     METHODS end_of_page REDEFINITION.
     METHODS at_selection_screen_on_exit REDEFINITION.
@@ -229,6 +233,7 @@ CLASS ltcl_test DEFINITION FINAL FOR TESTING
     METHODS alv_chart FOR TESTING.
     METHODS transport_popup FOR TESTING.
     METHODS roundtrip_start FOR TESTING.
+    METHODS fresh_start FOR TESTING.
     METHODS popup_values_of_an_sval FOR TESTING.
     METHODS alv_layout_default FOR TESTING.
     METHODS alv_layout_without_store FOR TESTING.
@@ -373,6 +378,8 @@ CLASS ltcl_report IMPLEMENTATION.
 
   METHOD start_of_selection.
 
+    mv_total = mv_total + 1.
+
     " CALL SCREEN - the rest comes in after_call_screen( )
     IF mv_dynpro = abap_true.
       call_screen( `100` ).
@@ -443,6 +450,12 @@ CLASS ltcl_report IMPLEMENTATION.
   METHOD at_user_command.
 
     mv_ucomm = ucomm.
+
+  ENDMETHOD.
+
+  METHOD initialization.
+
+    mv_inits = mv_inits + 1.
 
   ENDMETHOD.
 
@@ -1204,6 +1217,43 @@ CLASS ltcl_test IMPLEMENTATION.
 
   ENDMETHOD.
 
+  METHOD fresh_start.
+
+    init( ).
+    mo_report->p_carrid = `LH`.
+    event( z2ui5_cl_cgui_report=>cs_ucomm-execute ).
+    cl_abap_unit_assert=>assert_equals( act = mo_report->mv_total
+                                        exp = 101 ).
+    " Back: the classic restart - the data as after INITIALIZATION, which
+    " runs again; the selection screen keeps its input
+    event( z2ui5_cl_cgui_report=>cs_ucomm-back ).
+    cl_abap_unit_assert=>assert_equals( act = mo_report->mv_total
+                                        exp = 100 ).
+    cl_abap_unit_assert=>assert_equals( act = mo_report->mv_inits
+                                        exp = 2 ).
+    cl_abap_unit_assert=>assert_equals( act = mo_report->p_carrid
+                                        exp = `LH` ).
+    event( z2ui5_cl_cgui_report=>cs_ucomm-execute ).
+    cl_abap_unit_assert=>assert_equals( act = mo_report->mv_total
+                                        exp = 101 ).
+
+    " off: the data stays from one run to the next
+    DATA(lo_keep) = NEW ltcl_report( ).
+    lo_keep->set_fresh_start( abap_false ).
+    mo_report = lo_keep.
+    mo_cut = lo_keep.
+    mo_client = NEW #( ).
+    mo_client->mo_app = lo_keep.
+    init( ).
+    lo_keep->p_carrid = `LH`.
+    event( z2ui5_cl_cgui_report=>cs_ucomm-execute ).
+    event( z2ui5_cl_cgui_report=>cs_ucomm-back ).
+    event( z2ui5_cl_cgui_report=>cs_ucomm-execute ).
+    cl_abap_unit_assert=>assert_equals( act = lo_keep->mv_total
+                                        exp = 102 ).
+
+  ENDMETHOD.
+
   METHOD roundtrip_start.
 
     " first in every roundtrip, before the event - and in the background run
@@ -1758,8 +1808,10 @@ CLASS ltcl_test IMPLEMENTATION.
     DATA(lt_catalog) = mo_cut->variant_catalog( ).
     cl_abap_unit_assert=>assert_false( xsdbool( line_exists( lt_catalog[ name = `#L#MINE` ] ) ) ).
 
-    " the next run starts with the default layout
+    " the next run starts with the default layout - the switch of the test
+    " is no field of the screen, the restart after the list resets it
     event( z2ui5_cl_cgui_report=>cs_ucomm-back ).
+    mo_report->mv_alv = abap_true.
     CLEAR mo_cut->mv_cgui_layout.
     event( z2ui5_cl_cgui_report=>cs_ucomm-execute ).
     cl_abap_unit_assert=>assert_equals( act = mo_cut->mv_cgui_layout

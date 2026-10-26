@@ -5,7 +5,7 @@
 | Source | `zr2c_47_salvtree.prog.abap` |
 | Text pool | `zr2c_47_salvtree.prog.xml` |
 | Result | **converted** - `z2ui5_cl_cgui_r2c_47.clas.abap`, `z2ui5_cl_cgui_r2c_47.clas.locals_imp.abap`, `z2ui5_cl_cgui_r2c_47.clas.xml` |
-| Mapped | 7 construct(s) |
+| Mapped | 6 construct(s) |
 | TODO | 0 |
 | Release state to check | 0 object(s) |
 
@@ -25,7 +25,6 @@ Layout, formatting and behaviour of the classic report that the list, the ALV or
 | Line | Classic | abap-cloud-gui |
 |---|---|---|
 | 7 | `REPORT zr2c_47_salvtree` | the class, `INHERITING FROM z2ui5_cl_cgui_report` |
-| 16 | `global data - the report restarted after its list` | `CLEAR` of 2 global data object(s) at the start of `start_of_selection( )` |
 | 19 | `CLASS lcl_handler DEFINITION` | locals_imp |
 | 25 | `CLASS lcl_handler IMPLEMENTATION` | locals_imp |
 | 28 | `MESSAGE \|{ lo_node->get_text( ) } picked\| TYPE 'S'` | `message( )` |

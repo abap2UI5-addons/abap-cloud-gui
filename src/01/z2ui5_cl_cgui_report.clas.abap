@@ -611,6 +611,15 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
         type  TYPE clike DEFAULT `S`
         field TYPE clike OPTIONAL.
 
+    "! the classic restart after the list: Back from the output gives the
+    "! global data of the report - its own public attributes - the values
+    "! they had after initialization( ), which runs again; the fields of the
+    "! selection screen keep their input. On by default - off for a report
+    "! that keeps its data from one run to the next
+    METHODS set_fresh_start
+      IMPORTING
+        val TYPE abap_bool DEFAULT abap_true.
+
     "! the selection screen starts with the last entries of the fields:
     "! an empty field takes the latest entry of its input history (a
     "! variant to start with and the URL still win) - in initialization( )
@@ -939,6 +948,19 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
     DATA mo_cgui_catalog TYPE REF TO z2ui5_if_cgui_catalog.
     DATA mo_cgui_app_log TYPE REF TO z2ui5_if_cgui_log.
     DATA mo_cgui_tree_handler TYPE REF TO z2ui5_if_cgui_tree_handler.
+    DATA mv_cgui_fresh_off TYPE abap_bool.
+    TYPES:
+      BEGIN OF ty_s_cgui_fresh,
+        name  TYPE string,
+        kind  TYPE abap_typekind,
+        " a copy of the value - an object or data reference as the reference
+        value TYPE REF TO data,
+        obj   TYPE REF TO object,
+        dref  TYPE REF TO data,
+      END OF ty_s_cgui_fresh.
+    TYPES ty_t_cgui_fresh TYPE STANDARD TABLE OF ty_s_cgui_fresh WITH EMPTY KEY.
+    "! the global data of the report after initialization( ) - set_fresh_start( )
+    DATA mt_cgui_fresh TYPE ty_t_cgui_fresh.
     DATA ms_cgui_transport TYPE z2ui5_cl_cgui_transport=>ty_s_result.
     DATA mv_cgui_cmd_on  TYPE abap_bool.
     " the message boxes of _msg_box( ) - shown at the end of the roundtrip
@@ -1550,6 +1572,14 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
     "! Execute in Background: the checks of Execute, then the job
     METHODS on_background.
 
+    "! the global data of the report after initialization( ) - a copy of
+    "! each public attribute the report declares, not the runtime's
+    METHODS fresh_keep.
+
+    "! Back from the output: the copies back, initialization( ) again, the
+    "! fields of the selection screen with the input they had
+    METHODS fresh_restart.
+
     "! a function of the screen, as a button or an OK code would run it
     METHODS user_command
       IMPORTING
@@ -2063,6 +2093,7 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
     ENDIF.
 
     initialization( ).
+    fresh_keep( ).
 
     " SUBMIT ... WITH: the values of the caller after INITIALIZATION
     IF mt_cgui_submit IS NOT INITIAL.
@@ -3068,6 +3099,7 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
 
     IF mv_cgui_screen = cs_screen-output.
       leave_to_selection_screen( ).
+      fresh_restart( ).
     ENDIF.
 
   ENDMETHOD.
@@ -4201,6 +4233,110 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
     client->nav_app_call( z2ui5_cl_cgui_select=>factory(
         tab   = lt_row
         title = COND string( WHEN title IS INITIAL THEN 'Application Log'(060) ELSE title ) ) ).
+
+  ENDMETHOD.
+
+  METHOD set_fresh_start.
+
+    mv_cgui_fresh_off = xsdbool( val = abap_false ).
+
+  ENDMETHOD.
+
+  METHOD fresh_keep.
+
+    DATA lr_copy TYPE REF TO data.
+    DATA lo_me   TYPE REF TO object.
+    FIELD-SYMBOLS <attri> TYPE any.
+    FIELD-SYMBOLS <copy>  TYPE any.
+
+    CLEAR mt_cgui_fresh.
+    IF mv_cgui_fresh_off = abap_true.
+      RETURN.
+    ENDIF.
+    " the attributes of the runtime are not the report's data
+    DATA(lo_base) = CAST cl_abap_classdescr( cl_abap_typedescr=>describe_by_name( `Z2UI5_CL_CGUI_REPORT` ) ).
+    DATA(lo_class) = CAST cl_abap_classdescr( cl_abap_typedescr=>describe_by_object_ref( me ) ).
+    lo_me = me.
+    LOOP AT lo_class->attributes REFERENCE INTO DATA(lr_attri)
+         WHERE visibility = cl_abap_classdescr=>public AND is_constant = abap_false AND is_class = abap_false.
+      IF line_exists( lo_base->attributes[ name = lr_attri->name ] ).
+        CONTINUE.
+      ENDIF.
+      UNASSIGN <attri>.
+      ASSIGN lo_me->(lr_attri->name) TO <attri>.
+      IF <attri> IS NOT ASSIGNED.
+        CONTINUE.
+      ENDIF.
+      " a reference as the reference it is - an object of the report stays
+      " that object; CREATE DATA LIKE does not take a bound one everywhere
+      DATA(ls_fresh) = VALUE ty_s_cgui_fresh( name = lr_attri->name
+                                              kind = lr_attri->type_kind ).
+      CASE lr_attri->type_kind.
+        WHEN cl_abap_typedescr=>typekind_oref.
+          ls_fresh-obj = <attri>.
+        WHEN cl_abap_typedescr=>typekind_dref.
+          ls_fresh-dref = <attri>.
+        WHEN OTHERS.
+          CREATE DATA lr_copy LIKE <attri>.
+          ASSIGN lr_copy->* TO <copy>.
+          <copy> = <attri>.
+          ls_fresh-value = lr_copy.
+      ENDCASE.
+      INSERT ls_fresh INTO TABLE mt_cgui_fresh.
+    ENDLOOP.
+
+  ENDMETHOD.
+
+  METHOD fresh_restart.
+
+    DATA lt_screen TYPE ty_t_cgui_fresh.
+    DATA lr_copy   TYPE REF TO data.
+    DATA lo_me     TYPE REF TO object.
+    FIELD-SYMBOLS <attri> TYPE any.
+    FIELD-SYMBOLS <copy>  TYPE any.
+
+    IF mv_cgui_fresh_off = abap_true OR mt_cgui_fresh IS INITIAL.
+      RETURN.
+    ENDIF.
+    lo_me = me.
+    " the input of the selection screen survives the restart - its fields,
+    " not those of a dynpro shown last
+    DATA(lt_field) = screen_fields( ).
+    LOOP AT lt_field REFERENCE INTO DATA(lr_field).
+      UNASSIGN <attri>.
+      ASSIGN lo_me->(lr_field->name) TO <attri>.
+      IF <attri> IS NOT ASSIGNED.
+        CONTINUE.
+      ENDIF.
+      CREATE DATA lr_copy LIKE <attri>.
+      ASSIGN lr_copy->* TO <copy>.
+      <copy> = <attri>.
+      INSERT VALUE #( name  = lr_field->name
+                      value = lr_copy ) INTO TABLE lt_screen.
+    ENDLOOP.
+    " the data as initialization( ) left it, then initialization( ) again
+    LOOP AT mt_cgui_fresh INTO DATA(ls_fresh).
+      UNASSIGN <attri>.
+      ASSIGN lo_me->(ls_fresh-name) TO <attri>.
+      IF <attri> IS NOT ASSIGNED.
+        CONTINUE.
+      ENDIF.
+      CASE ls_fresh-kind.
+        WHEN cl_abap_typedescr=>typekind_oref.
+          <attri> ?= ls_fresh-obj.
+        WHEN cl_abap_typedescr=>typekind_dref.
+          <attri> = ls_fresh-dref.
+        WHEN OTHERS.
+          ASSIGN ls_fresh-value->* TO <copy>.
+          <attri> = <copy>.
+      ENDCASE.
+    ENDLOOP.
+    initialization( ).
+    LOOP AT lt_screen INTO DATA(ls_screen).
+      ASSIGN lo_me->(ls_screen-name) TO <attri>.
+      ASSIGN ls_screen-value->* TO <copy>.
+      <attri> = <copy>.
+    ENDLOOP.
 
   ENDMETHOD.
 

@@ -5,7 +5,7 @@
 | Source | `zr2c_14_headerline.prog.abap` |
 | Text pool | none - texts are placeholders, see the TODOs |
 | Result | **converted** - `z2ui5_cl_cgui_r2c_14.clas.abap`, `z2ui5_cl_cgui_r2c_14.clas.xml` |
-| Mapped | 30 construct(s) |
+| Mapped | 29 construct(s) |
 | TODO | 2 |
 | Release state to check | 1 object(s) |
 
@@ -28,7 +28,6 @@ ABAP Cloud only allows released objects. Check each one; the successor is a hint
 |---|---|---|
 | 9 | `REPORT zr2c_14_headerline` | the class, `INHERITING FROM z2ui5_cl_cgui_report` |
 | 11 | `TABLES sflight` | typed work area `DATA sflight TYPE sflight` |
-| 11 | `global data - the report restarted after its list` | `CLEAR` of 7 global data object(s) at the start of `start_of_selection( )` |
 | 13 | `DATA BEGIN OF gt_sum OCCURS 0` | `BEGIN OF wa_gt_sum` - the structure is the work area; the table `gt_sum` is declared LIKE a table of it |
 | 19 | `DATA gt_flight TYPE sflight OCCURS 0 WITH HEADER LINE` | `DATA gt_flight ... STANDARD TABLE OF` and the work area `wa_gt_flight` - the header line is a work area |
 | 21 | `DATA gt_log TYPE TABLE OF string WITH HEADER LINE` | `DATA gt_log ... STANDARD TABLE OF` and the work area `wa_gt_log` - the header line is a work area |

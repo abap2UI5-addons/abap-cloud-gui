@@ -107,10 +107,6 @@ CLASS z2ui5_cl_cgui_r2c_12 IMPLEMENTATION.
 
   METHOD start_of_selection.
 
-    " every run starts with the global data of a fresh start - the classic report restarted after its list
-    CLEAR: gv_num,
-           gv_count.
-
     DO p_lines TIMES.
       gv_num = sy-index.
       IF s_skip IS NOT INITIAL AND z2ui5_cl_cgui_context=>range_check( val = gv_num range = s_skip ) = abap_true.

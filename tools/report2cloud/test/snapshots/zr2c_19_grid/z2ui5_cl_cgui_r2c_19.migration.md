@@ -5,7 +5,7 @@
 | Source | `zr2c_19_grid.prog.abap` |
 | Text pool | `zr2c_19_grid.prog.xml` |
 | Result | **converted** - `z2ui5_cl_cgui_r2c_19.clas.abap`, `z2ui5_cl_cgui_r2c_19.clas.xml` |
-| Mapped | 53 construct(s) |
+| Mapped | 52 construct(s) |
 | TODO | 0 |
 | Release state to check | 1 object(s) |
 
@@ -33,7 +33,6 @@ Layout, formatting and behaviour of the classic report that the list, the ALV or
 | 16 | `METHODS on_hotspot FOR EVENT hotspot_click OF cl_gui_alv_grid IMPOR...` | `at_link_click( row column )` - the HOTSPOT_CLICK handler of the grid, e_row_id-index is row, e_column_id-fieldname column |
 | 18 | `METHODS on_toolbar FOR EVENT toolbar OF cl_gui_alv_grid IMPORTING e...` | `add_function( )` in the alv( ) chain - the buttons of the TOOLBAR handler; they arrive in `at_user_command( )` |
 | 20 | `METHODS on_user_command FOR EVENT user_command OF cl_gui_alv_grid I...` | `at_user_command( ucomm )` - the USER_COMMAND handler of the grid, e_ucomm is ucomm |
-| 24 | `global data - the report restarted after its list` | `CLEAR` of 2 global data object(s) at the start of `start_of_selection( )` |
 | 26 | `DATA gt_fcat TYPE lvc_t_fcat` | dropped - the ALV object, field catalog or layout is the alv( ) chain now |
 | 27 | `DATA gs_fcat TYPE lvc_s_fcat` | dropped - the ALV object, field catalog or layout is the alv( ) chain now |
 | 28 | `DATA gs_layout TYPE lvc_s_layo` | dropped - the ALV object, field catalog or layout is the alv( ) chain now |

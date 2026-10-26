@@ -38,11 +38,6 @@ CLASS z2ui5_cl_cgui_r2c_34 IMPLEMENTATION.
 
   METHOD start_of_selection.
 
-    " every run starts with the global data of a fresh start - the classic report restarted after its list
-    CLEAR: gt_sale,
-           gv_region,
-           gv_all.
-
     gt_sale = VALUE #( ( region = 'NORTH' month = '01' amount = '120.00' )
                        ( region = 'SOUTH' month = '01' amount = '80.50' )
                        ( region = 'NORTH' month = '02' amount = '99.90' )

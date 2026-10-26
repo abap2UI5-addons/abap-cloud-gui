@@ -5,7 +5,7 @@
 | Source | `zr2c_16_popups.prog.abap` |
 | Text pool | `zr2c_16_popups.prog.xml` |
 | Result | **converted** - `z2ui5_cl_cgui_r2c_16.clas.abap`, `z2ui5_cl_cgui_r2c_16.clas.xml` |
-| Mapped | 31 construct(s) |
+| Mapped | 30 construct(s) |
 | TODO | 1 |
 | Release state to check | 1 object(s) |
 
@@ -32,7 +32,6 @@ Layout, formatting and behaviour of the classic report that the list, the ALV or
 | Line | Classic | abap-cloud-gui |
 |---|---|---|
 | 9 | `REPORT zr2c_16_popups` | the class, `INHERITING FROM z2ui5_cl_cgui_report` |
-| 19 | `global data - the report restarted after its list` | `CLEAR` of 5 global data object(s) at the start of `start_of_selection( )` |
 | 24 | `PARAMETERS p_carrid TYPE sflight-carrid DEFAULT 'LH'` | attribute `p_carrid`, `screen->parameter( )` |
 | 26 | `START-OF-SELECTION` | `start_of_selection( )` |
 | 31 | `WRITE / gs_flight-carrid` | `write( )` |

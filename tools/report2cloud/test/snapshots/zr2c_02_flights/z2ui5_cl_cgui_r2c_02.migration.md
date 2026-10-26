@@ -5,7 +5,7 @@
 | Source | `zr2c_02_flights.prog.abap` |
 | Text pool | `zr2c_02_flights.prog.xml` |
 | Result | **converted** - `z2ui5_cl_cgui_r2c_02.clas.abap`, `z2ui5_cl_cgui_r2c_02.clas.xml` |
-| Mapped | 39 construct(s) |
+| Mapped | 38 construct(s) |
 | TODO | 0 |
 | Release state to check | 2 object(s) |
 
@@ -30,7 +30,6 @@ Layout, formatting and behaviour of the classic report that the list, the ALV or
 |---|---|---|
 | 7 | `REPORT zr2c_02_flights NO STANDARD PAGE HEADING LINE-SIZE 120 MESSA...` | the class, `INHERITING FROM z2ui5_cl_cgui_report` |
 | 9 | `TABLES sflight` | dropped - it only typed the select-options and parameters, which now refer to the DDIC type |
-| 21 | `global data - the report restarted after its list` | `CLEAR` of 3 global data object(s) at the start of `start_of_selection( )` |
 | 25 | `SELECTION-SCREEN BEGIN OF BLOCK b1 WITH FRAME TITLE TEXT-001` | `screen->block_begin( )` |
 | 26 | `PARAMETERS p_carrid LIKE sflight-carrid OBLIGATORY DEFAULT 'LH'` | attribute `p_carrid`, `screen->parameter( )` |
 | 27 | `SELECT-OPTIONS s_fldate FOR sflight-fldate` | range attribute `s_fldate`, `screen->select_option( )` |

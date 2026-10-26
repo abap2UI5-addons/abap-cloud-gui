@@ -38,10 +38,6 @@ CLASS z2ui5_cl_cgui_r2c_47 IMPLEMENTATION.
 
   METHOD start_of_selection.
 
-    " every run starts with the global data of a fresh start - the classic report restarted after its list
-    CLEAR: gt_empty,
-           go_tree.
-
     TRY.
         z2ui5_cl_cgui_salv_tree=>factory( IMPORTING r_salv_tree = go_tree
                                CHANGING  t_table     = gt_empty ).

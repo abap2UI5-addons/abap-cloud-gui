@@ -5,7 +5,7 @@
 | Source | `zr2c_12_pages.prog.abap` |
 | Text pool | none - texts are placeholders, see the TODOs |
 | Result | **converted** - `z2ui5_cl_cgui_r2c_12.clas.abap`, `z2ui5_cl_cgui_r2c_12.clas.xml` |
-| Mapped | 37 construct(s) |
+| Mapped | 36 construct(s) |
 | TODO | 2 |
 | Release state to check | 0 object(s) |
 
@@ -29,7 +29,6 @@ Layout, formatting and behaviour of the classic report that the list, the ALV or
 | Line | Classic | abap-cloud-gui |
 |---|---|---|
 | 9 | `REPORT zr2c_12_pages NO STANDARD PAGE HEADING LINE-COUNT 6(1)` | the class, `INHERITING FROM z2ui5_cl_cgui_report` |
-| 11 | `global data - the report restarted after its list` | `CLEAR` of 2 global data object(s) at the start of `start_of_selection( )` |
 | 14 | `SELECTION-SCREEN BEGIN OF BLOCK b1 WITH FRAME` | `screen->block_begin( )` |
 | 15 | `PARAMETERS p_lines TYPE i DEFAULT 7` | attribute `p_lines`, `screen->parameter( )` |
 | 16 | `SELECT-OPTIONS s_skip FOR gv_num NO INTERVALS` | range attribute `s_skip`, `screen->select_option( )` |

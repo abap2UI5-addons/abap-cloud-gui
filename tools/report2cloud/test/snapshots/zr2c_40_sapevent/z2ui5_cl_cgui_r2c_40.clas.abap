@@ -39,13 +39,6 @@ CLASS z2ui5_cl_cgui_r2c_40 IMPLEMENTATION.
 
   METHOD start_of_selection.
 
-    " every run starts with the global data of a fresh start - the classic report restarted after its list
-    CLEAR: go_html,
-           go_menu,
-           lt_html,
-           lv_url,
-           lt_event.
-
     go_html = NEW z2ui5_cl_cgui_gui_html_viewer( parent = z2ui5_cl_cgui_gui_container=>default_screen ).
     APPEND VALUE #( eventid = z2ui5_cl_cgui_gui_html_viewer=>m_id_sapevent appl_event = abap_true ) TO lt_event.
     go_html->set_registered_events( lt_event ).

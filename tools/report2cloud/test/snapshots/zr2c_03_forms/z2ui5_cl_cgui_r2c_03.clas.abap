@@ -94,12 +94,6 @@ CLASS z2ui5_cl_cgui_r2c_03 IMPLEMENTATION.
 
   METHOD start_of_selection.
 
-    " every run starts with the global data of a fresh start - the classic report restarted after its list
-    CLEAR: gt_items,
-           gs_template,
-           gv_net,
-           gv_gross.
-
     build_items( EXPORTING
                    iv_count = p_items
                  CHANGING

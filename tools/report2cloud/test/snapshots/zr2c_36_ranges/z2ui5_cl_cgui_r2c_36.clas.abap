@@ -63,10 +63,6 @@ CLASS z2ui5_cl_cgui_r2c_36 IMPLEMENTATION.
 
   METHOD start_of_selection.
 
-    " every run starts with the global data of a fresh start - the classic report restarted after its list
-    CLEAR: gs_product,
-           gt_product.
-
     gt_product = VALUE #( ( name = 'LAMP'  group = 'HOME' price = 45 )
                           ( name = 'CHAIR' group = 'HOME' price = 120 )
                           ( name = 'LAMP'  group = 'HOME' price = 45 )

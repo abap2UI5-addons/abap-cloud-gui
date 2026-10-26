@@ -49,9 +49,6 @@ CLASS z2ui5_cl_cgui_r2c_42 IMPLEMENTATION.
 
   METHOD start_of_selection.
 
-    " every run starts with the global data of a fresh start - the classic report restarted after its list
-    CLEAR lv_total.
-
     DATA(lt_shelf) = VALUE ty_t_shelf( ( wine = 'Riesling' vintage = '2019' bottles = 12 )
                                        ( wine = 'Merlot'   vintage = '2016' bottles = 4 )
                                        ( wine = 'Rose'     vintage = '2021' bottles = 9 ) ).

@@ -963,7 +963,7 @@ const BASE_METHODS = ["cgui_run_in_background", "at_roundtrip_start",
   "at_tree_node", "at_tree_checkbox", "at_tree_expand_no_children", "at_data_changed", "at_user_command",
   "at_value_request", "value_request_part", "at_alv_value_request", "authority_check",
   "selection_screen_dynnr", "after_call_selection_screen", "write", "format", "get_cursor", "lisel",
-  "_msg", "_msg_box", "_popup", "set_prefill_last", "set_job", "set_log", "messages_from_log", "log_display", "set_command_field", "set_catalog", "okcode_execute", "set_cursor_field", "set_selscreen_status", "list", "alv", "tree", "get_selected_rows", "lsind", "message",
+  "_msg", "_msg_box", "_popup", "set_prefill_last", "set_fresh_start", "set_job", "set_log", "messages_from_log", "log_display", "set_command_field", "set_catalog", "okcode_execute", "set_cursor_field", "set_selscreen_status", "list", "alv", "tree", "get_selected_rows", "lsind", "message",
   "message_t100", "messages_from_bapiret", "popup_to_confirm", "popup_to_decide",
   "popup_get_values", "popup_get_values_sval", "popup_values_sval", "popup_answer", "popup_values", "value_help_popup", "vrm_set_values",
   "leave_to_selection_screen", "window", "call_selection_screen", "submit", "set_parameter_id", "get_parameter_id",
@@ -3223,7 +3223,6 @@ class Converter {
     {
       const body = [];
       const sos = byKind("StartOfSelection");
-      if (sos.length || byKind("EndOfSelection").length) body.push(...this.resetGlobals());
       for (const e of sos) {
         if (e.fromInit) this.map(e.stmt, "`start_of_selection( )` - the report has no selection screen: INITIALIZATION went straight on with START-OF-SELECTION");
         else if (!e.implicit) this.map(e.stmt, "`start_of_selection( )`");
@@ -3742,7 +3741,6 @@ class Converter {
           continue;
         }
         if (this.tablesKept.has(name)) {
-          this.resetCandidate(s);
           heading("global data of the report");
           push(`DATA ${name} TYPE ${name}.`);
           this.map(s, `typed work area \`DATA ${name} TYPE ${name}\``);
@@ -3824,8 +3822,7 @@ class Converter {
             if (/End$/.test(k)) stickyDepth--;
           }
         }
-        if ((k === "Data" || k === "DataBegin" || k === "Ranges") && !this.insideBegin(s)) this.resetCandidate(s);
-        if (k === "Ranges") {
+                if (k === "Ranges") {
           const forNode = child(s, "SimpleFieldChain2");
           const forText = lc(nodeText(forNode));
           const root = forText.split("-")[0];
@@ -3837,9 +3834,6 @@ class Converter {
         if (s.getColon()) {
           const group = [s];
           while (this.decls[i + 1] && sameColon(this.decls[i + 1], s)) group.push(this.decls[++i]);
-          for (const g of group.slice(1)) {
-            if ((kind(g) === "Data" || kind(g) === "DataBegin") && !this.insideBegin(g)) this.resetCandidate(g);
-          }
           const text = this.renderDeclGroup(group);
           if (text) push(text);
         } else {
@@ -3905,71 +3899,6 @@ class Converter {
       if (!d.used) this.todo(d.stmt, `subscreen ${nr} is on no tab of the report - SELECTION-SCREEN INCLUDE and CALL SUBSCREEN are not converted; its fields are not on the screen`);
     }
     return { chain: renderScreenChain(resolved), defaults };
-  }
-
-  /** a global data object start_of_selection( ) may reset (resetGlobals) -
-   *  with its start value; a structure with start values in its components
-   *  is left alone */
-  resetCandidate(s) {
-    this.resetList ??= [];
-    const name = lc(declName(s) ?? "");
-    if (!name || this.salvVars.has(name) || this.fcatVars.has(name) || this.layoutVars.has(name) || this.isGridObject(name)) return;
-    let value;
-    const v = kind(s) === "Data" ? findAll(s, "Value")[0] : undefined;
-    if (v) {
-      const text = renderTokens(v.getTokens().slice(1)).trim();
-      if (!/^IS\s+INITIAL$/i.test(text)) value = text;
-      if (this.isDynproFlag(name) && /^'X'$/i.test(text)) value = "abap_true";
-    }
-    if (kind(s) === "DataBegin") {
-      const end = this.declEnd(this.stmts.indexOf(s));
-      const run = this.stmts.slice(this.stmts.indexOf(s), end + 1);
-      if (run.some((x) => words(x).includes("VALUE"))) return;
-    }
-    this.resetList.push({ name, value, row: s.getFirstToken().getRow() });
-    const header = this.globalHeader?.get(name);
-    if (header) this.resetList.push({ name: header.wa, row: s.getFirstToken().getRow() });
-  }
-
-  /**
-   * The lines that start a run of start_of_selection( ) with the global data
-   * a classic run started with. The classic report is restarted when its
-   * list is left: its global data is initial again (or has its VALUE), the
-   * selection screen keeps its input. The class keeps every attribute from
-   * one Execute to the next - a total summed up in START-OF-SELECTION grew
-   * with every run. So every global data object is reset, except the ones
-   * the selection phase uses - INITIALIZATION, LOAD-OF-PROGRAM, every AT
-   * SELECTION-SCREEN, an F4, and the FORMs they call: the classic restart
-   * ran INITIALIZATION again, and AT SELECTION-SCREEN ran before
-   * START-OF-SELECTION in the same run.
-   */
-  resetGlobals() {
-    if (!this.resetList?.length) return [];
-    const phase = this.events.filter((e) => ["Initialization", "LoadOfProgram", "AtSelectionScreen"].includes(e.kind))
-      .flatMap((e) => e.stmts);
-    const used = new Set();
-    const seenForms = new Set();
-    const visit = (stmts) => {
-      for (const s of stmts) {
-        for (const t of s.getTokens()) used.add(lc(t.getStr()));
-        if (kind(s) !== "Perform") continue;
-        const f = this.formByName.get(lc(nodeText(child(s, "FormName") ?? s)));
-        if (f && !seenForms.has(f.name)) {
-          seenForms.add(f.name);
-          visit(f.body);
-        }
-      }
-    };
-    visit(phase);
-    const reset = this.resetList.filter((r) => !used.has(r.name) && !this.screenField(r.name));
-    if (!reset.length) return [];
-    const lines = ["\" every run starts with the global data of a fresh start - the classic report restarted after its list"];
-    const cleared = reset.filter((r) => r.value === undefined).map((r) => r.name);
-    if (cleared.length === 1) lines.push(`CLEAR ${cleared[0]}.`);
-    else if (cleared.length) lines.push(`CLEAR: ${cleared.join(`,\n       `)}.`);
-    for (const r of reset.filter((x) => x.value !== undefined)) lines.push(`${r.name} = ${r.value}.`);
-    this.mapped.push({ row: reset[0].row, col: 1, classic: "global data - the report restarted after its list", target: `\`CLEAR\` of ${reset.length} global data object(s) at the start of \`start_of_selection( )\`` });
-    return lines;
   }
 
   isTables(name) {

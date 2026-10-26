@@ -58,15 +58,6 @@ CLASS z2ui5_cl_cgui_r2c_25 IMPLEMENTATION.
 
   METHOD start_of_selection.
 
-    " every run starts with the global data of a fresh start - the classic report restarted after its list
-    CLEAR: ok_code,
-           go_notes,
-           go_editor,
-           go_preview,
-           go_html,
-           gt_notes,
-           gv_saved.
-
     CLEAR gv_saved.
     gt_notes = VALUE #( ( 'First line of the notes' ) ( 'Second line' ) ).
     call_screen( `0100` ).

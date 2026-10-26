@@ -49,9 +49,6 @@ CLASS z2ui5_cl_cgui_r2c_30 IMPLEMENTATION.
 
   METHOD start_of_selection.
 
-    " every run starts with the global data of a fresh start - the classic report restarted after its list
-    CLEAR gt_result.
-
     gt_result = VALUE #( ( student = 'Anna'  subject = 'Maths'   points = 71 )
                          ( student = 'Ben'   subject = 'Maths'   points = 44 )
                          ( student = 'Clara' subject = 'Physics' points = 58 ) ).

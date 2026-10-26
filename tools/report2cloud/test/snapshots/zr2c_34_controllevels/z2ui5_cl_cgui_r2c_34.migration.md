@@ -5,7 +5,7 @@
 | Source | `zr2c_34_controllevels.prog.abap` |
 | Text pool | `zr2c_34_controllevels.prog.xml` |
 | Result | **converted** - `z2ui5_cl_cgui_r2c_34.clas.abap`, `z2ui5_cl_cgui_r2c_34.clas.xml` |
-| Mapped | 16 construct(s) |
+| Mapped | 15 construct(s) |
 | TODO | 0 |
 | Release state to check | 0 object(s) |
 
@@ -24,7 +24,6 @@ Layout, formatting and behaviour of the classic report that the list, the ALV or
 | Line | Classic | abap-cloud-gui |
 |---|---|---|
 | 8 | `REPORT zr2c_34_controllevels` | the class, `INHERITING FROM z2ui5_cl_cgui_report` |
-| 17 | `global data - the report restarted after its list` | `CLEAR` of 3 global data object(s) at the start of `start_of_selection( )` |
 | 21 | `START-OF-SELECTION` | `start_of_selection( )` |
 | 31 | `WRITE / 'Sales per region'` | `write( )` |
 | 32 | `ULINE` | `list( )->uline( )` |

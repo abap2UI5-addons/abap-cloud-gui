@@ -119,7 +119,9 @@ test("BEGIN OF BLOCK WITH FRAME TITLE TEXT-001: the text of the text pool", () =
 
 test("TOP-OF-PAGE, END-OF-SELECTION, HIDE and AT LINE-SELECTION", () => {
   const abap = classOf("zr2c_02_flights");
-  assert.match(abap, /METHOD start_of_selection\.\n\n {4}" every run starts [^\n]*\n {4}CLEAR: gt_flight,\n {11}gs_flight,\n {11}gv_total\.\n\n {4}SELECT /);
+  // the global data starts fresh on its own - the runtime restarts the
+  // report on Back from the list (set_fresh_start( )), no CLEAR is written
+  assert.match(abap, /METHOD start_of_selection\.\n\n {4}SELECT /);
   assert.match(abap, /METHODS top_of_page REDEFINITION\./);
   // END-OF-SELECTION is the event of the runtime, which runs it after the
   // RETURN of START-OF-SELECTION as well
@@ -749,8 +751,6 @@ test("a global table with a header line is a table and a work area attribute, an
   assert.match(cls, /DATA gt_sum LIKE STANDARD TABLE OF wa_gt_sum WITH DEFAULT KEY\./);
   assert.match(cls, /gt_car TYPE STANDARD TABLE OF scarr WITH DEFAULT KEY,/);
   assert.match(cls, /DATA wa_gt_car LIKE LINE OF gt_car\./);
-  // the work areas start fresh with the globals
-  assert.match(cls, /CLEAR: gt_num,\n\s+wa_gt_num,\n\s+gt_sum,\n\s+wa_gt_sum,/);
   // the short forms
   assert.match(cls, /CLEAR gt_num\.\n\s+wa_gt_num = 1\.\n\s+APPEND wa_gt_num TO gt_num\./);
   assert.match(cls, /wa_gt_sum-key = 'A'\.\n\s+wa_gt_sum-val = 2\./);

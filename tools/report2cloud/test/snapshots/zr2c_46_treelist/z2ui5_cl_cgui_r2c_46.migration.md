@@ -5,7 +5,7 @@
 | Source | `zr2c_46_treelist.prog.abap` |
 | Text pool | `zr2c_46_treelist.prog.xml` |
 | Result | **converted** - `z2ui5_cl_cgui_r2c_46.clas.abap`, `z2ui5_cl_cgui_r2c_46.clas.xml` |
-| Mapped | 12 construct(s) |
+| Mapped | 11 construct(s) |
 | TODO | 0 |
 | Release state to check | 1 object(s) |
 
@@ -28,7 +28,6 @@ Layout, formatting and behaviour of the classic report that the list, the ALV or
 | Line | Classic | abap-cloud-gui |
 |---|---|---|
 | 7 | `REPORT zr2c_46_treelist` | the class, `INHERITING FROM z2ui5_cl_cgui_report` |
-| 9 | `global data - the report restarted after its list` | `CLEAR` of 2 global data object(s) at the start of `start_of_selection( )` |
 | 12 | `START-OF-SELECTION` | `start_of_selection( )` |
 | 13 | `PERFORM add USING 1 'Airlines' ''` | `add( )` |
 | 14 | `PERFORM add USING 2 'LH' 'Lufthansa'` | `add( )` |

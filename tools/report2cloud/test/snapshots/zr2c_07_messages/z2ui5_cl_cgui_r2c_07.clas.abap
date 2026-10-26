@@ -60,9 +60,6 @@ CLASS z2ui5_cl_cgui_r2c_07 IMPLEMENTATION.
 
   METHOD start_of_selection.
 
-    " every run starts with the global data of a fresh start - the classic report restarted after its list
-    CLEAR gv_text.
-
     CASE p_type.
       WHEN 'S'.
         message( 'A status message' ).

@@ -254,10 +254,6 @@ CLASS z2ui5_cl_cgui_r2c_02 DEFINITION PUBLIC
 
   METHOD start_of_selection.
 
-    " every run starts with the global data of a fresh start - the classic report restarted after its list
-    CLEAR: gt_flight,
-           gs_flight.
-
     SELECT carrid, connid, fldate
       FROM sflight
       INTO TABLE @gt_flight
@@ -326,7 +322,7 @@ class `ZR2C` must exist in the target system.
 | selection texts | `text =` of the field; none for a text taken from the DDIC (the screen shows the DDIC label as well) |
 | `TABLES dbtab` | dropped when it only typed select-options and parameters; otherwise `DATA dbtab TYPE dbtab` and a TODO. `TABLES sscrfields` is dropped |
 | global `DATA`, `TYPES`, `CONSTANTS` (also those inside event blocks, which are global in a report) | PUBLIC attributes, types and constants - PUBLIC because `alv( )` binds a PUBLIC table directly, and the draft persists no PRIVATE attributes (AGENTS.md). `DATA ... TYPE [STANDARD] TABLE OF x` without a key gets `WITH DEFAULT KEY` written out - the same table, said (the abap2UI5 linter's `default-key-table`) |
-| the restart of the report after its list | `start_of_selection( )` begins with a `CLEAR` of the global data (its `VALUE` where it has one): the classic report started every run afresh, the class keeps its attributes from one Execute to the next. Left alone are the selection screen and what `INITIALIZATION`, `LOAD-OF-PROGRAM`, `AT SELECTION-SCREEN ...` and the FORMs they call use |
+| the restart of the report after its list | nothing is written - the runtime does it (`set_fresh_start( )`, on by default): Back from the list gives the global data the values it had after `initialization( )` (its `VALUE` and what `INITIALIZATION` set) and runs `initialization( )` again, the selection screen keeps its input - as the classic report started every run afresh |
 | global `FIELD-SYMBOLS` | declared in each method that uses them |
 | `TYPE-POOLS` | dropped |
 | `INITIALIZATION`, `LOAD-OF-PROGRAM` | `initialization( )` |

@@ -48,10 +48,6 @@ CLASS z2ui5_cl_cgui_r2c_38 IMPLEMENTATION.
 
   METHOD start_of_selection.
 
-    " every run starts with the global data of a fresh start - the classic report restarted after its list
-    CLEAR: gt_todo,
-           lv_answer.
-
     gt_todo = VALUE #( ( task = `Write the report` done = abap_true )
                        ( task = `Test it`          done = abap_false )
                        ( task = `Ship it`          done = abap_true ) ).

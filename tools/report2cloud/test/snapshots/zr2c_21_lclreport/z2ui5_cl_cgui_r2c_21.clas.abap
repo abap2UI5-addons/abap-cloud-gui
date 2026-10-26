@@ -60,10 +60,6 @@ CLASS z2ui5_cl_cgui_r2c_21 IMPLEMENTATION.
 
   METHOD start_of_selection.
 
-    " every run starts with the global data of a fresh start - the classic report restarted after its list
-    CLEAR: scarr,
-           gv_total.
-
     SELECT SINGLE * FROM scarr INTO @scarr WHERE carrid = @p_carrid.
     IF sy-subrc <> 0.
       message( 'Unknown airline' ).

@@ -5,7 +5,7 @@
 | Source | `zr2c_15_submit.prog.abap` |
 | Text pool | `zr2c_15_submit.prog.xml` |
 | Result | **converted** - `z2ui5_cl_cgui_r2c_15.clas.abap`, `z2ui5_cl_cgui_r2c_15.clas.xml` |
-| Mapped | 22 construct(s) |
+| Mapped | 21 construct(s) |
 | TODO | 0 |
 | Release state to check | 1 object(s) |
 
@@ -29,7 +29,6 @@ Layout, formatting and behaviour of the classic report that the list, the ALV or
 | Line | Classic | abap-cloud-gui |
 |---|---|---|
 | 9 | `REPORT zr2c_15_submit` | the class, `INHERITING FROM z2ui5_cl_cgui_report` |
-| 20 | `global data - the report restarted after its list` | `CLEAR` of 2 global data object(s) at the start of `start_of_selection( )` |
 | 23 | `PARAMETERS p_carrid TYPE sflight-carrid DEFAULT 'LH'` | attribute `p_carrid`, `screen->parameter( )` |
 | 24 | `SELECT-OPTIONS s_fldate FOR sy-datum` | range attribute `s_fldate`, `screen->select_option( )` |
 | 25 | `PARAMETERS p_max TYPE i DEFAULT 20` | attribute `p_max`, `screen->parameter( )` |

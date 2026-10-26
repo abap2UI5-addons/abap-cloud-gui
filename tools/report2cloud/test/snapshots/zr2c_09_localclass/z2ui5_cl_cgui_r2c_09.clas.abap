@@ -45,9 +45,6 @@ CLASS z2ui5_cl_cgui_r2c_09 IMPLEMENTATION.
 
   METHOD start_of_selection.
 
-    " every run starts with the global data of a fresh start - the classic report restarted after its list
-    CLEAR go_calc.
-
     DATA(lo_calc) = NEW lcl_calculator( p_dec ).
     go_calc = lo_calc.
     list( )->new_line(

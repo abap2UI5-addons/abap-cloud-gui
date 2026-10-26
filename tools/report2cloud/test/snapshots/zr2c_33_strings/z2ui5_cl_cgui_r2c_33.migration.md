@@ -5,7 +5,7 @@
 | Source | `zr2c_33_strings.prog.abap` |
 | Text pool | `zr2c_33_strings.prog.xml` |
 | Result | **converted** - `z2ui5_cl_cgui_r2c_33.clas.abap`, `z2ui5_cl_cgui_r2c_33.clas.xml` |
-| Mapped | 25 construct(s) |
+| Mapped | 24 construct(s) |
 | TODO | 0 |
 | Release state to check | 0 object(s) |
 
@@ -20,7 +20,6 @@ The class uses no database table, DDIC type, function module, class or message c
 | 8 | `REPORT zr2c_33_strings` | the class, `INHERITING FROM z2ui5_cl_cgui_report` |
 | 10 | `PARAMETERS p_name TYPE string LOWER CASE DEFAULT 'ada augusta lovel...` | attribute `p_name`, `screen->parameter( )` |
 | 12 | `START-OF-SELECTION` | `start_of_selection( )` |
-| 13 | `global data - the report restarted after its list` | `CLEAR` of 2 global data object(s) at the start of `start_of_selection( )` |
 | 19 | `WRITE / 'Input:'` | `write( )` |
 | 19 | `WRITE p_name` | `write( )` |
 | 20 | `WRITE / 'Condensed:'` | `write( )` |

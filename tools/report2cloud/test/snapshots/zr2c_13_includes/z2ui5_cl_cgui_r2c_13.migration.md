@@ -6,7 +6,7 @@
 | Text pool | none - texts are placeholders, see the TODOs |
 | Includes | inlined: `ZR2C_13_INCLUDES_TOP`, `ZR2C_13_INCLUDES_F01` |
 | Result | **converted** - `z2ui5_cl_cgui_r2c_13.clas.abap`, `z2ui5_cl_cgui_r2c_13.clas.xml` |
-| Mapped | 12 construct(s) |
+| Mapped | 11 construct(s) |
 | TODO | 1 |
 | Release state to check | 0 object(s) |
 
@@ -23,7 +23,6 @@ The class uses no database table, DDIC type, function module, class or message c
 | Line | Classic | abap-cloud-gui |
 |---|---|---|
 | 8 | `REPORT zr2c_13_includes` | the class, `INHERITING FROM z2ui5_cl_cgui_report` |
-| zr2c_13_includes_top.prog.abap:9 | `global data - the report restarted after its list` | `CLEAR` of 3 global data object(s) at the start of `start_of_selection( )` |
 | zr2c_13_includes_top.prog.abap:13 | `PARAMETERS p_count TYPE i DEFAULT 3` | attribute `p_count`, `screen->parameter( )` |
 | zr2c_13_includes_top.prog.abap:16 | `DEFINE add_and_write` | nothing - the macro is expanded at every call |
 | zr2c_13_includes_f01.prog.abap:4 | `FORM fill_lines` | private method `fill_lines( )` |

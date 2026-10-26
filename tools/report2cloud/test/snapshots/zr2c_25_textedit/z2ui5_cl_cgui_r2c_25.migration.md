@@ -5,7 +5,7 @@
 | Source | `zr2c_25_textedit.prog.abap` |
 | Text pool | `zr2c_25_textedit.prog.xml` |
 | Result | **converted** - `z2ui5_cl_cgui_r2c_25.clas.abap`, `z2ui5_cl_cgui_r2c_25.clas.xml` |
-| Mapped | 19 construct(s) |
+| Mapped | 18 construct(s) |
 | TODO | 0 |
 | Release state to check | 0 object(s) |
 
@@ -19,7 +19,6 @@ The class uses no database table, DDIC type, function module, class or message c
 |---|---|---|
 | 10 | `REPORT zr2c_25_textedit` | the class, `INHERITING FROM z2ui5_cl_cgui_report` |
 | 14 | `PARAMETERS p_carrid TYPE c LENGTH 3 DEFAULT 'LH'` | attribute `p_carrid`, `screen->parameter( )` |
-| 16 | `global data - the report restarted after its list` | `CLEAR` of 7 global data object(s) at the start of `start_of_selection( )` |
 | 24 | `START-OF-SELECTION` | `start_of_selection( )` |
 | 27 | `CALL SCREEN 100` | `call_screen( dynnr )` - the dynpro shows when the event block is done, what follows goes on in `after_call_screen( dynnr )` |
 | 28 | `IF gv_saved = 'X'` | `after_call_screen( )` - WHEN `0100`: the statements after CALL SCREEN 0100 |

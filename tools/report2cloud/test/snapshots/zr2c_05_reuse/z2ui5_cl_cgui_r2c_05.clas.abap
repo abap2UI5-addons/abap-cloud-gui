@@ -40,11 +40,6 @@ CLASS z2ui5_cl_cgui_r2c_05 IMPLEMENTATION.
 
   METHOD start_of_selection.
 
-    " every run starts with the global data of a fresh start - the classic report restarted after its list
-    CLEAR: scarr,
-           gt_scarr,
-           gs_scarr.
-
     IF p_curr IS INITIAL.
       SELECT * FROM scarr INTO TABLE @gt_scarr.
     ELSE.

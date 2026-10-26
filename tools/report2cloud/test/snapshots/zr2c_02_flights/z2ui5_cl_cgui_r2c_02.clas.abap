@@ -87,11 +87,6 @@ CLASS z2ui5_cl_cgui_r2c_02 IMPLEMENTATION.
 
   METHOD start_of_selection.
 
-    " every run starts with the global data of a fresh start - the classic report restarted after its list
-    CLEAR: gt_flight,
-           gs_flight,
-           gv_total.
-
     SELECT carrid, connid, fldate, price, currency, seatsmax, seatsocc
       FROM sflight
       INTO TABLE @gt_flight

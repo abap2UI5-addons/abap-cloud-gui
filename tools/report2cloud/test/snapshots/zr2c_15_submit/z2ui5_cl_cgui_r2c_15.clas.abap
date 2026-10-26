@@ -75,10 +75,6 @@ CLASS z2ui5_cl_cgui_r2c_15 IMPLEMENTATION.
 
   METHOD start_of_selection.
 
-    " every run starts with the global data of a fresh start - the classic report restarted after its list
-    CLEAR: gv_seats,
-           gt_rspar.
-
     list( )->new_line(
         )->write( 'Flights of'
         )->write( p_carrid ).

@@ -42,10 +42,6 @@ CLASS z2ui5_cl_cgui_r2c_33 IMPLEMENTATION.
 
   METHOD start_of_selection.
 
-    " every run starts with the global data of a fresh start - the classic report restarted after its list
-    CLEAR: lt_part,
-           lv_initials.
-
     DATA(lv_clean) = condense( p_name ).
     SPLIT lv_clean AT space INTO TABLE lt_part.
 

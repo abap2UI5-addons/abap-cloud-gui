@@ -45,10 +45,6 @@ CLASS z2ui5_cl_cgui_r2c_19 IMPLEMENTATION.
 
   METHOD start_of_selection.
 
-    " every run starts with the global data of a fresh start - the classic report restarted after its list
-    CLEAR: gt_flight,
-           gs_flight.
-
     SELECT * FROM sflight INTO TABLE @gt_flight
       WHERE carrid = @p_carrid
       ORDER BY PRIMARY KEY.

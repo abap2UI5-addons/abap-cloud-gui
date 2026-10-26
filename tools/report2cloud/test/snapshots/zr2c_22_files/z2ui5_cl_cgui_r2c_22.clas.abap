@@ -60,10 +60,6 @@ CLASS z2ui5_cl_cgui_r2c_22 IMPLEMENTATION.
 
   METHOD start_of_selection.
 
-    " every run starts with the global data of a fresh start - the classic report restarted after its list
-    CLEAR: gt_seats,
-           gv_total.
-
     z2ui5_cl_cgui_frontend=>gui_upload( EXPORTING  filename            = p_file
                                                    filetype            = 'ASC'
                                                    has_field_separator = 'X'
