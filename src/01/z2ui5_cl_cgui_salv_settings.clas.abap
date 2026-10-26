@@ -1,7 +1,8 @@
 "! The stand-in of the settings of a SALV table - cl_salv_display_settings,
 "! cl_salv_functions(_list), cl_salv_selections, cl_salv_sorts,
 "! cl_salv_aggregations, cl_salv_layout, cl_salv_filters, cl_salv_print and
-"! cl_salv_functional_settings in one: get_display_settings( ),
+"! cl_salv_functional_settings in one, and cl_salv_tree_settings:
+"! get_display_settings( ),
 "! get_functions( ), get_selections( ), ... of z2ui5_cl_cgui_salv_table
 "! answer it. The title, the striped rows, the functions added and the
 "! selection mode go to the grid at display( ); get_selected_rows( ) are the
@@ -142,6 +143,30 @@ CLASS z2ui5_cl_cgui_salv_settings DEFINITION PUBLIC CREATE PUBLIC.
       IMPORTING
         value TYPE clike.
 
+    " cl_salv_tree_settings - the tree of z2ui5_cl_cgui_salv_tree
+    DATA mv_header           TYPE string READ-ONLY.
+    DATA mv_hierarchy_header TYPE string READ-ONLY.
+
+    METHODS set_header
+      IMPORTING
+        value TYPE clike.
+
+    METHODS set_hierarchy_header
+      IMPORTING
+        value TYPE clike.
+
+    METHODS set_hierarchy_tooltip
+      IMPORTING
+        value TYPE clike.
+
+    METHODS set_hierarchy_size
+      IMPORTING
+        value TYPE any.
+
+    METHODS set_hierarchy_icon
+      IMPORTING
+        value TYPE any.
+
   PROTECTED SECTION.
   PRIVATE SECTION.
     DATA mo_grid TYPE REF TO z2ui5_cl_cgui_gui_alv_grid.
@@ -253,6 +278,27 @@ CLASS z2ui5_cl_cgui_salv_settings IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD set_initial_layout ##NEEDED.
+  ENDMETHOD.
+
+  METHOD set_header.
+
+    mv_header = value.
+
+  ENDMETHOD.
+
+  METHOD set_hierarchy_header.
+
+    mv_hierarchy_header = value.
+
+  ENDMETHOD.
+
+  METHOD set_hierarchy_tooltip ##NEEDED.
+  ENDMETHOD.
+
+  METHOD set_hierarchy_size ##NEEDED.
+  ENDMETHOD.
+
+  METHOD set_hierarchy_icon ##NEEDED.
   ENDMETHOD.
 
 ENDCLASS.

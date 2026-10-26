@@ -691,7 +691,9 @@ Later
 
 - [x] Tree lists: `RS_TREE_CONSTRUCT` / `RS_TREE_LIST_DISPLAY` as the ALV tree
       of the report
-- [ ] `CL_SALV_TREE` as a stand-in, as `CL_SALV_TABLE` is
+- [x] `CL_SALV_TREE` as a stand-in, as `CL_SALV_TABLE` is: the nodes, their
+      relationships, the columns, the tree settings, `double_click` and
+      `checkbox_change` to the handlers
 
 ## Development
 

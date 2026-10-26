@@ -919,6 +919,7 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
     DATA mo_cgui_job     TYPE REF TO z2ui5_if_cgui_job.
     DATA mo_cgui_catalog TYPE REF TO z2ui5_if_cgui_catalog.
     DATA mo_cgui_app_log TYPE REF TO z2ui5_if_cgui_log.
+    DATA mo_cgui_tree_handler TYPE REF TO z2ui5_if_cgui_tree_handler.
     DATA mv_cgui_cmd_on  TYPE abap_bool.
     " the message boxes of _msg_box( ) - shown at the end of the roundtrip
     DATA mt_cgui_box           TYPE ty_t_cgui_msg.
@@ -1661,6 +1662,18 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
   METHOD z2ui5_if_cgui_gui~cursor.
 
     result = CORRESPONDING #( get_cursor( ) ).
+
+  ENDMETHOD.
+
+  METHOD z2ui5_if_cgui_gui~tree.
+
+    result = tree( ).
+
+  ENDMETHOD.
+
+  METHOD z2ui5_if_cgui_gui~tree_handler.
+
+    mo_cgui_tree_handler = handler.
 
   ENDMETHOD.
 
@@ -2715,6 +2728,11 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
         DATA(lv_tick) = z2ui5_cl_cgui_tree=>get_node_by_event( client ).
         at_tree_checkbox( key     = lv_tick
                           checked = mo_cgui_tree->get_node( lv_tick )-checked ).
+        IF mo_cgui_tree_handler IS BOUND.
+          at_gui_event( ).
+          mo_cgui_tree_handler->on_checkbox( key     = lv_tick
+                                             checked = mo_cgui_tree->get_node( lv_tick )-checked ).
+        ENDIF.
         RETURN.
       ENDIF.
     ENDIF.
@@ -5534,7 +5552,7 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
   METHOD tree.
 
     mo_cgui_tree = z2ui5_cl_cgui_tree=>factory( )->set_title( mv_cgui_title ).
-    CLEAR mt_cgui_tree_view.
+    CLEAR: mt_cgui_tree_view, mo_cgui_tree_handler.
     result = mo_cgui_tree.
 
   ENDMETHOD.
@@ -5559,6 +5577,11 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
     level_push( ).
     at_tree_node( key   = key
                   value = ls_node-value ).
+    IF mo_cgui_tree_handler IS BOUND.
+      " the handlers of the stand-in of cl_salv_tree - an event of a control
+      at_gui_event( ).
+      mo_cgui_tree_handler->on_node( key ).
+    ENDIF.
     IF mv_cgui_screen <> cs_screen-output.
       CLEAR mt_cgui_level.
       RETURN.

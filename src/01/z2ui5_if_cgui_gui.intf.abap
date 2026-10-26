@@ -168,4 +168,15 @@ INTERFACE z2ui5_if_cgui_gui PUBLIC.
     RETURNING
       VALUE(result) TYPE ty_s_cursor.
 
+  "! the ALV tree of the run, new - where the stand-in of cl_salv_tree
+  "! (z2ui5_cl_cgui_salv_tree) adds its nodes
+  METHODS tree
+    RETURNING
+      VALUE(result) TYPE REF TO z2ui5_cl_cgui_tree.
+
+  "! who hears the clicks of that tree besides the report
+  METHODS tree_handler
+    IMPORTING
+      handler TYPE REF TO z2ui5_if_cgui_tree_handler.
+
 ENDINTERFACE.

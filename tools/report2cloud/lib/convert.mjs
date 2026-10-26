@@ -546,9 +546,123 @@ export const GUI = {
           exceptions: [] },
       },
     },
+    z2ui5_cl_cgui_salv_tree: {
+      parent: "z2ui5_cl_cgui_gui",
+      constants: [],
+      attributes: [],
+      events: ["double_click", "link_click", "checkbox_change", "added_function", "expand_empty_folder"],
+      methods: {
+        factory: { params: ["r_container", "hide_selection_column", "r_salv_tree", "t_table"],
+          exceptions: [] },
+        constructor: { params: [],
+          exceptions: [] },
+        display: { params: [],
+          exceptions: [] },
+        get_nodes: { params: [],
+          exceptions: [] },
+        get_columns: { params: [],
+          exceptions: [] },
+        get_tree_settings: { params: [],
+          exceptions: [] },
+        get_functions: { params: [],
+          exceptions: [] },
+        get_display_settings: { params: [],
+          exceptions: [] },
+        get_aggregations: { params: [],
+          exceptions: [] },
+        get_layout: { params: [],
+          exceptions: [] },
+        get_selections: { params: [],
+          exceptions: [] },
+        get_event: { params: [],
+          exceptions: [] },
+        get_tree: { params: [],
+          exceptions: [] },
+      },
+    },
+    z2ui5_cl_cgui_salv_nodes: {
+      constants: [],
+      attributes: [],
+      events: [],
+      methods: {
+        constructor: { params: ["tree"],
+          exceptions: [] },
+        add_node: { params: ["related_node", "relationship", "data_row", "collapsed_icon", "expanded_icon", "row_style", "text", "visible", "expander", "enabled", "folder"],
+          exceptions: [] },
+        get_node: { params: ["node_key"],
+          exceptions: [] },
+        get_all_nodes: { params: [],
+          exceptions: [] },
+        expand_all: { params: [],
+          exceptions: [] },
+        collapse_all: { params: [],
+          exceptions: [] },
+        delete_all: { params: [],
+          exceptions: [] },
+      },
+    },
+    z2ui5_cl_cgui_salv_node: {
+      constants: [],
+      attributes: [],
+      events: [],
+      methods: {
+        constructor: { params: ["tree", "key"],
+          exceptions: [] },
+        to_key: { params: ["key"],
+          exceptions: [] },
+        get_key: { params: [],
+          exceptions: [] },
+        get_text: { params: [],
+          exceptions: [] },
+        set_text: { params: ["value"],
+          exceptions: [] },
+        get_parent: { params: [],
+          exceptions: [] },
+        get_first_child: { params: [],
+          exceptions: [] },
+        get_next_sibling: { params: [],
+          exceptions: [] },
+        get_children: { params: [],
+          exceptions: [] },
+        expand: { params: ["complete_subtree", "level"],
+          exceptions: [] },
+        collapse: { params: [],
+          exceptions: [] },
+        delete: { params: [],
+          exceptions: [] },
+        set_folder: { params: ["folder"],
+          exceptions: [] },
+        set_expander: { params: ["value"],
+          exceptions: [] },
+        set_collapsed_icon: { params: ["value"],
+          exceptions: [] },
+        set_expanded_icon: { params: ["value"],
+          exceptions: [] },
+        set_row_style: { params: ["value"],
+          exceptions: [] },
+        get_item: { params: ["columnname"],
+          exceptions: [] },
+        get_hierarchy_item: { params: [],
+          exceptions: [] },
+        set_type: { params: ["value"],
+          exceptions: [] },
+        set_checked: { params: ["value"],
+          exceptions: [] },
+        is_checked: { params: [],
+          exceptions: [] },
+        set_editable: { params: ["value"],
+          exceptions: [] },
+        set_enabled: { params: ["value"],
+          exceptions: [] },
+        set_icon: { params: ["value"],
+          exceptions: [] },
+        set_value: { params: ["value"],
+          exceptions: [] },
+      },
+    },
     z2ui5_cl_cgui_salv_settings: {
       constants: [],
-      attributes: ["mv_title", "mv_striped", "mv_selection_mode", "mt_function"],
+      attributes: ["mv_title", "mv_striped", "mv_selection_mode", "mt_function", "mv_header", "mv_hierarchy_header"],
       events: [],
       methods: {
         set_grid: { params: ["grid"],
@@ -594,6 +708,16 @@ export const GUI = {
         set_save_restriction: { params: ["value"],
           exceptions: [] },
         set_initial_layout: { params: ["value"],
+          exceptions: [] },
+        set_header: { params: ["value"],
+          exceptions: [] },
+        set_hierarchy_header: { params: ["value"],
+          exceptions: [] },
+        set_hierarchy_tooltip: { params: ["value"],
+          exceptions: [] },
+        set_hierarchy_size: { params: ["value"],
+          exceptions: [] },
+        set_hierarchy_icon: { params: ["value"],
           exceptions: [] },
       },
     },
@@ -738,18 +862,24 @@ export const SALV = {
     cl_salv_sorts: "z2ui5_cl_cgui_salv_settings", cl_salv_aggregations: "z2ui5_cl_cgui_salv_settings",
     cl_salv_layout: "z2ui5_cl_cgui_salv_settings", cl_salv_filters: "z2ui5_cl_cgui_salv_settings",
     cl_salv_print: "z2ui5_cl_cgui_salv_settings", cl_salv_functional_settings: "z2ui5_cl_cgui_salv_settings",
+    cl_salv_tree: "z2ui5_cl_cgui_salv_tree", cl_salv_events_tree: "z2ui5_cl_cgui_salv_tree",
+    cl_salv_nodes: "z2ui5_cl_cgui_salv_nodes", cl_salv_node: "z2ui5_cl_cgui_salv_node", cl_salv_item: "z2ui5_cl_cgui_salv_node",
+    cl_salv_tree_settings: "z2ui5_cl_cgui_salv_settings", cl_salv_columns_tree: "z2ui5_cl_cgui_salv_columns",
+    cl_salv_column_tree: "z2ui5_cl_cgui_salv_column", cl_salv_functions_tree: "z2ui5_cl_cgui_salv_settings",
   },
   // if_salv_c_* - the structures of z2ui5_if_cgui_salv_c
   constants: {
     if_salv_c_selection_mode: "selection_mode", if_salv_c_function_position: "function_position",
     if_salv_c_cell_type: "cell_type", if_salv_c_alignment: "alignment", if_salv_c_sort: "sort",
-    if_salv_c_aggregation: "aggregation",
+    if_salv_c_aggregation: "aggregation", if_salv_c_node_relation: "node_relation", if_salv_c_item_type: "item_type",
   },
   types: {
     salv_t_row: "z2ui5_cl_cgui_salv_settings=>ty_t_row", salv_s_cell: "z2ui5_cl_cgui_salv_settings=>ty_s_cell",
     salv_t_column_ref: "z2ui5_cl_cgui_salv_columns=>ty_t_column_ref", salv_s_column_ref: "z2ui5_cl_cgui_salv_columns=>ty_s_column_ref",
     salv_de_function: "z2ui5_cl_cgui_salv_table=>ty_function", salv_de_column: "z2ui5_cl_cgui_salv_table=>ty_column",
     salv_de_row: "i",
+    salv_de_node_key: "z2ui5_cl_cgui_salv_node=>ty_node_key", lvc_nkey: "z2ui5_cl_cgui_salv_node=>ty_node_key",
+    salv_t_nodes: "z2ui5_cl_cgui_salv_node=>ty_t_node_ref", salv_s_nodes: "z2ui5_cl_cgui_salv_node=>ty_s_node_ref",
   },
 };
 Object.setPrototypeOf(SALV.classes, null);
@@ -779,6 +909,9 @@ function salvTokens(toks) {
       cx = true;
     } else if (SALV.constants[t] && toks[i + 1]?.getStr() === "=>" && toks[i + 2]) {
       out.push([i, "z2ui5_if_cgui_salv_c"], [i + 2, `${SALV.constants[t]}-${lc(toks[i + 2].getStr())}`]);
+    } else if (/^(cl_gui_column_tree|cl_gui_list_tree|cl_tree_control_base)$/.test(t) && toks[i + 1]?.getStr() === "=>" && /^relat_/i.test(toks[i + 2]?.getStr() ?? "")) {
+      // the relationship of a node of a tree - that of if_salv_c_node_relation
+      out.push([i, "z2ui5_if_cgui_salv_c"], [i + 2, `node_relation-${lc(toks[i + 2].getStr()).slice("relat_".length)}`]);
     } else if (t === "if_salv_c_bool_sap" && toks[i + 1]?.getStr() === "=>" && toks[i + 2]) {
       out.push([i, lc(toks[i + 2].getStr()) === "true" ? "abap_true" : "abap_false"], [i + 1, ""], [i + 2, ""]);
     } else if (SALV.types[t] && ["type", "of", "like"].includes(prev)) {
@@ -786,6 +919,12 @@ function salvTokens(toks) {
     }
   }
   return out;
+}
+
+/** the text without the relat_* constants of the tree controls - in the
+ *  stand-in mode they are those of z2ui5_if_cgui_salv_c, no control */
+function salvRelations(text) {
+  return salvMode ? text.replace(/\bcl_(gui_column_tree|gui_list_tree|tree_control_base)\s*=>\s*relat_\w+/g, "") : text;
 }
 
 /** whether a stand-in or one of its parents raises the event */
@@ -1441,7 +1580,7 @@ class Converter {
     // a local class keeps its source - its containers, text editors and HTML
     // viewers become the stand-ins (localsSource), every other control stays one
     for (const u of this.locals) {
-      const text = u.stmts.map((x) => lc(renderTokens(stmtTokens(x)))).join(" ");
+      const text = salvRelations(u.stmts.map((x) => lc(renderTokens(stmtTokens(x)))).join(" "));
       const hit = text.match(GUI_CONTROL);
       if (!hit) continue;
       const missing = [...new Set([...text.matchAll(/\bcl_gui_\w+/g)].map((m) => m[0]))].filter((c) => !guiClass(c) && !["cl_gui_cfw", "cl_gui_frontend_services"].includes(c));
@@ -1760,6 +1899,9 @@ class Converter {
       if (kind(x) === "Move") {
         const m = /^data\s*\(\s*([\w/]+)\s*\)\s*=\s*new\s+(cl_gui_\w+|cl_salv_\w+)\s*\(/.exec(t);
         if (m && guiClass(m[2])) this.guiVars.set(m[1], guiClass(m[2]));
+        // DATA(lo_events) = go_salv->get_event( ): the events of a SALV are the SALV itself
+        const ev = /^data\s*\(\s*([\w/]+)\s*\)\s*=\s*(?:me\s*->\s*)?([\w/]+)\s*->\s*get_event\s*\(\s*\)/.exec(t);
+        if (ev && this.guiVars.has(ev[2])) this.guiVars.set(ev[1], this.guiVars.get(ev[2]));
         continue;
       }
       if (!["Data", "Static", "ClassData"].includes(kind(x)) || this.insideBegin(x)) continue;
@@ -1859,7 +2001,7 @@ class Converter {
   /** the SAP GUI control classes of a statement that have no stand-in -
    *  the refusal, undefined when every one has */
   guiRefusal(text) {
-    const t = lc(text);
+    const t = salvRelations(lc(text));
     // the SALV of the stand-in mode: a class of it the stand-ins do not have
     if (salvMode) {
       const salv = [...new Set([...t.matchAll(/\bcl_salv_\w+/g)].map((m) => m[0]))].filter((c) => !SALV.classes[c]);

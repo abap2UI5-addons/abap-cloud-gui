@@ -54,6 +54,12 @@ CLASS ltcl_gui IMPLEMENTATION.
   METHOD z2ui5_if_cgui_gui~list ##NEEDED.
   ENDMETHOD.
 
+  METHOD z2ui5_if_cgui_gui~tree ##NEEDED.
+  ENDMETHOD.
+
+  METHOD z2ui5_if_cgui_gui~tree_handler ##NEEDED.
+  ENDMETHOD.
+
   METHOD z2ui5_if_cgui_gui~cursor.
 
     result = VALUE #( field = `GS_PEAK-NAME`

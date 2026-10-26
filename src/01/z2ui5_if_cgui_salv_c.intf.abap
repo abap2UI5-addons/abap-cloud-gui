@@ -2,7 +2,8 @@
 "! z2ui5_if_cgui_salv_c=>selection_mode-row_column for
 "! if_salv_c_selection_mode=>row_column, and the same for
 "! if_salv_c_function_position, if_salv_c_cell_type, if_salv_c_alignment,
-"! if_salv_c_sort and if_salv_c_aggregation
+"! if_salv_c_sort, if_salv_c_aggregation, if_salv_c_node_relation and
+"! if_salv_c_item_type
 INTERFACE z2ui5_if_cgui_salv_c PUBLIC.
 
   CONSTANTS:
@@ -53,5 +54,25 @@ INTERFACE z2ui5_if_cgui_salv_c PUBLIC.
       maximum TYPE i VALUE 3,
       average TYPE i VALUE 4,
     END OF aggregation.
+
+  " if_salv_c_node_relation - and the relat_* of cl_gui_column_tree
+  CONSTANTS:
+    BEGIN OF node_relation,
+      first_sibling TYPE i VALUE 1,
+      last_sibling  TYPE i VALUE 2,
+      prev_sibling  TYPE i VALUE 3,
+      next_sibling  TYPE i VALUE 4,
+      first_child   TYPE i VALUE 5,
+      last_child    TYPE i VALUE 6,
+    END OF node_relation.
+
+  " if_salv_c_item_type
+  CONSTANTS:
+    BEGIN OF item_type,
+      text     TYPE i VALUE 0,
+      checkbox TYPE i VALUE 3,
+      button   TYPE i VALUE 4,
+      link     TYPE i VALUE 5,
+    END OF item_type.
 
 ENDINTERFACE.

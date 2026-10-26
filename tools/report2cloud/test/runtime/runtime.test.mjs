@@ -769,3 +769,19 @@ test("zr2c_46_treelist: RS_TREE_CONSTRUCT and RS_TREE_LIST_DISPLAY - the nodes a
     "2 0017 New York - San Francisco",
   ]);
 });
+
+test("zr2c_47_salvtree: CL_SALV_TREE as the stand-in - the nodes below their related node, a sibling beside it, the header, a click to the handler", { skip }, async () => {
+  let s = await d.start("z2ui5_cl_cgui_r2c_47");
+  if (!s.tables.length) s = await d.act(s.session, { event: "CGUI_EXECUTE" });
+  const [t] = s.tables;
+  assert.ok(t, "the tree");
+  assert.equal(t.label, "Seats per flight");
+  const view = d.state().models.MAIN.data.MT_CGUI_TREE_VIEW;
+  // American Airlines the next sibling of Lufthansa - a root as well
+  assert.deepEqual(view.map((n) => `${n.LEVEL} ${n.TEXT}`), ["0 Lufthansa", "1 0400", "1 0402", "0 American Airlines", "1 0017"]);
+  // the columns of the table: CARRID hidden, SEATS with its text
+  assert.deepEqual(t.columns.map((c) => c.label), ["Airline", "CONNID", "Free seats"]);
+  // a click on 0402 - double_click with its key, the handler reads its text
+  s = await d.act(s.session, { event: "CGUI_TREE_NODE", args: [String(view[2].KEY)] });
+  assert.deepEqual(toasts(s), ["0402 picked"]);
+});
