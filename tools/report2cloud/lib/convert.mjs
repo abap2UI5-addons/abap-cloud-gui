@@ -27,6 +27,7 @@
 // is not released on ABAP Cloud, a selection text the source does not carry,
 // a formatting option of WRITE the list does not know - is a TODO of the
 // migration report, with its position in the generated class.
+import { SUCCESSOR_TABLES } from "./successors.mjs";
 import {
   abaplint, after, child, children, findAll, hasSeq, isToken, key, kind, lc, literal, nodeText,
   partTokens, renderTokens, stmtTokens, uc, unquote, words,
@@ -1018,6 +1019,9 @@ class Converter {
     // wrappers: a CALL FUNCTION of a function module with no counterpart
     // calls a method of a wrapper class, written beside the class
     this.wrappers = opts.wrappers === true;
+    // successors: a SELECT of a table with a released successor whose
+    // columns map one to one reads the successor (lib/successors.mjs)
+    this.successors = opts.successors === true;
     this.wrapped = new Map();
     this.refusals = [];
     this.mapped = [];
@@ -5882,6 +5886,7 @@ class Converter {
       for (const t of toks.slice(1)) ov.set(key(t), null);
       this.mapOnce(s, cmp, "`z2ui5_cl_cgui_context=>range_check( val range )` - IN outside ABAP SQL");
     }
+    this.successorSql(s, ov);
     this.strictSql(s, ov);
     this.gridRewrites(toks, ov, ctx);
     return ov;
@@ -5960,6 +5965,42 @@ class Converter {
     this.mapOnce(s, cond, "`LOOP AT ...` and the WHERE as `IF ... CONTINUE. ENDIF.` at the top of the loop - `range_check( )` for the IN");
     this.todo(s, "LOOP AT ... WHERE with IN on a range became a CONTINUE at the top of the loop - sy-subrc after ENDLOOP is 0 when the table has lines, also when none matched");
     return [`${head}.`, `  IF ${skipIf}.`, "    CONTINUE.", "  ENDIF."];
+  }
+
+  /** SELECT from a table of SUCCESSOR_TABLES as the SELECT of its
+   *  successor: the table, the columns of the field list under their old
+   *  names, those of WHERE, ORDER BY, GROUP BY and HAVING - only when every
+   *  column has its counterpart, one table, no join and no SELECT * */
+  successorSql(s, ov) {
+    if (!this.successors || !["Select", "SelectLoop"].includes(kind(s))) return;
+    const tabs = findAll(s, "DatabaseTable");
+    if (tabs.length !== 1 || findAll(s, "SQLJoin").length) return;
+    const old = lc(nodeText(tabs[0]));
+    const succ = SUCCESSOR_TABLES[old];
+    if (!succ) return;
+    const list = findAll(s, "SQLFieldList")[0];
+    if (!list || list.getTokens().some((t) => t.getStr() === "*")) {
+      this.todo(s, `SELECT * FROM ${old}: its successor ${succ.name} has other columns - name the columns, the converter reads them from the successor then (--successors)`);
+      return;
+    }
+    const names = findAll(s, "SQLFieldName");
+    const aliased = findAll(s, "SQLAliasField");
+    const column = (n) => lc(n).replace(/^.*~/, "");
+    const missing = [...new Set([...names.map((n) => lc(nodeText(n))), ...aliased.map((n) => column(nodeText(n)))])].filter((c) => !succ.columns[c]);
+    if (missing.length) {
+      this.todo(s, `SELECT FROM ${old}: ${missing.join(", ")} ${missing.length > 1 ? "have" : "has"} no certain counterpart in ${succ.name} - the table stays`);
+      return;
+    }
+    ov.set(key(tabs[0].getFirstToken()), succ.name);
+    for (const f of children(list, "SQLField")) {
+      const n = child(f, "SQLFieldName");
+      // a column of the field list under its old name - INTO stays as it is
+      if (n && f.getChildren().length === 1) ov.set(key(n.getFirstToken()), `${succ.columns[lc(nodeText(n))]} AS ${lc(nodeText(n))}`);
+    }
+    for (const n of names) if (!ov.has(key(n.getFirstToken()))) ov.set(key(n.getFirstToken()), succ.columns[lc(nodeText(n))]);
+    for (const a of aliased) ov.set(key(a.getFirstToken()), `${succ.name}~${succ.columns[column(nodeText(a))]}`);
+    this.note(`--successors: a SELECT of ${old} reads ${succ.name}, the columns under their old names - the types of the targets stay those of ${old}; type them with the successor`);
+    this.map(s, `\`SELECT ... FROM ${succ.name}\` - the released successor of ${old}, the columns under their old names`);
   }
 
   /** ABAP SQL in strict mode, as ABAP Cloud demands it: host variables

@@ -630,8 +630,8 @@ Navigation and transactions
 
 Stage 3 - clean core at the scale of a code base
 
-- [ ] A `SELECT` from a table with a known released successor rewritten,
-      field names included, where the mapping is certain
+- [x] A `SELECT` from a table with a known released successor rewritten,
+      field names included, where the mapping is certain (`--successors`)
 - [x] A wrapper stub for an unreleased function module, for a person to type
       and release (`--wrappers`: `<class>_fmw`, the call through its method)
 - [ ] ATC findings in the migration report

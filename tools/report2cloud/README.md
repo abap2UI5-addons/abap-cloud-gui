@@ -57,7 +57,20 @@ node tools/report2cloud/cli.mjs <report.prog.abap> [options]
   --partial        write the class even when statements are refused
   --wrappers       a CALL FUNCTION the converter has no counterpart for calls a method of a
                    wrapper class, written beside the class: <class>_fmw, to type and release
+  --successors     a SELECT of a table with a released successor whose columns map one to one
+                   reads the successor, the columns under their old names
 ```
+
+With `--successors`, a `SELECT` of a table whose released successor has the
+same columns under other names (`lib/successors.mjs`: SCARR, SPFLI, SFLIGHT,
+SBOOK and SCUSTOM onto the ABAP Flight Reference Scenario, T001, T005T and
+MAKT onto I_CompanyCode, I_CountryText and I_ProductDescription) reads the
+successor: the table, the columns of the field list under their old names
+(`carrier_id AS carrid`), those of `WHERE`, `ORDER BY` and `GROUP BY`. The
+target of `INTO` stays as it is. Only when every column the statement names
+has its counterpart, from one table without a join; `SELECT *` and a column
+without one keep the table, with a TODO. The types of the targets stay
+those of the old table - type them with the successor.
 
 With `--wrappers`, a function module the converter does not map - a Z one,
 or one of SAP that is not released - is called through a wrapper class, as

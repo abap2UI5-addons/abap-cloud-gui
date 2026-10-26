@@ -1162,3 +1162,20 @@ test("wrappers: a function module without a counterpart behind a method of a wra
   // the function module is still one to check - in the wrapper
   assert.deepEqual(r.release.filter((x) => x.kind === "function module").map((x) => `${x.name} ${x.file}`), ["Z_LEGACY_READ zcl_t_fmw.clas.abap"]);
 });
+
+test("successors: a SELECT of a table with a released successor reads it - the columns under their old names, only when every column maps", () => {
+  const src = "REPORT zt.\nPARAMETERS p_carr TYPE c LENGTH 3.\nDATA gt TYPE STANDARD TABLE OF sflight.\nDATA gs TYPE scarr.\nSTART-OF-SELECTION.\n" +
+    "  SELECT carrid connid fldate FROM sflight INTO CORRESPONDING FIELDS OF TABLE gt WHERE carrid = p_carr ORDER BY fldate.\n" +
+    "  SELECT SINGLE url FROM scarr INTO gs-url WHERE carrid = p_carr.\n" +
+    "  SELECT SINGLE * FROM scarr INTO gs WHERE carrid = p_carr.\n  WRITE gs-carrid.\n";
+  const off = convert(src, { file: "zt.prog.abap", className: "zcl_t" });
+  assert.doesNotMatch(off.files["zcl_t.clas.abap"], /\/dmo\//);
+  const r = convert(src, { file: "zt.prog.abap", className: "zcl_t", successors: true });
+  const cls = r.files["zcl_t.clas.abap"];
+  assert.match(cls, /SELECT carrier_id AS carrid, connection_id AS connid, flight_date AS fldate FROM \/dmo\/flight INTO CORRESPONDING FIELDS OF TABLE @gt WHERE carrier_id = @p_carr ORDER BY flight_date\./);
+  // a column without a certain counterpart, and SELECT *: the table stays
+  assert.match(cls, /SELECT SINGLE url FROM scarr/);
+  assert.match(cls, /SELECT SINGLE \* FROM scarr/);
+  assert.ok(r.todos.some((t) => /url has no certain counterpart in \/dmo\/carrier/.test(t.message)));
+  assert.ok(r.todos.some((t) => /SELECT \* FROM scarr/.test(t.message)));
+});

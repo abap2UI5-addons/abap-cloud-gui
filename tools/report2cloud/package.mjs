@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // report2cloud package - a whole package of classic reports in one run.
 //
-//   node tools/report2cloud/package.mjs <dir> [<dir> ...] --out <dir> [--includes dir] [--wrappers]
+//   node tools/report2cloud/package.mjs <dir> [<dir> ...] --out <dir> [--includes dir] [--wrappers] [--successors]
 //
 // Converts every report under the folders (as coverage.mjs: a .prog.abap
 // with a REPORT or PROGRAM statement, the includes inlined), writes the
@@ -18,7 +18,7 @@ import { includesFrom, inlineIncludes } from "./lib/includes.mjs";
 import { callsOf, estateGraph, estateMarkdown } from "./lib/estate.mjs";
 import { coverage, isReport, programs, summary } from "./coverage.mjs";
 
-const USAGE = "usage: node tools/report2cloud/package.mjs <dir> [<dir> ...] --out <dir> [--includes dir] [--wrappers]";
+const USAGE = "usage: node tools/report2cloud/package.mjs <dir> [<dir> ...] --out <dir> [--includes dir] [--wrappers] [--successors]";
 
 function args(argv) {
   const opts = { _: [] };
@@ -26,6 +26,7 @@ function args(argv) {
     const a = argv[i];
     if (a === "--help" || a === "-h") opts.help = true;
     else if (a === "--wrappers") opts.wrappers = true;
+    else if (a === "--successors") opts.successors = true;
     else if (a === "--out" || a === "--includes") {
       if (argv[i + 1] === undefined) throw new Error(`${a} needs a value`);
       opts[a.slice(2)] = argv[++i];
@@ -39,9 +40,9 @@ const nameOf = (file) => (/^(.+)\.prog\.abap$/i.exec(basename(file))?.[1] ?? bas
 
 /** the run over the files: { rows, graph, markdown } - and the classes in
  *  out, when it is given */
-export function packageRun(files, { read, out, wrappers = false } = {}) {
+export function packageRun(files, { read, out, wrappers = false, successors = false } = {}) {
   const reportFiles = files.filter((f) => isReport(readFileSync(f, "utf8")));
-  const rows = coverage(reportFiles, { read, keep: true, wrappers });
+  const rows = coverage(reportFiles, { read, keep: true, wrappers, successors });
   const reports = rows.map((row) => {
     const source = inlineIncludes(readFileSync(row.file, "utf8"), { file: row.file, read: read ?? includesFrom([dirname(row.file)]) }).source;
     const name = nameOf(row.file);
@@ -72,7 +73,7 @@ async function main() {
   const dirs = opts._.map((d) => resolve(d));
   const files = dirs.flatMap((d) => programs(d));
   const read = includesFrom([...files.map(dirname), ...(opts.includes ? [resolve(opts.includes)] : [])]);
-  const { graph } = packageRun(files, { read, out: resolve(opts.out), wrappers: opts.wrappers === true });
+  const { graph } = packageRun(files, { read, out: resolve(opts.out), wrappers: opts.wrappers === true, successors: opts.successors === true });
   const ok = graph.nodes.filter((n) => n.ok).length;
   console.log(`report2cloud package: ${graph.nodes.length} report(s), ${ok} converted - the classes and estate.md in ${resolve(opts.out)}`);
   return 0;

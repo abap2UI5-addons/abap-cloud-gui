@@ -60,7 +60,7 @@ const todoOf = (message) => message.replace(/'[^']*'/g, "'…'").replace(/`[^`]*
  *  className(file) names the class (default: zcl_ + the report name), and
  *  with keep the generated files of every converted report are in its row,
  *  and the files of the dependencies it reads (deps: { name: text }) */
-export function coverage(files, { read, className, keep = false, deps, wrappers = false } = {}) {
+export function coverage(files, { read, className, keep = false, deps, wrappers = false, successors = false } = {}) {
   const rows = [];
   for (const file of files) {
     const raw = readFileSync(file, "utf8");
@@ -84,6 +84,7 @@ export function coverage(files, { read, className, keep = false, deps, wrappers 
         className: className?.(file),
         deps: needs,
         wrappers,
+        successors,
         classFor: (program) => (reader(program) !== undefined ? defaultClassName(program) : undefined),
       });
     } catch (e) {

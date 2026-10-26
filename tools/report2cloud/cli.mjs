@@ -2,7 +2,7 @@
 // report2cloud - a classic ABAP report as an abap-cloud-gui report class.
 //
 //   node tools/report2cloud/cli.mjs zreport.prog.abap [--class zcl_name] [--out dir]
-//        [--texts zreport.prog.xml] [--includes dir] [--check] [--ddic dir] [--partial] [--wrappers]
+//        [--texts zreport.prog.xml] [--includes dir] [--check] [--ddic dir] [--partial] [--wrappers] [--successors]
 //
 // Writes <class>.clas.abap, <class>.clas.xml (abapGit format), the local
 // types and classes of the report as .clas.locals_def/_imp.abap, and the
@@ -38,6 +38,9 @@ const USAGE = `usage: node tools/report2cloud/cli.mjs <report.prog.abap> [option
   --partial        write the class even when statements are refused
   --wrappers       a CALL FUNCTION the converter has no counterpart for calls a method of a
                    wrapper class, written beside the class: <class>_fmw, to type and release
+  --successors     a SELECT of a table with a released successor whose columns map one to one
+                   (the flight model, T001, T005T, MAKT) reads the successor, the columns under
+                   their old names
   --help           this text`;
 
 function args(argv) {
@@ -48,6 +51,7 @@ function args(argv) {
     else if (a === "--check") opts.check = true;
     else if (a === "--partial") opts.partial = true;
     else if (a === "--wrappers") opts.wrappers = true;
+    else if (a === "--successors") opts.successors = true;
     else if (["--class", "--out", "--texts", "--includes", "--report", "--ddic", "--deps"].includes(a)) {
       if (argv[i + 1] === undefined) throw new Error(`${a} needs a value`);
       opts[a.slice(2)] = argv[++i];
@@ -110,6 +114,7 @@ async function main() {
     textpool,
     origin: includes.origin,
     wrappers: opts.wrappers === true,
+    successors: opts.successors === true,
     // a report beside the input (or under --includes) is one to convert as
     // well - a SUBMIT of it starts the class report2cloud names it
     classFor: (program) => (read(program) !== undefined ? defaultClassName(program) : undefined),
