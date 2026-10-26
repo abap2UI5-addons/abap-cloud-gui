@@ -276,6 +276,83 @@ test("CALL TRANSACTION [AND SKIP FIRST SCREEN] -> call_transaction( ), the class
   assert.equal(u.ok, false);
 });
 
+test("READ LINE / MODIFY LINE ... FIELD VALUE -> read_list( )->read_field( ) / modify_field( ) by the name of the WRITE, the checkbox ready for input", () => {
+  const r = convert([
+    "REPORT zt.",
+    "DATA gv_check TYPE c LENGTH 1.",
+    "DATA gv_carrid TYPE c LENGTH 3.",
+    "DATA gv_line TYPE string.",
+    "START-OF-SELECTION.",
+    "  gv_carrid = 'LH'.",
+    "  WRITE: / gv_check AS CHECKBOX, gv_carrid.",
+    "AT USER-COMMAND.",
+    "  DO.",
+    "    READ LINE sy-index FIELD VALUE gv_check gv_carrid INTO gv_line.",
+    "    IF sy-subrc <> 0.",
+    "      EXIT.",
+    "    ENDIF.",
+    "    IF gv_check = 'X'.",
+    "      MODIFY LINE sy-index FIELD VALUE gv_check FROM space LINE FORMAT COLOR 5.",
+    "    ENDIF.",
+    "  ENDDO.",
+    "AT LINE-SELECTION.",
+    "  READ CURRENT LINE LINE VALUE INTO gv_line.",
+  ].join("\n"), { file: "zt.prog.abap", className: "zcl_t" });
+  assert.equal(r.ok, true, r.refusals.map((x) => x.message).join("\n"));
+  const cls = r.draft["zcl_t.clas.abap"];
+  assert.match(cls, /write_as_checkbox\( val   = gv_check\n\s+input = abap_true\n\s+name  = `GV_CHECK`/);
+  assert.match(cls, /write\( val  = gv_carrid\n\s+name = `GV_CARRID`/);
+  assert.match(cls, /read_list\( \)->read_field\( EXPORTING  line    = sy-index\n\s+name    = `GV_CHECK`\n\s+CHANGING   value   = gv_check\n\s+EXCEPTIONS no_line = 4 \)\./);
+  assert.match(cls, /name    = `GV_CARRID`\n\s+CHANGING   value   = gv_line\n/);
+  assert.match(cls, /read_list\( \)->modify_field\( EXPORTING  line    = sy-index\n\s+name    = `GV_CHECK`\n\s+value   = space\n\s+EXCEPTIONS no_line = 4 \)\./);
+  // CURRENT LINE of the line selection is row
+  assert.match(cls, /gv_line = read_list\( \)->line_text\( row \)\.\n\s+read_list\( \)->read_field\( EXPORTING  line    = row\n\s+EXCEPTIONS no_line = 4 \)\./);
+  // INDEX of another list level stays refused
+  const u = convert("REPORT zt.\nDATA gv TYPE c LENGTH 1.\nSTART-OF-SELECTION.\n  READ LINE 2 INDEX 1 FIELD VALUE gv.", { file: "zt.prog.abap", className: "zcl_t" });
+  assert.equal(u.ok, false);
+});
+
+test("cl_gui_simple_tree -> z2ui5_cl_cgui_gui_simple_tree, MTREESNODE its node type, the handler of node_double_click set", () => {
+  const r = convert([
+    "REPORT zt.",
+    "CLASS lcl_handler DEFINITION.",
+    "  PUBLIC SECTION.",
+    "    METHODS on_node FOR EVENT node_double_click OF cl_gui_simple_tree IMPORTING node_key.",
+    "ENDCLASS.",
+    "CLASS lcl_handler IMPLEMENTATION.",
+    "  METHOD on_node.",
+    "    MESSAGE node_key TYPE 'S'.",
+    "  ENDMETHOD.",
+    "ENDCLASS.",
+    "DATA go_cont TYPE REF TO cl_gui_docking_container.",
+    "DATA go_tree TYPE REF TO cl_gui_simple_tree.",
+    "DATA go_handler TYPE REF TO lcl_handler.",
+    "DATA gt_node TYPE STANDARD TABLE OF mtreesnode WITH DEFAULT KEY.",
+    "DATA gs_node TYPE mtreesnode.",
+    "DATA gt_events TYPE cntl_simple_events.",
+    "DATA gs_event TYPE cntl_simple_event.",
+    "START-OF-SELECTION.",
+    "  CREATE OBJECT go_cont EXPORTING repid = sy-repid dynnr = '1000' extension = 300.",
+    "  CREATE OBJECT go_tree EXPORTING parent = go_cont node_selection_mode = cl_gui_simple_tree=>node_sel_mode_single.",
+    "  gs_event-eventid = cl_gui_simple_tree=>eventid_node_double_click.",
+    "  APPEND gs_event TO gt_events.",
+    "  go_tree->set_registered_events( EXPORTING events = gt_events ).",
+    "  CREATE OBJECT go_handler.",
+    "  SET HANDLER go_handler->on_node FOR go_tree.",
+    "  gs_node-node_key = 'ROOT'. gs_node-isfolder = 'X'. gs_node-text = 'Carriers'.",
+    "  APPEND gs_node TO gt_node.",
+    "  go_tree->add_nodes( EXPORTING table_structure_name = 'MTREESNODE' node_table = gt_node ).",
+    "  go_tree->expand_node( node_key = 'ROOT' ).",
+  ].join("\n"), { file: "zt.prog.abap", className: "zcl_t" });
+  assert.equal(r.ok, true, r.refusals.map((x) => x.message).join("\n"));
+  const all = Object.values(r.draft).join("\n");
+  assert.ok(!/cl_gui_simple_tree|TYPE (STANDARD TABLE OF )?mtreesnode/i.test(all), all);
+  assert.match(all, /TYPE REF TO z2ui5_cl_cgui_gui_simple_tree/);
+  assert.match(all, /TYPE STANDARD TABLE OF z2ui5_cl_cgui_gui_simple_tree=>ty_s_node/);
+  assert.match(all, /z2ui5_cl_cgui_gui_simple_tree=>eventid_node_double_click/);
+  assert.match(all, /set_handler\(/);
+});
+
 test("SUBMIT ... AND RETURN starts the class of the called report with the values, CALL SELECTION-SCREEN goes on in after_call_selection_screen( )", () => {
   const cls = classOf("zr2c_15_submit");
   assert.match(cls, /DATA lt_r2c_submit_1 TYPE z2ui5_cl_cgui_variant=>ty_t_value\.\n\s+DATA lt_r2c_lines_1 TYPE z2ui5_cl_cgui_variant=>ty_t_value\.\n\s+CLEAR lt_r2c_submit_1\.\n\s+INSERT VALUE #\( name = `P_CARRID` kind = z2ui5_cl_cgui_variant=>cs_kind-parameter low = p_carrid \) INTO TABLE lt_r2c_submit_1\.\n\s+lt_r2c_lines_1 = z2ui5_cl_cgui_variant=>range_lines_get\( name = `S_FLDATE` range = s_fldate \)\.\n\s+APPEND LINES OF lt_r2c_lines_1 TO lt_r2c_submit_1\.\n\s+INSERT VALUE #\( name = `P_MAX` kind = z2ui5_cl_cgui_variant=>cs_kind-select_option sign = 'E' option = `NE` low = p_max \) INTO TABLE lt_r2c_submit_1\.\n\s+submit\( report = `Z2UI5_CL_CGUI_R2C_02`\n\s+values = lt_r2c_submit_1 \)\./);
@@ -956,7 +1033,7 @@ test("SAP GUI controls: a member, a parameter or an event the stand-ins do not h
   assert.deepEqual(refused("  go_e = NEW #( parent = go_c colour = 1 ).\n"), ["SAP GUI controls: colour is no parameter of the method called in the stand-in - port this statement by hand"]);
   assert.deepEqual(refused("  go_e->set_comments_string( ).\n"), ["SAP GUI controls: go_e->set_comments_string has no counterpart in z2ui5_cl_cgui_gui_textedit - port this statement by hand"]);
   assert.deepEqual(refused("  go_e->set_textstream( text = 'x' colour = 1 ).\n"), ["SAP GUI controls: colour is no parameter of the method called in the stand-in - port this statement by hand"]);
-  assert.deepEqual(refusalOf(`${head}DATA go_p TYPE REF TO cl_gui_simple_tree.\n`).map((x) => x.replace(/^\d+:\d+ /, "")), ["SAP GUI controls: cl_gui_simple_tree has no counterpart - the containers, cl_gui_textedit, cl_gui_html_viewer, cl_gui_toolbar, cl_gui_picture and cl_gui_alv_grid have (z2ui5_cl_cgui_gui*)"]);
+  assert.deepEqual(refusalOf(`${head}DATA go_p TYPE REF TO cl_gui_column_tree.\n`).map((x) => x.replace(/^\d+:\d+ /, "")), ["SAP GUI controls: cl_gui_column_tree has no counterpart - the containers, cl_gui_textedit, cl_gui_html_viewer, cl_gui_toolbar, cl_gui_picture, cl_gui_simple_tree and cl_gui_alv_grid have (z2ui5_cl_cgui_gui*)"]);
 });
 
 test("SAP GUI controls: SET HANDLER of a local class's method is set_handler( ) of the stand-in; what it cannot call is refused", () => {

@@ -131,6 +131,10 @@ CLASS ltcl_handler DEFINITION FINAL FOR TESTING.
       IMPORTING e_row_id e_column_id es_row_no.
     METHODS on_user_command FOR EVENT user_command OF z2ui5_cl_cgui_gui_alv_grid
       IMPORTING e_ucomm.
+    METHODS on_node FOR EVENT node_double_click OF z2ui5_cl_cgui_gui_simple_tree
+      IMPORTING node_key.
+    METHODS on_expand FOR EVENT expand_no_children OF z2ui5_cl_cgui_gui_simple_tree
+      IMPORTING node_key sender.
 
 ENDCLASS.
 
@@ -141,6 +145,23 @@ CLASS ltcl_handler IMPLEMENTATION.
 
     mv_log = |{ mv_log }CLOSE { sender->get_id( ) };|.
     sender->free( ).
+
+  ENDMETHOD.
+
+  METHOD on_node.
+
+    mv_log = |{ mv_log }NODE { node_key };|.
+
+  ENDMETHOD.
+
+  METHOD on_expand.
+
+    DATA lt_node TYPE z2ui5_cl_cgui_gui_simple_tree=>ty_t_node.
+
+    mv_log = |{ mv_log }EXPAND { node_key };|.
+    lt_node = VALUE #( ( node_key = 'LH0400' relatkey = node_key relatship = z2ui5_cl_cgui_gui_simple_tree=>relat_last_child
+                         text = 'LH 0400' ) ).
+    sender->add_nodes( lt_node ).
 
   ENDMETHOD.
 
@@ -209,6 +230,7 @@ CLASS ltcl_test DEFINITION FINAL
     METHODS toolbar_buttons FOR TESTING.
     METHODS grid FOR TESTING.
     METHODS sapevent_links FOR TESTING.
+    METHODS simple_tree FOR TESTING.
     METHODS cursor_field FOR TESTING.
 
 ENDCLASS.
@@ -329,6 +351,60 @@ CLASS ltcl_test IMPLEMENTATION.
     DATA(ls_right) = mo_gui->mt_control[ lo_easy->bottom_right_container->get_id( ) ].
     cl_abap_unit_assert=>assert_equals( act = ls_right-column
                                         exp = 2 ).
+
+  ENDMETHOD.
+
+  METHOD simple_tree.
+
+    DATA lt_node TYPE z2ui5_cl_cgui_gui_simple_tree=>ty_t_node.
+    DATA lv_selected TYPE c LENGTH 12.
+
+    DATA(lo_handler) = NEW ltcl_handler( ).
+    DATA(lo_tree) = NEW z2ui5_cl_cgui_gui_simple_tree( parent = mo_cont ).
+    cl_abap_unit_assert=>assert_equals( act = mo_gui->mt_control[ lo_tree->get_id( ) ]-kind
+                                        exp = z2ui5_if_cgui_gui=>cs_kind-simple_tree ).
+    " MTREESNODE: a root folder, a carrier below it, its flights on expand
+    lt_node = VALUE #( ( node_key = 'ROOT' isfolder = abap_true text = 'Carriers' )
+                       ( node_key = 'LH' relatkey = 'ROOT' relatship = z2ui5_cl_cgui_gui_simple_tree=>relat_last_child
+                         expander = abap_true text = 'Lufthansa' ) ).
+    lo_tree->add_nodes( table_structure_name = 'MTREESNODE'
+                        node_table           = lt_node ).
+    lo_tree->expand_node( 'ROOT' ).
+    DATA(lt_view) = lo_tree->view( ).
+    cl_abap_unit_assert=>assert_equals( act = lines( lt_view )
+                                        exp = 2 ).
+    cl_abap_unit_assert=>assert_equals( act = lt_view[ 2 ]-text
+                                        exp = `Lufthansa` ).
+
+    lo_tree->set_handler( handler = lo_handler
+                          method  = 'ON_EXPAND'
+                          event   = 'EXPAND_NO_CHILDREN' ).
+    lo_tree->set_handler( handler = lo_handler
+                          method  = 'ON_NODE'
+                          event   = 'NODE_DOUBLE_CLICK' ).
+    " the expander of LH - its children come from the handler
+    lo_tree->dispatch( event = `EXPAND`
+                       value = |{ lt_view[ 2 ]-key }| ).
+    lt_view = lo_tree->view( ).
+    cl_abap_unit_assert=>assert_equals( act = lines( lt_view )
+                                        exp = 3 ).
+    cl_abap_unit_assert=>assert_equals( act = lt_view[ 3 ]-text
+                                        exp = `LH 0400` ).
+
+    " a click: the node selected, node_double_click with its key
+    lo_tree->dispatch( event = `CLICK`
+                       value = |{ lt_view[ 3 ]-key }| ).
+    lo_tree->get_selected_node( CHANGING node_key = lv_selected ).
+    cl_abap_unit_assert=>assert_equals( act = lv_selected
+                                        exp = 'LH0400' ).
+    cl_abap_unit_assert=>assert_equals( act = lo_handler->mv_log
+                                        exp = `EXPAND LH;NODE LH0400;` ).
+
+    lo_tree->delete_node( 'LH' ).
+    cl_abap_unit_assert=>assert_equals( act = lines( lo_tree->view( ) )
+                                        exp = 1 ).
+    lo_tree->get_selected_node( CHANGING node_key = lv_selected ).
+    cl_abap_unit_assert=>assert_initial( lv_selected ).
 
   ENDMETHOD.
 

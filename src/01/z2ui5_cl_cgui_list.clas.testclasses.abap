@@ -36,6 +36,7 @@ CLASS ltcl_test DEFINITION FINAL FOR TESTING
     METHODS hide_of_a_structure FOR TESTING.
     METHODS write_formats FOR TESTING.
     METHODS input_read_modify FOR TESTING.
+    METHODS fields_by_name FOR TESTING.
     METHODS line_count_and_footer FOR TESTING.
     METHODS format_and_columns FOR TESTING.
     METHODS write_options_r10 FOR TESTING.
@@ -208,6 +209,55 @@ CLASS ltcl_test IMPLEMENTATION.
     cl_abap_unit_assert=>assert_true( xsdbool( lv_view CS `design="Bold"` ) ).
     cl_abap_unit_assert=>assert_true( xsdbool( lv_view CS `inverted="true"` ) ).
     cl_abap_unit_assert=>assert_true( xsdbool( lv_view CS `textAlign="End"` ) ).
+
+  ENDMETHOD.
+
+  METHOD fields_by_name.
+
+    DATA lv_check TYPE c LENGTH 1.
+    DATA lv_carrid TYPE c LENGTH 3 VALUE `XX`.
+
+    " READ LINE n FIELD VALUE: the fields written with their names
+    DATA(lo_list) = z2ui5_cl_cgui_list=>factory( ).
+    lo_list->write_as_checkbox( val   = abap_false
+                                input = abap_true
+                                name  = `gv_check`
+        )->write( val  = `LH`
+                  name = `GS-CARRID` ).
+    DATA(lt_input) = lo_list->get_inputs( ).
+    lt_input[ 1 ]-flag = abap_true.
+    lo_list->set_inputs( lt_input ).
+
+    lo_list->read_field( EXPORTING  line    = 1
+                                    name    = `GV_CHECK`
+                         CHANGING   value   = lv_check
+                         EXCEPTIONS no_line = 4 ).
+    cl_abap_unit_assert=>assert_subrc( exp = 0 ).
+    cl_abap_unit_assert=>assert_equals( act = lv_check
+                                        exp = `X` ).
+    lo_list->read_field( EXPORTING  line    = 1
+                                    name    = `gs-carrid`
+                         CHANGING   value   = lv_carrid
+                         EXCEPTIONS no_line = 4 ).
+    cl_abap_unit_assert=>assert_equals( act = lv_carrid
+                                        exp = `LH` ).
+
+    " MODIFY LINE n FIELD VALUE ... FROM
+    lo_list->modify_field( EXPORTING  line    = 1
+                                      name    = `GS-CARRID`
+                                      value   = `UA`
+                           EXCEPTIONS no_line = 4 ).
+    cl_abap_unit_assert=>assert_equals( act = lo_list->read_value( line = 1 index = 2 )
+                                        exp = `UA` ).
+
+    " no such line: sy-subrc 4, the field unchanged
+    lo_list->read_field( EXPORTING  line    = 2
+                                    name    = `GS-CARRID`
+                         CHANGING   value   = lv_carrid
+                         EXCEPTIONS no_line = 4 ).
+    cl_abap_unit_assert=>assert_subrc( exp = 4 ).
+    cl_abap_unit_assert=>assert_equals( act = lv_carrid
+                                        exp = `LH` ).
 
   ENDMETHOD.
 

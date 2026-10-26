@@ -170,6 +170,24 @@ _popup( )->decide( question = `Which copy?` options = VALUE #( ( `Original` ) ( 
 not in the popover, an error does not stop the run - and `_popup( )` has the
 popups of the report: the answer comes as `at_user_command( ucomm )`.
 
+Or the answer goes to a method of its own: with `then` instead of `ucomm` the
+popup calls a public method of the report with `IMPORTING answer TYPE string`
+- `1`, `2`, ... for the option, `A` for Cancel (Yes and No of a confirm are
+`1` and `A`). The statements after a classic `CALL FUNCTION 'POPUP_TO_...'`
+fit there as they are:
+
+```abap
+METHODS on_post IMPORTING answer TYPE string.   " PUBLIC SECTION
+
+_popup( )->confirm( question = `Post the document?` then = `ON_POST` ).
+
+METHOD on_post.
+  IF answer = '1'.
+    post( ).
+  ENDIF.
+ENDMETHOD.
+```
+
 ### The application log
 
 `set_log( )` gives the report an application log: every message - `MESSAGE`,
@@ -214,6 +232,10 @@ The transactions come from the installation: an object of
 and the variant to start with; a report class name works without a catalog.
 `Ctrl+K` (`Cmd+K` on a Mac) opens the command palette - the transactions and
 the functions of the screen in a popup to search.
+
+The code starts the same way: `call_transaction( code = 'ZFLIGHTS' )` is
+`CALL TRANSACTION`, `skip_first = abap_true` its `AND SKIP FIRST SCREEN` -
+the report class of the catalog with its variant, Back returns here.
 
 ### The last entries
 
@@ -539,9 +561,11 @@ Stage 1 - the converter: the constructs that stop the most reports
       values handed over; a screen of the report's own as a dialog, the
       statements after the call continued in `after_call_selection_screen( )`
       - reports call reports
+- [x] `CALL TRANSACTION` (without batch input) as `call_transaction( )` -
+      the report class the catalog names for the code
 - [x] The synchronous popups (`POPUP_TO_CONFIRM`, `POPUP_TO_CONFIRM_STEP`,
       `POPUP_TO_DECIDE`, `POPUP_GET_VALUES`): the event block cut at the
-      call, the rest continued in `at_user_command( )` - the one
+      call, the rest continued in a callback `on_popup_n( answer )` - the one
       transformation that changes a block's shape, and the one in every
       report that posts something
 - [x] `SET PF-STATUS`, `SET TITLEBAR`, `AT PFnn` as `set_pf_status( )`,
@@ -550,6 +574,9 @@ Stage 1 - the converter: the constructs that stop the most reports
 - [x] Secondary lists (`sy-lsind`) and `WRITE AT` positions, in a column
       mode of the list (every item of a line with a position in a box of
       its width in characters) - the evaluations that live by the column
+- [x] `READ LINE` / `MODIFY LINE ... FIELD VALUE` as `read_list( )->read_field(
+      )` / `modify_field( )` - the checkboxes of a list read back by the
+      names of their `WRITE`s
 - [x] `cl_gui_alv_grid` in a container with its simple handlers (hotspot,
       double click, toolbar, user command) as `alv( )`, the screen's PBO and
       PAI modules resolved - the ALV every report since 2005 is written with
@@ -675,7 +702,11 @@ Stage 5 - research
 - [x] `cl_demo_output` (in 72 reports of the web corpus): the stand-in
       `z2ui5_cl_cgui_demo_output` writes into the list - values, structures
       and tables as columns, sections as headings
-- [ ] More than one grid, F1 of the editor, the tree and the picture; table
+- [x] `cl_gui_picture` and `cl_gui_simple_tree`: the stand-ins
+      `z2ui5_cl_cgui_gui_picture` and `z2ui5_cl_cgui_gui_simple_tree` - the
+      nodes of `MTREESNODE`, lazy children on the first expand, the click as
+      `node_double_click` and `selection_changed`
+- [ ] More than one grid, F1 of the editor, the column tree; table
       controls, subscreens and tabstrips on a dynpro
 
 Quality, through every stage

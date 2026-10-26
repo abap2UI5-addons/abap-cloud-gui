@@ -568,6 +568,13 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
       RETURNING
         VALUE(result) TYPE REF TO z2ui5_cl_cgui_list.
 
+    "! the list READ LINE and MODIFY LINE work on - in at_line_selection( )
+    "! the one clicked (what list( ) writes there is the next level), else
+    "! the list of list( )
+    METHODS read_list
+      RETURNING
+        VALUE(result) TYPE REF TO z2ui5_cl_cgui_list.
+
     "! show tab as ALV grid - returns the ALV for its settings. Pass a PUBLIC
     "! attribute of the report: the grid binds it directly. Anything else is
     "! copied into mr_cgui_alv, whose type the draft has to rebuild with RTTI
@@ -1014,6 +1021,9 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
     DATA mv_cgui_pending_kind  TYPE string.
     DATA mv_cgui_pending_col   TYPE string.
     DATA mv_cgui_pending_ucomm TYPE string.
+    " at_line_selection( ) / at_link_click( ) runs - read_list( ) is the
+    " list clicked
+    DATA mv_cgui_on_line       TYPE abap_bool.
     " the method a popup with then calls back with its answer
     DATA mv_cgui_then          TYPE string.
     DATA mv_cgui_on_field      TYPE string.
@@ -2089,6 +2099,37 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
                                                     t_arg = VALUE #( ( |{ id }| ) ( `PICTURE_CLICK` ) ) ) ).
         ENDIF.
 
+      WHEN z2ui5_if_cgui_gui=>cs_kind-simple_tree.
+        " the rows of the expanded branches: expander, icon, the text a link
+        DATA(lo_stree) = CAST z2ui5_cl_cgui_gui_simple_tree( mt_cgui_gui_obj[ id ] ).
+        DATA(lo_nodes) = node->ele( `VBox`
+            )->a( n = `class` v = `sapUiTinyMarginTopBottom` ).
+        LOOP AT lo_stree->view( ) INTO DATA(ls_row).
+          DATA(lo_row) = lo_nodes->ele( `HBox`
+              )->a( n = `alignItems` v = `Center` ).
+          lo_row->tag( `Text`
+              )->a( n = `text`  v = ``
+              )->a( n = `width` v = ls_row-indent ).
+          IF ls_row-expander IS NOT INITIAL.
+            lo_row->tag( `Button`
+                )->a( n = `icon`  v = ls_row-expander
+                )->a( n = `type`  v = `Transparent`
+                )->a( n = `press` v = client->_event( val   = cs_ucomm-gui
+                                                      t_arg = VALUE #( ( |{ id }| ) ( `EXPAND` ) ( |{ ls_row-key }| ) ) ) ).
+          ENDIF.
+          IF ls_row-icon IS NOT INITIAL.
+            lo_row->tag( n = `Icon` ns = `core`
+                )->a( n = `xmlns:core` v = `sap.ui.core`
+                )->a( n = `src`        v = ls_row-icon
+                )->a( n = `class`      v = `sapUiTinyMarginEnd` ).
+          ENDIF.
+          lo_row->tag( `Link`
+              )->a( n = `text`       t = ls_row-text
+              )->a( n = `emphasized` b = xsdbool( ls_row-key = lo_stree->selected( ) )
+              )->a( n = `press`      v = client->_event( val   = cs_ucomm-gui
+                                                         t_arg = VALUE #( ( |{ id }| ) ( `CLICK` ) ( |{ ls_row-key }| ) ) ) ).
+        ENDLOOP.
+
       WHEN z2ui5_if_cgui_gui=>cs_kind-grid.
         " the grid the ALV shows - another one shows nothing
         IF mv_cgui_grid = id AND mo_cgui_alv IS BOUND.
@@ -3149,6 +3190,7 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
     " what the event block writes is a secondary list; nothing written, the
     " list stays as it is
     level_push( ).
+    mv_cgui_on_line = abap_true.
     IF link = abap_true.
       at_link_click( row    = row
                      column = column ).
@@ -3156,6 +3198,7 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
       at_line_selection( row  = row
                          hide = hide ).
     ENDIF.
+    mv_cgui_on_line = abap_false.
 
     IF mv_cgui_screen <> cs_screen-output.
       " leave_to_selection_screen( ) - the levels are gone
@@ -5778,6 +5821,17 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
       mo_cgui_list->header_end( ).
     ENDIF.
     result = mo_cgui_list.
+
+  ENDMETHOD.
+
+  METHOD read_list.
+
+    IF mv_cgui_on_line = abap_true AND mt_cgui_level IS NOT INITIAL.
+      result = mt_cgui_level[ lines( mt_cgui_level ) ]-list.
+    ENDIF.
+    IF result IS NOT BOUND.
+      result = list( ).
+    ENDIF.
 
   ENDMETHOD.
 

@@ -313,6 +313,30 @@ CLASS z2ui5_cl_cgui_list DEFINITION PUBLIC FINAL CREATE PUBLIC.
       RETURNING
         VALUE(result) TYPE ty_t_item.
 
+    "! READ LINE line FIELD VALUE name INTO value - the value of the field
+    "! written with name on the line (`X` or empty for a checkbox), value
+    "! unchanged when the line has none; no_line when there is no such line
+    METHODS read_field
+      IMPORTING
+        line  TYPE i
+        name  TYPE clike OPTIONAL
+      CHANGING
+        value TYPE any OPTIONAL
+      EXCEPTIONS
+        no_line.
+
+    "! MODIFY LINE line FIELD VALUE name FROM value - the field written with
+    "! name on the line, and its color when passed; no_line when there is
+    "! no such line
+    METHODS modify_field
+      IMPORTING
+        line  TYPE i
+        name  TYPE clike OPTIONAL
+        value TYPE any   OPTIONAL
+        color TYPE clike OPTIONAL
+      EXCEPTIONS
+        no_line.
+
     "! MODIFY LINE line FIELD VALUE - the value of the index-th field of the
     "! line, and its color when passed
     METHODS modify_line
@@ -359,6 +383,7 @@ CLASS z2ui5_cl_cgui_list DEFINITION PUBLIC FINAL CREATE PUBLIC.
       IMPORTING
         val           TYPE abap_bool
         input         TYPE abap_bool DEFAULT abap_false
+        name          TYPE clike     OPTIONAL
       RETURNING
         VALUE(result) TYPE REF TO z2ui5_cl_cgui_list.
 
@@ -756,7 +781,8 @@ CLASS z2ui5_cl_cgui_list IMPLEMENTATION.
 
     item_add( VALUE #( kind  = cs_kind-checkbox
                        flag  = val
-                       input = input ) ).
+                       input = input
+                       name  = to_upper( name ) ) ).
     result = me.
 
   ENDMETHOD.
@@ -986,6 +1012,50 @@ CLASS z2ui5_cl_cgui_list IMPLEMENTATION.
     ELSE.
       result = ls_item-text.
     ENDIF.
+
+  ENDMETHOD.
+
+  METHOD read_field.
+
+    IF line < 1 OR NOT line_exists( mt_item[ line = line ] ).
+      RAISE no_line.
+    ENDIF.
+    IF name IS INITIAL OR value IS NOT SUPPLIED.
+      RETURN.
+    ENDIF.
+    DATA(lv_name) = to_upper( condense( CONV string( name ) ) ).
+    LOOP AT mt_item INTO DATA(ls_item) WHERE line = line AND name = lv_name
+         AND ( kind = cs_kind-text OR kind = cs_kind-checkbox ).
+      IF ls_item-kind = cs_kind-checkbox.
+        value = COND #( WHEN ls_item-flag = abap_true THEN `X` ELSE `` ).
+      ELSE.
+        value = ls_item-text.
+      ENDIF.
+      RETURN.
+    ENDLOOP.
+
+  ENDMETHOD.
+
+  METHOD modify_field.
+
+    IF line < 1 OR NOT line_exists( mt_item[ line = line ] ).
+      RAISE no_line.
+    ENDIF.
+    DATA(lv_name) = to_upper( condense( CONV string( name ) ) ).
+    LOOP AT mt_item REFERENCE INTO DATA(lr_item) WHERE line = line AND name = lv_name
+         AND ( kind = cs_kind-text OR kind = cs_kind-checkbox ).
+      IF value IS SUPPLIED.
+        IF lr_item->kind = cs_kind-checkbox.
+          lr_item->flag = xsdbool( value IS NOT INITIAL ).
+        ELSE.
+          lr_item->text = z2ui5_cl_cgui_context=>conv_to_text( value ).
+        ENDIF.
+      ENDIF.
+      IF color IS SUPPLIED.
+        lr_item->color = color.
+      ENDIF.
+      RETURN.
+    ENDLOOP.
 
   ENDMETHOD.
 

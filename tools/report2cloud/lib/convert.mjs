@@ -71,8 +71,8 @@ const REFUSED = {
   Get: "GET - logical database events have no counterpart; read the data with ABAP SQL",
   Reject: "REJECT - logical database statement",
   Controls: "CONTROLS - table controls and tabstrips belong to dynpros",
-  ReadLine: "READ LINE - not converted; list( )->read_line( ) / read_value( ) read the list back - port it by hand, or keep the data in an internal table",
-  ModifyLine: "MODIFY LINE - not converted; list( )->modify_line( ) changes a written line - port it by hand",
+  ReadLine: "READ LINE ... INDEX / OF PAGE, READ CURRENT LINE outside AT LINE-SELECTION - not converted; read_list( )->read_field( ) reads a field of a line of the list - port it by hand, or keep the data in an internal table",
+  ModifyLine: "MODIFY LINE ... INDEX / OF PAGE / LINE VALUE FROM, MODIFY CURRENT LINE outside AT LINE-SELECTION - not converted; read_list( )->modify_field( ) changes a field of a written line - port it by hand",
   SetUserCommand: "SET USER-COMMAND - triggers no event here",
   PrintControl: "PRINT-CONTROL - printing is not supported",
   CallSubscreen: "CALL SUBSCREEN - dynpro statement",
@@ -174,6 +174,8 @@ const LVC_TYPES = {
   filetable: "z2ui5_cl_cgui_frontend=>ty_t_file_table", file_table: "z2ui5_cl_cgui_frontend=>ty_s_file_table",
   // the events a SAP GUI control registers - set_registered_events( )
   cntl_simple_events: "z2ui5_cl_cgui_gui=>ty_t_simple_events", cntl_simple_event: "z2ui5_cl_cgui_gui=>ty_s_simple_event",
+  // the nodes of cl_gui_simple_tree
+  mtreesnode: "z2ui5_cl_cgui_gui_simple_tree=>ty_s_node", tv_nodekey: "z2ui5_cl_cgui_gui_simple_tree=>ty_node_key",
 };
 
 // the statements that open and close a block
@@ -277,6 +279,7 @@ export const GUI = {
     cl_gui_html_viewer: "z2ui5_cl_cgui_gui_html_viewer",
     cl_gui_toolbar: "z2ui5_cl_cgui_gui_toolbar",
     cl_gui_picture: "z2ui5_cl_cgui_gui_picture",
+    cl_gui_simple_tree: "z2ui5_cl_cgui_gui_simple_tree",
     cl_gui_alv_grid: "z2ui5_cl_cgui_gui_alv_grid",
     cl_alv_event_toolbar_set: "z2ui5_cl_cgui_gui_alv_toolbar",
   },
@@ -722,6 +725,44 @@ export const GUI = {
           exceptions: [] },
       },
     },
+    z2ui5_cl_cgui_gui_simple_tree: {
+      parent: "z2ui5_cl_cgui_gui",
+      constants: ["node_sel_mode_single", "node_sel_mode_multiple", "relat_first_sibling", "relat_last_sibling", "relat_prev_sibling", "relat_next_sibling", "relat_first_child", "relat_last_child", "eventid_node_double_click", "eventid_expand_no_children", "eventid_selection_changed", "eventid_node_context_menu_req"],
+      attributes: [],
+      events: ["node_double_click", "expand_no_children", "selection_changed"],
+      methods: {
+        constructor: { params: ["parent", "node_selection_mode", "hide_selection", "lifetime", "shellstyle", "name"],
+          exceptions: ["lifetime_error", "cntl_system_error", "create_error", "failed", "illegal_node_selection_mode"] },
+        add_nodes: { params: ["table_structure_name", "node_table"],
+          exceptions: ["failed", "error_in_node_table", "dp_error", "table_structure_name_not_found"] },
+        delete_all_nodes: { params: [],
+          exceptions: ["failed", "cntl_system_error"] },
+        delete_node: { params: ["node_key"],
+          exceptions: ["failed", "node_not_found", "cntl_system_error"] },
+        expand_node: { params: ["node_key", "level_count", "expand_predecessors", "expand_subtree"],
+          exceptions: ["failed", "illegal_level_count", "cntl_system_error", "node_not_found", "cannot_expand_leaf"] },
+        expand_root_nodes: { params: ["level_count", "expand_subtree"],
+          exceptions: ["failed", "illegal_level_count", "cntl_system_error"] },
+        collapse_node: { params: ["node_key", "collapse_subtree"],
+          exceptions: ["failed", "node_not_found", "cntl_system_error"] },
+        collapse_all_nodes: { params: [],
+          exceptions: ["failed", "cntl_system_error"] },
+        get_selected_node: { params: ["node_key"],
+          exceptions: ["failed", "single_node_selection_only", "cntl_system_error"] },
+        set_selected_node: { params: ["node_key"],
+          exceptions: ["failed", "single_node_selection_only", "node_not_found", "cntl_system_error"] },
+        node_set_text: { params: ["node_key", "text"],
+          exceptions: ["failed", "node_not_found", "cntl_system_error"] },
+        set_registered_events: { params: ["events"],
+          exceptions: ["cntl_error", "cntl_system_error", "illegal_event_combination"] },
+        view: { params: [],
+          exceptions: [] },
+        selected: { params: [],
+          exceptions: [] },
+        dispatch: { params: [],
+          exceptions: [] },
+      },
+    },
     z2ui5_cl_cgui_gui_picture: {
       parent: "z2ui5_cl_cgui_gui",
       constants: ["display_mode_normal", "display_mode_stretch", "display_mode_fit", "display_mode_normal_center", "display_mode_fit_center", "eventid_picture_click"],
@@ -966,7 +1007,7 @@ const BASE_METHODS = ["cgui_run_in_background", "at_roundtrip_start",
   "_msg", "_msg_box", "_popup", "set_prefill_last", "set_fresh_start", "set_job", "set_log", "messages_from_log", "log_display", "set_command_field", "set_catalog", "okcode_execute", "set_cursor_field", "set_selscreen_status", "list", "alv", "tree", "get_selected_rows", "lsind", "message",
   "message_t100", "messages_from_bapiret", "popup_to_confirm", "popup_to_decide",
   "popup_get_values", "popup_get_values_sval", "popup_values_sval", "popup_answer", "popup_values", "value_help_popup", "vrm_set_values",
-  "leave_to_selection_screen", "window", "call_selection_screen", "submit", "call_transaction", "set_parameter_id", "get_parameter_id",
+  "leave_to_selection_screen", "window", "call_selection_screen", "submit", "call_transaction", "read_list", "set_parameter_id", "get_parameter_id",
   "set_line_count", "set_pf_status", "set_title", "set_variant", "set_variant_store", "set_layout_store", "get_link",
   "current_screen", "dynpro_screen", "dynpro_pbo", "dynpro_pai", "after_call_screen",
   "call_screen", "set_screen", "leave_to_screen", "leave_screen", "screen_left", "cgui_statics_keep", "cgui_statics_restore"];
@@ -2015,7 +2056,7 @@ class Converter {
     const missing = [...new Set([...t.matchAll(/\bcl_gui_\w+/g)].map((m) => m[0]))]
       .filter((c) => !guiClass(c) && !["cl_gui_cfw", "cl_gui_frontend_services"].includes(c));
     if (this.guiVars?.size && !missing.length) return undefined;
-    if (this.guiVars?.size) return `SAP GUI controls: ${missing.join(", ")} ${missing.length > 1 ? "have" : "has"} no counterpart - the containers, cl_gui_textedit, cl_gui_html_viewer, cl_gui_toolbar, cl_gui_picture and cl_gui_alv_grid have (z2ui5_cl_cgui_gui*)`;
+    if (this.guiVars?.size) return `SAP GUI controls: ${missing.join(", ")} ${missing.length > 1 ? "have" : "has"} no counterpart - the containers, cl_gui_textedit, cl_gui_html_viewer, cl_gui_toolbar, cl_gui_picture, cl_gui_simple_tree and cl_gui_alv_grid have (z2ui5_cl_cgui_gui*)`;
     return "SAP GUI controls (cl_gui_*) need a dynpro container - use alv( ) or an abap2UI5 view";
   }
 
@@ -2988,6 +3029,8 @@ class Converter {
     // GET CURSOR FIELD asks for the name of the field clicked - every WRITE
     // of a data object then writes it with its name
     this.cursorField = this.stmts.some((x) => kind(x) === "GetCursor" && words(x).includes("FIELD"));
+    // READ LINE / MODIFY LINE ... FIELD VALUE f - f is written with its name
+    this.lineFields = new Set(this.stmts.filter((x) => ["ReadLine", "ModifyLine"].includes(kind(x))).flatMap((x) => lineFieldNames(x)));
     const pub = [];          // PUBLIC SECTION
     const methods = [];      // { name, def, body: string[] }
     this.methodDefs = [];    // PRIVATE methods
@@ -4730,6 +4773,69 @@ class Converter {
   }
 
   /**
+   * READ LINE n FIELD VALUE f1 [INTO g1] ... [LINE VALUE INTO wa] and
+   * MODIFY LINE n FIELD VALUE f1 [FROM g1] ... -> read_list( )->read_field(
+   * ) / modify_field( ) per field, by the name the WRITE gave it, EXCEPTIONS
+   * no_line = 4 the sy-subrc of the classic. CURRENT LINE in AT
+   * LINE-SELECTION is row. False when not converted (refused).
+   */
+  lineAccess(s, b) {
+    const read = kind(s) === "ReadLine";
+    const w = words(s);
+    const ch = s.getChildren();
+    const ov = this.rewrites(s, b.ctx, b);
+    const tok = (c) => (isToken(c) ? uc(c.get().getStr()) : undefined);
+    if (w.includes("INDEX") || w.includes("PAGE") || (!read && hasSeq(w, "LINE", "VALUE"))) return false;
+    let line;
+    if (w[1] === "CURRENT") {
+      if (!b.ctx.lineSelection || b.ctx.form) return false;
+      line = "row";
+    } else {
+      line = nodeText(ch.find((c) => !isToken(c)), ov);
+    }
+    // the fields: f [INTO g] (READ) or f [FROM g] (MODIFY) after FIELD VALUE
+    const fields = [];
+    let into;
+    const at = ch.findIndex((c, i) => tok(c) === "VALUE" && tok(ch[i - 1]) === "FIELD");
+    if (at >= 0) {
+      for (let i = at + 1; i < ch.length; i++) {
+        const t = tok(ch[i]);
+        if (t === "INTO" || t === "FROM") {
+          fields[fields.length - 1].target = nodeText(ch[++i], ov);
+          continue;
+        }
+        // MODIFY ... FIELD FORMAT f INPUT OFF parses as sources
+        if (t !== undefined || ["FIELD", "LINE"].includes(uc(nodeText(ch[i]).trim()))) break;
+        fields.push({ name: underName(nodeText(ch[i])), target: nodeText(ch[i], ov) });
+      }
+    }
+    const lv = ch.findIndex((c, i) => tok(c) === "VALUE" && tok(ch[i - 1]) === "LINE");
+    if (read && lv >= 0) into = nodeText(ch[lv + 2], ov);
+    if (!read && (hasSeq(w, "LINE", "FORMAT") || hasSeq(w, "FIELD", "FORMAT"))) {
+      this.note("MODIFY LINE ... LINE FORMAT / FIELD FORMAT - dropped, the list keeps the format the WRITE gave");
+    }
+    const method = read ? "read_field" : "modify_field";
+    const call = (f) => {
+      const exp = [["line", line], ...(f ? [["name", literal(f.name)]] : []), ...(f && !read ? [["value", f.target]] : [])];
+      const chg = f && read ? [["value", f.target]] : [];
+      const width = Math.max(...[...exp, ...chg, ["no_line"]].map(([n]) => n.length));
+      const head = `read_list( )->${method}( `;
+      const kw = "EXCEPTIONS ";
+      const rows = [];
+      const block = (word, pairs) => pairs.forEach(([n, v], i) => rows.push(`${i ? " ".repeat(kw.length) : word.padEnd(kw.length)}${n.padEnd(width)} = ${v}`));
+      block("EXPORTING", exp);
+      block("CHANGING", chg);
+      block("EXCEPTIONS", [["no_line", "4"]]);
+      return rows.map((r, i) => `${i ? " ".repeat(head.length) : head}${r}`).join("\n") + " ).";
+    };
+    if (into) b.out.push(`${into} = read_list( )->line_text( ${line} ).`);
+    if (fields.length) for (const f of fields) b.out.push(call(f));
+    else b.out.push(call());
+    this.map(s, `\`read_list( )->${method}( )\` - ${read ? "the fields" : "a field"} of line ${line} by the name its WRITE gave it, sy-subrc 4 without such a line`);
+    return true;
+  }
+
+  /**
    * CALL TRANSACTION code [AND SKIP FIRST SCREEN] -> call_transaction( code
    * skip_first ): the runtime starts the report class of the transaction -
    * the catalog of the installation names it - and Back returns here. With
@@ -5097,7 +5203,7 @@ class Converter {
       }
     }
     // CALL TRANSACTION without batch input is call_transaction( )
-    if (REFUSED[k] && !(k === "CallTransaction" && !batchInput(s))) {
+    if (REFUSED[k] && !(k === "CallTransaction" && !batchInput(s)) && !["ReadLine", "ModifyLine"].includes(k)) {
       this.refuse(s, REFUSED[k]);
       return;
     }
@@ -5318,6 +5424,10 @@ class Converter {
       case "CallTransaction":
         if (this.callTransaction(s, b)) return;
         break;
+      case "ReadLine":
+      case "ModifyLine":
+        if (!this.lineAccess(s, b)) this.refuse(s, REFUSED[k]);
+        return;
       case "CallSelectionScreen":
         this.callSelectionScreen(s, b);
         return;
@@ -6112,7 +6222,12 @@ class Converter {
       if (!src) continue;
       const value = nodeText(src, ov);
       if (hasSeq(w, "AS", "CHECKBOX")) {
-        items.push({ method: "write_as_checkbox", params: [{ value }] });
+        // read back by READ LINE: the user ticks it, as WRITE AS CHECKBOX
+        // without INPUT OFF lets him
+        const name = underName(nodeText(src));
+        items.push({ method: "write_as_checkbox", params: this.lineFields.has(name)
+          ? [{ name: "val", value }, ...(hasSeq(w, "INPUT", "OFF") ? [] : [{ name: "input", value: "abap_true" }]), { name: "name", value: literal(name) }]
+          : [{ value }] });
         this.map(s, "`list( )->write_as_checkbox( )`");
         continue;
       }
@@ -6151,7 +6266,8 @@ class Converter {
         const g = s.getChildren()[underAt + 1];
         item.params.push({ name: "under", value: literal(underName(nodeText(g))) });
       }
-      if (this.underTargets?.has(underName(nodeText(src))) || (this.cursorField && /^[a-z_][\w-]*$/i.test(nodeText(src).trim()))) {
+      if (this.underTargets?.has(underName(nodeText(src))) || this.lineFields.has(underName(nodeText(src)))
+          || (this.cursorField && /^[a-z_][\w-]*$/i.test(nodeText(src).trim()))) {
         item.params.push({ name: "name", value: literal(underName(nodeText(src))) });
       }
       if (color || !b.runtimeColor) {
@@ -7696,7 +7812,7 @@ Object.setPrototypeOf(LVC_TYPES, null);
 
 // the methods of the runtime the converted code calls, besides BASE_METHODS
 const REPORT_CALLS = ["list", "write", "message", "message_t100", "messages_from_bapiret", "alv", "tree", "set_title",
-  "set_pf_status", "set_line_count", "leave_to_selection_screen", "submit", "call_transaction", "call_selection_screen", "window",
+  "set_pf_status", "set_line_count", "leave_to_selection_screen", "submit", "call_transaction", "read_list", "call_selection_screen", "window",
   "popup_to_confirm", "popup_to_decide", "popup_get_values", "popup_get_values_sval", "popup_values_sval",
   "popup_answer", "popup_values", "value_help_popup", "lsind", "set_lsind", "get_selected_rows", "get_cursor",
   "lisel", "set_parameter_id", "get_parameter_id", "set_cursor_field", "vrm_set_values", "current_screen",
@@ -7906,6 +8022,26 @@ function renderCall(method, imp, chg) {
   for (const p of chg) lines.push(`${pad}  ${p.name.padEnd(width)} = ${p.value}`);
   lines[lines.length - 1] += " ).";
   return lines.join("\n");
+}
+
+/** the fields READ LINE / MODIFY LINE ... FIELD VALUE name - the names of
+ *  their WRITEs */
+function lineFieldNames(s) {
+  const ch = s.getChildren();
+  const tok = (c) => (isToken(c) ? uc(c.get().getStr()) : undefined);
+  const at = ch.findIndex((c, i) => tok(c) === "VALUE" && tok(ch[i - 1]) === "FIELD");
+  const out = [];
+  if (at < 0) return out;
+  for (let i = at + 1; i < ch.length; i++) {
+    const t = tok(ch[i]);
+    if (t === "INTO" || t === "FROM") {
+      i++;
+      continue;
+    }
+    if (t !== undefined || ["FIELD", "LINE"].includes(uc(nodeText(ch[i]).trim()))) break;
+    out.push(underName(nodeText(ch[i])));
+  }
+  return out;
 }
 
 /** CALL TRANSACTION ... USING / OPTIONS FROM / MESSAGES INTO - batch input */

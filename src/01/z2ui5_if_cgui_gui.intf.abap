@@ -15,6 +15,8 @@ INTERFACE z2ui5_if_cgui_gui PUBLIC.
       grid      TYPE string VALUE `GRID`,
       picture   TYPE string VALUE `PICTURE`,
       salv      TYPE string VALUE `SALV`,
+      "! cl_gui_simple_tree - the control object keeps its nodes
+      simple_tree TYPE string VALUE `SIMPLE_TREE`,
     END OF cs_kind.
 
   TYPES:

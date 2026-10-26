@@ -240,6 +240,7 @@ CLASS ltcl_test DEFINITION FINAL FOR TESTING
     METHODS transport_popup FOR TESTING.
     METHODS popup_then FOR TESTING.
     METHODS call_transaction FOR TESTING.
+    METHODS read_list_clicked FOR TESTING.
     METHODS roundtrip_start FOR TESTING.
     METHODS fresh_start FOR TESTING.
     METHODS popup_values_of_an_sval FOR TESTING.
@@ -1302,6 +1303,23 @@ CLASS ltcl_test IMPLEMENTATION.
     cl_abap_unit_assert=>assert_equals( act = mo_report->mv_ucomm
                                         exp = `TR` ).
     cl_abap_unit_assert=>assert_true( mo_cut->get_transport( )-local ).
+
+  ENDMETHOD.
+
+  METHOD read_list_clicked.
+
+    init( ).
+    " outside a line selection: the list of list( )
+    DATA(lo_list) = mo_cut->list( ).
+    cl_abap_unit_assert=>assert_true( xsdbool( mo_cut->read_list( ) = lo_list ) ).
+
+    " in at_line_selection( ): the list clicked, not the next level
+    mo_cut->level_push( ).
+    mo_cut->mv_cgui_on_line = abap_true.
+    DATA(lo_next) = mo_cut->list( ).
+    cl_abap_unit_assert=>assert_true( xsdbool( mo_cut->read_list( ) = lo_list ) ).
+    cl_abap_unit_assert=>assert_false( xsdbool( lo_next = lo_list ) ).
+    mo_cut->mv_cgui_on_line = abap_false.
 
   ENDMETHOD.
 
