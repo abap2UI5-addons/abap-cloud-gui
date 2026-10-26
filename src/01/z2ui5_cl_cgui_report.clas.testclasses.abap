@@ -79,6 +79,7 @@ CLASS ltcl_report DEFINITION INHERITING FROM z2ui5_cl_cgui_report FINAL.
     DATA s_code      TYPE RANGE OF ty_c4.
     DATA mt_row      TYPE ty_t_row.
     DATA mv_alv      TYPE abap_bool.
+    DATA mv_starts   TYPE i.
     DATA mv_tree     TYPE abap_bool.
 
     DATA mv_end      TYPE abap_bool.
@@ -108,6 +109,7 @@ CLASS ltcl_report DEFINITION INHERITING FROM z2ui5_cl_cgui_report FINAL.
     METHODS top_of_page REDEFINITION.
     METHODS at_line_selection REDEFINITION.
     METHODS at_user_command REDEFINITION.
+    METHODS at_roundtrip_start REDEFINITION.
     METHODS at_selection_screen_on_block REDEFINITION.
     METHODS end_of_page REDEFINITION.
     METHODS at_selection_screen_on_exit REDEFINITION.
@@ -226,6 +228,7 @@ CLASS ltcl_test DEFINITION FINAL FOR TESTING
     METHODS application_log FOR TESTING.
     METHODS alv_chart FOR TESTING.
     METHODS transport_popup FOR TESTING.
+    METHODS roundtrip_start FOR TESTING.
     METHODS popup_values_of_an_sval FOR TESTING.
     METHODS alv_layout_default FOR TESTING.
     METHODS alv_layout_without_store FOR TESTING.
@@ -440,6 +443,12 @@ CLASS ltcl_report IMPLEMENTATION.
   METHOD at_user_command.
 
     mv_ucomm = ucomm.
+
+  ENDMETHOD.
+
+  METHOD at_roundtrip_start.
+
+    mv_starts = mv_starts + 1.
 
   ENDMETHOD.
 
@@ -1192,6 +1201,20 @@ CLASS ltcl_test IMPLEMENTATION.
     cl_abap_unit_assert=>assert_equals( act = mo_cut->get_parameter_id( `zcgui_test` )
                                         exp = `LH` ).
     cl_abap_unit_assert=>assert_true( xsdbool( mo_report->mv_cgui_spa CS `ZCGUI_TEST=LH` ) ).
+
+  ENDMETHOD.
+
+  METHOD roundtrip_start.
+
+    " first in every roundtrip, before the event - and in the background run
+    init( ).
+    event( z2ui5_cl_cgui_report=>cs_ucomm-execute ).
+    cl_abap_unit_assert=>assert_equals( act = mo_report->mv_starts
+                                        exp = 2 ).
+    DATA(lo_job) = NEW ltcl_report( ).
+    lo_job->cgui_run_in_background( VALUE #( ( name = `P_CARRID` kind = `P` low = `LH` ) ) ).
+    cl_abap_unit_assert=>assert_equals( act = lo_job->mv_starts
+                                        exp = 1 ).
 
   ENDMETHOD.
 

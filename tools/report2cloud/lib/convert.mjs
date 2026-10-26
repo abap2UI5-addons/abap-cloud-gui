@@ -955,7 +955,7 @@ const SCREEN_FIELDS = new Set(["name", "group1", ...SCREEN_FLAGS]);
 // the PUBLIC and PROTECTED methods and attributes of z2ui5_cl_cgui_report -
 // a FORM must not take one as method name, a global of the report not as
 // attribute name (methods and attributes share one namespace in a class)
-const BASE_METHODS = ["cgui_run_in_background",
+const BASE_METHODS = ["cgui_run_in_background", "at_roundtrip_start",
   "initialization", "selection_screen", "at_selection_screen_output", "at_selection_screen_on",
   "at_selection_screen", "start_of_selection", "end_of_selection", "end_of_page", "at_selection_screen_on_block",
   "at_selection_screen_on_radio", "at_selection_screen_on_end_of", "at_selection_screen_on_help",
@@ -3442,7 +3442,9 @@ class Converter {
     }
     // the handlers of the controls are methods of local classes: the event
     // of a control hands them the instance like every event method
-    if (locals.app && [...this.guiHandlers().values()].flat().some((h) => guiClass(h.of))) methods.push({ name: "at_gui_event", body: [] });
+    // the local classes reach the report through its instance - set once at
+    // the start of every roundtrip
+    if (locals.app) methods.push({ name: "at_roundtrip_start", body: [`${this.appRef} = me.`] });
     for (const f of this.forms) {
       if (!this.alvCallbacks.has(f.name) && !this.emptyForms.has(f.name) && !f.performed) this.todo(f.stmt, `FORM ${f.name} is not PERFORMed in this report - the private method ${f.method}( ) is unused (abaplint unused_methods)`);
     }
@@ -3471,7 +3473,7 @@ class Converter {
       "at_selection_screen_on_block", "at_selection_screen_on_radio", "at_selection_screen_on_end_of",
       "at_selection_screen_on_exit", "at_selection_screen_on_help", "at_selection_screen", "start_of_selection", "end_of_selection", "top_of_page",
       "top_of_page_line_selection", "end_of_page", "at_line_selection", "at_link_click", "at_user_command", "at_value_request",
-      "after_call_selection_screen", "dynpro_screen", "dynpro_pbo", "dynpro_pai", "at_gui_event", "after_call_screen",
+      "after_call_selection_screen", "dynpro_screen", "dynpro_pbo", "dynpro_pai", "at_gui_event", "after_call_screen", "at_roundtrip_start",
       "cgui_statics_keep", "cgui_statics_restore"];
     methods.sort((a, b) => order.indexOf(a.name) - order.indexOf(b.name));
     for (const m of methods) lines.push(`    METHODS ${m.name} REDEFINITION.`);
@@ -3497,9 +3499,7 @@ class Converter {
       lines.push(`  METHOD ${m.name}.`);
       lines.push("");
       const was = [...(this.methodWa.get(m.name) ?? new Map())].map(([tab, wa]) => `DATA ${wa} LIKE LINE OF ${tab}.`);
-      // the local classes reach the report through the instance of the event
-      const app = locals.app && methods.includes(m) ? [`${this.appRef} = me.`] : [];
-      const globalFs = [...was, ...(this.prelude.get(m.name) ?? []), ...this.fieldSymbolDecls(m.body), ...app];
+      const globalFs = [...was, ...(this.prelude.get(m.name) ?? []), ...this.fieldSymbolDecls(m.body)];
       for (const l of [...globalFs, ...(globalFs.length ? [""] : []), ...trimBlank(dropEmptyIfs(m.body))]) lines.push(indent(l, 4));
       lines.push("");
       lines.push("  ENDMETHOD.");
@@ -7096,7 +7096,7 @@ class Converter {
    * the class. A method of a local class that writes the list, calls a FORM
    * or uses a global of the report is converted like an event block: the
    * report's data is reached through the instance of the class
-   * (lcl_r2c=>app->gv, set at the start of every event method), its
+   * (lcl_r2c=>app->gv, set in at_roundtrip_start( ), first in every roundtrip), its
    * constants and types through the class (zcl_x=>c_pi), the methods of the
    * runtime and the FORMs through the instance - the class declares the
    * local class a LOCAL FRIEND for that. Everything else is copied as it is.

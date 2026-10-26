@@ -50,7 +50,7 @@ CLASS ltcl_client IMPLEMENTATION.
 
   ENDMETHOD.
 
-  METHOD z2ui5_if_client~_bind_edit.
+  METHOD z2ui5_if_client~_bind.
 
     result = `{/MT_ROW}`.
 

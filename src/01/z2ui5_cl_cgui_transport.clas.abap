@@ -11,7 +11,6 @@
 CLASS z2ui5_cl_cgui_transport DEFINITION PUBLIC FINAL CREATE PUBLIC.
 
   PUBLIC SECTION.
-    INTERFACES if_serializable_object.
     INTERFACES z2ui5_if_app.
 
     CONSTANTS:
@@ -64,7 +63,8 @@ CLASS z2ui5_cl_cgui_transport DEFINITION PUBLIC FINAL CREATE PUBLIC.
         VALUE(result) TYPE ty_t_row.
 
   PROTECTED SECTION.
-  PRIVATE SECTION.
+    " the state of the app - PROTECTED, the draft keeps it (a PRIVATE
+    " attribute the transpiled runtime does not reach)
     DATA client     TYPE REF TO z2ui5_if_client.
     DATA mv_event   TYPE string.
     DATA mv_title   TYPE string.
@@ -74,6 +74,7 @@ CLASS z2ui5_cl_cgui_transport DEFINITION PUBLIC FINAL CREATE PUBLIC.
     METHODS view_display.
     METHODS leave.
 
+  PRIVATE SECTION.
 ENDCLASS.
 
 
@@ -157,7 +158,7 @@ CLASS z2ui5_cl_cgui_transport IMPLEMENTATION.
     lo_dialog->ele( `content`
         )->ele( `Table`
             )->a( n = `mode`       v = `SingleSelectLeft`
-            )->a( n = `items`      v = client->_bind_edit( mt_row )
+            )->a( n = `items`      v = client->_bind( mt_row )
             )->a( n = `noDataText` t = CONV #( 'No modifiable transport request of yours'(003) )
             )->ele( `columns`
                 )->ele( `Column`

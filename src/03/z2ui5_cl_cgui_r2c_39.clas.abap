@@ -11,7 +11,7 @@ CLASS z2ui5_cl_cgui_r2c_39 DEFINITION PUBLIC
     METHODS initialization REDEFINITION.
     METHODS selection_screen REDEFINITION.
     METHODS start_of_selection REDEFINITION.
-    METHODS at_gui_event REDEFINITION.
+    METHODS at_roundtrip_start REDEFINITION.
 
   PRIVATE SECTION.
     " global data of the report typed with its local classes - local types
@@ -25,8 +25,6 @@ CLASS z2ui5_cl_cgui_r2c_39 IMPLEMENTATION.
 
   METHOD initialization.
 
-    lcl_r2c=>app = me.
-
     " the command field of the SAP GUI: transactions, /n, /o and OK codes
     set_command_field( ).
 
@@ -37,8 +35,6 @@ CLASS z2ui5_cl_cgui_r2c_39 IMPLEMENTATION.
 
   METHOD selection_screen.
 
-    lcl_r2c=>app = me.
-
     screen->parameter( val        = p_text
                        text       = `Note`
                        lower_case = abap_true ).
@@ -46,8 +42,6 @@ CLASS z2ui5_cl_cgui_r2c_39 IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD start_of_selection.
-
-    lcl_r2c=>app = me.
 
     " every run starts with the global data of a fresh start - the classic report restarted after its list
     CLEAR go_note.
@@ -57,7 +51,7 @@ CLASS z2ui5_cl_cgui_r2c_39 IMPLEMENTATION.
 
   ENDMETHOD.
 
-  METHOD at_gui_event.
+  METHOD at_roundtrip_start.
 
     lcl_r2c=>app = me.
 

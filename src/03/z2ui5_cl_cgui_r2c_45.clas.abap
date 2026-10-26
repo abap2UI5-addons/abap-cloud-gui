@@ -16,7 +16,7 @@ CLASS z2ui5_cl_cgui_r2c_45 DEFINITION PUBLIC
   PROTECTED SECTION.
     METHODS initialization REDEFINITION.
     METHODS start_of_selection REDEFINITION.
-    METHODS at_gui_event REDEFINITION.
+    METHODS at_roundtrip_start REDEFINITION.
     METHODS cgui_statics_keep REDEFINITION.
     METHODS cgui_statics_restore REDEFINITION.
 
@@ -34,8 +34,6 @@ CLASS z2ui5_cl_cgui_r2c_45 IMPLEMENTATION.
 
   METHOD initialization.
 
-    lcl_r2c=>app = me.
-
     " the command field of the SAP GUI: transactions, /n, /o and OK codes
     set_command_field( ).
 
@@ -45,22 +43,18 @@ CLASS z2ui5_cl_cgui_r2c_45 IMPLEMENTATION.
 
   METHOD start_of_selection.
 
-    lcl_r2c=>app = me.
-
     lcl_pack=>show( ).
     write( space ).
 
   ENDMETHOD.
 
-  METHOD at_gui_event.
+  METHOD at_roundtrip_start.
 
     lcl_r2c=>app = me.
 
   ENDMETHOD.
 
   METHOD cgui_statics_keep.
-
-    lcl_r2c=>app = me.
 
     " the CLASS-DATA of the local classes - kept with the app until the next roundtrip
     FIELD-SYMBOLS <lv_cgui_static> TYPE any.
@@ -74,8 +68,6 @@ CLASS z2ui5_cl_cgui_r2c_45 IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD cgui_statics_restore.
-
-    lcl_r2c=>app = me.
 
     " the CLASS-DATA of the local classes - as the last roundtrip left them
     FIELD-SYMBOLS <lv_cgui_static> TYPE any.

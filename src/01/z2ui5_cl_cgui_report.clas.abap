@@ -463,6 +463,11 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
     "! an event of a SAP GUI control, before its handlers run (SET HANDLER)
     METHODS at_gui_event.
 
+    "! the start of every roundtrip, before any event - where the report
+    "! hands itself to its local classes (lcl_r2c=>app = me), once instead
+    "! of in every event method
+    METHODS at_roundtrip_start.
+
     "! the CLASS-DATA of the local classes of the report into attributes of
     "! the report - at the end of every roundtrip. A roundtrip is a session
     "! of its own on a system: the static attributes of a class start
@@ -1636,6 +1641,7 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
     z2ui5_cl_cgui_frontend=>set_files( me ).
     z2ui5_cl_cgui_gui=>set_report( me ).
     cgui_statics_restore( ).
+    at_roundtrip_start( ).
     CLEAR: mt_cgui_msg, mt_cgui_box.
     mv_cgui_nav = abap_false.
     " the messages of the run stay while the popover opens and the user
@@ -2229,6 +2235,9 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD at_gui_event ##NEEDED.
+  ENDMETHOD.
+
+  METHOD at_roundtrip_start ##NEEDED.
   ENDMETHOD.
 
   METHOD cgui_statics_keep ##NEEDED.
@@ -4831,7 +4840,8 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
     FIELD-SYMBOLS <src> TYPE STANDARD TABLE.
     FIELD-SYMBOLS <tab> TYPE STANDARD TABLE.
 
-    CLEAR: list, alv, alv_data, messages.
+    CLEAR: list, alv, alv_data, pdf, messages.
+    at_roundtrip_start( ).
     mv_cgui_batch = abap_true.
     mv_cgui_screen = cs_screen-selection.
     mv_cgui_title = cl_abap_typedescr=>describe_by_object_ref( me )->get_relative_name( ).
