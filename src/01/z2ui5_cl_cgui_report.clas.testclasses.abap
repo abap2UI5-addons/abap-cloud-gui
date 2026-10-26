@@ -138,6 +138,18 @@ CLASS ltcl_job IMPLEMENTATION.
   ENDMETHOD.
 ENDCLASS.
 
+CLASS ltcl_catalog DEFINITION FINAL FOR TESTING.
+  PUBLIC SECTION.
+    INTERFACES z2ui5_if_cgui_catalog.
+ENDCLASS.
+
+CLASS ltcl_catalog IMPLEMENTATION.
+  METHOD z2ui5_if_cgui_catalog~get.
+    result = VALUE #( ( code = `ZFLY`  report = `z2ui5_cl_cgui_sample_04` text = `Flights` variant = `MINE` )
+                      ( code = `ZGONE` report = `ZCL_NOT_THERE`           text = `Gone` ) ).
+  ENDMETHOD.
+ENDCLASS.
+
 CLASS ltcl_client DEFINITION FINAL FOR TESTING.
 
   PUBLIC SECTION.
@@ -209,6 +221,7 @@ CLASS ltcl_test DEFINITION FINAL FOR TESTING
     METHODS short_api FOR TESTING.
     METHODS input_history FOR TESTING.
     METHODS execute_in_background FOR TESTING.
+    METHODS command_field FOR TESTING.
     METHODS popup_values_of_an_sval FOR TESTING.
     METHODS alv_layout_default FOR TESTING.
     METHODS alv_layout_without_store FOR TESTING.
@@ -1175,6 +1188,57 @@ CLASS ltcl_test IMPLEMENTATION.
     cl_abap_unit_assert=>assert_equals( act = mo_cut->get_parameter_id( `zcgui_test` )
                                         exp = `LH` ).
     cl_abap_unit_assert=>assert_true( xsdbool( mo_report->mv_cgui_spa CS `ZCGUI_TEST=LH` ) ).
+
+  ENDMETHOD.
+
+  METHOD command_field.
+
+    mo_client->ms_get-s_config-origin = `https://host`.
+    mo_client->ms_get-s_config-pathname = `/sap/bc/z2ui5`.
+    mo_client->ms_get-s_config-search = `?sap-client=100&app_start=ltcl_report`.
+    mo_cut->set_command_field( ).
+    mo_cut->set_catalog( NEW ltcl_catalog( ) ).
+    init( ).
+    cl_abap_unit_assert=>assert_true( xsdbool( mo_client->mv_view CS `CGUI_OKCODE` ) ).
+    DATA(lv_ctrl_k) = |{ z2ui5_if_client=>cs_event-keyboard_shortcut }:Ctrl+K\|CGUI_PALETTE\|MAIN|.
+    cl_abap_unit_assert=>assert_true( xsdbool( line_exists( mo_client->mt_action[ table_line = lv_ctrl_k ] ) ) ).
+
+    " an OK code of the screen - at_user_command( ), the field empty again
+    mo_report->mv_cgui_okcode = ` mycmd `.
+    event( z2ui5_cl_cgui_report=>cs_ucomm-okcode ).
+    cl_abap_unit_assert=>assert_equals( act = mo_report->mv_ucomm
+                                        exp = `MYCMD` ).
+    cl_abap_unit_assert=>assert_initial( mo_report->mv_cgui_okcode ).
+
+    " /o and a transaction: a new tab with the report and its variant
+    mo_cut->okcode_execute( `/oZFLY` ).
+    DATA(lv_tab) = |{ z2ui5_if_client=>cs_event-open_new_tab }:https://host/sap/bc/z2ui5?sap-client=100&app_start=z2ui5_cl_cgui_sample_04&variant=MINE|.
+    cl_abap_unit_assert=>assert_true( xsdbool( line_exists( mo_client->mt_action[ table_line = lv_tab ] ) ) ).
+
+    " the transaction in this window
+    mo_cut->okcode_execute( `zfly` ).
+    DATA lo_started TYPE REF TO z2ui5_cl_cgui_report.
+    lo_started ?= mo_client->mo_called.
+    cl_abap_unit_assert=>assert_bound( lo_started ).
+
+    " what is no report and no command says so
+    CLEAR mo_client->mo_called.
+    mo_cut->okcode_execute( `/nZGONE` ).
+    cl_abap_unit_assert=>assert_not_bound( mo_client->mo_called ).
+    cl_abap_unit_assert=>assert_char_cp( act = mo_cut->mt_cgui_msg[ lines( mo_cut->mt_cgui_msg ) ]-text
+                                         exp = `*ZGONE*` ).
+    mo_cut->okcode_execute( `/x` ).
+    cl_abap_unit_assert=>assert_equals( act = mo_cut->mt_cgui_msg[ lines( mo_cut->mt_cgui_msg ) ]-type
+                                        exp = `E` ).
+
+    " Ctrl+K: the palette - the transactions and Execute
+    event( z2ui5_cl_cgui_report=>cs_ucomm-palette ).
+    DATA lo_palette TYPE REF TO z2ui5_cl_cgui_select.
+    lo_palette ?= mo_client->mo_called.
+    cl_abap_unit_assert=>assert_bound( lo_palette ).
+    DATA(lt_rows) = mo_cut->palette_rows( ).
+    cl_abap_unit_assert=>assert_true( xsdbool( line_exists( lt_rows[ command = `ZFLY` ] ) ) ).
+    cl_abap_unit_assert=>assert_true( xsdbool( line_exists( lt_rows[ command = `ONLI` ] ) ) ).
 
   ENDMETHOD.
 

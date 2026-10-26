@@ -31,6 +31,9 @@ CLASS z2ui5_cl_cgui_r2c_35 IMPLEMENTATION.
 
   METHOD initialization.
 
+    " the command field of the SAP GUI: transactions, /n, /o and OK codes
+    set_command_field( ).
+
     set_title( `Project Dates` ).
     p_start = '20260105'.
     p_end = '20260320'.

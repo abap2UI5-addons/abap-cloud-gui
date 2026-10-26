@@ -72,6 +72,8 @@ test("zr2c_01_hello: parameters, OBLIGATORY, a DO loop of WRITEs", { skip }, asy
   let s = await d.start("z2ui5_cl_cgui_r2c_01");
   assert.equal(s.title, "Hello World");
   assert.deepEqual(fieldsOf(s), ['P_NAME=""*', "P_TIMES=3"]);
+  // the command field of the SAP GUI in the page header, empty
+  assert.equal(s.command?.value, "");
   assert.deepEqual(s.fields.map((f) => f.label), ["Your name", "Lines"]);
 
   s = await d.act(s.session, { event: "CGUI_EXECUTE" });

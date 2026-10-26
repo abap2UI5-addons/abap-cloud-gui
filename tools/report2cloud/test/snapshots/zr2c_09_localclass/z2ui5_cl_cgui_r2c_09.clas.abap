@@ -26,6 +26,9 @@ CLASS z2ui5_cl_cgui_r2c_09 IMPLEMENTATION.
 
   METHOD initialization.
 
+    " the command field of the SAP GUI: transactions, /n, /o and OK codes
+    set_command_field( ).
+
     p_a = '1.005'.
     p_b = '2.5'.
     p_dec = 2.

@@ -27,6 +27,9 @@ CLASS z2ui5_cl_cgui_r2c_39 IMPLEMENTATION.
 
     lcl_r2c=>app = me.
 
+    " the command field of the SAP GUI: transactions, /n, /o and OK codes
+    set_command_field( ).
+
     set_title( `A Note Editor` ).
     p_text = 'Buy milk'.
 

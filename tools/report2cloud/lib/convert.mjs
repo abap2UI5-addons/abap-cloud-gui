@@ -823,7 +823,7 @@ const BASE_METHODS = ["cgui_run_in_background",
   "at_tree_node", "at_tree_checkbox", "at_tree_expand_no_children", "at_data_changed", "at_user_command",
   "at_value_request", "value_request_part", "at_alv_value_request", "authority_check",
   "selection_screen_dynnr", "after_call_selection_screen", "write", "format", "get_cursor", "lisel",
-  "_msg", "_msg_box", "_popup", "set_prefill_last", "set_job", "set_cursor_field", "set_selscreen_status", "list", "alv", "tree", "get_selected_rows", "lsind", "message",
+  "_msg", "_msg_box", "_popup", "set_prefill_last", "set_job", "set_command_field", "set_catalog", "okcode_execute", "set_cursor_field", "set_selscreen_status", "list", "alv", "tree", "get_selected_rows", "lsind", "message",
   "message_t100", "messages_from_bapiret", "popup_to_confirm", "popup_to_decide",
   "popup_get_values", "popup_get_values_sval", "popup_values_sval", "popup_answer", "popup_values", "value_help_popup", "vrm_set_values",
   "leave_to_selection_screen", "window", "call_selection_screen", "submit", "set_parameter_id", "get_parameter_id",
@@ -873,6 +873,9 @@ class Converter {
     // classFor(program) names the class of another report of the input -
     // the one a SUBMIT starts; undefined when the report is not there
     this.classFor = opts.classFor;
+    // the command field of the SAP GUI in the page header - off with
+    // commandField: false
+    this.commandField = opts.commandField !== false;
     this.refusals = [];
     this.mapped = [];
     this.todos = [];
@@ -3239,6 +3242,13 @@ class Converter {
         if (init) init.body.unshift(...lines, "");
         else methods.push({ name: "initialization", body: lines });
       }
+    }
+
+    if (this.commandField) {
+      const init = methods.find((m) => m.name === "initialization");
+      const lines = ["\" the command field of the SAP GUI: transactions, /n, /o and OK codes", "set_command_field( )."];
+      if (init) init.body.unshift(...lines, "");
+      else methods.push({ name: "initialization", body: lines });
     }
 
     if (this.dynpro) methods.push(...this.dynproMethods());

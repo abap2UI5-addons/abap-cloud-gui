@@ -19,7 +19,7 @@ ABAP Cloud only allows released objects. Check each one; the successor is a hint
 
 | Object | Kind | First use | Released successor (hint) |
 |---|---|---|---|
-| `SPFLI` | database table | `z2ui5_cl_cgui_r2c_24.clas.abap:27:19` | /DMO/CONNECTION (ABAP Flight Reference Scenario) |
+| `SPFLI` | database table | `z2ui5_cl_cgui_r2c_24.clas.abap:30:19` | /DMO/CONNECTION (ABAP Flight Reference Scenario) |
 
 ## Mapped
 

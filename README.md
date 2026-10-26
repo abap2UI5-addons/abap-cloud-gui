@@ -172,6 +172,25 @@ _popup( )->decide( question = `Which copy?` options = VALUE #( ( `Original` ) ( 
 not in the popover, an error does not stop the run - and `_popup( )` has the
 popups of the report: the answer comes as `at_user_command( ucomm )`.
 
+### The command field
+
+`set_command_field( )` in `initialization( )` puts the command field of the
+SAP GUI into the page header - a converted report has it from the start:
+
+| Typed | What happens |
+|---|---|
+| `ZFLIGHTS` | a transaction of the catalog starts, Back returns |
+| `/nZFLIGHTS`, `/n` | the transaction, or this report anew |
+| `/oZFLIGHTS`, `/o` | the same in a new browser tab |
+| `ONLI`, `BACK`, `PRI` | Execute, Back, Print |
+| any other code | `at_user_command( )`, as a function of the screen |
+
+The transactions come from the installation: an object of
+`z2ui5_if_cgui_catalog` (`set_catalog( )`) returns code, report class, text
+and the variant to start with; a report class name works without a catalog.
+`Ctrl+K` (`Cmd+K` on a Mac) opens the command palette - the transactions and
+the functions of the screen in a popup to search.
+
 ### The last entries
 
 Every field remembers what was run with it: the last ten values - of a
@@ -554,8 +573,9 @@ Dialogs and screens
 Navigation and transactions
 
 - [ ] Launchpad tiles and intent navigation for a converted class
-- [ ] Command field instead of a plain input: transaction codes, `/n`, `/o`
-- [ ] Command palette (`Cmd+K` / `Ctrl+K`) to search and start reports
+- [x] Command field instead of a plain input: transaction codes, `/n`, `/o`
+      (`set_command_field( )`, `set_catalog( )`)
+- [x] Command palette (`Cmd+K` / `Ctrl+K`) to search and start reports
 - [x] Input history: the last ten entries of a field, in the browser's local
       storage, suggested as the user types
 - [x] Keyboard shortcuts: F8 Execute, F3 Back, `AT PFnn` and the function

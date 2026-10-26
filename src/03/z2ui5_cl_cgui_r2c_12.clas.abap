@@ -37,6 +37,9 @@ CLASS z2ui5_cl_cgui_r2c_12 IMPLEMENTATION.
 
   METHOD initialization.
 
+    " the command field of the SAP GUI: transactions, /n, /o and OK codes
+    set_command_field( ).
+
     set_line_count( 6 ).
     p_lines = 7.
     p_list = abap_true.

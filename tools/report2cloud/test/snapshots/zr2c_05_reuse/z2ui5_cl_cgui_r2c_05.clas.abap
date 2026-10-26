@@ -14,6 +14,7 @@ CLASS z2ui5_cl_cgui_r2c_05 DEFINITION PUBLIC
     DATA p_curr TYPE scarr-currcode.
 
   PROTECTED SECTION.
+    METHODS initialization REDEFINITION.
     METHODS selection_screen REDEFINITION.
     METHODS start_of_selection REDEFINITION.
     METHODS at_line_selection REDEFINITION.
@@ -23,6 +24,13 @@ ENDCLASS.
 
 
 CLASS z2ui5_cl_cgui_r2c_05 IMPLEMENTATION.
+
+  METHOD initialization.
+
+    " the command field of the SAP GUI: transactions, /n, /o and OK codes
+    set_command_field( ).
+
+  ENDMETHOD.
 
   METHOD selection_screen.
 

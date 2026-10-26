@@ -46,6 +46,9 @@ CLASS z2ui5_cl_cgui_r2c_02 IMPLEMENTATION.
 
     DATA ls_s_fldate LIKE LINE OF s_fldate.
 
+    " the command field of the SAP GUI: transactions, /n, /o and OK codes
+    set_command_field( ).
+
     set_title( `Flights of an Airline` ).
     p_carrid = 'LH'.
     p_max = 100.

@@ -682,7 +682,7 @@ test("SET PF-STATUS: the buttons and function keys of the status in the .prog.xm
 });
 
 test("SET PF-STATUS without the .prog.xml, of another program, by a field, space; AT PFnn", () => {
-  const conv = (src) => convert(src, { file: "zt.prog.abap", className: "zcl_t" });
+  const conv = (src) => convert(src, { file: "zt.prog.abap", className: "zcl_t", commandField: false });
   const r = conv("REPORT zt.\nDATA gv TYPE string.\nSTART-OF-SELECTION.\n  SET PF-STATUS 'MAIN'.\n  SET PF-STATUS gv.\n  SET PF-STATUS 'X' OF PROGRAM 'ZOTHER'.\n  SET PF-STATUS space.\n  SET TITLEBAR 'T01'.\n");
   assert.deepEqual(r.todos.map((t) => t.message.split(" - ")[0].split(":")[0]), [
     "SET PF-STATUS 'MAIN' dropped",
@@ -828,7 +828,7 @@ test("a grid created inline, a VALUE field catalog, no selection screen: alv( ) 
   const { result } = converted.get("zr2c_24_gridinline");
   assert.equal(result.ok, true, result.refusals.map((x) => x.message).join("\n"));
   // INITIALIZATION went straight on with START-OF-SELECTION - its statements are there
-  assert.match(cls, /METHOD initialization\.\n\n\s+set_title\( `Connections in a grid` \)\.\n\n\s+ENDMETHOD\./);
+  assert.match(cls, /METHOD initialization\.\n\n\s+" the command field[^\n]*\n\s+set_command_field\( \)\.\n\n\s+set_title\( `Connections in a grid` \)\.\n\n\s+ENDMETHOD\./);
   assert.match(cls, /METHOD start_of_selection\.\n\n\s+SELECT \* FROM spfli INTO TABLE @DATA\(connections\)/);
   assert.match(cls, /alv\( connections\n\s+\)->set_column_text\( name = `CARRID`\n\s+text = 'Airline'\n(.*\n){4}\s+\)->set_column_text\( name = `CITYTO`\n\s+text = 'To'\n\s+\)->set_column_hidden\( `MANDT` \)\./);
   assert.doesNotMatch(cls, /cl_gui_|DATA\(grid\)|DATA\(fcat\)|IF sy-subrc/i);
@@ -837,8 +837,11 @@ test("a grid created inline, a VALUE field catalog, no selection screen: alv( ) 
 
 test("a report with a selection screen keeps its INITIALIZATION; an IF of the source that is empty stays", () => {
   const src = "REPORT zt.\nPARAMETERS p TYPE i.\nINITIALIZATION.\n  p = 1.\nSTART-OF-SELECTION.\n  IF p = 2.\n  ENDIF.\n  WRITE p.\n";
-  const r = convert(src, { file: "zt.prog.abap", className: "zcl_t" });
+  const r = convert(src, { file: "zt.prog.abap", className: "zcl_t", commandField: false });
   assert.match(r.files["zcl_t.clas.abap"], /METHOD initialization\.\n\n\s+p = 1\./);
+  // by default the command field of the SAP GUI comes first
+  const on = convert(src, { file: "zt.prog.abap", className: "zcl_t" });
+  assert.match(on.files["zcl_t.clas.abap"], /METHOD initialization\.\n\n\s+" the command field[^\n]*\n\s+set_command_field\( \)\.\n\n\s+p = 1\./);
   assert.match(r.files["zcl_t.clas.abap"], /IF p = 2\.\n\s+ENDIF\./);
 });
 

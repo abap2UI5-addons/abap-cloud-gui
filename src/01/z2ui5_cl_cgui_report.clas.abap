@@ -70,6 +70,8 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
         variant_saved     TYPE string VALUE `CGUI_VARIANT_SAVED`,
         print             TYPE string VALUE `CGUI_PRINT`,
         background        TYPE string VALUE `CGUI_BACKGROUND`,
+        okcode            TYPE string VALUE `CGUI_OKCODE`,
+        palette           TYPE string VALUE `CGUI_PALETTE`,
         enter             TYPE string VALUE `CGUI_ENTER`,
         gui               TYPE string VALUE `CGUI_GUI`,
       END OF cs_ucomm.
@@ -162,6 +164,8 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
     "! the parameter IDs of the browser - ID=value lines, bound to the
     "! storage control that reads them
     DATA mv_cgui_spa TYPE string.
+    "! the command field of the page header
+    DATA mv_cgui_okcode TYPE string.
     "! the input history in the browser - a line per field: NAME, a tab,
     "! the entries apart by tabs, the latest first
     DATA mv_cgui_history TYPE string.
@@ -608,6 +612,24 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
       IMPORTING
         val TYPE REF TO z2ui5_if_cgui_job.
 
+    "! the command field in the page header, as in the SAP GUI: a
+    "! transaction of the catalog, /nCODE and /oCODE (a new browser tab),
+    "! /n and /o alone for this report, else an OK code - in
+    "! initialization( )
+    METHODS set_command_field
+      IMPORTING
+        val TYPE abap_bool DEFAULT abap_true.
+
+    "! the transactions the command field and the palette (Ctrl+K) start
+    METHODS set_catalog
+      IMPORTING
+        val TYPE REF TO z2ui5_if_cgui_catalog.
+
+    "! what the command field does with a command - the event of the field
+    METHODS okcode_execute
+      IMPORTING
+        val TYPE clike.
+
     METHODS set_prefill_last
       IMPORTING
         val TYPE abap_bool DEFAULT abap_true.
@@ -872,6 +894,8 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
     DATA mt_cgui_msg           TYPE ty_t_cgui_msg.
     DATA mv_cgui_prefill TYPE abap_bool.
     DATA mo_cgui_job     TYPE REF TO z2ui5_if_cgui_job.
+    DATA mo_cgui_catalog TYPE REF TO z2ui5_if_cgui_catalog.
+    DATA mv_cgui_cmd_on  TYPE abap_bool.
     " the message boxes of _msg_box( ) - shown at the end of the roundtrip
     DATA mt_cgui_box           TYPE ty_t_cgui_msg.
     " the messages of the run, I, W, E and A - what the message popover
@@ -1040,6 +1064,7 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
         filter         TYPE string VALUE `FILTER`,
         alv_f4         TYPE string VALUE `ALV_F4`,
         file           TYPE string VALUE `FILE`,
+        palette        TYPE string VALUE `PALETTE`,
       END OF cs_pending.
 
     TYPES:
@@ -1469,6 +1494,34 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
 
     "! Execute in Background: the checks of Execute, then the job
     METHODS on_background.
+
+    "! a function of the screen, as a button or an OK code would run it
+    METHODS user_command
+      IMPORTING
+        ucomm TYPE string.
+
+    "! start a report: code - a transaction of the catalog or a report
+    "! class; new_window - in a new browser tab
+    METHODS okcode_start
+      IMPORTING
+        code       TYPE string
+        new_window TYPE abap_bool.
+
+    "! the command palette - the transactions and the functions of the
+    "! screen in a popup to search
+    METHODS palette_open.
+    METHODS palette_result.
+
+    TYPES:
+      BEGIN OF ty_s_cgui_palette,
+        command TYPE c LENGTH 40,
+        text    TYPE c LENGTH 80,
+      END OF ty_s_cgui_palette.
+    TYPES ty_t_cgui_palette TYPE STANDARD TABLE OF ty_s_cgui_palette WITH EMPTY KEY.
+
+    METHODS palette_rows
+      RETURNING
+        VALUE(result) TYPE ty_t_cgui_palette.
 
     METHODS print_lines
       RETURNING
@@ -2715,6 +2768,12 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
       WHEN cs_ucomm-print.
         on_print( ).
 
+      WHEN cs_ucomm-okcode.
+        okcode_execute( mv_cgui_okcode ).
+
+      WHEN cs_ucomm-palette.
+        palette_open( ).
+
       WHEN cs_ucomm-background.
         IF mv_cgui_screen = cs_screen-selection AND mo_cgui_job IS BOUND.
           on_background( ).
@@ -2781,33 +2840,7 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
         ENDIF.
 
       WHEN OTHERS.
-        " the answer of a popup the run opened on the selection screen: the
-        " rest of START-OF-SELECTION follows in at_user_command( )
-        DATA(lv_run_answer) = xsdbool( mv_cgui_pending_ucomm IS NOT INITIAL AND lv_event = mv_cgui_pending_ucomm
-                                       AND mv_cgui_screen = cs_screen-selection ).
-        IF mv_cgui_pending_ucomm IS NOT INITIAL AND lv_event = mv_cgui_pending_ucomm.
-          CLEAR mv_cgui_pending_ucomm.
-        ENDIF.
-
-        " a function of the toolbar of a grid: its event user_command
-        READ TABLE mt_cgui_grid INTO DATA(ls_grid) WITH KEY id = mv_cgui_grid.
-        IF sy-subrc = 0 AND line_exists( ls_grid-functions[ fcode = lv_event ] ).
-          gui_event( id    = mv_cgui_grid
-                     event = `USER_COMMAND`
-                     value = lv_event ).
-        " a function on a dynpro is its PAI
-        ELSEIF mv_cgui_screen = cs_screen-dynpro.
-          on_dynpro_command( lv_event ).
-        ELSE.
-          at_user_command( lv_event ).
-          " what the rest of the run wrote shows - unless it opened the
-          " next popup
-          IF lv_run_answer = abap_true AND mv_cgui_nav = abap_false
-              AND ( mo_cgui_alv IS BOUND OR mo_cgui_tree IS BOUND OR gui_on_list( ) = abap_true
-                 OR ( mo_cgui_list IS BOUND AND mo_cgui_list->has_content( ) = abap_true ) ).
-            mv_cgui_screen = cs_screen-output.
-          ENDIF.
-        ENDIF.
+        user_command( lv_event ).
 
     ENDCASE.
 
@@ -3054,6 +3087,9 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
     CLEAR: mv_cgui_pending_field, mv_cgui_pending_kind, mv_cgui_pending_col.
 
     CASE lv_kind.
+      WHEN cs_pending-palette.
+        palette_result( ).
+
       WHEN cs_pending-range.
         on_range_result( lv_field ).
 
@@ -3678,6 +3714,234 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
     IF sy-subrc = 0.
       result = ls_spa-v.
     ENDIF.
+
+  ENDMETHOD.
+
+  METHOD user_command.
+
+    " the answer of a popup the run opened on the selection screen: the
+    " rest of START-OF-SELECTION follows in at_user_command( )
+    DATA(lv_run_answer) = xsdbool( mv_cgui_pending_ucomm IS NOT INITIAL AND ucomm = mv_cgui_pending_ucomm
+                                   AND mv_cgui_screen = cs_screen-selection ).
+    IF mv_cgui_pending_ucomm IS NOT INITIAL AND ucomm = mv_cgui_pending_ucomm.
+      CLEAR mv_cgui_pending_ucomm.
+    ENDIF.
+
+    " a function of the toolbar of a grid: its event user_command
+    READ TABLE mt_cgui_grid INTO DATA(ls_grid) WITH KEY id = mv_cgui_grid.
+    IF sy-subrc = 0 AND line_exists( ls_grid-functions[ fcode = ucomm ] ).
+      gui_event( id    = mv_cgui_grid
+                 event = `USER_COMMAND`
+                 value = ucomm ).
+    " a function on a dynpro is its PAI
+    ELSEIF mv_cgui_screen = cs_screen-dynpro.
+      on_dynpro_command( ucomm ).
+    ELSE.
+      at_user_command( ucomm ).
+      " what the rest of the run wrote shows - unless it opened the
+      " next popup
+      IF lv_run_answer = abap_true AND mv_cgui_nav = abap_false
+          AND ( mo_cgui_alv IS BOUND OR mo_cgui_tree IS BOUND OR gui_on_list( ) = abap_true
+             OR ( mo_cgui_list IS BOUND AND mo_cgui_list->has_content( ) = abap_true ) ).
+        mv_cgui_screen = cs_screen-output.
+      ENDIF.
+    ENDIF.
+
+  ENDMETHOD.
+
+  METHOD set_command_field.
+
+    mv_cgui_cmd_on = val.
+
+  ENDMETHOD.
+
+  METHOD set_catalog.
+
+    mo_cgui_catalog = val.
+
+  ENDMETHOD.
+
+  METHOD okcode_execute.
+
+    DATA(lv_code) = condense( CONV string( val ) ).
+    CLEAR mv_cgui_okcode.
+    IF lv_code IS INITIAL.
+      RETURN.
+    ENDIF.
+    DATA(lv_upper) = to_upper( lv_code ).
+
+    " /n and /o: a transaction here or in a new browser tab - alone, this
+    " report again
+    IF strlen( lv_upper ) >= 2 AND lv_upper(1) = `/`.
+      DATA(lv_target) = condense( substring( val = lv_upper off = 2 ) ).
+      IF lv_target IS INITIAL.
+        lv_target = variant_key( ).
+      ENDIF.
+      CASE lv_upper+1(1).
+        WHEN `N`.
+          okcode_start( code       = lv_target
+                        new_window = abap_false ).
+        WHEN `O`.
+          okcode_start( code       = lv_target
+                        new_window = abap_true ).
+        WHEN OTHERS.
+          message( text = replace( val  = 'Command &1 is not supported'(050)
+                                   sub  = `&1`
+                                   with = lv_code )
+                   type = `E` ).
+      ENDCASE.
+      RETURN.
+    ENDIF.
+
+    " a transaction of the catalog
+    DATA lt_tcode TYPE z2ui5_if_cgui_catalog=>ty_t_transaction.
+    IF mo_cgui_catalog IS BOUND.
+      lt_tcode = mo_cgui_catalog->get( ).
+    ENDIF.
+    IF line_exists( lt_tcode[ code = lv_upper ] ).
+      okcode_start( code       = lv_upper
+                    new_window = abap_false ).
+      RETURN.
+    ENDIF.
+
+    " else an OK code of the screen - the standard ones of the SAP GUI first
+    CASE lv_upper.
+      WHEN `ONLI` OR `F8`.
+        IF mv_cgui_screen = cs_screen-selection.
+          on_execute( ).
+        ENDIF.
+      WHEN `BACK` OR `%EX` OR `RW` OR `F3`.
+        on_back( ).
+      WHEN `PRI`.
+        IF mv_cgui_screen = cs_screen-output.
+          on_print( ).
+        ENDIF.
+      WHEN OTHERS.
+        user_command( lv_upper ).
+    ENDCASE.
+
+  ENDMETHOD.
+
+  METHOD okcode_start.
+
+    DATA lo_app   TYPE REF TO z2ui5_cl_cgui_report.
+    DATA lt_keep  TYPE string_table.
+    DATA lt_query TYPE string_table.
+
+    DATA(lv_report) = code.
+    DATA(lv_variant) = ``.
+    IF mo_cgui_catalog IS BOUND.
+      DATA(lt_tcode) = mo_cgui_catalog->get( ).
+      READ TABLE lt_tcode INTO DATA(ls_tcode) WITH KEY code = code.
+      IF sy-subrc = 0.
+        lv_report = to_upper( ls_tcode-report ).
+        lv_variant = ls_tcode-variant.
+      ENDIF.
+    ENDIF.
+
+    " a report class - nothing else starts from the command field
+    cl_abap_typedescr=>describe_by_name( EXPORTING  p_name         = lv_report
+                                         RECEIVING  p_descr_ref    = DATA(lo_type)
+                                         EXCEPTIONS type_not_found = 1
+                                                    OTHERS         = 2 ).
+    " created, also for a new tab: what is no report fails here, not there
+    DATA(lv_ok) = xsdbool( sy-subrc = 0 AND lo_type->kind = cl_abap_typedescr=>kind_class ).
+    IF lv_ok = abap_true.
+      TRY.
+          CREATE OBJECT lo_app TYPE (lv_report).
+        CATCH cx_sy_create_object_error cx_sy_move_cast_error.
+          lv_ok = abap_false.
+      ENDTRY.
+    ENDIF.
+    IF lv_ok = abap_false.
+      message( text = replace( val  = 'Transaction &1 does not exist'(051)
+                               sub  = `&1`
+                               with = code )
+               type = `E` ).
+      RETURN.
+    ENDIF.
+
+    IF new_window = abap_false.
+      IF lv_variant IS NOT INITIAL.
+        lo_app->mv_cgui_variant_start = lv_variant.
+      ENDIF.
+      lo_app->mv_cgui_called = abap_true.
+      mv_cgui_nav = abap_true.
+      client->nav_app_call( lo_app ).
+      RETURN.
+    ENDIF.
+
+    " a new browser tab: the URL of this one with the other app to start -
+    " the client and the language stay
+    DATA(lv_search) = client->get( )-s_config-search.
+    IF lv_search IS NOT INITIAL AND lv_search(1) = `?`.
+      lv_search = lv_search+1.
+    ENDIF.
+    SPLIT lv_search AT `&` INTO TABLE lt_query.
+    LOOP AT lt_query INTO DATA(lv_param) WHERE table_line IS NOT INITIAL.
+      IF to_upper( segment( val = lv_param index = 1 sep = `=` ) ) = `APP_START`
+          OR to_upper( segment( val = lv_param index = 1 sep = `=` ) ) = `VARIANT`.
+        CONTINUE.
+      ENDIF.
+      INSERT lv_param INTO TABLE lt_keep.
+    ENDLOOP.
+    INSERT |app_start={ to_lower( lv_report ) }| INTO TABLE lt_keep.
+    IF lv_variant IS NOT INITIAL.
+      INSERT |variant={ z2ui5_cl_cgui_context=>url_escape( lv_variant ) }| INTO TABLE lt_keep.
+    ENDIF.
+    client->follow_up_action( val   = client->cs_event-open_new_tab
+                              t_arg = VALUE #( ( |{ client->get( )-s_config-origin }{ client->get( )-s_config-pathname }?| &&
+                                                 concat_lines_of( table = lt_keep sep = `&` ) ) ) ).
+
+  ENDMETHOD.
+
+  METHOD palette_rows.
+
+    IF mo_cgui_catalog IS BOUND.
+      LOOP AT mo_cgui_catalog->get( ) INTO DATA(ls_tcode).
+        INSERT VALUE #( command = to_upper( ls_tcode-code ) text = ls_tcode-text ) INTO TABLE result.
+      ENDLOOP.
+    ENDIF.
+    " the function keys of the screen
+    LOOP AT mt_cgui_fkey INTO DATA(ls_fkey).
+      INSERT VALUE #( command = to_upper( ls_fkey-ucomm ) text = ls_fkey-text ) INTO TABLE result.
+    ENDLOOP.
+    CASE mv_cgui_screen.
+      WHEN cs_screen-selection.
+        INSERT VALUE #( command = `ONLI` text = 'Execute'(026) ) INTO TABLE result.
+      WHEN cs_screen-output.
+        INSERT VALUE #( command = `PRI` text = 'Print'(034) ) INTO TABLE result.
+    ENDCASE.
+    INSERT VALUE #( command = `/O` text = 'This report in a new window'(052) ) INTO TABLE result.
+
+  ENDMETHOD.
+
+  METHOD palette_open.
+
+    DATA(lt_row) = palette_rows( ).
+    mv_cgui_pending_kind = cs_pending-palette.
+    mv_cgui_nav = abap_true.
+    client->nav_app_call( z2ui5_cl_cgui_select=>factory( tab   = lt_row
+                                                         title = 'Commands'(053) ) ).
+
+  ENDMETHOD.
+
+  METHOD palette_result.
+
+    FIELD-SYMBOLS <row> TYPE ty_s_cgui_palette.
+    DATA lo_popup TYPE REF TO z2ui5_cl_cgui_select.
+
+    TRY.
+        lo_popup ?= client->get_app_prev( ).
+      CATCH cx_root.
+        RETURN.
+    ENDTRY.
+    IF lo_popup->result( )-confirmed = abap_false OR lo_popup->result( )-row IS NOT BOUND.
+      RETURN.
+    ENDIF.
+    DATA(lr_row) = lo_popup->result( )-row.
+    ASSIGN lr_row->* TO <row>.
+    okcode_execute( <row>-command ).
 
   ENDMETHOD.
 
@@ -5650,6 +5914,13 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
                               t_arg = VALUE #( ( `F8` ) ( cs_ucomm-execute ) ( client->cs_view-main ) ) ).
     client->follow_up_action( val   = client->cs_event-keyboard_shortcut
                               t_arg = VALUE #( ( `F3` ) ( cs_ucomm-back ) ( client->cs_view-main ) ) ).
+    " the command palette - with a command field or a catalog to search
+    IF mv_cgui_cmd_on = abap_true OR mo_cgui_catalog IS BOUND.
+      client->follow_up_action( val   = client->cs_event-keyboard_shortcut
+                                t_arg = VALUE #( ( `Ctrl+K` ) ( cs_ucomm-palette ) ( client->cs_view-main ) ) ).
+      client->follow_up_action( val   = client->cs_event-keyboard_shortcut
+                                t_arg = VALUE #( ( `Meta+K` ) ( cs_ucomm-palette ) ( client->cs_view-main ) ) ).
+    ENDIF.
 
     " the function keys of SET PF-STATUS, on the output only
     IF mv_cgui_screen = cs_screen-selection.
@@ -6228,6 +6499,15 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
         )->a( n = `title`          t = mv_cgui_title
         )->a( n = `showNavButton`  b = xsdbool( mv_cgui_screen = cs_screen-output OR mv_cgui_screen = cs_screen-dynpro OR mv_cgui_called = abap_true )
         )->a( n = `navButtonPress` v = client->_event( cs_ucomm-back ) ).
+
+    IF mv_cgui_cmd_on = abap_true AND mv_cgui_denied = abap_false.
+      page->ele( `headerContent`
+          )->tag( `Input`
+              )->a( n = `value`       v = client->_bind( mv_cgui_okcode )
+              )->a( n = `placeholder` t = CONV #( 'Command'(054) )
+              )->a( n = `width`       v = `12rem`
+              )->a( n = `submit`      v = client->_event( cs_ucomm-okcode ) ).
+    ENDIF.
 
     " the storage controls read the variants and the parameter IDs out of
     " the browser's local storage into mv_cgui_variants and mv_cgui_spa and

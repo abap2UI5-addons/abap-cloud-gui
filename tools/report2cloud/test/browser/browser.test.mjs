@@ -72,7 +72,7 @@ test("the input history - a value run once is offered as a suggestion on the nex
     execute: false,
     onLine: (l) => t.diagnostic(l),
     check: async (page, errors, cls) => {
-      const input = page.locator("input.sapMInputBaseInner").first();
+      const input = page.locator('input[id$="cgui_f_p_name-inner"]');
       await input.fill("Ada Lovelace");
       await input.press("Tab");
       await page.locator(".sapMBtn").filter({ hasText: /^\s*Execute/ }).first().click({ timeout: 10_000 });
@@ -102,7 +102,7 @@ test("Print hands the output to the browser as a PDF - a document a PDF reader o
     execute: false,
     onLine: (l) => t.diagnostic(l),
     check: async (page, errors) => {
-      const input = page.locator("input.sapMInputBaseInner").first();
+      const input = page.locator('input[id$="cgui_f_p_name-inner"]');
       await input.fill("Ada");
       await input.press("Tab");
       await page.locator(".sapMBtn").filter({ hasText: /^\s*Execute/ }).first().click({ timeout: 10_000 });
@@ -123,6 +123,44 @@ test("Print hands the output to the browser as a PDF - a document a PDF reader o
       try { text = execFileSync("pdftotext", ["-layout", file, "-"], { encoding: "utf8" }); } catch { text = undefined; }
       if (text !== undefined && !/Hello\s+Ada/.test(text)) errors.push(`pdftotext does not read the list: ${text.slice(0, 200)}`);
       t.diagnostic(text === undefined ? "no pdftotext - the structure checked only" : "pdftotext read the list");
+    },
+  });
+  assert.deepEqual(rows.filter((r) => !r.ok).map((r) => `${r.cls}: ${r.errors.join("; ")}`), []);
+});
+
+test("the command field and Ctrl+K - /o opens a report in a new tab, the palette runs a function of the screen", { skip, timeout: 10 * 60_000 }, async (t) => {
+  const hello = classes.filter((c) => /_r2c_01$/.test(c));
+  const rows = await browserRun(hello, {
+    url: backend.url,
+    execute: false,
+    onLine: (l) => t.diagnostic(l),
+    check: async (page, errors) => {
+      const command = page.getByPlaceholder("Command");
+      if (!(await command.count())) {
+        errors.push("no command field in the page header");
+        return;
+      }
+      // /o: the other report in a new tab
+      const [tab] = await Promise.all([
+        page.context().waitForEvent("page", { timeout: 30_000 }),
+        (async () => { await command.fill("/oz2ui5_cl_cgui_r2c_02"); await command.press("Enter"); })(),
+      ]);
+      if (!/app_start=z2ui5_cl_cgui_r2c_02/i.test(tab.url())) errors.push(`the new tab is ${tab.url()}`);
+      await tab.close();
+      // Ctrl+K: the palette, Execute picked from it runs the report
+      const name = page.locator('input[id$="cgui_f_p_name-inner"]');
+      await name.fill("Ada");
+      await name.press("Tab");
+      await page.keyboard.press("Control+K");
+      const dialog = page.locator(".sapMDialog").filter({ hasText: "Commands" });
+      await dialog.waitFor({ timeout: 30_000 });
+      await dialog.locator(".sapMLIB").filter({ hasText: "ONLI" }).first().click();
+      const ok = dialog.locator(".sapMBtn").filter({ hasText: /^\s*(OK|Select|Confirm)/ });
+      if (await ok.count()) await ok.first().click();
+      await page.waitForLoadState("networkidle", { timeout: 10_000 }).catch(() => {});
+      await page.waitForTimeout(500);
+      const text = (await page.evaluate(() => document.body.innerText)).replace(/\s+/g, " ");
+      if (!/Hello Ada/.test(text)) errors.push(`Execute from the palette did not run the report: ${text.slice(0, 300)}`);
     },
   });
   assert.deepEqual(rows.filter((r) => !r.ok).map((r) => `${r.cls}: ${r.errors.join("; ")}`), []);

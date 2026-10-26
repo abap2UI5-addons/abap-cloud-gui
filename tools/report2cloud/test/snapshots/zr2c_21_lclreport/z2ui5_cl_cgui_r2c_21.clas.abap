@@ -36,6 +36,9 @@ CLASS z2ui5_cl_cgui_r2c_21 IMPLEMENTATION.
 
     lcl_r2c=>app = me.
 
+    " the command field of the SAP GUI: transactions, /n, /o and OK codes
+    set_command_field( ).
+
     p_carrid = 'LH'.
 
     go_report = NEW lcl_report( |Flights| ).

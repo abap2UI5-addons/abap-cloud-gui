@@ -29,6 +29,9 @@ CLASS z2ui5_cl_cgui_r2c_17 IMPLEMENTATION.
 
   METHOD initialization.
 
+    " the command field of the SAP GUI: transactions, /n, /o and OK codes
+    set_command_field( ).
+
     set_title( `The GUI status of a list` ).
     p_carrid = 'LH'.
 

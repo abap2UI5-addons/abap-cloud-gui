@@ -30,6 +30,9 @@ CLASS z2ui5_cl_cgui_r2c_04 IMPLEMENTATION.
 
   METHOD initialization.
 
+    " the command field of the SAP GUI: transactions, /n, /o and OK codes
+    set_command_field( ).
+
     s_carrid = VALUE #( ( sign = `I` option = `EQ` low = 'LH' ) ).
     p_rows = 200.
 

@@ -36,6 +36,9 @@ CLASS z2ui5_cl_cgui_r2c_36 IMPLEMENTATION.
 
     DATA ls_s_price LIKE LINE OF s_price.
 
+    " the command field of the SAP GUI: transactions, /n, /o and OK codes
+    set_command_field( ).
+
     set_title( `Products in a Selection` ).
     p_uniq = abap_true.
 
