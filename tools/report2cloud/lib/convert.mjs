@@ -876,6 +876,10 @@ class Converter {
     // the command field of the SAP GUI in the page header - off with
     // commandField: false
     this.commandField = opts.commandField !== false;
+    // wrappers: a CALL FUNCTION of a function module with no counterpart
+    // calls a method of a wrapper class, written beside the class
+    this.wrappers = opts.wrappers === true;
+    this.wrapped = new Map();
     this.refusals = [];
     this.mapped = [];
     this.todos = [];
@@ -3366,6 +3370,11 @@ class Converter {
     if (locals.imp) files[`${cls}.clas.locals_imp.abap`] = normalizeAbap(this.reindent(locals.imp, "zr2c_locals_imp.prog.abap"));
 
     files[`${cls}.clas.xml`] = classXml(cls, this.pool.title || `report2cloud - ${this.programName}`);
+    if (this.wrapped.size) {
+      const w = this.wrapperName();
+      files[`${w}.clas.abap`] = normalizeAbap(this.reindent(this.wrapperClass(), `${w}.clas.abap`));
+      files[`${w}.clas.xml`] = classXml(w, `report2cloud - the function modules of ${this.programName ?? cls}`);
+    }
 
     for (const [name, text] of Object.entries(files)) {
       for (const l of longLines(text)) {
@@ -6462,6 +6471,10 @@ class Converter {
       this.refuse(s, `CALL FUNCTION '${fm}' - only REUSE_ALV_GRID_DISPLAY / REUSE_ALV_LIST_DISPLAY with TABLES t_outtab are converted`);
       return true;
     }
+    if (this.wrappers && /^'[^']+'$/.test(nodeText(child(s, "FunctionName")).trim()) && !/^(POPUP_|REUSE_ALV_|LVC_|GUI_|F4IF_)/.test(fm)) {
+      this.wrapFunction(s, b, fm);
+      return true;
+    }
     if (fm === "F4IF_INT_TABLE_VALUE_REQUEST") {
       // in a FORM: called from AT SELECTION-SCREEN ON VALUE-REQUEST, its
       // value_help_popup( ) writes into the field of that event
@@ -6490,6 +6503,127 @@ class Converter {
       return true;
     }
     return false;
+  }
+
+  // ------------------------------------------------------------- wrappers
+
+  wrapperName() {
+    return `${this.className.slice(0, 26)}_fmw`;
+  }
+
+  /** CALL FUNCTION as the method of the wrapper class: the parameters as
+   *  the call passes them, EXPORTING becomes IMPORTING of the method and
+   *  IMPORTING EXPORTING, TABLES CHANGING; the EXCEPTIONS stay, so
+   *  sy-subrc does */
+  wrapFunction(s, b, fm) {
+    const ov = this.rewrites(s, b.ctx, b);
+    const call = { EXPORTING: [], IMPORTING: [], CHANGING: [], EXCEPTIONS: [] };
+    const params = child(s, "FunctionParameters");
+    let keyword;
+    for (const c of params ? params.getChildren() : []) {
+      if (isToken(c)) {
+        keyword = uc(c.getFirstToken().getStr());
+        continue;
+      }
+      for (const p of children(c)) {
+        const name = lc(nodeText(child(p, "ParameterName") ?? p.getChildren()[0]));
+        const value = kind(p) === "ParameterException" ? nodeText(p.getChildren()[p.getChildren().length - 1]) : nodeText(p.getChildren()[p.getChildren().length - 1], ov);
+        const section = keyword === "TABLES" ? "CHANGING" : keyword;
+        if (!call[section]) continue;
+        call[section].push({ name: name === "others" ? "OTHERS" : name, value, table: keyword === "TABLES" });
+      }
+    }
+    // the method: one per function module, its parameters the union of
+    // all its calls
+    const method = lc(fm).replace(/^\/(\w+)\//, "$1_").replace(/[^a-z0-9_]/g, "_").slice(0, 30);
+    const sig = this.wrapped.get(fm) ?? { method, calls: 0, IMPORTING: new Map(), EXPORTING: new Map(), CHANGING: new Map(), EXCEPTIONS: new Set(), others: false };
+    sig.calls++;
+    for (const p of call.EXPORTING) sig.IMPORTING.set(p.name, p);
+    for (const p of call.IMPORTING) sig.EXPORTING.set(p.name, p);
+    for (const p of call.CHANGING) sig.CHANGING.set(p.name, p);
+    for (const p of call.EXCEPTIONS) {
+      if (p.name === "OTHERS") sig.others = true;
+      else if (p.name !== "error_message") sig.EXCEPTIONS.add(p.name);
+    }
+    this.wrapped.set(fm, sig);
+
+    const head = `${this.wrapperName()}=>${method}( `;
+    const width = Math.max(0, ...Object.values(call).flat().map((p) => p.name.length));
+    const lines = [];
+    for (const [title, list] of Object.entries(call)) {
+      list.filter((p) => title !== "EXCEPTIONS" || p.name !== "error_message").forEach((p, i) => {
+        const lead = i === 0 ? title.padEnd(10) : " ".repeat(10);
+        lines.push(`${lines.length ? " ".repeat(head.length) : head}${lead} ${p.name.padEnd(width)} = ${p.value}`);
+      });
+    }
+    if (!lines.length) lines.push(head.trimEnd());
+    lines[lines.length - 1] += " ).";
+    b.out.push(...lines);
+    if (sig.calls === 2) this.todo(s, `CALL FUNCTION '${fm}' twice: ${this.wrapperName()}=>${method}( ) has the parameters of all calls - a parameter one call leaves out is passed initial; check it against the function module`);
+    this.map(s, `\`${this.wrapperName()}=>${method}( )\` - the function module behind a wrapper class, for a person to type and to release for ABAP Cloud`);
+  }
+
+  /** the wrapper class of the function modules - a stub: its parameters
+   *  are generic until a person types them as the function module does */
+  wrapperClass() {
+    const w = this.wrapperName();
+    const out = [
+      `"! The function modules ${this.programName ?? this.className} calls, behind methods - written by report2cloud.`,
+      "\"! It stays in a classic package (tier 2) and calls them as they are; the",
+      "\"! report class calls the methods. Type every parameter as the function",
+      "\"! module does (SE37), then release the class for ABAP Cloud (C1).",
+      `CLASS ${w} DEFINITION PUBLIC FINAL CREATE PUBLIC.`, "", "  PUBLIC SECTION.", "",
+    ];
+    const signature = (sig) => {
+      const l = [`    CLASS-METHODS ${sig.method}`];
+      const section = (title, map, type) => {
+        if (!map.size) return;
+        l.push(`      ${title}`);
+        for (const p of map.values()) l.push(`        ${p.name} TYPE ${p.table ? "STANDARD TABLE" : type}${title === "IMPORTING" ? " OPTIONAL" : ""}`);
+      };
+      section("IMPORTING", sig.IMPORTING, "any");
+      section("EXPORTING", sig.EXPORTING, "any");
+      section("CHANGING", sig.CHANGING, "any");
+      const exc = [...sig.EXCEPTIONS, ...(sig.others ? ["error"] : [])];
+      if (exc.length) {
+        l.push("      EXCEPTIONS");
+        for (const e of exc) l.push(`        ${e}`);
+      }
+      l[l.length - 1] += ".";
+      return l;
+    };
+    for (const [fm, sig] of this.wrapped) out.push(`    " ${fm}`, ...signature(sig), "");
+    out.push("ENDCLASS.", "", "", `CLASS ${w} IMPLEMENTATION.`, "");
+    for (const [fm, sig] of this.wrapped) {
+      out.push(`  METHOD ${sig.method}.`, "", `    CALL FUNCTION '${fm}'`);
+      const pass = (title, map) => {
+        if (!map.size) return;
+        out.push(`      ${title}`);
+        for (const p of map.values()) out.push(`        ${p.name} = ${p.name}`);
+      };
+      pass("EXPORTING", sig.IMPORTING);
+      pass("IMPORTING", sig.EXPORTING);
+      const changing = new Map([...sig.CHANGING].filter(([, p]) => !p.table));
+      const tables = new Map([...sig.CHANGING].filter(([, p]) => p.table));
+      pass("CHANGING", changing);
+      pass("TABLES", tables);
+      const exc = [...sig.EXCEPTIONS];
+      if (exc.length || sig.others) {
+        out.push("      EXCEPTIONS");
+        exc.forEach((e, i) => out.push(`        ${e} = ${i + 1}`));
+        out.push(`        OTHERS = ${exc.length + 1}`);
+      }
+      out[out.length - 1] += ".";
+      if (exc.length || sig.others) {
+        out.push("    CASE sy-subrc.");
+        exc.forEach((e, i) => out.push(`      WHEN ${i + 1}.`, `        RAISE ${e}.`));
+        out.push(`      WHEN ${exc.length + 1}.`, `        RAISE ${sig.others ? "error" : exc[exc.length - 1]}.`);
+        out.push("    ENDCASE.");
+      }
+      out.push("", "  ENDMETHOD.", "");
+    }
+    out.push("ENDCLASS.");
+    return out.join("\n");
   }
 
   // ------------------------------------------------------------------ ALV

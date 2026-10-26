@@ -55,7 +55,20 @@ node tools/report2cloud/cli.mjs <report.prog.abap> [options]
                    copy of this repository (needs git and network for the dependencies)
   --ddic <dir>     abapGit DDIC objects to resolve on-premise tables during --check
   --partial        write the class even when statements are refused
+  --wrappers       a CALL FUNCTION the converter has no counterpart for calls a method of a
+                   wrapper class, written beside the class: <class>_fmw, to type and release
 ```
+
+With `--wrappers`, a function module the converter does not map - a Z one,
+or one of SAP that is not released - is called through a wrapper class, as
+the clean core model has it: `<class>_fmw` gets one static method per
+function module, with the parameters as the report passes them (EXPORTING
+becomes IMPORTING, TABLES CHANGING) and its EXCEPTIONS, and calls the
+function module as it is; the report class calls the method, `sy-subrc`
+stays. The wrapper stays in a classic package. Its parameters are generic -
+a person types them as the function module does (SE37) and releases the
+class for ABAP Cloud; the migration report still names the function module,
+in the wrapper.
 
 | Exit code | |
 |---|---|
@@ -109,6 +122,26 @@ export of the Z reports: the top line of the refusals is the next construct
 to map, and the converted share is the number to move. `--json` writes a line
 per report for a diff between two runs. A measurement, not a gate - the exit
 code is 0 whatever the numbers.
+
+### A whole package in one run
+
+```
+node tools/report2cloud/package.mjs <dir> [<dir> ...] --out <dir> [--includes dir] [--wrappers]
+```
+
+converts every report under the folders as `coverage.mjs` does and writes the
+classes of the converted ones into `--out`, with `estate.md` beside them:
+
+- the reports in the order to migrate them - a report after the reports it
+  calls with `SUBMIT`, `PERFORM ... IN PROGRAM` and `PERFORM f(prog)`, a
+  cycle kept in the order of the names;
+- the calls as a Mermaid graph, refused reports and calls out of the estate
+  marked;
+- what the estate calls outside of it - reports and transactions of SAP or
+  of another package, to check by hand;
+- the coverage of the estate, the refusals ranked across it.
+
+A `SUBMIT` of a report of the estate starts its class.
 
 ### The web corpus
 
@@ -466,6 +499,8 @@ of the samples: one call per line, the parameters aligned.
 |---|---|
 | `cli.mjs` | the command line |
 | `coverage.mjs` | the measurement over a folder of reports |
+| `package.mjs` | a whole package in one run: the classes and `estate.md` |
+| `lib/estate.mjs` | the calls between the reports of a package, the order to migrate them in |
 | `web.mjs` | the measurement over the open-source reports of the web (`report2cloud:web`) |
 | `lib/convert.mjs` | the converter |
 | `lib/includes.mjs` | the INCLUDEs of a report, inlined from the files beside it, with where every line came from |

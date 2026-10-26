@@ -1141,3 +1141,24 @@ test("the converter runs in the browser too - no node: import in convert.mjs and
   walk("report.mjs");
   assert.ok(seen.has("abap.mjs") && seen.has("refusals.mjs"));
 });
+
+test("wrappers: a function module without a counterpart behind a method of a wrapper class - the parameters as the call passes them, the EXCEPTIONS and sy-subrc kept", () => {
+  const src = "REPORT zt.\nDATA lv TYPE string.\nDATA lt TYPE STANDARD TABLE OF string.\nSTART-OF-SELECTION.\n" +
+    "  CALL FUNCTION 'Z_LEGACY_READ'\n    EXPORTING\n      iv_key = 'A'\n    IMPORTING\n      ev_text = lv\n    TABLES\n      et_lines = lt\n    EXCEPTIONS\n      not_found = 1\n      OTHERS = 2.\n" +
+    "  WRITE lv.\n";
+  const off = convert(src, { file: "zt.prog.abap", className: "zcl_t" });
+  assert.match(off.files["zcl_t.clas.abap"], /CALL FUNCTION 'Z_LEGACY_READ'/);
+  assert.equal(off.files["zcl_t_fmw.clas.abap"], undefined);
+
+  const r = convert(src, { file: "zt.prog.abap", className: "zcl_t", wrappers: true });
+  assert.equal(r.ok, true, r.refusals.map((x) => x.message).join("\n"));
+  const cls = r.files["zcl_t.clas.abap"];
+  assert.doesNotMatch(cls, /CALL FUNCTION/);
+  assert.match(cls, /zcl_t_fmw=>z_legacy_read\( EXPORTING\s+iv_key\s+= 'A'\n\s+IMPORTING\s+ev_text\s+= lv\n\s+CHANGING\s+et_lines\s+= lt\n\s+EXCEPTIONS not_found = 1\n\s+OTHERS\s+= 2 \)\./);
+  const w = r.files["zcl_t_fmw.clas.abap"];
+  assert.match(w, /CLASS-METHODS z_legacy_read\n\s+IMPORTING\n\s+iv_key TYPE any OPTIONAL\n\s+EXPORTING\n\s+ev_text TYPE any\n\s+CHANGING\n\s+et_lines TYPE STANDARD TABLE\n\s+EXCEPTIONS\n\s+not_found\n\s+error\./);
+  assert.match(w, /CALL FUNCTION 'Z_LEGACY_READ'[\s\S]*TABLES\n\s+et_lines = et_lines[\s\S]*WHEN 1\.\n\s+RAISE not_found\./);
+  assert.ok(r.files["zcl_t_fmw.clas.xml"]);
+  // the function module is still one to check - in the wrapper
+  assert.deepEqual(r.release.filter((x) => x.kind === "function module").map((x) => `${x.name} ${x.file}`), ["Z_LEGACY_READ zcl_t_fmw.clas.abap"]);
+});

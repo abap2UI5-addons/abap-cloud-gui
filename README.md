@@ -631,12 +631,14 @@ Navigation and transactions
 Stage 3 - clean core at the scale of a code base
 
 - [ ] A `SELECT` from a table with a known released successor rewritten,
-      field names included, where the mapping is certain; a typed wrapper
-      stub for an unreleased function module, for a person to fill
+      field names included, where the mapping is certain
+- [x] A wrapper stub for an unreleased function module, for a person to type
+      and release (`--wrappers`: `<class>_fmw`, the call through its method)
 - [ ] ATC findings in the migration report
-- [ ] A whole package or transport converted in one run: the dependency
-      graph over `SUBMIT` and `PERFORM ... IN PROGRAM`, one coverage table
-      for the estate, the refusals ranked across it
+- [x] A whole package converted in one run (`tools/report2cloud/package.mjs`):
+      the dependency graph over `SUBMIT` and `PERFORM ... IN PROGRAM`, the
+      order to migrate in, one coverage table for the estate, the refusals
+      ranked across it
 
 Stage 4 - in the browser, and with an agent
 
