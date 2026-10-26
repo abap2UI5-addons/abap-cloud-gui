@@ -157,6 +157,21 @@ the popover, and a click on it puts the cursor into the field. Fields
 declared `obligatory` are checked before `at_selection_screen`, each empty
 one with a message of its own.
 
+The short API, in the style of abap2UI5, says the same in fewer words, and
+its calls chain:
+
+```abap
+_msg( )->w( `Only the first 100 flights` )->s( `Flights read` ).
+_msg( )->e( text = `Enter a carrier` field = `P_CARRID` ).      " MESSAGE ... TYPE 'E'
+_msg_box( )->i( `Saved` ).                                    " a box of its own, the run goes on
+_popup( )->confirm( question = `Post the document?` ucomm = `POST` ).
+_popup( )->decide( question = `Which copy?` options = VALUE #( ( `Original` ) ( `Copy` ) ) ucomm = `PICK` ).
+```
+
+`_msg( )` is `message( )`, `_msg_box( )` a message box whatever the type -
+not in the popover, an error does not stop the run - and `_popup( )` has the
+popups of the report: the answer comes as `at_user_command( ucomm )`.
+
 ### A dynamic selection screen
 
 `MODIF ID`, `USER-COMMAND` and `LOOP AT SCREEN` work as in a classic report:
@@ -470,9 +485,11 @@ Selection screen
 - [ ] Value helps: CDS value helps (`@Consumption.valueHelpDefinition`),
       text tables beside value tables, search helps, F4 inside the range
       popup of a select-option
-- [ ] `AT SELECTION-SCREEN ON BLOCK`, `ON RADIOBUTTON GROUP`, `AS LISTBOX`
-- [ ] `MEMORY ID`
-- [ ] A phone layout of the selection screen
+- [x] `AT SELECTION-SCREEN ON BLOCK`, `ON RADIOBUTTON GROUP`, `AS LISTBOX`
+- [x] `MEMORY ID`
+- [x] A phone layout of the selection screen: labels above the fields, a
+      select-option's from and to and a line of fields wrap instead of
+      squeezing (the browser test checks it at 390 px, themed)
 - [x] Selection variants on the server (table `Z2UI5_CGUI_VAR`): shared
       and protected variants, a pluggable store beside the browser's local
       storage, dynamic date values
@@ -481,8 +498,9 @@ Output
 
 - [x] ALV: Excel export (Office Open XML), layouts on the server (table
       `Z2UI5_CGUI_LAY`, shared, protected, a default per user)
-- [ ] ALV: user-formatted dates, times and amounts, totals and subtotals,
-      hotspot per column, toolbar with own functions, editable cells
+- [x] ALV: formatted dates, times and amounts (the locale of the browser),
+      totals and subtotals, hotspot per column, toolbar with own functions,
+      editable cells
 - [ ] ALV: a chart over the grid - the columns as series, the layout's
       sort and filter applied
 - [x] List: `WRITE AT` positions and `UNDER`, columns that line up
@@ -493,16 +511,18 @@ Output
 
 Messages and logging
 
-- [ ] Short API in the style of abap2UI5: `_msg( )->e( )`, `_msg_box( )->e( )`
+- [x] Short API in the style of abap2UI5: `_msg( )->e( )`, `_msg_box( )->e( )`,
+      `_popup( )->decide( )` / `confirm( )` / `get_values( )`
 - [ ] Application log (BAL) and [ABAP Logger](https://github.com/ABAP-Logger/ABAP-Logger)
       as a source for the message popover and a log popup; the internal
       message table is replaced by the log
 
 Dialogs and screens
 
-- [ ] Popups: `_popup( )->decide` (`POPUP_TO_DECIDE`), `POPUP_GET_VALUES`,
-      transport request selection (from [abap2UI5-addons/popups](https://github.com/abap2UI5-addons/popups))
-- [ ] `CALL SCREEN` and back, also of a screen in another class
+- [ ] Popups: transport request selection (from [abap2UI5-addons/popups](https://github.com/abap2UI5-addons/popups)) -
+      `POPUP_TO_DECIDE` and `POPUP_GET_VALUES` are there, also as `_popup( )`
+- [ ] `CALL SCREEN` of a screen in another class - `CALL SCREEN` of the
+      report's own screens and back is there
 - [ ] `CALL SELECTION-SCREEN` of another report, as a popup or by screen number
 
 Navigation and transactions
@@ -533,7 +553,7 @@ Stage 4 - in the browser, and with an agent
 - [ ] The converter in the abap2UI5 playground: drop a `.prog.abap` into the
       AI Studio, the class runs on the stage, the refusals are the model's
       work list - nothing to install
-- [ ] `migrate_report` in the MCP server with the class deployed into the
+- [x] `migrate_report` in the MCP server with the class deployed into the
       sandbox and its first screen answered
 - [ ] An evaluation harness for the AI loop: a model works the migration
       reports of the corpus, and the share that ends clean is measured

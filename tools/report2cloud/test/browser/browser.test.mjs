@@ -56,3 +56,10 @@ test("every converted report of the corpus boots in the browser, renders and run
   assert.deepEqual(failed.map((r) => `${r.cls}: ${r.errors.join("; ")}`), []);
   assert.ok(rows.filter((r) => r.executed).length >= 20, "the reports with a selection screen ran with Execute");
 });
+
+test("on a phone the selection screens fit the width - select-options, lines of fields and the list wrap instead of scrolling sideways", { skip, timeout: 30 * 60_000 }, async (t) => {
+  // the selection screens of the corpus with select-options, a line of fields and pushbuttons
+  const phone = classes.filter((c) => /_r2c_(01|02|06|10|12|14)$/.test(c));
+  const rows = await browserRun(phone, { url: backend.url, execute: false, themes: true, viewport: { width: 390, height: 844 }, onLine: (l) => t.diagnostic(l) });
+  assert.deepEqual(rows.filter((r) => !r.ok).map((r) => `${r.cls}: ${r.errors.join("; ")}`), []);
+});

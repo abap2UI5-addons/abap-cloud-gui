@@ -47,6 +47,8 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
     INTERFACES z2ui5_if_cgui_files.
     "! the SAP GUI controls - z2ui5_cl_cgui_gui and its subclasses
     INTERFACES z2ui5_if_cgui_gui.
+    "! the messages and popups of the short API - _msg( ), _msg_box( ), _popup( )
+    INTERFACES z2ui5_if_cgui_dialogs.
 
     CONSTANTS:
       BEGIN OF cs_ucomm,
@@ -586,6 +588,26 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
         type  TYPE clike DEFAULT `S`
         field TYPE clike OPTIONAL.
 
+    "! the short API of the messages, in the style of abap2UI5:
+    "! _msg( )->e( `No flights found` ) is message( text = ... type = `E` );
+    "! the methods chain
+    METHODS _msg
+      RETURNING
+        VALUE(result) TYPE REF TO z2ui5_cl_cgui_msg.
+
+    "! _msg_box( )->i( `Saved` ) - a message box of its own, whatever the
+    "! type; not in the message popover, the run goes on
+    METHODS _msg_box
+      RETURNING
+        VALUE(result) TYPE REF TO z2ui5_cl_cgui_msg.
+
+    "! the short API of the popups: _popup( )->confirm( ), decide( ),
+    "! get_values( ) - popup_to_confirm( ), popup_to_decide( ),
+    "! popup_get_values( )
+    METHODS _popup
+      RETURNING
+        VALUE(result) TYPE REF TO z2ui5_cl_cgui_dialog.
+
     "! MESSAGE ID id TYPE type NUMBER number WITH v1 ... v4 - the text of the
     "! message class in the logon language
     METHODS message_t100
@@ -824,6 +846,8 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
     DATA mt_cgui_level         TYPE ty_t_cgui_level.
     DATA mt_cgui_field         TYPE z2ui5_cl_cgui_selscreen=>ty_t_field.
     DATA mt_cgui_msg           TYPE ty_t_cgui_msg.
+    " the message boxes of _msg_box( ) - shown at the end of the roundtrip
+    DATA mt_cgui_box           TYPE ty_t_cgui_msg.
     " the messages of the run, I, W, E and A - what the message popover
     " lists; kept while the user picks one of them
     DATA mt_cgui_log           TYPE ty_t_cgui_msg.
@@ -1461,7 +1485,7 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
     z2ui5_cl_cgui_frontend=>set_files( me ).
     z2ui5_cl_cgui_gui=>set_report( me ).
     cgui_statics_restore( ).
-    CLEAR mt_cgui_msg.
+    CLEAR: mt_cgui_msg, mt_cgui_box.
     mv_cgui_nav = abap_false.
     " the messages of the run stay while the popover opens and the user
     " picks one of them
@@ -4974,6 +4998,66 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
 
   ENDMETHOD.
 
+  METHOD _msg.
+
+    result = NEW #( me ).
+
+  ENDMETHOD.
+
+  METHOD _msg_box.
+
+    result = NEW #( report = me
+                    box    = abap_true ).
+
+  ENDMETHOD.
+
+  METHOD _popup.
+
+    result = NEW #( me ).
+
+  ENDMETHOD.
+
+  METHOD z2ui5_if_cgui_dialogs~message.
+
+    message( text  = text
+             type  = type
+             field = field ).
+
+  ENDMETHOD.
+
+  METHOD z2ui5_if_cgui_dialogs~message_box.
+
+    INSERT VALUE #( type = to_upper( type )
+                    text = text ) INTO TABLE mt_cgui_box.
+
+  ENDMETHOD.
+
+  METHOD z2ui5_if_cgui_dialogs~popup_to_confirm.
+
+    popup_to_confirm( question = question
+                      ucomm    = ucomm
+                      title    = COND #( WHEN title IS INITIAL THEN `Confirm` ELSE title ) ).
+
+  ENDMETHOD.
+
+  METHOD z2ui5_if_cgui_dialogs~popup_to_decide.
+
+    popup_to_decide( question = question
+                     options  = options
+                     ucomm    = ucomm
+                     title    = title ).
+
+  ENDMETHOD.
+
+  METHOD z2ui5_if_cgui_dialogs~popup_get_values.
+
+    popup_get_values( fields = fields
+                      ucomm  = ucomm
+                      title  = title
+                      text   = text ).
+
+  ENDMETHOD.
+
   METHOD message.
 
     DATA lv_field TYPE string.
@@ -6284,6 +6368,22 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
     ELSEIF lv_text IS NOT INITIAL.
       client->message_box_display( text = lv_text
                                    type = `information` ).
+    ENDIF.
+
+    " _msg_box( ): one box, its type the worst of the messages
+    IF mt_cgui_box IS NOT INITIAL AND lv_text IS INITIAL.
+      CLEAR lv_text.
+      DATA(lv_box) = `information`.
+      LOOP AT mt_cgui_box INTO DATA(ls_box).
+        lv_text = COND #( WHEN lv_text IS INITIAL THEN ls_box-text ELSE lv_text && cl_abap_char_utilities=>newline && ls_box-text ).
+        lv_box = SWITCH #( ls_box-type
+                           WHEN `E` OR `A` THEN `error`
+                           WHEN `W` THEN COND #( WHEN lv_box = `error` THEN lv_box ELSE `warning` )
+                           WHEN `S` THEN COND #( WHEN lv_box = `information` THEN `success` ELSE lv_box )
+                           ELSE lv_box ).
+      ENDLOOP.
+      client->message_box_display( text = lv_text
+                                   type = lv_box ).
     ENDIF.
 
   ENDMETHOD.

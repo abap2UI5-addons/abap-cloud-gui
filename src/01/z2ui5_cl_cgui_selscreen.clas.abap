@@ -1256,7 +1256,9 @@ CLASS z2ui5_cl_cgui_selscreen IMPLEMENTATION.
           IF lv_in_line = abap_true AND lo_line IS NOT BOUND.
             lo_form->tag( `Label`
                 )->a( n = `text` t = lv_line_text ).
+            " the fields of one line - on a phone they wrap
             lo_line = lo_form->ele( `HBox`
+                )->a( n = `wrap`       v = `Wrap`
                 )->a( n = `alignItems` v = `Center` ).
           ENDIF.
           IF lo_line IS BOUND.
@@ -1599,8 +1601,10 @@ CLASS z2ui5_cl_cgui_selscreen IMPLEMENTATION.
 
     " the classic select-option: from, to and the button of the multiple
     " selection - emphasized while the range holds more than its first line
+    " on a phone from and to wrap onto lines of their own
     DATA(lo_box) = node->ele( `HBox`
         )->a( n = `width`      v = `100%`
+        )->a( n = `wrap`       v = `Wrap`
         )->a( n = `alignItems` v = `Center` ).
 
     render_range_field( node = lo_box
@@ -1682,7 +1686,8 @@ CLASS z2ui5_cl_cgui_selscreen IMPLEMENTATION.
     ENDIF.
     lo_field->ele( `layoutData`
         )->tag( `FlexItemData`
-        )->a( n = `growFactor` v = `1` ).
+        )->a( n = `growFactor` v = `1`
+        )->a( n = `baseSize`   v = `8rem` ).
 
   ENDMETHOD.
 

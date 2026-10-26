@@ -139,6 +139,8 @@ CLASS ltcl_client DEFINITION FINAL FOR TESTING.
     DATA mo_called    TYPE REF TO z2ui5_if_app.
     DATA mo_prev      TYPE REF TO z2ui5_if_app.
     DATA mv_left      TYPE abap_bool.
+    DATA mv_box       TYPE string.
+    DATA mv_box_type  TYPE string.
 
 ENDCLASS.
 
@@ -188,6 +190,7 @@ CLASS ltcl_test DEFINITION FINAL FOR TESTING
     METHODS range_f4_returns_to_popup FOR TESTING.
     METHODS f4_keeps_other_lines FOR TESTING.
     METHODS popups_of_the_project FOR TESTING.
+    METHODS short_api FOR TESTING.
     METHODS popup_values_of_an_sval FOR TESTING.
     METHODS alv_layout_default FOR TESTING.
     METHODS alv_layout_without_store FOR TESTING.
@@ -577,7 +580,11 @@ CLASS ltcl_client IMPLEMENTATION.
   METHOD z2ui5_if_client~message_toast_display ##NEEDED.
   ENDMETHOD.
 
-  METHOD z2ui5_if_client~message_box_display ##NEEDED.
+  METHOD z2ui5_if_client~message_box_display.
+
+    mv_box = text.
+    mv_box_type = type.
+
   ENDMETHOD.
 
   METHOD z2ui5_if_client~nav_app_call.
@@ -1370,6 +1377,44 @@ CLASS ltcl_test IMPLEMENTATION.
       CATCH cx_sy_move_cast_error.
         cl_abap_unit_assert=>fail( `not a z2ui5_cl_cgui_select` ).
     ENDTRY.
+
+  ENDMETHOD.
+
+  METHOD short_api.
+
+    init( ).
+    " _msg( ): message( ), the methods chain - a warning and a toast
+    mo_cut->_msg( )->w( `Careful` )->s( `Done` ).
+    cl_abap_unit_assert=>assert_equals( exp = 2
+                                        act = lines( mo_cut->mt_cgui_msg ) ).
+    cl_abap_unit_assert=>assert_equals( exp = `W`
+                                        act = mo_cut->mt_cgui_msg[ 1 ]-type ).
+    cl_abap_unit_assert=>assert_false( mo_cut->mv_cgui_stop ).
+    " _msg_box( ): a box of its own - an error does not stop the run
+    mo_cut->_msg_box( )->i( `Saved` )->e( `But the mail failed` ).
+    cl_abap_unit_assert=>assert_false( mo_cut->mv_cgui_stop ).
+    mo_cut->messages_display( ).
+    cl_abap_unit_assert=>assert_equals( exp = `error`
+                                        act = mo_client->mv_box_type ).
+    cl_abap_unit_assert=>assert_char_cp( exp = `Saved*But the mail failed`
+                                         act = mo_client->mv_box ).
+    " _msg( )->e( ): as MESSAGE TYPE 'E' - the run stops
+    mo_cut->_msg( )->e( `Wrong` ).
+    cl_abap_unit_assert=>assert_true( mo_cut->mv_cgui_stop ).
+
+    " _popup( ): the popups of the report
+    mo_cut->_popup( )->decide( question = `Which one?`
+                               options  = VALUE #( ( `First` ) ( `Second` ) )
+                               ucomm    = `PICK` ).
+    TRY.
+        cl_abap_unit_assert=>assert_bound( CAST z2ui5_cl_cgui_popup( mo_client->mo_called ) ).
+      CATCH cx_sy_move_cast_error.
+        cl_abap_unit_assert=>fail( `not a z2ui5_cl_cgui_popup` ).
+    ENDTRY.
+    CLEAR mo_client->mo_called.
+    mo_cut->_popup( )->confirm( question = `Sure?`
+                                ucomm    = `DO_IT` ).
+    cl_abap_unit_assert=>assert_bound( mo_client->mo_called ).
 
   ENDMETHOD.
 
