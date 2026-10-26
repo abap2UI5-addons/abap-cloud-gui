@@ -172,6 +172,32 @@ _popup( )->decide( question = `Which copy?` options = VALUE #( ( `Original` ) ( 
 not in the popover, an error does not stop the run - and `_popup( )` has the
 popups of the report: the answer comes as `at_user_command( ucomm )`.
 
+### The application log
+
+`set_log( )` gives the report an application log: every message - `MESSAGE`,
+`message( )`, `_msg( )` - goes into it as well. `z2ui5_cl_cgui_log` keeps the
+messages in memory; an adapter of the installation implements
+`z2ui5_if_cgui_log` (`add`, `get`) and writes them where the system keeps its
+logs. `messages_from_log( )` puts the messages of a log into the message
+popover - a BAPI's return table, read with `add_table( )`, or a log of the
+system - and `log_display( )` shows a log as a popup, as SLG1 does.
+
+```abap
+" an adapter on ABAP Cloud - cl_bali_log
+METHOD z2ui5_if_cgui_log~add.
+  mo_log->add_item( cl_bali_free_text_setter=>create( severity = type text = CONV #( text ) ) ).
+ENDMETHOD.
+
+" an adapter for the ABAP Logger
+METHOD z2ui5_if_cgui_log~add.
+  CASE type.
+    WHEN 'E'. mo_logger->e( text ).
+    WHEN 'W'. mo_logger->w( text ).
+    WHEN OTHERS. mo_logger->i( text ).
+  ENDCASE.
+ENDMETHOD.
+```
+
 ### The command field
 
 `set_command_field( )` in `initialization( )` puts the command field of the
@@ -286,6 +312,12 @@ METHOD initialization.
   set_variant_store( ).   " the browser's local storage, no table
 ENDMETHOD.
 ```
+
+The user parameters - `SET` / `GET PARAMETER ID`, `MEMORY ID` - live in the
+same store: one entry per user, so every report of the user sees them, on
+every device. `SU3` in the command field opens them in a popup to change, add
+or delete (an empty value deletes the parameter). Without a server store
+they stay in the browser's local storage.
 
 ### ALV layouts
 
@@ -558,9 +590,9 @@ Messages and logging
 
 - [x] Short API in the style of abap2UI5: `_msg( )->e( )`, `_msg_box( )->e( )`,
       `_popup( )->decide( )` / `confirm( )` / `get_values( )`
-- [ ] Application log (BAL) and [ABAP Logger](https://github.com/ABAP-Logger/ABAP-Logger)
-      as a source for the message popover and a log popup; the internal
-      message table is replaced by the log
+- [x] Application log (BAL) and [ABAP Logger](https://github.com/ABAP-Logger/ABAP-Logger)
+      as a source for the message popover and a log popup: `set_log( )`,
+      `messages_from_log( )`, `log_display( )` over `z2ui5_if_cgui_log`
 
 Dialogs and screens
 
@@ -583,8 +615,9 @@ Navigation and transactions
 - [x] Transaction logic: start with a variant, prefill the last entries
       (`set_prefill_last( )`)
 - [ ] Transaction logic: create a draft
-- [ ] `SET` / `GET PARAMETER ID` with user parameters (like SU3), system
-      parameters and customizing parameters
+- [x] `SET` / `GET PARAMETER ID` with user parameters on the server, `SU3` in
+      the command field to maintain them
+- [ ] System parameters and customizing parameters beside the user parameters
 
 Stage 3 - clean core at the scale of a code base
 

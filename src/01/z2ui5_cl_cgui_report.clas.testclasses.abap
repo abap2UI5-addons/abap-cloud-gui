@@ -222,6 +222,8 @@ CLASS ltcl_test DEFINITION FINAL FOR TESTING
     METHODS input_history FOR TESTING.
     METHODS execute_in_background FOR TESTING.
     METHODS command_field FOR TESTING.
+    METHODS user_parameters FOR TESTING.
+    METHODS application_log FOR TESTING.
     METHODS popup_values_of_an_sval FOR TESTING.
     METHODS alv_layout_default FOR TESTING.
     METHODS alv_layout_without_store FOR TESTING.
@@ -1188,6 +1190,92 @@ CLASS ltcl_test IMPLEMENTATION.
     cl_abap_unit_assert=>assert_equals( act = mo_cut->get_parameter_id( `zcgui_test` )
                                         exp = `LH` ).
     cl_abap_unit_assert=>assert_true( xsdbool( mo_report->mv_cgui_spa CS `ZCGUI_TEST=LH` ) ).
+
+  ENDMETHOD.
+
+  METHOD application_log.
+
+    TYPES:
+      BEGIN OF ty_s_bapiret,
+        type    TYPE c LENGTH 1,
+        message TYPE c LENGTH 220,
+      END OF ty_s_bapiret.
+    DATA lt_return TYPE STANDARD TABLE OF ty_s_bapiret WITH EMPTY KEY.
+
+    " the messages of the report go into its log - the required field
+    DATA(lo_log) = NEW z2ui5_cl_cgui_log( ).
+    mo_cut->set_log( lo_log ).
+    init( ).
+    event( z2ui5_cl_cgui_report=>cs_ucomm-execute ).
+    DATA(lt_logged) = lo_log->z2ui5_if_cgui_log~get( ).
+    cl_abap_unit_assert=>assert_equals( act = lt_logged[ 1 ]-type
+                                        exp = `E` ).
+
+    " a log of another source - a BAPI's return table - in the popover
+    lt_return = VALUE #( ( type = 'W' message = 'Seats nearly gone' ) ( type = 'I' message = 'Flight LH 400' ) ).
+    DATA(lo_bapi) = NEW z2ui5_cl_cgui_log( ).
+    lo_bapi->add_table( lt_return ).
+    CLEAR: mo_cut->mt_cgui_log, mo_cut->mv_cgui_stop.
+    mo_cut->messages_from_log( lo_bapi ).
+    cl_abap_unit_assert=>assert_equals( act = lines( mo_cut->mt_cgui_log )
+                                        exp = 2 ).
+    cl_abap_unit_assert=>assert_false( mo_cut->mv_cgui_stop ).
+
+    " the log as a popup
+    mo_cut->log_display( lo_bapi ).
+    DATA lo_popup TYPE REF TO z2ui5_cl_cgui_select.
+    lo_popup ?= mo_client->mo_called.
+    cl_abap_unit_assert=>assert_bound( lo_popup ).
+
+  ENDMETHOD.
+
+  METHOD user_parameters.
+
+    " the server store - the table of the variants: a parameter ID set in
+    " one report is there in the next one, in any browser
+    init( ).
+    mo_cut->set_parameter_id( id    = `ZCGUI_SRV`
+                              value = `UA` ).
+    DATA(lo_next) = NEW ltcl_report( ).
+    DATA(lo_next_client) = NEW ltcl_client( ).
+    lo_next_client->mo_app = lo_next.
+    lo_next_client->mv_init = abap_true.
+    lo_next->set_layout_store( NEW ltcl_layout_store( ) ).
+    lo_next->z2ui5_if_app~main( lo_next_client ).
+    cl_abap_unit_assert=>assert_equals( act = lo_next->get_parameter_id( `ZCGUI_SRV` )
+                                        exp = `UA` ).
+    " the browser's storage control for them is gone
+    cl_abap_unit_assert=>assert_false( xsdbool( lo_next_client->mv_view CS `z2ui5_cgui_spa` ) ).
+
+    " SU3 in the command field: the parameters in a popup - one changed,
+    " one added, an emptied one deleted
+    mo_cut->set_parameter_id( id    = `ZCGUI_DEL`
+                              value = `X1` ).
+    mo_cut->okcode_execute( `/nSU3` ).
+    DATA(lo_popup) = CAST z2ui5_cl_cgui_popup( mo_client->mo_called ).
+    cl_abap_unit_assert=>assert_true( xsdbool( line_exists( lo_popup->mt_field[ name = `ZCGUI_SRV` value = `UA` ] ) ) ).
+    lo_popup->mt_field[ name = `ZCGUI_SRV` ]-value = `LH`.
+    lo_popup->mt_field[ name = `ZCGUI_DEL` ]-value = ``.
+    lo_popup->mt_field[ name = `%NEW_ID` ]-value = `zcgui_add`.
+    lo_popup->mt_field[ name = `%NEW_VALUE` ]-value = `0017`.
+    " OK of the popup - its event
+    mo_client->mv_event = `CGUI_POP_OK`.
+    lo_popup->z2ui5_if_app~main( mo_client ).
+    CLEAR: mo_client->mo_called, mo_client->mv_event.
+    mo_client->mo_prev = lo_popup.
+    mo_client->mv_navigated = abap_true.
+    mo_cut->z2ui5_if_app~main( mo_client ).
+    mo_client->mv_navigated = abap_false.
+
+    cl_abap_unit_assert=>assert_equals( act = mo_cut->get_parameter_id( `ZCGUI_SRV` )
+                                        exp = `LH` ).
+    cl_abap_unit_assert=>assert_equals( act = mo_cut->get_parameter_id( `ZCGUI_ADD` )
+                                        exp = `0017` ).
+    cl_abap_unit_assert=>assert_initial( mo_cut->get_parameter_id( `ZCGUI_DEL` ) ).
+    " and on the server
+    lo_next->spa_load( ).
+    cl_abap_unit_assert=>assert_equals( act = lo_next->get_parameter_id( `ZCGUI_ADD` )
+                                        exp = `0017` ).
 
   ENDMETHOD.
 

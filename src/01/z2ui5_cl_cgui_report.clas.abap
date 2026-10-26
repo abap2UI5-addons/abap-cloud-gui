@@ -83,6 +83,9 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
     "! the browser's local storage of SET / GET PARAMETER ID - one entry for
     "! every report of the browser, the SAP memory of this addon
     CONSTANTS cv_cgui_spa_prefix TYPE string VALUE `z2ui5_cgui_spa`.
+    "! the user parameters in a server store: the "report" of the variants
+    "! that hold them, one variant per user, named by the user
+    CONSTANTS cv_cgui_spa_report TYPE string VALUE `%SPA`.
     CONSTANTS cv_cgui_spa_key    TYPE string VALUE `PARAMETERS`.
 
     "! the browser's local storage of the input history - the last entries
@@ -630,6 +633,26 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
       IMPORTING
         val TYPE clike.
 
+    "! the application log of the report: every message( ) - MESSAGE,
+    "! _msg( ) - goes into it as well; the installation's adapter writes it
+    "! to BAL, cl_bali_log or the ABAP Logger
+    METHODS set_log
+      IMPORTING
+        val TYPE REF TO z2ui5_if_cgui_log.
+
+    "! the messages of a log into the message popover of this roundtrip -
+    "! an application log as its source; they do not stop the run
+    METHODS messages_from_log
+      IMPORTING
+        log TYPE REF TO z2ui5_if_cgui_log.
+
+    "! a log as a popup to read - the type and the text of every message,
+    "! as SLG1 shows it
+    METHODS log_display
+      IMPORTING
+        log   TYPE REF TO z2ui5_if_cgui_log
+        title TYPE clike OPTIONAL.
+
     METHODS set_prefill_last
       IMPORTING
         val TYPE abap_bool DEFAULT abap_true.
@@ -895,6 +918,7 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
     DATA mv_cgui_prefill TYPE abap_bool.
     DATA mo_cgui_job     TYPE REF TO z2ui5_if_cgui_job.
     DATA mo_cgui_catalog TYPE REF TO z2ui5_if_cgui_catalog.
+    DATA mo_cgui_app_log TYPE REF TO z2ui5_if_cgui_log.
     DATA mv_cgui_cmd_on  TYPE abap_bool.
     " the message boxes of _msg_box( ) - shown at the end of the roundtrip
     DATA mt_cgui_box           TYPE ty_t_cgui_msg.
@@ -1065,6 +1089,7 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
         alv_f4         TYPE string VALUE `ALV_F4`,
         file           TYPE string VALUE `FILE`,
         palette        TYPE string VALUE `PALETTE`,
+        su3            TYPE string VALUE `SU3`,
       END OF cs_pending.
 
     TYPES:
@@ -1182,6 +1207,14 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
         values TYPE z2ui5_if_client=>ty_t_name_value.
 
     METHODS on_storage_loaded.
+
+    "! the user parameters out of the server store - every report of the
+    "! user sees the same ones, in every browser
+    METHODS spa_load.
+
+    "! SU3 in the command field: the user's parameters in a popup to change
+    METHODS su3_open.
+    METHODS su3_result.
 
     TYPES:
       BEGIN OF ty_s_cgui_history,
@@ -2011,6 +2044,7 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
     " a server store reads the variants now, the browser once it rendered
     IF mo_cgui_store IS BOUND.
       variant_store( mo_cgui_store->load( variant_key( ) ) ).
+      spa_load( ).
     ENDIF.
 
     " a variant in the URL wins over the one initialization( ) set
@@ -3090,6 +3124,9 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
       WHEN cs_pending-palette.
         palette_result( ).
 
+      WHEN cs_pending-su3.
+        su3_result( ).
+
       WHEN cs_pending-range.
         on_range_result( lv_field ).
 
@@ -3686,12 +3723,90 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
     ENDLOOP.
     mv_cgui_spa = concat_lines_of( table = lt_line sep = cl_abap_char_utilities=>newline ).
 
-    IF client IS BOUND AND mv_cgui_batch = abap_false.
+    " a server store keeps them for the user - else the browser
+    IF mo_cgui_store IS BOUND.
+      TRY.
+          mo_cgui_store->save( report  = cv_cgui_spa_report
+                               variant = VALUE #( name   = to_upper( sy-uname )
+                                                  text   = 'User parameters'(055)
+                                                  values = VALUE #( FOR ls_spa IN values
+                                                                    ( name = ls_spa-n kind = `P` low = ls_spa-v ) ) ) ).
+        CATCH z2ui5_cx_cgui_error INTO DATA(lx_error).
+          message( text = lx_error->get_text( )
+                   type = `W` ).
+      ENDTRY.
+    ELSEIF client IS BOUND AND mv_cgui_batch = abap_false.
       client->follow_up_action( val   = client->cs_event-store_data
                                 t_arg = VALUE #( ( z2ui5_cl_cgui_variant=>storage_json( prefix = cv_cgui_spa_prefix
                                                                                         key    = cv_cgui_spa_key
                                                                                         val    = mv_cgui_spa ) ) ) ).
     ENDIF.
+
+  ENDMETHOD.
+
+  METHOD spa_load.
+
+    DATA lt_line TYPE string_table.
+
+    DATA(lt_variant) = mo_cgui_store->load( cv_cgui_spa_report ).
+    READ TABLE lt_variant INTO DATA(ls_variant) WITH KEY name = to_upper( sy-uname ).
+    IF sy-subrc <> 0.
+      RETURN.
+    ENDIF.
+    LOOP AT ls_variant-values INTO DATA(ls_value).
+      INSERT |{ to_upper( ls_value-name ) }={ ls_value-low }| INTO TABLE lt_line.
+    ENDLOOP.
+    mv_cgui_spa = concat_lines_of( table = lt_line sep = cl_abap_char_utilities=>newline ).
+
+  ENDMETHOD.
+
+  METHOD su3_open.
+
+    DATA lt_field TYPE z2ui5_cl_cgui_popup=>ty_t_field.
+
+    LOOP AT spa_get( ) INTO DATA(ls_spa).
+      INSERT VALUE #( name = ls_spa-n text = ls_spa-n value = ls_spa-v ) INTO TABLE lt_field.
+    ENDLOOP.
+    " a parameter of its own - the ID and the value
+    INSERT VALUE #( name = `%NEW_ID`    text = 'New parameter ID'(056) ) INTO TABLE lt_field.
+    INSERT VALUE #( name = `%NEW_VALUE` text = 'Value'(057) ) INTO TABLE lt_field.
+
+    mv_cgui_pending_kind = cs_pending-su3.
+    mv_cgui_nav = abap_true.
+    client->nav_app_call( z2ui5_cl_cgui_popup=>get_values(
+        fields = lt_field
+        title  = 'User parameters'(055)
+        text   = 'An empty value deletes the parameter'(058) ) ).
+
+  ENDMETHOD.
+
+  METHOD su3_result.
+
+    DATA lt_spa TYPE z2ui5_if_client=>ty_t_name_value.
+    DATA lo_popup TYPE REF TO z2ui5_cl_cgui_popup.
+
+    TRY.
+        lo_popup ?= client->get_app_prev( ).
+      CATCH cx_root.
+        RETURN.
+    ENDTRY.
+    DATA(ls_result) = lo_popup->result( ).
+    IF ls_result-confirmed = abap_false.
+      RETURN.
+    ENDIF.
+
+    LOOP AT ls_result-fields INTO DATA(ls_field) WHERE value IS NOT INITIAL AND name(1) <> `%`.
+      INSERT VALUE #( n = to_upper( ls_field-name ) v = ls_field-value ) INTO TABLE lt_spa.
+    ENDLOOP.
+    DATA(lv_new) = to_upper( condense( lo_popup->result_value( `%NEW_ID` ) ) ).
+    DATA(lv_value) = lo_popup->result_value( `%NEW_VALUE` ).
+    IF lv_new IS NOT INITIAL AND lv_value IS NOT INITIAL.
+      DELETE lt_spa WHERE n = lv_new.
+      INSERT VALUE #( n = lv_new v = lv_value ) INTO TABLE lt_spa.
+    ENDIF.
+    spa_set( lt_spa ).
+    message( text = 'User parameters saved'(059)
+             type = `S` ).
 
   ENDMETHOD.
 
@@ -3779,6 +3894,10 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
       ENDIF.
       CASE lv_upper+1(1).
         WHEN `N`.
+          IF lv_target = `SU3`.
+            su3_open( ).
+            RETURN.
+          ENDIF.
           okcode_start( code       = lv_target
                         new_window = abap_false ).
         WHEN `O`.
@@ -3816,6 +3935,8 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
         IF mv_cgui_screen = cs_screen-output.
           on_print( ).
         ENDIF.
+      WHEN `SU3`.
+        su3_open( ).
       WHEN OTHERS.
         user_command( lv_upper ).
     ENDCASE.
@@ -3913,6 +4034,7 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
         INSERT VALUE #( command = `PRI` text = 'Print'(034) ) INTO TABLE result.
     ENDCASE.
     INSERT VALUE #( command = `/O` text = 'This report in a new window'(052) ) INTO TABLE result.
+    INSERT VALUE #( command = `SU3` text = 'User parameters'(055) ) INTO TABLE result.
 
   ENDMETHOD.
 
@@ -3980,6 +4102,52 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
                              sub  = `&1`
                              with = lv_job )
              type = `S` ).
+
+  ENDMETHOD.
+
+  METHOD set_log.
+
+    mo_cgui_app_log = val.
+
+  ENDMETHOD.
+
+  METHOD messages_from_log.
+
+    IF log IS NOT BOUND.
+      RETURN.
+    ENDIF.
+    LOOP AT log->get( ) INTO DATA(ls_message).
+      DATA(ls_msg) = VALUE ty_s_cgui_msg( type = to_upper( ls_message-type )
+                                          text = ls_message-text ).
+      IF ls_msg-type = `S`.
+        INSERT ls_msg INTO TABLE mt_cgui_msg.
+      ELSE.
+        INSERT ls_msg INTO TABLE mt_cgui_log.
+      ENDIF.
+    ENDLOOP.
+
+  ENDMETHOD.
+
+  METHOD log_display.
+
+    TYPES:
+      BEGIN OF ty_s_row,
+        type TYPE c LENGTH 1,
+        text TYPE c LENGTH 220,
+      END OF ty_s_row.
+    DATA lt_row TYPE STANDARD TABLE OF ty_s_row WITH EMPTY KEY.
+
+    IF log IS NOT BOUND OR client IS NOT BOUND.
+      RETURN.
+    ENDIF.
+    LOOP AT log->get( ) INTO DATA(ls_message).
+      INSERT VALUE #( type = ls_message-type
+                      text = ls_message-text ) INTO TABLE lt_row.
+    ENDLOOP.
+    mv_cgui_nav = abap_true.
+    client->nav_app_call( z2ui5_cl_cgui_select=>factory(
+        tab   = lt_row
+        title = COND string( WHEN title IS INITIAL THEN 'Application Log'(060) ELSE title ) ) ).
 
   ENDMETHOD.
 
@@ -5564,6 +5732,10 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
                                         field = lv_field ).
     INSERT ls_msg INTO TABLE mt_cgui_msg.
     INSERT ls_msg INTO TABLE mt_cgui_run_msg.
+    IF mo_cgui_app_log IS BOUND.
+      mo_cgui_app_log->add( type = ls_msg-type
+                            text = ls_msg-text ).
+    ENDIF.
     IF ls_msg-type <> `S`.
       INSERT ls_msg INTO TABLE mt_cgui_log.
     ENDIF.
@@ -6532,13 +6704,16 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
         )->a( n = `value`    v = client->_bind( mv_cgui_history )
         )->a( n = `finished` v = client->_event( val    = cs_ucomm-variants_loaded
                                                  s_ctrl = VALUE #( check_queue_last = abap_true ) ) ).
-    page->tag( n = `Storage` ns = `z2ui5`
-        )->a( n = `type`     v = `local`
-        )->a( n = `prefix`   v = cv_cgui_spa_prefix
-        )->a( n = `key`      v = cv_cgui_spa_key
-        )->a( n = `value`    v = client->_bind( mv_cgui_spa )
-        )->a( n = `finished` v = client->_event( val    = cs_ucomm-variants_loaded
-                                                 s_ctrl = VALUE #( check_queue_last = abap_true ) ) ).
+    " the parameter IDs - a server store has them already (spa_load( ))
+    IF mo_cgui_store IS NOT BOUND.
+      page->tag( n = `Storage` ns = `z2ui5`
+          )->a( n = `type`     v = `local`
+          )->a( n = `prefix`   v = cv_cgui_spa_prefix
+          )->a( n = `key`      v = cv_cgui_spa_key
+          )->a( n = `value`    v = client->_bind( mv_cgui_spa )
+          )->a( n = `finished` v = client->_event( val    = cs_ucomm-variants_loaded
+                                                   s_ctrl = VALUE #( check_queue_last = abap_true ) ) ).
+    ENDIF.
 
     DATA(lv_window) = xsdbool( mv_cgui_screen = cs_screen-output
                                AND mv_cgui_window = abap_true
