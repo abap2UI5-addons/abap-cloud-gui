@@ -15,7 +15,8 @@
 // REPORT2CLOUD_CHROMIUM). Without an mcp-server checkout it is skipped.
 import { after, before, test } from "node:test";
 import assert from "node:assert/strict";
-import { rmSync } from "node:fs";
+import { readFileSync, rmSync } from "node:fs";
+import { execFileSync } from "node:child_process";
 import { corpus, convertEntry, DDIC } from "../corpus.mjs";
 import { buildBackend, resolveMcpServer, startBackend } from "../runtime/backend.mjs";
 import { seedSql } from "../runtime/seed.mjs";
@@ -89,6 +90,39 @@ test("the input history - a value run once is offered as a suggestion on the nex
           .flatMap((c) => c.getSuggestionItems().map((i) => i.getText()));
       });
       if (!offered.includes("Ada Lovelace")) errors.push(`no suggestion of the last entry - offered: ${JSON.stringify(offered)}`);
+    },
+  });
+  assert.deepEqual(rows.filter((r) => !r.ok).map((r) => `${r.cls}: ${r.errors.join("; ")}`), []);
+});
+
+test("Print hands the output to the browser as a PDF - a document a PDF reader opens, with the lines of the list", { skip, timeout: 10 * 60_000 }, async (t) => {
+  const hello = classes.filter((c) => /_r2c_01$/.test(c));
+  const rows = await browserRun(hello, {
+    url: backend.url,
+    execute: false,
+    onLine: (l) => t.diagnostic(l),
+    check: async (page, errors) => {
+      const input = page.locator("input.sapMInputBaseInner").first();
+      await input.fill("Ada");
+      await input.press("Tab");
+      await page.locator(".sapMBtn").filter({ hasText: /^\s*Execute/ }).first().click({ timeout: 10_000 });
+      await page.waitForLoadState("networkidle", { timeout: 10_000 }).catch(() => {});
+      const [download] = await Promise.all([
+        page.waitForEvent("download", { timeout: 30_000 }),
+        page.locator(".sapMBtn").filter({ hasText: /^\s*Print/ }).first().click({ timeout: 10_000 }),
+      ]);
+      const file = await download.path();
+      const pdf = readFileSync(file, "latin1");
+      if (!download.suggestedFilename().endsWith(".pdf")) errors.push(`the file is ${download.suggestedFilename()}`);
+      if (!pdf.startsWith("%PDF-")) errors.push("no PDF");
+      // the offset after startxref points at the xref table
+      const start = Number(/startxref\n(\d+)/.exec(pdf)?.[1]);
+      if (pdf.slice(start, start + 4) !== "xref") errors.push(`startxref ${start} does not point at the xref table`);
+      // a PDF reader, when there is one: the text of the list comes out
+      let text;
+      try { text = execFileSync("pdftotext", ["-layout", file, "-"], { encoding: "utf8" }); } catch { text = undefined; }
+      if (text !== undefined && !/Hello\s+Ada/.test(text)) errors.push(`pdftotext does not read the list: ${text.slice(0, 200)}`);
+      t.diagnostic(text === undefined ? "no pdftotext - the structure checked only" : "pdftotext read the list");
     },
   });
   assert.deepEqual(rows.filter((r) => !r.ok).map((r) => `${r.cls}: ${r.errors.join("; ")}`), []);

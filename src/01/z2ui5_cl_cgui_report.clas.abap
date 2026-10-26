@@ -69,6 +69,7 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
         popup_answer      TYPE string VALUE `CGUI_POPUP_ANSWER`,
         variant_saved     TYPE string VALUE `CGUI_VARIANT_SAVED`,
         print             TYPE string VALUE `CGUI_PRINT`,
+        background        TYPE string VALUE `CGUI_BACKGROUND`,
         enter             TYPE string VALUE `CGUI_ENTER`,
         gui               TYPE string VALUE `CGUI_GUI`,
       END OF cs_ucomm.
@@ -181,8 +182,8 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
     "! the report without a browser - e.g. in an application job of your
     "! own: the values are set, the events of the selection screen,
     "! START-OF-SELECTION and END-OF-SELECTION run; list and alv return the
-    "! output, messages what the run reported. A run stopped by an error
-    "! returns no output
+    "! output, pdf its printout, messages what the run reported. A run
+    "! stopped by an error returns no output
     METHODS cgui_run_in_background
       IMPORTING
         values   TYPE z2ui5_cl_cgui_variant=>ty_t_value
@@ -190,6 +191,7 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
         list     TYPE REF TO z2ui5_cl_cgui_list
         alv      TYPE REF TO z2ui5_cl_cgui_alv
         alv_data TYPE REF TO data
+        pdf      TYPE xstring
         messages TYPE ty_t_cgui_message.
 
   PROTECTED SECTION.
@@ -600,6 +602,12 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
     "! the selection screen starts with the last entries of the fields:
     "! an empty field takes the latest entry of its input history (a
     "! variant to start with and the URL still win) - in initialization( )
+    "! Execute in Background on the selection screen: the button hands the
+    "! report and its values to the job - in initialization( )
+    METHODS set_job
+      IMPORTING
+        val TYPE REF TO z2ui5_if_cgui_job.
+
     METHODS set_prefill_last
       IMPORTING
         val TYPE abap_bool DEFAULT abap_true.
@@ -863,6 +871,7 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
     DATA mt_cgui_field         TYPE z2ui5_cl_cgui_selscreen=>ty_t_field.
     DATA mt_cgui_msg           TYPE ty_t_cgui_msg.
     DATA mv_cgui_prefill TYPE abap_bool.
+    DATA mo_cgui_job     TYPE REF TO z2ui5_if_cgui_job.
     " the message boxes of _msg_box( ) - shown at the end of the roundtrip
     DATA mt_cgui_box           TYPE ty_t_cgui_msg.
     " the messages of the run, I, W, E and A - what the message popover
@@ -1455,8 +1464,11 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
     "! the dialog box of WINDOW with the current list
     METHODS view_display_window.
 
-    "! the printout of the output - a text file to the browser
+    "! the printout of the output - a PDF to the browser
     METHODS on_print.
+
+    "! Execute in Background: the checks of Execute, then the job
+    METHODS on_background.
 
     METHODS print_lines
       RETURNING
@@ -2703,6 +2715,11 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
       WHEN cs_ucomm-print.
         on_print( ).
 
+      WHEN cs_ucomm-background.
+        IF mv_cgui_screen = cs_screen-selection AND mo_cgui_job IS BOUND.
+          on_background( ).
+        ENDIF.
+
       WHEN z2ui5_cl_cgui_selscreen=>cs_event-value_request.
         IF screen_field_check( client->get_event_arg( ) ) = abap_true.
           mv_cgui_value_field = client->get_event_arg( ).
@@ -3664,6 +3681,44 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
 
   ENDMETHOD.
 
+  METHOD set_job.
+
+    mo_cgui_job = val.
+
+  ENDMETHOD.
+
+  METHOD on_background.
+
+    DATA lt_name TYPE string_table.
+
+    CLEAR mt_cgui_run_msg.
+    IF check_screen( ) = abap_false.
+      RETURN.
+    ENDIF.
+    memory_id_store( ).
+    history_store( ).
+
+    LOOP AT mt_cgui_field REFERENCE INTO DATA(lr_field).
+      INSERT lr_field->name INTO TABLE lt_name.
+    ENDLOOP.
+    mo_cgui_job->schedule( EXPORTING report = cl_abap_typedescr=>describe_by_object_ref( me )->get_relative_name( )
+                                     title  = mv_cgui_title
+                                     values = z2ui5_cl_cgui_variant=>values_get( app   = me
+                                                                                 names = lt_name )
+                           IMPORTING job    = DATA(lv_job)
+                                     error  = DATA(lv_error) ).
+    IF lv_error IS NOT INITIAL.
+      message( text = lv_error
+               type = `E` ).
+      RETURN.
+    ENDIF.
+    message( text = replace( val  = 'Background job &1 scheduled'(048)
+                             sub  = `&1`
+                             with = lv_job )
+             type = `S` ).
+
+  ENDMETHOD.
+
   METHOD set_prefill_last.
 
     mv_cgui_prefill = val.
@@ -4351,6 +4406,8 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
     ENDIF.
     list = mo_cgui_list.
     alv = mo_cgui_alv.
+    pdf = z2ui5_cl_cgui_pdf=>from_lines( lines = print_lines( )
+                                         title = mv_cgui_title ).
     DATA(lr_src) = alv_source( ).
     IF alv IS BOUND AND lr_src IS BOUND.
       ASSIGN lr_src->* TO <src>.
@@ -5650,11 +5707,10 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
 
   METHOD on_print.
 
-    " the printout as a text file for the browser to print or keep - ABAP
-    " Cloud has no spool, and a spool request is no paper next to the user
-    DATA(lv_text) = concat_lines_of( table = print_lines( )
-                                     sep   = |\r\n| ).
-    DATA(lv_file) = z2ui5_cl_cgui_context=>conv_get_xstring_by_string( lv_text ).
+    " the printout as a PDF for the browser to print or keep - ABAP Cloud
+    " has no spool, and a spool request is no paper next to the user
+    DATA(lv_file) = z2ui5_cl_cgui_pdf=>from_lines( lines = print_lines( )
+                                                   title = mv_cgui_title ).
     IF lv_file IS INITIAL.
       message( text = 'The output could not be printed'(037)
                type = `E` ).
@@ -5662,9 +5718,9 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
     ENDIF.
 
     client->follow_up_action( val   = client->cs_event-download_b64_file
-                              t_arg = VALUE #( ( |data:text/plain;charset=utf-8;base64,| &&
+                              t_arg = VALUE #( ( |data:application/pdf;base64,| &&
                                                  z2ui5_cl_cgui_context=>conv_encode_x_base64( lv_file ) )
-                                               ( |{ mv_cgui_title }.txt| ) ) ).
+                                               ( |{ mv_cgui_title }.pdf| ) ) ).
 
   ENDMETHOD.
 
@@ -6268,6 +6324,12 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
 
     IF mv_cgui_screen = cs_screen-selection AND mt_cgui_field IS NOT INITIAL.
       " RS_SET_SELSCREEN_STATUS switches standard functions off
+      IF mo_cgui_job IS BOUND AND NOT line_exists( mt_cgui_excl_sel[ table_line = cs_ucomm-background ] ).
+        toolbar->tag( `Button`
+            )->a( n = `text`  t = CONV #( 'Execute in Background'(049) )
+            )->a( n = `icon`  v = `sap-icon://history`
+            )->a( n = `press` v = client->_event( cs_ucomm-background ) ).
+      ENDIF.
       IF NOT line_exists( mt_cgui_excl_sel[ table_line = cs_ucomm-variant_get ] ).
         toolbar->tag( `Button`
             )->a( n = `text`  t = CONV #( 'Get Variant'(016) )

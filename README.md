@@ -283,10 +283,27 @@ variants.
 ### Output to keep
 
 **Export** writes the ALV as CSV or as an Excel file (Office Open XML, zipped
-with `CL_ABAP_ZIP` - no `CL_SALV_TABLE`), **Print** hands the list to the
-browser as a text file - ABAP Cloud has no spool. There is no "Execute in
-Background" button: a report runs without a browser through
-`cgui_run_in_background( )`, e.g. in an application job of your own.
+with `CL_ABAP_ZIP` - no `CL_SALV_TABLE`). **Print** hands the output to the
+browser as a PDF - ABAP Cloud has no spool. The PDF is written in ABAP
+(`z2ui5_cl_cgui_pdf`) in Courier, a font every PDF reader has, so nothing is
+embedded; a wide list turns the page to landscape and shrinks the font.
+
+**Execute in Background** shows on the selection screen once the report has
+a job: `set_job( )` in `initialization( )` with an object of
+`z2ui5_if_cgui_job`. The button runs the checks of Execute and hands the
+report class and the values of the screen to `schedule( )`; how the job runs
+is up to the installation - an application job on ABAP Cloud, a background
+job on premise. The job creates the class and runs it without a browser:
+
+```abap
+" in the job - report and values as schedule( ) got them
+DATA lo_report TYPE REF TO z2ui5_cl_cgui_report.
+CREATE OBJECT lo_report TYPE (report).
+lo_report->cgui_run_in_background( EXPORTING values   = values
+                                   IMPORTING pdf      = DATA(lv_pdf)
+                                             messages = DATA(lt_msg) ).
+" lv_pdf as the attachment of a mail, or into a table of your own
+```
 
 ## Samples
 
@@ -391,7 +408,7 @@ Known limitations:
   `SELECT ... WHERE ... IN` work as usual.
 - `WRITE ... CURRENCY` takes the decimals of the currency from ISO 4217,
   `UNIT` formats the number as it is — `TCURX` and `T006` are not released on
-  ABAP Cloud. Print is a text file, not a spool request.
+  ABAP Cloud. Print is a PDF in the browser, not a spool request.
 - Value tables are read on premise only — on ABAP Cloud the DDIC is not
   read, and the standard F4 is the domain's fixed values.
 - `alv( )` binds a PUBLIC attribute directly; any other table is copied into
@@ -515,8 +532,8 @@ Output
 - [x] List: `WRITE AT` positions and `UNDER`, columns that line up
       (every item of a positioned line in a box of its width), secondary
       lists (`sy-lsind`, `set_lsind( )`)
-- [ ] Print as PDF; "Execute in background" as an application job with the
-      list as a file or a mail
+- [x] Print as PDF; "Execute in background" hands report and values to a job
+      of the installation (`set_job( )`), which gets the list and its PDF
 
 Messages and logging
 

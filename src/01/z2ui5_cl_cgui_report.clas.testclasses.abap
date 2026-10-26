@@ -122,6 +122,22 @@ CLASS ltcl_report DEFINITION INHERITING FROM z2ui5_cl_cgui_report FINAL.
 ENDCLASS.
 
 
+CLASS ltcl_job DEFINITION FINAL FOR TESTING.
+  PUBLIC SECTION.
+    INTERFACES z2ui5_if_cgui_job.
+    DATA mv_report TYPE string.
+    DATA mt_values TYPE z2ui5_cl_cgui_variant=>ty_t_value.
+ENDCLASS.
+
+CLASS ltcl_job IMPLEMENTATION.
+  METHOD z2ui5_if_cgui_job~schedule.
+    CLEAR error.
+    mv_report = report.
+    mt_values = values.
+    job = `4711`.
+  ENDMETHOD.
+ENDCLASS.
+
 CLASS ltcl_client DEFINITION FINAL FOR TESTING.
 
   PUBLIC SECTION.
@@ -192,6 +208,7 @@ CLASS ltcl_test DEFINITION FINAL FOR TESTING
     METHODS popups_of_the_project FOR TESTING.
     METHODS short_api FOR TESTING.
     METHODS input_history FOR TESTING.
+    METHODS execute_in_background FOR TESTING.
     METHODS popup_values_of_an_sval FOR TESTING.
     METHODS alv_layout_default FOR TESTING.
     METHODS alv_layout_without_store FOR TESTING.
@@ -1158,6 +1175,38 @@ CLASS ltcl_test IMPLEMENTATION.
     cl_abap_unit_assert=>assert_equals( act = mo_cut->get_parameter_id( `zcgui_test` )
                                         exp = `LH` ).
     cl_abap_unit_assert=>assert_true( xsdbool( mo_report->mv_cgui_spa CS `ZCGUI_TEST=LH` ) ).
+
+  ENDMETHOD.
+
+  METHOD execute_in_background.
+
+    DATA(lo_job) = NEW ltcl_job( ).
+    mo_cut->set_job( lo_job ).
+    init( ).
+    cl_abap_unit_assert=>assert_true( xsdbool( mo_client->mv_view CS `CGUI_BACKGROUND` ) ).
+
+    " the checks of Execute first - the required field is empty
+    event( z2ui5_cl_cgui_report=>cs_ucomm-background ).
+    cl_abap_unit_assert=>assert_initial( lo_job->mv_report ).
+
+    mo_report->p_carrid = `LH`.
+    event( z2ui5_cl_cgui_report=>cs_ucomm-background ).
+    cl_abap_unit_assert=>assert_equals( act = lo_job->mv_report
+                                        exp = `LTCL_REPORT` ).
+    cl_abap_unit_assert=>assert_true( xsdbool( line_exists( lo_job->mt_values[ name = `P_CARRID` low = `LH` ] ) ) ).
+    cl_abap_unit_assert=>assert_char_cp( act = mo_cut->mt_cgui_msg[ 1 ]-text
+                                         exp = `*4711*` ).
+    " the selection screen stays - the report did not run here
+    cl_abap_unit_assert=>assert_equals( act = mo_cut->mv_cgui_screen
+                                        exp = `SELECTION` ).
+    cl_abap_unit_assert=>assert_false( mo_report->mv_end ).
+
+    " the job's side: the run without a browser, its printout as a PDF
+    DATA(lo_run) = NEW ltcl_report( ).
+    lo_run->cgui_run_in_background( EXPORTING values = lo_job->mt_values
+                                    IMPORTING pdf    = DATA(lv_pdf) ).
+    cl_abap_unit_assert=>assert_char_cp( act = z2ui5_cl_cgui_context=>conv_get_string_by_xstring( lv_pdf )
+                                         exp = `%PDF-*(HEADER) Tj*` ).
 
   ENDMETHOD.
 

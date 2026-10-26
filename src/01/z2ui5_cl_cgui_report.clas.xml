@@ -271,6 +271,18 @@
      <ENTRY>Close</ENTRY>
      <LENGTH>15</LENGTH>
     </item>
+    <item>
+     <ID>I</ID>
+     <KEY>048</KEY>
+     <ENTRY>Background job &amp;1 scheduled</ENTRY>
+     <LENGTH>60</LENGTH>
+    </item>
+    <item>
+     <ID>I</ID>
+     <KEY>049</KEY>
+     <ENTRY>Execute in Background</ENTRY>
+     <LENGTH>42</LENGTH>
+    </item>
    </TPOOL>
   </asx:values>
  </asx:abap>
