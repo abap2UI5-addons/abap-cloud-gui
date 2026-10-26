@@ -38,4 +38,9 @@ INTERFACE z2ui5_if_cgui_dialogs PUBLIC.
       title  TYPE clike OPTIONAL
       text   TYPE clike OPTIONAL.
 
+  METHODS popup_transport
+    IMPORTING
+      ucomm TYPE clike
+      title TYPE clike OPTIONAL.
+
 ENDINTERFACE.

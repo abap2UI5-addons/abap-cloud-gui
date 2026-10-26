@@ -27,28 +27,9 @@ export const TARGETS = {
   v750: "abaplint.jsonc",
   cloud: ".github/abaplint/abap_cloud.jsonc",
   // the 7.02 gate of .github/scripts/check-702.sh: `abaplint --fix` downports
-  // the copy, then the v702 syntax checks it - with the popups beside it
+  // the copy, then the v702 syntax checks it
   v702: ".github/abaplint/abap_702.jsonc",
 };
-
-/** A checkout of abap2UI5-addons/popups: POPUPS_HOME, else .deps/popups
- *  (unit.yaml clones it there), else ../popups, else cloned into
- *  build/popups (git, network). */
-export function popupsDir(env = process.env) {
-  const probe = (dir) => existsSync(join(dir, "src", "z2ui5_cl_popup_to_select.clas.abap"));
-  if (env.POPUPS_HOME) {
-    const dir = resolve(env.POPUPS_HOME);
-    if (!probe(dir)) throw new Error(`POPUPS_HOME=${env.POPUPS_HOME} is no checkout of abap2UI5-addons/popups`);
-    return dir;
-  }
-  for (const dir of [join(REPO, ".deps", "popups"), resolve(REPO, "..", "popups"), join(REPO, "build", "popups")]) {
-    if (probe(dir)) return dir;
-  }
-  const dir = join(REPO, "build", "popups");
-  const run = spawnSync("git", ["clone", "--quiet", "--depth", "1", "https://github.com/abap2UI5-addons/popups", dir], { encoding: "utf8" });
-  if (run.status !== 0) throw new Error(`git clone of abap2UI5-addons/popups failed: ${run.stderr}`);
-  return dir;
-}
 
 /** JSON with comments, as the abaplint configs are written - comments and
  *  trailing commas are dropped outside of strings only. */
@@ -77,8 +58,7 @@ export function parseJsonc(text) {
 /** The config of a target, rebased onto a scratch copy whose root holds it. */
 export function gateConfig(target, { ddic = false, naming = true } = {}) {
   const config = parseJsonc(readFileSync(join(REPO, TARGETS[target]), "utf8"));
-  // the 7.02 config lists the popups of its copy beside src
-  if (target !== "v702") config.global.files = "/src/**/*.*";
+  config.global.files = "/src/**/*.*";
   if (ddic) config.dependencies.push({ folder: "/ddic", files: "/**/*.*" });
   if (!naming) delete config.rules.object_naming;
   return config;
@@ -122,7 +102,6 @@ export function lint({ files, target, ddic, naming = true, keep = false }) {
 
     const cli = join(REPO, "node_modules", "@abaplint", "cli", "abaplint");
     if (target === "v702") {
-      cpSync(join(popupsDir(), "src"), join(work, "popups", "src"), { recursive: true });
       // --fix exits non-zero while findings remain; the run below decides
       spawnSync(process.execPath, [cli, "abaplint.json", "--fix"], { cwd: work, encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
     }
@@ -134,7 +113,7 @@ export function lint({ files, target, ddic, naming = true, keep = false }) {
       throw new Error(`abaplint (${target}) produced no result:\n${run.stdout}\n${run.stderr}`);
     }
     const issues = JSON.parse(run.stdout.slice(at)).map((i) => ({
-      file: i.file.replace(/^.*?(popups\/)?src\//, (m, p) => `${p ?? ""}src/`),
+      file: i.file.replace(/^.*?src\//, "src/"),
       row: i.start.row,
       col: i.start.col,
       key: i.key,

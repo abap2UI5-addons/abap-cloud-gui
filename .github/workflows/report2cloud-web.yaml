@@ -4,7 +4,7 @@ name: report2cloud web corpus
 # the repositories of the community list of ABAP projects cloned shallow and
 # sparse (only *.prog.abap and *.prog.xml - read, never run), every report
 # converted with its includes, the converted classes linted together, then
-# checked, built and started in the transpiled runtime - the popups and the
+# checked, built and started in the transpiled runtime - the
 # MCP server (its npm backend and app client) beside it, as in the runtime
 # job of report2cloud.yaml (tools/report2cloud/web.mjs --start). The job
 # summary carries the share that converts, the refusals ranked, and how many
@@ -37,7 +37,6 @@ jobs:
         node-version: '22'
         cache: 'npm'
     - run: npm ci
-    - run: git clone --depth 1 https://github.com/abap2UI5-addons/popups .deps/popups
     - run: git clone --depth 1 --branch "$MCP_SERVER_REF" https://github.com/abap2UI5/mcp-server ../mcp-server
     - run: npm run report2cloud:web -- --lint --start --summary "$GITHUB_STEP_SUMMARY" --json build/web-corpus.jsonl
     - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

@@ -6,7 +6,7 @@
 //
 //   check  the syntax check of the transpile (abaplint, version open-abap,
 //          check_syntax / unknown_types / structure / parser_error) over the
-//          classes with src/01, the popups, the DDIC stubs, the package's
+//          classes with src/01, the DDIC stubs, the package's
 //          downport and open-abap-core - and the dependencies of each report
 //          (lib/deps.mjs). A dependency with an error is left out and the
 //          classes are checked again without it, to a fixed point: a report
@@ -28,7 +28,7 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { basename, join } from "node:path";
 import abaplint from "@abaplint/core";
-import { popupsDir, REPO } from "./gate.mjs";
+import { REPO } from "./gate.mjs";
 
 const CHECK = ["check_syntax", "unknown_types", "structure", "parser_error"];
 
@@ -126,7 +126,7 @@ export async function startAll(rows, { ddic, port = 4499, timeoutMs = 60_000, br
   const stage = new Map();   // class -> { stage, ok, error }
 
   onLine(`start: the syntax check of ${classes.size} classes`);
-  const checked = check({ ...deps, ...files }, classes, { dirs: [join(REPO, "src", "01"), join(popupsDir(), "src"), ddic, dirs.downport, dirs.core] });
+  const checked = check({ ...deps, ...files }, classes, { dirs: [join(REPO, "src", "01"), ddic, dirs.downport, dirs.core] });
   for (const [c, e] of checked.errors) stage.set(c, { stage: "check", ok: false, error: e });
 
   // the classes that pass, the dependencies of their reports, nothing the

@@ -1,7 +1,7 @@
 // report2cloud, golden master lite: the generated classes RUN.
 //
-// The corpus is converted, the classes are transpiled with src/01 and the
-// popups against @abap2ui5/node-runtime (backend.mjs), the stubs of the flight
+// The corpus is converted, the classes are transpiled with src/01
+// against @abap2ui5/node-runtime (backend.mjs), the stubs of the flight
 // tables are seeded (seed.mjs), and every report is operated the way a user
 // operates it - start the app, fill the selection screen, Execute, click a
 // line - through the JSON protocol of the UI5 frontend (driver.mjs, the app
@@ -15,8 +15,7 @@
 //
 // Opt-in, like the abaplint gates it complements: it needs an mcp-server
 // checkout (MCP_SERVER_HOME or ../mcp-server), git and network for the first
-// install of the runtime (A2UI5_MCP_WORKSPACE, default ~/.abap2ui5-mcp) and
-// the popups (.deps/popups, ../popups or a clone into build/popups). Without
+// install of the runtime (A2UI5_MCP_WORKSPACE, default ~/.abap2ui5-mcp). Without
 // an mcp-server checkout every test is skipped with the reason.
 import { after, before, test } from "node:test";
 import assert from "node:assert/strict";

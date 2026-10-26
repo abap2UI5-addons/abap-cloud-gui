@@ -3,7 +3,6 @@
 [![abap2UI5-addons](https://img.shields.io/badge/abap2UI5--addons-library-1873b4)](https://github.com/abap2UI5-addons)
 [![ABAP](https://img.shields.io/badge/ABAP-Cloud%20%7C%20Standard%20%E2%89%A5%207.50%20%7C%207.02-blue)](#installation)
 [![abap2UI5](https://img.shields.io/badge/requires-abap2UI5-blue)](https://github.com/abap2UI5/abap2UI5)
-[![popups](https://img.shields.io/badge/requires-popups-blue)](https://github.com/abap2UI5-addons/popups)
 [![License](https://img.shields.io/github/license/abap2UI5-addons/abap-cloud-gui)](LICENSE)
 <br>
 [![abaplint](https://img.shields.io/github/actions/workflow/status/abap2UI5-addons/abap-cloud-gui/abaplint.yaml?branch=main&label=abaplint)](https://github.com/abap2UI5-addons/abap-cloud-gui/actions/workflows/abaplint.yaml)
@@ -55,15 +54,14 @@ What it is not:
 
 - ABAP Cloud (BTP ABAP Environment, S/4HANA Cloud) or Standard ABAP 7.50 or
   higher; NetWeaver 7.02 with a downported copy (see [Compatibility](#compatibility))
-- [abap2UI5](https://github.com/abap2UI5/abap2UI5)
-- [abap2UI5-addons/popups](https://github.com/abap2UI5-addons/popups) - the
-  value helps and confirmation popups
+- [abap2UI5](https://github.com/abap2UI5/abap2UI5) - nothing else: the popups
+  (value help, ranges, confirmation, values, transport request) are classes
+  of this addon
 
 **Steps** - with [abapGit](https://abapgit.org), in this order:
 
 1. [abap2UI5](https://github.com/abap2UI5/abap2UI5)
-2. [abap2UI5-addons/popups](https://github.com/abap2UI5-addons/popups)
-3. this repository (branch `main`) - classes, two interfaces and the two
+2. this repository (branch `main`) - classes, two interfaces and the two
    tables `Z2UI5_CGUI_VAR` / `Z2UI5_CGUI_LAY`; nothing else to set up
 
 **Start** - run a sample like any abap2UI5 app, e.g.
@@ -605,8 +603,10 @@ Messages and logging
 
 Dialogs and screens
 
-- [ ] Popups: transport request selection (from [abap2UI5-addons/popups](https://github.com/abap2UI5-addons/popups)) -
-      `POPUP_TO_DECIDE` and `POPUP_GET_VALUES` are there, also as `_popup( )`
+- [x] Popups: transport request selection - `popup_transport( )` /
+      `_popup( )->transport( )`, `z2ui5_cl_cgui_transport`, beside
+      `POPUP_TO_DECIDE` and `POPUP_GET_VALUES`; no popup of another addon is
+      needed any more
 - [ ] `CALL SCREEN` of a screen in another class - `CALL SCREEN` of the
       report's own screens and back is there
 - [ ] `CALL SELECTION-SCREEN` of another report, as a popup or by screen number
@@ -704,7 +704,7 @@ npm run check:cloud     # abaplint, ABAP Cloud
 npm run check:702       # downport a scratch copy to 7.02 and check it
 npm run check:abap2ui5  # abap2UI5-linter over apps and views
 npm run check:regex     # no regular expressions in src/
-npm run unit            # ABAP Unit in the transpiled backend (needs ../mcp-server and .deps/popups)
+npm run unit            # ABAP Unit in the transpiled backend (needs ../mcp-server)
 npm run test:report2cloud  # the report converter: snapshots and abaplint over its output
 npm run site            # the GitHub Pages site with the converter playground into build/site (-- --serve: on :8080)
 ```

@@ -1,5 +1,5 @@
 // The transpiled abap2UI5 backend for the runtime test of report2cloud: the
-// generated classes, src/01, the popups they call and stubs of the flight
+// generated classes, src/01 and stubs of the flight
 // tables, transpiled with @abaplint/transpiler against @abap2ui5/node-runtime
 // and served on loopback - no SAP system.
 //
@@ -17,27 +17,15 @@
 //
 // Where the MCP server is:   MCP_SERVER_HOME, else ../mcp-server beside this
 //                            repository (a set variable is authoritative)
-// Where the popups are:      POPUPS_HOME, else .deps/popups (unit.yaml clones
-//                            it there), else ../popups - else cloned into
-//                            build/popups
 // Where the runtime goes:    A2UI5_MCP_WORKSPACE (the MCP server's own
 //                            variable), default ~/.abap2ui5-mcp
 import { spawn } from "node:child_process";
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, relative, resolve, sep } from "node:path";
 import { pathToFileURL, fileURLToPath } from "node:url";
-import { parseJsonc, popupsDir, REPO } from "../../lib/gate.mjs";
+import { parseJsonc, REPO } from "../../lib/gate.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
-
-/** the popups the report runtime calls - unit.yaml deploys the same set */
-export const POPUP_FILES = [
-  "src/00",
-  "src/z2ui5_cl_popup_get_range.clas.abap",
-  "src/z2ui5_cl_popup_to_confirm.clas.abap",
-  "src/z2ui5_cl_popup_to_select.clas.abap",
-  "src/z2ui5_cl_popup_input_val.clas.abap",
-];
 
 /** The mcp-server checkout: `{ dir }`, or `{ missing }` with the reason. */
 export function resolveMcpServer(env = process.env) {
@@ -133,7 +121,7 @@ export async function runtimeSources({ onLine = () => {} } = {}) {
 /**
  * Transpile `files` (generated classes, { name: text }) together with the
  * packages `sources` (default src/01 - every class, interface, table and
- * data element), the popups and the DDIC stubs into a directory inside the
+ * data element) and the DDIC stubs into a directory inside the
  * runtime's install (the modules resolve the package through its
  * node_modules). `withTests` takes the test includes along and keeps the
  * transpiler's unit-test runner (index.mjs) beside init.mjs - what
@@ -162,8 +150,6 @@ export async function buildBackend({ files = {}, ddic, seed = [], sources = ["sr
   mkdirSync(staging);
   mkdirSync(apps);
   for (const source of sources) copyObjects(join(REPO, source), input, withTests);
-  const popups = popupsDir();
-  for (const p of POPUP_FILES) copyObjects(join(popups, p), input);
   for (const [name, text] of Object.entries(files)) writeFileSync(join(input, name), text);
   if (ddic) copyObjects(ddic, input);
 

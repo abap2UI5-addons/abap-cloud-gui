@@ -3,7 +3,7 @@ name: unit
 # The ABAP Unit tests, run in the transpiled abap2UI5 backend - no SAP system.
 # npm run unit (scripts/unit.mjs) transpiles src/01 and src/02 - classes,
 # interfaces, the tables of the variant and layout stores and their data
-# elements - with the popups the report runtime calls, against
+# elements - against
 # @abap2ui5/node-runtime at the release abaplint.jsonc pins, creates the
 # tables in the runtime's SQLite, and runs every test class, the RISK LEVEL
 # DANGEROUS ones of the stores included. It uses the abap2UI5 MCP server as a
@@ -38,6 +38,5 @@ jobs:
         node-version: '22'
         cache: 'npm'
     - run: npm ci
-    - run: git clone --depth 1 https://github.com/abap2UI5-addons/popups .deps/popups
     - run: git clone --depth 1 --branch "$MCP_SERVER_REF" https://github.com/abap2UI5/mcp-server ../mcp-server
     - run: npm run unit

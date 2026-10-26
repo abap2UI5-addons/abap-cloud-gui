@@ -18,6 +18,13 @@ CLASS z2ui5_cl_cgui_dialog DEFINITION PUBLIC FINAL CREATE PUBLIC.
         ucomm    TYPE clike
         title    TYPE clike OPTIONAL.
 
+    "! the transport request popup - at_user_command( ucomm ) when the
+    "! user picked one or chose no transport, get_transport( ) the answer
+    METHODS transport
+      IMPORTING
+        ucomm TYPE clike
+        title TYPE clike OPTIONAL.
+
     METHODS decide
       IMPORTING
         question TYPE clike
@@ -51,6 +58,13 @@ CLASS z2ui5_cl_cgui_dialog IMPLEMENTATION.
     mo_report->popup_to_confirm( question = question
                                  ucomm    = ucomm
                                  title    = title ).
+
+  ENDMETHOD.
+
+  METHOD transport.
+
+    mo_report->popup_transport( ucomm = ucomm
+                                title = title ).
 
   ENDMETHOD.
 

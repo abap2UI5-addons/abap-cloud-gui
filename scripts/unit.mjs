@@ -1,15 +1,14 @@
 #!/usr/bin/env node
 // The ABAP Unit tests of src/ in the transpiled abap2UI5 backend - no SAP
 // system. The classes, interfaces, tables and data elements of src/01 and
-// src/02 and the popups the report runtime calls are transpiled with their
+// src/02 are transpiled with their
 // test includes against @abap2ui5/node-runtime at the release abaplint.jsonc
 // pins; the tables are created in the runtime's SQLite before the tests
 // start, so the RISK LEVEL DANGEROUS tests of the variant and layout stores
 // run against them. The build is the one the runtime test of report2cloud
 // uses (tools/report2cloud/test/runtime/backend.mjs), the runner and the
 // report of its results are the abap2UI5 MCP server's (lib/runtime.mjs) - it
-// needs an mcp-server checkout at MCP_SERVER_HOME or ../mcp-server and the
-// popups at POPUPS_HOME or .deps/popups. The MCP server's own unit action
+// needs an mcp-server checkout at MCP_SERVER_HOME or ../mcp-server. The MCP server's own unit action
 // deploys classes and interfaces only, no tables - hence this script.
 //
 //   npm run unit

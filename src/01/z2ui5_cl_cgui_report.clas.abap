@@ -695,6 +695,20 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
       IMPORTING
         tab TYPE STANDARD TABLE.
 
+    "! the transport request popup - the modifiable requests of the user;
+    "! on a pick or "No Transport" at_user_command( ) runs with ucomm,
+    "! get_transport( ) returns the answer
+    METHODS popup_transport
+      IMPORTING
+        ucomm TYPE clike
+        title TYPE clike OPTIONAL.
+
+    "! the answer of popup_transport( ) - confirmed, local (no transport),
+    "! the request and the task of the user
+    METHODS get_transport
+      RETURNING
+        VALUE(result) TYPE z2ui5_cl_cgui_transport=>ty_s_result.
+
     "! POPUP_TO_CONFIRM - on Yes, at_user_command( ) runs with ucomm
     METHODS popup_to_confirm
       IMPORTING
@@ -920,6 +934,7 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
     DATA mo_cgui_catalog TYPE REF TO z2ui5_if_cgui_catalog.
     DATA mo_cgui_app_log TYPE REF TO z2ui5_if_cgui_log.
     DATA mo_cgui_tree_handler TYPE REF TO z2ui5_if_cgui_tree_handler.
+    DATA ms_cgui_transport TYPE z2ui5_cl_cgui_transport=>ty_s_result.
     DATA mv_cgui_cmd_on  TYPE abap_bool.
     " the message boxes of _msg_box( ) - shown at the end of the roundtrip
     DATA mt_cgui_box           TYPE ty_t_cgui_msg.
@@ -1091,6 +1106,7 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
         file           TYPE string VALUE `FILE`,
         palette        TYPE string VALUE `PALETTE`,
         su3            TYPE string VALUE `SU3`,
+        transport      TYPE string VALUE `TRANSPORT`,
       END OF cs_pending.
 
     TYPES:
@@ -3147,6 +3163,13 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
 
       WHEN cs_pending-su3.
         su3_result( ).
+
+      WHEN cs_pending-transport.
+        TRY.
+            ms_cgui_transport = CAST z2ui5_cl_cgui_transport( client->get_app_prev( ) )->result( ).
+          CATCH cx_root.
+            CLEAR ms_cgui_transport.
+        ENDTRY.
 
       WHEN cs_pending-range.
         on_range_result( lv_field ).
@@ -5732,6 +5755,29 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
                      options  = options
                      ucomm    = ucomm
                      title    = title ).
+
+  ENDMETHOD.
+
+  METHOD z2ui5_if_cgui_dialogs~popup_transport.
+
+    popup_transport( ucomm = ucomm
+                     title = title ).
+
+  ENDMETHOD.
+
+  METHOD popup_transport.
+
+    CLEAR ms_cgui_transport.
+    mv_cgui_pending_kind = cs_pending-transport.
+    mv_cgui_nav = abap_true.
+    client->nav_app_call( z2ui5_cl_cgui_transport=>factory( event = ucomm
+                                                            title = title ) ).
+
+  ENDMETHOD.
+
+  METHOD get_transport.
+
+    result = ms_cgui_transport.
 
   ENDMETHOD.
 

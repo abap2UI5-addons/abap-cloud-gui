@@ -606,8 +606,7 @@ npm run test:report2cloud:browser                                          # the
   `lib/snapshot.mjs`) - from a checkout at `MCP_SERVER_HOME` or
   `../mcp-server`; without one every test is skipped with the reason. The
   runtime is installed into `A2UI5_MCP_WORKSPACE` (default `~/.abap2ui5-mcp`,
-  the MCP server's), the popups come from `POPUPS_HOME`, `.deps/popups`,
-  `../popups` or a clone into `build/popups`. About 20 s on a warm workspace;
+  the MCP server's). About 20 s on a warm workspace;
   `REPORT2CLOUD_RUNTIME_PORT` (default 4481) is the port,
   `REPORT2CLOUD_RUNTIME_KEEP=1` keeps the build (`<runtime>/.r2c-*`). The backend clears the
   `CLASS-DATA` of the local classes of the reports before every request

@@ -225,6 +225,7 @@ CLASS ltcl_test DEFINITION FINAL FOR TESTING
     METHODS user_parameters FOR TESTING.
     METHODS application_log FOR TESTING.
     METHODS alv_chart FOR TESTING.
+    METHODS transport_popup FOR TESTING.
     METHODS popup_values_of_an_sval FOR TESTING.
     METHODS alv_layout_default FOR TESTING.
     METHODS alv_layout_without_store FOR TESTING.
@@ -1191,6 +1192,29 @@ CLASS ltcl_test IMPLEMENTATION.
     cl_abap_unit_assert=>assert_equals( act = mo_cut->get_parameter_id( `zcgui_test` )
                                         exp = `LH` ).
     cl_abap_unit_assert=>assert_true( xsdbool( mo_report->mv_cgui_spa CS `ZCGUI_TEST=LH` ) ).
+
+  ENDMETHOD.
+
+  METHOD transport_popup.
+
+    init( ).
+    mo_cut->_popup( )->transport( `TR` ).
+    DATA(lo_popup) = CAST z2ui5_cl_cgui_transport( mo_client->mo_called ).
+    " the transpiled runtime has no E070 - the list is empty
+    lo_popup->z2ui5_if_app~main( mo_client ).
+
+    " No Transport - the popup leaves with TR, at_user_command( ) runs
+    mo_client->mv_event = z2ui5_cl_cgui_transport=>cs_event-local.
+    lo_popup->z2ui5_if_app~main( mo_client ).
+    mo_client->mo_prev = lo_popup.
+    mo_client->mv_event = `TR`.
+    mo_client->mv_navigated = abap_true.
+    mo_cut->z2ui5_if_app~main( mo_client ).
+    mo_client->mv_navigated = abap_false.
+
+    cl_abap_unit_assert=>assert_equals( act = mo_report->mv_ucomm
+                                        exp = `TR` ).
+    cl_abap_unit_assert=>assert_true( mo_cut->get_transport( )-local ).
 
   ENDMETHOD.
 

@@ -14,16 +14,6 @@
       "branch": "1.148.0",
       "folder": "/abap2UI5",
       "files": "/src/**/*.*"
-    },
-    {
-      "url": "https://github.com/abap2UI5-addons/popups",
-      "folder": "/popups",
-      "files": "/src/**/*.*"
-    },
-    {
-      "url": "https://github.com/abap2UI5-addons/layout-management",
-      "folder": "/layout-management",
-      "files": "/src/**/*.*"
     }
   ],
   "syntax": {
