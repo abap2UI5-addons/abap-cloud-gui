@@ -751,3 +751,21 @@ test("zr2c_45_salvlocal: a SALV kept by a local class - a function of its own ov
   s = await d.act(s.session, { event: "CGUI_ALV_HOTSPOT", args: [`${t.path}/2`, "ITEM"] });
   assert.deepEqual(toasts(s), ["Item 003 (ITEM)"]);
 });
+
+test("zr2c_46_treelist: RS_TREE_CONSTRUCT and RS_TREE_LIST_DISPLAY - the nodes as the tree of the report, TLEVEL the hierarchy", { skip }, async () => {
+  let s = await d.start("z2ui5_cl_cgui_r2c_46");
+  if (!s.tables.length) s = await d.act(s.session, { event: "CGUI_EXECUTE" });
+  const [t] = s.tables;
+  assert.ok(t, "the tree");
+  assert.equal(t.label, "Flights as a tree list");
+  // the nodes in their order, LEVEL from TLEVEL - every node open
+  const view = d.state().models.MAIN.data.MT_CGUI_TREE_VIEW;
+  assert.deepEqual(view.map((n) => `${n.LEVEL} ${n.TEXT}`), [
+    "0 Airlines",
+    "1 LH Lufthansa",
+    "2 0400 Frankfurt - New York",
+    "2 0402 Frankfurt - New York",
+    "1 AA American Airlines",
+    "2 0017 New York - San Francisco",
+  ]);
+});

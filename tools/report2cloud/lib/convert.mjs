@@ -6440,6 +6440,48 @@ class Converter {
       this.popup(s, b, fm);
       return true;
     }
+    // the tree list: the nodes of RS_TREE_CONSTRUCT as the ALV tree of the
+    // report, TLEVEL the hierarchy - RS_TREE_LIST_DISPLAY shows it
+    if (fm === "RS_TREE_CONSTRUCT") {
+      const tab = functionParams(s).get("nodetab");
+      if (!tab) {
+        this.refuse(s, "RS_TREE_CONSTRUCT without TABLES nodetab - not understood");
+        return true;
+      }
+      const ov = this.rewrites(s, b.ctx, b);
+      const nodes = nodeText(tab.node, ov).replace(/\[\]$/, "");
+      this.treeCount = (this.treeCount ?? 0) + 1;
+      const n = this.treeCount;
+      const parents = `lt_r2c_tree_parent${n}`;
+      const node = `<ls_r2c_tree_node${n}>`;
+      const level = `lv_r2c_tree_level${n}`;
+      b.out.push(
+        `DATA(lo_r2c_tree${n}) = tree( ).`,
+        `DATA ${parents} TYPE STANDARD TABLE OF i WITH EMPTY KEY.`,
+        `LOOP AT ${nodes} ASSIGNING FIELD-SYMBOL(${node}).`,
+        `  DATA(lv_r2c_tree_row${n}) = sy-tabix.`,
+        `  DATA(${level}) = nmax( val1 = 1 val2 = CONV i( ${node}-tlevel ) ).`,
+        `  WHILE lines( ${parents} ) >= ${level}.`,
+        `    DELETE ${parents} INDEX lines( ${parents} ).`,
+        "  ENDWHILE.",
+        `  INSERT lo_r2c_tree${n}->add_node( parent   = COND #( WHEN ${parents} IS NOT INITIAL THEN ${parents}[ lines( ${parents} ) ] )`,
+        `                                   text     = condense( |{ ${node}-name } { ${node}-text }| )`,
+        "                                   expanded = abap_true",
+        `                                   value    = |{ lv_r2c_tree_row${n} }| ) INTO TABLE ${parents}.`,
+        "ENDLOOP.");
+      this.note("RS_TREE_CONSTRUCT / RS_TREE_LIST_DISPLAY are the ALV tree of the report: tree( )->add_node( ) per row of the node table, TLEVEL the hierarchy, NAME and TEXT the text of the node, every node open; a click on a node raises at_tree_node( key value ) with the index of its row as value");
+      this.map(s, "`tree( )->add_node( )` per row of the node table - TLEVEL the hierarchy");
+      return true;
+    }
+    if (fm === "RS_TREE_LIST_DISPLAY") {
+      const p = functionParams(s);
+      const form = p.get("callback_user_command");
+      if (form) {
+        this.todo(s, `RS_TREE_LIST_DISPLAY: the callback ${nodeText(form.node)} is not called - a click on a node raises at_tree_node( key value ), value the index of its row in the node table; call the FORM's method from a redefinition of at_tree_node( )`);
+      }
+      this.map(s, "dropped - the tree of RS_TREE_CONSTRUCT is the output");
+      return true;
+    }
     if (fm === "DYNP_VALUES_READ" || fm === "DYNP_VALUES_UPDATE") {
       // the fields of the selection screen are attributes, and every event
       // brings their values along - the table of names reads or writes them
