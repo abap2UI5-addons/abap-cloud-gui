@@ -165,3 +165,40 @@ test("the command field and Ctrl+K - /o opens a report in a new tab, the palette
   });
   assert.deepEqual(rows.filter((r) => !r.ok).map((r) => `${r.cls}: ${r.errors.join("; ")}`), []);
 });
+
+test("the chart of an ALV - a dialog with the bars as SVG, drawn anew for the column picked", { skip, timeout: 10 * 60_000 }, async (t) => {
+  const salv = classes.filter((c) => /_r2c_04$/.test(c));
+  const rows = await browserRun(salv, {
+    url: backend.url,
+    onLine: (l) => t.diagnostic(l),
+    check: async (page, errors) => {
+      // a full toolbar keeps it in its overflow, rendered once opened
+      const chart = page.locator(".sapMBtn[title='Chart']:visible").first();
+      await page.locator(".sapMOTB").first().waitFor({ timeout: 30_000 }).catch(() => {});
+      if (!(await chart.count())) {
+        await page.locator(".sapMBtn[title='Additional Options'], .sapMOTB .sapMBtn[id$='overflowButton']").first().click().catch(() => {});
+        await chart.waitFor({ timeout: 10_000 }).catch(() => {});
+      }
+      if (!(await chart.count())) {
+        errors.push("no chart button on the ALV");
+        return;
+      }
+      await chart.click();
+      const dialog = page.locator(".sapMDialog").filter({ has: page.locator("svg") });
+      await dialog.waitFor({ timeout: 30_000 }).catch(() => {});
+      const bars = await dialog.locator("svg rect").count();
+      if (bars < 1) errors.push("the chart has no bars");
+      // the rows counted: the Select of the values, its last but... first item
+      const select = dialog.locator(".sapMSlt").nth(1);
+      await select.click();
+      await page.locator(".sapMSelectList li, .sapMSelectList .sapMSelectListItem").filter({ hasText: "Number of rows" }).first().click();
+      await page.waitForLoadState("networkidle", { timeout: 10_000 }).catch(() => {});
+      await page.waitForTimeout(500);
+      const after = await page.locator(".sapMDialog svg rect").count();
+      if (after < 1) errors.push("the chart of the rows counted has no bars");
+      t.diagnostic(`bars: ${bars}, counted: ${after}`);
+      await page.locator(".sapMDialog .sapMBtn").filter({ hasText: /^\s*Close/ }).first().click();
+    },
+  });
+  assert.deepEqual(rows.filter((r) => !r.ok).map((r) => `${r.cls}: ${r.errors.join("; ")}`), []);
+});

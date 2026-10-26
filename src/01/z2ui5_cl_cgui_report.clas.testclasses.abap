@@ -224,6 +224,7 @@ CLASS ltcl_test DEFINITION FINAL FOR TESTING
     METHODS command_field FOR TESTING.
     METHODS user_parameters FOR TESTING.
     METHODS application_log FOR TESTING.
+    METHODS alv_chart FOR TESTING.
     METHODS popup_values_of_an_sval FOR TESTING.
     METHODS alv_layout_default FOR TESTING.
     METHODS alv_layout_without_store FOR TESTING.
@@ -1190,6 +1191,29 @@ CLASS ltcl_test IMPLEMENTATION.
     cl_abap_unit_assert=>assert_equals( act = mo_cut->get_parameter_id( `zcgui_test` )
                                         exp = `LH` ).
     cl_abap_unit_assert=>assert_true( xsdbool( mo_report->mv_cgui_spa CS `ZCGUI_TEST=LH` ) ).
+
+  ENDMETHOD.
+
+  METHOD alv_chart.
+
+    init( ).
+    mo_report->p_carrid = `LH`.
+    mo_report->mv_alv = abap_true.
+    event( z2ui5_cl_cgui_report=>cs_ucomm-execute ).
+    cl_abap_unit_assert=>assert_true( xsdbool( mo_client->mv_view CS z2ui5_cl_cgui_alv=>cs_event-chart ) ).
+
+    " the chart: the carriers, their seats - the first text, the first number
+    event( z2ui5_cl_cgui_alv=>cs_event-chart ).
+    cl_abap_unit_assert=>assert_true( xsdbool( mo_client->mv_popup CS `&lt;svg` OR mo_client->mv_popup CS `<svg` ) ).
+    cl_abap_unit_assert=>assert_true( xsdbool( mo_client->mv_popup CS `selectedKey="SEATS"` ) ).
+    cl_abap_unit_assert=>assert_true( xsdbool( mo_client->mv_popup CS `UA` ) ).
+
+    " the rows counted instead
+    event( name = z2ui5_cl_cgui_alv=>cs_event-chart
+           args = VALUE #( ( `VALUE` ) ( `%COUNT` ) ) ).
+    cl_abap_unit_assert=>assert_false( xsdbool( mo_client->mv_popup CS `selectedKey="SEATS"` ) ).
+
+    event( z2ui5_cl_cgui_alv=>cs_event-chart_close ).
 
   ENDMETHOD.
 

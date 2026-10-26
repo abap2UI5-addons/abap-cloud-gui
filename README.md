@@ -333,6 +333,13 @@ variants.
 
 ### Output to keep
 
+**Chart** shows the rows of the ALV - its filter and search applied - as a
+bar chart in a dialog: the user picks the column of the categories and the
+number to sum, or counts the rows; the 20 largest bars, the rest as one.
+OpenUI5 has no sap.viz, so `z2ui5_cl_cgui_chart` draws it as SVG of plain
+attributes, which the page's content security policy lets in.
+`set_chart( abap_false )` takes the button off the toolbar.
+
 **Export** writes the ALV as CSV or as an Excel file (Office Open XML, zipped
 with `CL_ABAP_ZIP` - no `CL_SALV_TABLE`). **Print** hands the output to the
 browser as a PDF - ABAP Cloud has no spool. The PDF is written in ABAP
@@ -578,8 +585,10 @@ Output
 - [x] ALV: formatted dates, times and amounts (the locale of the browser),
       totals and subtotals, hotspot per column, toolbar with own functions,
       editable cells
-- [ ] ALV: a chart over the grid - the columns as series, the layout's
-      sort and filter applied
+- [x] ALV: a chart over the grid - a bar chart of the rows shown, the filter
+      and search applied, a column as the categories and a number summed
+      (or the rows counted), drawn as SVG
+- [ ] ALV chart: several columns as series, other kinds of chart
 - [x] List: `WRITE AT` positions and `UNDER`, columns that line up
       (every item of a positioned line in a box of its width), secondary
       lists (`sy-lsind`, `set_lsind( )`)
@@ -669,9 +678,10 @@ Stage 5 - research
 
 Quality, through every stage
 
-- [ ] Tests for the report runtime and the ALV with a client test double
-      (the selection screen has them), samples in the abap2UI5 playground,
-      documentation page
+- [x] Tests for the report runtime and the ALV with a client test double
+      (`ltcl_client` of the report, the ALV's own), beside the selection
+      screen's
+- [ ] Samples in the abap2UI5 playground, a documentation page
 - [ ] Semantic tests: the classic report and its class driven against the
       same seeded rows in the transpiled runtime, their lists compared
 

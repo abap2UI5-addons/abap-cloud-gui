@@ -2896,6 +2896,8 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
          AND lv_event <> z2ui5_cl_cgui_alv=>cs_event-filter_clear
          AND lv_event <> z2ui5_cl_cgui_alv=>cs_event-details
          AND lv_event <> z2ui5_cl_cgui_alv=>cs_event-details_close
+         AND lv_event <> z2ui5_cl_cgui_alv=>cs_event-chart
+         AND lv_event <> z2ui5_cl_cgui_alv=>cs_event-chart_close
          AND lv_event <> z2ui5_cl_cgui_alv=>cs_event-search
          AND lv_event <> z2ui5_cl_cgui_alv=>cs_event-f4 ).
       RETURN.
@@ -2974,7 +2976,8 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
     " the export takes the table of the report, the selection the table the
     " grid shows
     DATA lr_tab TYPE REF TO data.
-    IF lv_event = z2ui5_cl_cgui_alv=>cs_event-export OR lv_event = z2ui5_cl_cgui_alv=>cs_event-export_xlsx.
+    IF lv_event = z2ui5_cl_cgui_alv=>cs_event-export OR lv_event = z2ui5_cl_cgui_alv=>cs_event-export_xlsx
+        OR lv_event = z2ui5_cl_cgui_alv=>cs_event-chart.
       lr_tab = alv_visible_source( ).
     ELSE.
       lr_tab = alv_shown( ).
