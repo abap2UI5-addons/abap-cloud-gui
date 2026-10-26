@@ -351,8 +351,8 @@ ENDIF.
   {
     id: "alv-classic",
     title: "ALV function modules and SALV calls without a counterpart",
-    match: /^(CALL FUNCTION '(REUSE_ALV|LVC_)|\S+ without TABLES t_outtab|cl_salv_table=>factory\( \) without|FORM \S+ is the USER_COMMAND callback|FORM \S+: \S+-\S+ has no counterpart)/,
-    why: "`REUSE_ALV_GRID_DISPLAY` / `REUSE_ALV_LIST_DISPLAY` with `TABLES t_outtab` and `CL_SALV_TABLE` become `alv( )`. A hierarchical list, the ALV popup, the other `REUSE_ALV_*` and `LVC_*` modules and a USER_COMMAND callback that reads more than the row (`rs_selfield-tabindex`), the column of a hotspot (`-fieldname`) and its cell (`-value`) have no counterpart - `-refresh` and the stable flags are dropped, the ALV is drawn anew on every roundtrip.",
+    match: /^(CALL FUNCTION '(REUSE_ALV|LVC_)|\S+ without TABLES t_outtab|cl_salv_table=>factory\( \) without|FORM \S+ is the USER_COMMAND callback|FORM \S+: \S+-\S+ has no counterpart|SALV: )/,
+    why: "`REUSE_ALV_GRID_DISPLAY` / `REUSE_ALV_LIST_DISPLAY` with `TABLES t_outtab` and `CL_SALV_TABLE` become `alv( )`; a `CL_SALV_TABLE` the report keeps and uses after `display( )` - an attribute of a local class, its event handlers, the rows selected - its stand-in `z2ui5_cl_cgui_salv_table`, which has the table, its columns, settings, functions, selections and events but not the Excel export (`cl_salv_ex_util`, `cl_salv_bs_*`) or the LVC field catalog of `cl_salv_controller_metadata`. A hierarchical list, the ALV popup, the other `REUSE_ALV_*` and `LVC_*` modules and a USER_COMMAND callback that reads more than the row (`rs_selfield-tabindex`), the column of a hotspot (`-fieldname`) and its cell (`-value`) have no counterpart - `-refresh` and the stable flags are dropped, the ALV is drawn anew on every roundtrip.",
     rewrite: abap(`
 * before
 CALL FUNCTION 'REUSE_ALV_POPUP_TO_SELECT' EXPORTING i_tabname = 'GT_CARR' ...

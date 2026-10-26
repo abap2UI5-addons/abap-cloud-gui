@@ -244,6 +244,8 @@ from it is rewritten by hand), measured weekly by
   in headless Chromium (UI5 from the `@openui5` devDependencies): boot,
   render, Execute, no page error - what the JSON protocol cannot see (a
   property value UI5 rejects ends the app before its first screen).
+  Both clear the `CLASS-DATA` of the reports' local classes before every
+  request, as a system does - the Node process would keep it.
 - **It follows the rules above**: report globals become PUBLIC attributes
   (never PRIVATE), the selection screen binds them by reference, ABAP SQL is
   written in strict mode, chains follow the house layout of the samples.

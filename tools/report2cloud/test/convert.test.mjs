@@ -6,7 +6,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { convert, defaultClassName, FRONTEND, GUI, RESERVED_METHODS, UNCATALOGUED } from "../lib/convert.mjs";
+import { convert, defaultClassName, FRONTEND, GUI, RESERVED_METHODS, SALV, UNCATALOGUED } from "../lib/convert.mjs";
 import { corpus, convertEntry, inTestSet, SNAPSHOTS, TEST_SET } from "./corpus.mjs";
 import { parseTextpool } from "../lib/textpool.mjs";
 import { dependenciesOf, dependencyIndex } from "../lib/deps.mjs";
@@ -902,7 +902,7 @@ test("the table of the SAP GUI stand-ins in the converter is the classes - their
     const events = [...def.matchAll(/^\s*EVENTS\s+(\w+)\s*(?:\.|\n\s*EXPORTING)/gm)].map((m) => m[1].toLowerCase());
     assert.deepEqual({ ...(parent ? { parent } : {}), constants, attributes, events, methods }, members, cls);
   }
-  for (const standin of Object.values(GUI.classes)) assert.ok(GUI.members[standin], standin);
+  for (const standin of [...Object.values(GUI.classes), ...Object.values(SALV.classes)]) assert.ok(GUI.members[standin], standin);
 });
 
 test("SAP GUI controls: the containers, the text editor and the HTML viewer become their stand-ins, CREATE OBJECT is NEW", () => {

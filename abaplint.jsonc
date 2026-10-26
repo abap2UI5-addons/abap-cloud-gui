@@ -61,7 +61,7 @@
     // controls - a converted call passes what the classic one did, used or
     // not - and its constants
     "unused_variables": {
-      "exclude": ["z2ui5_cl_cgui_frontend", "z2ui5_cl_cgui_gui", "z2ui5_cl_cgui_abap_browser"]
+      "exclude": ["z2ui5_cl_cgui_frontend", "z2ui5_cl_cgui_gui", "z2ui5_cl_cgui_abap_browser", "z2ui5_cl_cgui_salv"]
     },
     "unused_types": true,
     "unused_methods": true,
@@ -272,7 +272,7 @@
     // show_html( ) of CL_ABAP_BROWSER its html_errors, the function modules
     // z2ui5_cl_cgui_frontend stands in for (SCMS_*, SSFC_BASE64_*) their result
     "prefer_returning_to_exporting": {
-      "exclude": ["z2ui5_cl_cgui_gui", "z2ui5_cl_cgui_abap_browser", "z2ui5_cl_cgui_frontend"]
+      "exclude": ["z2ui5_cl_cgui_gui", "z2ui5_cl_cgui_abap_browser", "z2ui5_cl_cgui_frontend", "z2ui5_cl_cgui_salv"]
     },
     "preferred_compare_operator": true,
     "preferred_parameter_ignored": true,

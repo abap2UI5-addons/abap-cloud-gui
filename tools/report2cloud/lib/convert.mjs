@@ -424,6 +424,179 @@ export const GUI = {
           exceptions: [] },
       },
     },
+    z2ui5_cl_cgui_salv_table: {
+      parent: "z2ui5_cl_cgui_gui",
+      constants: [],
+      attributes: [],
+      events: ["added_function", "double_click", "link_click"],
+      methods: {
+        factory: { params: ["list_display", "r_container", "container_name", "r_salv_table", "t_table"],
+          exceptions: [] },
+        constructor: { params: ["container"],
+          exceptions: [] },
+        display: { params: [],
+          exceptions: [] },
+        refresh: { params: ["s_stable", "refresh_mode", "t_table"],
+          exceptions: [] },
+        set_data: { params: ["t_table"],
+          exceptions: [] },
+        get_columns: { params: [],
+          exceptions: [] },
+        get_display_settings: { params: [],
+          exceptions: [] },
+        get_functions: { params: [],
+          exceptions: [] },
+        get_selections: { params: [],
+          exceptions: [] },
+        get_sorts: { params: [],
+          exceptions: [] },
+        get_aggregations: { params: [],
+          exceptions: [] },
+        get_layout: { params: [],
+          exceptions: [] },
+        get_filters: { params: [],
+          exceptions: [] },
+        get_print: { params: [],
+          exceptions: [] },
+        get_functional_settings: { params: [],
+          exceptions: [] },
+        get_event: { params: [],
+          exceptions: [] },
+        set_screen_popup: { params: ["start_column", "end_column", "start_line", "end_line"],
+          exceptions: [] },
+        set_screen_status: { params: ["report", "pfstatus", "set_functions"],
+          exceptions: [] },
+        on_grid_command: { params: ["e_ucomm"],
+          exceptions: [] },
+        on_grid_double_click: { params: ["e_row", "e_column"],
+          exceptions: [] },
+        on_grid_hotspot: { params: ["e_row_id", "e_column_id"],
+          exceptions: [] },
+      },
+    },
+    z2ui5_cl_cgui_salv_columns: {
+      constants: [],
+      attributes: [],
+      events: [],
+      methods: {
+        constructor: { params: ["line"],
+          exceptions: [] },
+        get: { params: [],
+          exceptions: [] },
+        get_column: { params: ["columnname"],
+          exceptions: [] },
+        set_optimize: { params: ["value"],
+          exceptions: [] },
+        set_key_fixation: { params: ["value"],
+          exceptions: [] },
+        set_color_column: { params: ["value"],
+          exceptions: [] },
+        set_headers_visible: { params: ["value"],
+          exceptions: [] },
+        set_column_position: { params: ["columnname", "position"],
+          exceptions: [] },
+      },
+    },
+    z2ui5_cl_cgui_salv_column: {
+      constants: [],
+      attributes: ["mv_name", "mv_long", "mv_medium", "mv_short", "mv_hidden", "mv_technical", "mv_hotspot", "mv_key", "mv_length", "mv_tooltip"],
+      events: [],
+      methods: {
+        constructor: { params: ["name"],
+          exceptions: [] },
+        get_columnname: { params: [],
+          exceptions: [] },
+        set_long_text: { params: ["value"],
+          exceptions: [] },
+        set_medium_text: { params: ["value"],
+          exceptions: [] },
+        set_short_text: { params: ["value"],
+          exceptions: [] },
+        get_long_text: { params: [],
+          exceptions: [] },
+        get_medium_text: { params: [],
+          exceptions: [] },
+        get_short_text: { params: [],
+          exceptions: [] },
+        set_visible: { params: ["value"],
+          exceptions: [] },
+        is_visible: { params: [],
+          exceptions: [] },
+        set_technical: { params: ["value"],
+          exceptions: [] },
+        set_key: { params: ["value"],
+          exceptions: [] },
+        set_output_length: { params: ["value"],
+          exceptions: [] },
+        set_tooltip: { params: ["value"],
+          exceptions: [] },
+        set_cell_type: { params: ["value"],
+          exceptions: [] },
+        set_alignment: { params: ["value"],
+          exceptions: [] },
+        set_optimized: { params: ["value"],
+          exceptions: [] },
+        set_zero: { params: ["value"],
+          exceptions: [] },
+        set_lowercase: { params: ["value"],
+          exceptions: [] },
+        set_specific_group: { params: ["id"],
+          exceptions: [] },
+        set_color: { params: ["value"],
+          exceptions: [] },
+      },
+    },
+    z2ui5_cl_cgui_salv_settings: {
+      constants: [],
+      attributes: ["mv_title", "mv_striped", "mv_selection_mode", "mt_function"],
+      events: [],
+      methods: {
+        set_grid: { params: ["grid"],
+          exceptions: [] },
+        set_list_header: { params: ["value"],
+          exceptions: [] },
+        get_list_header: { params: [],
+          exceptions: [] },
+        set_striped_pattern: { params: ["value"],
+          exceptions: [] },
+        set_horizontal_lines: { params: ["value"],
+          exceptions: [] },
+        set_vertical_lines: { params: ["value"],
+          exceptions: [] },
+        set_fit_column_to_table_size: { params: ["value"],
+          exceptions: [] },
+        set_list_header_size: { params: ["value"],
+          exceptions: [] },
+        set_all: { params: ["value"],
+          exceptions: [] },
+        set_default: { params: ["value"],
+          exceptions: [] },
+        add_function: { params: ["name", "icon", "text", "tooltip", "position"],
+          exceptions: [] },
+        set_function: { params: ["name", "boolean"],
+          exceptions: [] },
+        set_selection_mode: { params: ["value"],
+          exceptions: [] },
+        get_selection_mode: { params: [],
+          exceptions: [] },
+        get_selected_rows: { params: [],
+          exceptions: [] },
+        set_selected_rows: { params: ["value"],
+          exceptions: [] },
+        get_current_cell: { params: [],
+          exceptions: [] },
+        add_sort: { params: ["columnname", "position", "sequence", "subtotal", "group", "obligatory"],
+          exceptions: [] },
+        add_aggregation: { params: ["columnname", "aggregation"],
+          exceptions: [] },
+        set_key: { params: ["value"],
+          exceptions: [] },
+        set_save_restriction: { params: ["value"],
+          exceptions: [] },
+        set_initial_layout: { params: ["value"],
+          exceptions: [] },
+      },
+    },
     z2ui5_cl_cgui_gui_picture: {
       parent: "z2ui5_cl_cgui_gui",
       constants: ["display_mode_normal", "display_mode_stretch", "display_mode_fit", "display_mode_normal_center", "display_mode_fit_center", "eventid_picture_click"],
@@ -548,7 +721,72 @@ const GRID_VALUE_TYPES = {
   it_fieldcatalog: "lvc_t_fcat", it_special_groups: "lvc_t_sgrp", it_hyperlink: "lvc_t_hype",
   it_except_qinfo: "lvc_t_qinf",
 };
-const guiClass = (name) => (Object.hasOwn(GUI.classes, name) ? GUI.classes[name] : undefined);
+// the SALV stand-ins (src/01/z2ui5_cl_cgui_salv_*) - for a report that keeps
+// its SALV object and uses it after display( ): an attribute of a local
+// class, its event handlers, the rows selected. A report that only sets its
+// SALV up and shows it gets alv( ) instead (analyzeAlv( )); the stand-ins
+// take over when that refuses (convert( ) runs again with salv: true)
+export const SALV = {
+  classes: {
+    cl_salv_table: "z2ui5_cl_cgui_salv_table", cl_salv_events_table: "z2ui5_cl_cgui_salv_table",
+    cl_salv_columns_table: "z2ui5_cl_cgui_salv_columns", cl_salv_columns_list: "z2ui5_cl_cgui_salv_columns",
+    cl_salv_columns: "z2ui5_cl_cgui_salv_columns",
+    cl_salv_column_table: "z2ui5_cl_cgui_salv_column", cl_salv_column_list: "z2ui5_cl_cgui_salv_column",
+    cl_salv_column: "z2ui5_cl_cgui_salv_column",
+    cl_salv_display_settings: "z2ui5_cl_cgui_salv_settings", cl_salv_functions_list: "z2ui5_cl_cgui_salv_settings",
+    cl_salv_functions: "z2ui5_cl_cgui_salv_settings", cl_salv_selections: "z2ui5_cl_cgui_salv_settings",
+    cl_salv_sorts: "z2ui5_cl_cgui_salv_settings", cl_salv_aggregations: "z2ui5_cl_cgui_salv_settings",
+    cl_salv_layout: "z2ui5_cl_cgui_salv_settings", cl_salv_filters: "z2ui5_cl_cgui_salv_settings",
+    cl_salv_print: "z2ui5_cl_cgui_salv_settings", cl_salv_functional_settings: "z2ui5_cl_cgui_salv_settings",
+  },
+  // if_salv_c_* - the structures of z2ui5_if_cgui_salv_c
+  constants: {
+    if_salv_c_selection_mode: "selection_mode", if_salv_c_function_position: "function_position",
+    if_salv_c_cell_type: "cell_type", if_salv_c_alignment: "alignment", if_salv_c_sort: "sort",
+    if_salv_c_aggregation: "aggregation",
+  },
+  types: {
+    salv_t_row: "z2ui5_cl_cgui_salv_settings=>ty_t_row", salv_s_cell: "z2ui5_cl_cgui_salv_settings=>ty_s_cell",
+    salv_t_column_ref: "z2ui5_cl_cgui_salv_columns=>ty_t_column_ref", salv_s_column_ref: "z2ui5_cl_cgui_salv_columns=>ty_s_column_ref",
+    salv_de_function: "z2ui5_cl_cgui_salv_table=>ty_function", salv_de_column: "z2ui5_cl_cgui_salv_table=>ty_column",
+    salv_de_row: "i",
+  },
+};
+Object.setPrototypeOf(SALV.classes, null);
+Object.setPrototypeOf(SALV.constants, null);
+Object.setPrototypeOf(SALV.types, null);
+
+// set while a converter runs with the SALV stand-ins - the conversion is synchronous
+let salvMode = false;
+
+const guiClass = (name) => (Object.hasOwn(GUI.classes, name) ? GUI.classes[name]
+  : salvMode && SALV.classes[name] ? SALV.classes[name] : undefined);
+
+/** the SALV tokens of a statement in the stand-in mode - [index, text] pairs
+ *  ("" drops a token): cx_salv_* the exception of the stand-ins (once in a
+ *  CATCH), if_salv_c_*=>x the constant of z2ui5_if_cgui_salv_c, the SALV
+ *  types of the DDIC the types of the stand-ins */
+function salvTokens(toks) {
+  if (!salvMode) return [];
+  const out = [];
+  let cx = false;
+  for (let i = 0; i < toks.length; i++) {
+    const t = lc(toks[i].getStr());
+    const prev = i > 0 ? lc(toks[i - 1].getStr()) : "";
+    if (["-", "->", "=>", "~"].includes(prev)) continue;
+    if (/^cx_salv_\w+$/.test(t)) {
+      out.push([i, cx ? "" : "z2ui5_cx_cgui_salv"]);
+      cx = true;
+    } else if (SALV.constants[t] && toks[i + 1]?.getStr() === "=>" && toks[i + 2]) {
+      out.push([i, "z2ui5_if_cgui_salv_c"], [i + 2, `${SALV.constants[t]}-${lc(toks[i + 2].getStr())}`]);
+    } else if (t === "if_salv_c_bool_sap" && toks[i + 1]?.getStr() === "=>" && toks[i + 2]) {
+      out.push([i, lc(toks[i + 2].getStr()) === "true" ? "abap_true" : "abap_false"], [i + 1, ""], [i + 2, ""]);
+    } else if (SALV.types[t] && ["type", "of", "like"].includes(prev)) {
+      out.push([i, SALV.types[t]]);
+    }
+  }
+  return out;
+}
 
 /** whether a stand-in or one of its parents raises the event */
 function guiEvent(cls, name) {
@@ -591,7 +829,7 @@ const BASE_METHODS = ["cgui_run_in_background",
   "leave_to_selection_screen", "window", "call_selection_screen", "submit", "set_parameter_id", "get_parameter_id",
   "set_line_count", "set_pf_status", "set_title", "set_variant", "set_variant_store", "set_layout_store", "get_link",
   "current_screen", "dynpro_screen", "dynpro_pbo", "dynpro_pai", "after_call_screen",
-  "call_screen", "set_screen", "leave_to_screen", "leave_screen", "screen_left"];
+  "call_screen", "set_screen", "leave_to_screen", "leave_screen", "screen_left", "cgui_statics_keep", "cgui_statics_restore"];
 export const RESERVED_METHODS = new Set([...BASE_METHODS, "client", "cs_ucomm", "z2ui5_if_app~main", "main",
   "at_selection_screen_ucomm", "constructor"]);
 
@@ -1513,12 +1751,12 @@ class Converter {
     for (const x of [...all, ...this.locals.flatMap((u) => u.stmts)]) {
       const t = lc(renderTokens(stmtTokens(x)));
       if (kind(x) === "Move") {
-        const m = /^data\s*\(\s*([\w/]+)\s*\)\s*=\s*new\s+(cl_gui_\w+)\s*\(/.exec(t);
+        const m = /^data\s*\(\s*([\w/]+)\s*\)\s*=\s*new\s+(cl_gui_\w+|cl_salv_\w+)\s*\(/.exec(t);
         if (m && guiClass(m[2])) this.guiVars.set(m[1], guiClass(m[2]));
         continue;
       }
       if (!["Data", "Static", "ClassData"].includes(kind(x)) || this.insideBegin(x)) continue;
-      const m = /type\s+ref\s+to\s+(cl_gui_\w+)\b/.exec(t);
+      const m = /type\s+ref\s+to\s+(cl_gui_\w+|cl_salv_\w+)\b/.exec(t);
       if (m && guiClass(m[1])) this.guiVars.set(lc(declName(x)), guiClass(m[1]));
     }
     // a control on the screen itself (cl_gui_container=>default_screen,
@@ -1539,7 +1777,8 @@ class Converter {
         const eh = child(x, "EventHandler");
         const name = lc(nodeText(child(x, "MethodName")));
         if (!this.guiHandlerMap.has(name)) this.guiHandlerMap.set(name, []);
-        this.guiHandlerMap.get(name).push({ cls, event: lc(nodeText(child(eh, "EventName"))), of: lc(nodeText(child(eh, "ClassName"))) });
+        this.guiHandlerMap.get(name).push({ cls, event: lc(nodeText(child(eh, "EventName"))), of: lc(nodeText(child(eh, "ClassName"))),
+          static: /^class-methods\b/i.test(renderTokens(stmtTokens(x))) });
       }
     }
     return this.guiHandlerMap;
@@ -1558,7 +1797,8 @@ class Converter {
       this.refuse(s, "SAP GUI controls: SET HANDLER ... FOR ALL INSTANCES - the stand-ins keep the handlers of one control; name the control");
       return;
     }
-    const control = lc(target.replace(/^me\s*->\s*/i, "").replace(/^.*->/, ""));
+    // x->get_event( ) of a SALV is the table itself; lcl=>x an attribute of a class
+    const control = lc(target.replace(/\s*->\s*get_event\(\s*\)$/i, "").replace(/^me\s*->\s*/i, "").replace(/^.*(->|=>)\s*/, ""));
     const cls = this.guiVars.get(control) ?? this.guiVars.get(lc(target));
     const lines = [];
     for (const m of children(s, "MethodSource")) {
@@ -1577,12 +1817,14 @@ class Converter {
         this.refuse(s, `SAP GUI controls: SET HANDLER ${method} - no handler FOR EVENT of the control in a local class, or an event its stand-in ${cls} does not raise`);
         return;
       }
-      if (handler === "me" && !b.ctx.local && !staticOf) {
+      // SET HANDLER m of a static handler method: called through an object of its class
+      const staticMe = !arrow && candidates[0].static ? candidates[0].cls : undefined;
+      if (handler === "me" && !b.ctx.local && !staticOf && !staticMe) {
         this.refuse(s, `SAP GUI controls: SET HANDLER ${method} outside of a local class - the handler is an object; name it`);
         return;
       }
       lines.push(renderNamedCall(`${target}->set_handler`, [
-        staticOf ? this.staticHandler(staticOf) : { name: "handler", value: handler },
+        staticOf || staticMe ? this.staticHandler(staticOf ?? staticMe) : { name: "handler", value: handler },
         { name: "method", value: literal(uc(method)) },
         { name: "event", value: literal(uc(candidates[0].event)) },
         ...(activation ? [{ name: "activation", value: activation }] : []),
@@ -1611,6 +1853,11 @@ class Converter {
    *  the refusal, undefined when every one has */
   guiRefusal(text) {
     const t = lc(text);
+    // the SALV of the stand-in mode: a class of it the stand-ins do not have
+    if (salvMode) {
+      const salv = [...new Set([...t.matchAll(/\bcl_salv_\w+/g)].map((m) => m[0]))].filter((c) => !SALV.classes[c]);
+      if (salv.length) return `SALV: ${salv.join(", ")} ${salv.length > 1 ? "have" : "has"} no counterpart - the stand-ins (z2ui5_cl_cgui_salv_*) have the table, its columns, settings, functions, selections and events`;
+    }
     if (!GUI_CONTROL.test(t)) return undefined;
     const missing = [...new Set([...t.matchAll(/\bcl_gui_\w+/g)].map((m) => m[0]))]
       .filter((c) => !guiClass(c) && !["cl_gui_cfw", "cl_gui_frontend_services"].includes(c));
@@ -1729,6 +1976,10 @@ class Converter {
     // the parameters and exceptions named: of one of the methods called
     const known = new Set(["others", "error_message", ...used.flatMap((m) => [...m.params, ...m.exceptions])]);
     const flat = toks.join(" ");
+    // a chain - x->get_functions( )->add_function( name = ... ): the method
+    // whose parameters they are is one of the object returned, the syntax
+    // check of the class sees it
+    if (/\)\s*->/.test(flat)) return undefined;
     // the target of an assignment - an attribute of a class too (lcl=>x)
     const head = /^(?:data\s*\(\s*[\w/]+\s*\)|[\w/-]+(?:\s*(?:=>|->)\s*[\w/-]+)*)\s*=(?![=>])/.exec(flat);
     // the components of a VALUE #( ... ) or another constructor expression
@@ -2183,7 +2434,7 @@ class Converter {
       if (!["Data", "Static"].includes(kind(s))) continue;
       const text = lc(renderTokens(stmtTokens(s)));
       const name = lc(declName(s) ?? "");
-      if (/type\s+ref\s+to\s+c[lx]_salv_/.test(text)) this.salvVars.add(name);
+      if (/type\s+ref\s+to\s+c[lx]_salv_/.test(text) && !salvMode) this.salvVars.add(name);
       if (/type\s+(standard\s+table\s+of\s+|table\s+of\s+|line\s+of\s+)?(slis_t_fieldcat_alv|slis_fieldcat_alv|lvc_t_fcat|lvc_s_fcat)\b/.test(text)) this.fcatVars.add(name);
       if (/type\s+(slis_layout_alv|lvc_s_layo|slis_print_alv|disvariant|slis_t_sortinfo_alv|slis_t_event|slis_t_listheader|lvc_t_sort)\b/.test(text)) this.layoutVars.add(name);
     }
@@ -2196,6 +2447,8 @@ class Converter {
       const toks = stmtTokens(s).map((t) => t.getStr());
       const flat = lc(toks.join(" "));
 
+      // the stand-ins of the SALV: the TRY stays, its cx_salv_* the stand-in exception
+      if (salvMode && ["Try", "Catch", "Cleanup", "EndTry"].includes(k)) continue;
       if (k === "Try") { tryStack.push({ stmt: s, clauses: [], cleanup: false }); continue; }
       if (k === "Catch" && tryStack.length) {
         const names = children(s, "ClassName").map((c) => lc(nodeText(c)));
@@ -2235,7 +2488,7 @@ class Converter {
       }
 
       // cl_salv_table=>factory( IMPORTING r_salv_table = x CHANGING t_table = itab )
-      if (/cl_salv_table\s*=>\s*factory/.test(flat)) {
+      if (/cl_salv_table\s*=>\s*factory/.test(flat) && !salvMode) {
         const m = /r_salv_table\s*=\s*(?:data\s*\(\s*)?([\w/]+)/.exec(flat);
         const tab = /t_table\s*=\s*([\w/-]+)/.exec(flat);
         if (!m || !tab) {
@@ -3010,6 +3263,23 @@ class Converter {
     }
     // the local classes - their methods may PERFORM a FORM as well
     const locals = this.localsSource();
+    // their CLASS-DATA: a roundtrip is a session of its own on a system, the
+    // static attributes start initial - the app keeps them in between
+    const statics = this.localStatics();
+    if (statics.length) {
+      const fs = "FIELD-SYMBOLS <lv_cgui_static> TYPE any.";
+      methods.push({ name: "cgui_statics_keep", body: [
+        "\" the CLASS-DATA of the local classes - kept with the app until the next roundtrip", fs,
+        ...statics.flatMap((x) => [`CREATE DATA ${x.attr} LIKE ${x.cls}=>${x.name}.`, `ASSIGN ${x.attr}->* TO <lv_cgui_static>.`, `<lv_cgui_static> = ${x.cls}=>${x.name}.`]),
+      ] });
+      methods.push({ name: "cgui_statics_restore", body: [
+        "\" the CLASS-DATA of the local classes - as the last roundtrip left them", fs,
+        ...statics.flatMap((x) => [`IF ${x.attr} IS BOUND.`, `  ASSIGN ${x.attr}->* TO <lv_cgui_static>.`, `  ${x.cls}=>${x.name} = <lv_cgui_static>.`, "ENDIF."]),
+      ] });
+      this.staticLines = ["\" the CLASS-DATA of the local classes between two roundtrips",
+        ...statics.flatMap((x) => [`" ${x.cls}=>${x.name}`, `DATA ${x.attr} TYPE REF TO data.`])];
+      this.map(statics[0].stmt, "`cgui_statics_keep( )` / `cgui_statics_restore( )` - the CLASS-DATA of the local classes kept with the app between two roundtrips");
+    }
     // the handlers of the controls are methods of local classes: the event
     // of a control hands them the instance like every event method
     if (locals.app && [...this.guiHandlers().values()].flat().some((h) => guiClass(h.of))) methods.push({ name: "at_gui_event", body: [] });
@@ -3041,7 +3311,8 @@ class Converter {
       "at_selection_screen_on_block", "at_selection_screen_on_radio", "at_selection_screen_on_end_of",
       "at_selection_screen_on_exit", "at_selection_screen_on_help", "at_selection_screen", "start_of_selection", "end_of_selection", "top_of_page",
       "top_of_page_line_selection", "end_of_page", "at_line_selection", "at_link_click", "at_user_command", "at_value_request",
-      "after_call_selection_screen", "dynpro_screen", "dynpro_pbo", "dynpro_pai", "at_gui_event", "after_call_screen"];
+      "after_call_selection_screen", "dynpro_screen", "dynpro_pbo", "dynpro_pai", "at_gui_event", "after_call_screen",
+      "cgui_statics_keep", "cgui_statics_restore"];
     methods.sort((a, b) => order.indexOf(a.name) - order.indexOf(b.name));
     for (const m of methods) lines.push(`    METHODS ${m.name} REDEFINITION.`);
     lines.push("");
@@ -3049,6 +3320,7 @@ class Converter {
     if (this.privateDataLines.length) {
       lines.push("    \" global data of the report typed with its local classes - local types", "    \" can type the private section only", ...this.privateDataLines.map((l) => indent(l, 4)), "");
     }
+    if (this.staticLines?.length) lines.push(...this.staticLines.map((l) => indent(l, 4)), "");
     for (const t of this.tablesTypes.values()) lines.push(`    ${t}`);
     if (this.tablesTypes.size && this.methodDefs.length) lines.push("");
     this.methodDefs.forEach((d, i) => {
@@ -4671,7 +4943,7 @@ class Converter {
       // FOR ALL INSTANCES of a handler of a control event too - it must not stay and never fire
       const allOfGui = /\bfor\s+all\s+instances\b/.test(t)
         && children(s, "MethodSource").some((m) => (this.guiHandlers().get(lc(nodeText(m)).replace(/^.*(->|=>)\s*/, "")) ?? []).some((h) => guiClass(h.of)));
-      if (k === "SetHandler" && (allOfGui || [...this.guiVars.keys()].some((v) => new RegExp(`\\bfor\\s+(me\\s*->\\s*)?${v}\\b`).test(t)))) {
+      if (k === "SetHandler" && (allOfGui || [...this.guiVars.keys()].some((v) => new RegExp(`\\bfor\\s+([\\w/]+\\s*=>\\s*)?(me\\s*->\\s*)?${v}\\b`).test(t)))) {
         this.guiSetHandler(s, b);
         return;
       }
@@ -5276,6 +5548,8 @@ class Converter {
     }
     const toks = stmtTokens(s);
     let parents;
+    // the SALV of the stand-in mode - exceptions, constants, types
+    for (const [i, text] of salvTokens(toks)) ov.set(key(toks[i]), text === "" ? null : text);
     for (let i = 0; i < toks.length; i++) {
       const t = lc(toks[i].getStr());
       const prev = i > 0 ? toks[i - 1].getStr() : "";
@@ -6458,6 +6732,32 @@ class Converter {
    * runtime and the FORMs through the instance - the class declares the
    * local class a LOCAL FRIEND for that. Everything else is copied as it is.
    */
+  /** the CLASS-DATA of the local classes the report class can write -
+   *  PUBLIC and not READ-ONLY; the others are named in a TODO */
+  localStatics() {
+    const out = [];
+    for (const u of this.locals.filter((x) => x.kind === "ClassDefinition")) {
+      const cls = lc(nodeText(child(u.stmts[0], "ClassName") ?? u.stmts[0].getChildren()[1]));
+      let section = "PublicSection";
+      for (const x of u.stmts) {
+        if (["PublicSection", "ProtectedSection", "PrivateSection"].includes(kind(x))) section = kind(x);
+        if (kind(x) === "ClassDataBegin") {
+          this.todo(x, `CLASS-DATA BEGIN OF in ${cls} - a static structure starts initial in every roundtrip; declare it with a TYPES structure to keep it`);
+          continue;
+        }
+        if (kind(x) !== "ClassData" || this.insideBegin(x)) continue;
+        const name = lc(declName(x) ?? "");
+        if (!name) continue;
+        if (section !== "PublicSection" || words(x).includes("READ-ONLY")) {
+          this.todo(x, `CLASS-DATA ${name} of ${cls} is not PUBLIC or READ-ONLY - it starts initial in every roundtrip (a roundtrip is a session of its own); make it PUBLIC to keep it with the app`);
+          continue;
+        }
+        out.push({ cls, name, attr: `mr_cgui_static${out.length + 1}`, stmt: x });
+      }
+    }
+    return out;
+  }
+
   localsSource() {
     if (!this.locals.length) return {};
     const cls = this.className;
@@ -6588,7 +6888,12 @@ class Converter {
         for (const s of u.stmts) {
           const toks = stmtTokens(s);
           const parents = tokenParents(s);
+          const salvAt = new Map(salvTokens(toks));
           toks.forEach((t, i) => {
+            if (salvAt.has(i)) {
+              subst.push({ row: t.getRow(), col: t.getCol(), len: t.getStr().length, text: salvAt.get(i) });
+              return;
+            }
             const v = lc(t.getStr());
             const prev = i > 0 ? toks[i - 1].getStr() : "";
             // a SAP GUI control: its stand-in
@@ -7320,5 +7625,29 @@ function renderScreenChain(calls) {
 export const REFUSED_MESSAGES = () => [...Object.values(REFUSED), ...Object.entries(REFUSED_FUNCTIONS).map(([fm, m]) => `CALL FUNCTION '${fm}' - ${m}`)];
 
 export function convert(source, opts = {}) {
-  return new Converter(source, opts).run();
+  // salv: true - the stand-ins of the SALV at once (the tests), false - never
+  if (opts.salv === true) {
+    salvMode = true;
+    try {
+      return new Converter(source, opts).run();
+    } finally {
+      salvMode = false;
+    }
+  }
+  const result = new Converter(source, opts).run();
+  // a SALV object used after display( ) - in a local class, in its handlers:
+  // the stand-ins of the SALV instead of alv( )
+  // (refused), or a SALV left as it was (a local class is copied as it is)
+  const salvLeft = (r) => r.refusals?.some((x) => /, an object of CL_SALV_TABLE, is used here/.test(x.message))
+    || r.release?.some((x) => /^(cl|cx|if)_salv_/i.test(x.name ?? ""));
+  if (opts.salv !== false && salvLeft(result)) {
+    salvMode = true;
+    try {
+      const standin = new Converter(source, { ...opts, salv: true }).run();
+      if ((standin.ok && !salvLeft(standin)) || standin.refusals.length < result.refusals.length) return standin;
+    } finally {
+      salvMode = false;
+    }
+  }
+  return result;
 }
