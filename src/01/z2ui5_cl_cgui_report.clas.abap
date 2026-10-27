@@ -1127,6 +1127,21 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
         event TYPE string
         value TYPE string.
 
+    "! the event of the button that shows a grid that does not show
+    CONSTANTS cs_gui_show TYPE string VALUE `CGUI_SHOW`.
+
+    "! the grid id shows in place of the one that shows
+    METHODS grid_show
+      IMPORTING
+        id TYPE i.
+
+    "! whether the control id and its containers are still there
+    METHODS gui_alive
+      IMPORTING
+        id            TYPE i
+      RETURNING
+        VALUE(result) TYPE abap_bool.
+
     "! a copy of the data val refers to
     CLASS-METHODS grid_copy
       IMPORTING
@@ -1872,6 +1887,14 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
     FIELD-SYMBOLS <copy> TYPE STANDARD TABLE.
     FIELD-SYMBOLS <part> TYPE any.
 
+    " a grid that does not show: it keeps what it is displayed with itself,
+    " its container offers to show it - so does the first display of a
+    " grid while another one shows
+    IF mv_cgui_grid <> id AND mv_cgui_grid IS NOT INITIAL AND gui_alive( mv_cgui_grid ) = abap_true
+        AND ( tab IS NOT BOUND OR first = abap_true ).
+      RETURN.
+    ENDIF.
+
     READ TABLE mt_cgui_grid ASSIGNING FIELD-SYMBOL(<grid>) WITH KEY id = id.
     IF sy-subrc <> 0.
       INSERT VALUE #( id = id ) INTO TABLE mt_cgui_grid ASSIGNING <grid>.
@@ -1902,6 +1925,8 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
     ELSEIF tab IS BOUND.
       ASSIGN tab->* TO <tab>.
       lo_alv = alv( <tab> )->set_line_selection( ).
+      " a new ALV - the functions of the toolbar are added to it anew
+      CLEAR <grid>-functions.
     ELSE.
       RETURN.
     ENDIF.
@@ -1943,6 +1968,7 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
     IF id = mv_cgui_grid.
       result-fieldcat = mr_cgui_grid_fieldcat.
       result-layout = mr_cgui_grid_layout.
+      result-shown = abap_true.
     ENDIF.
 
   ENDMETHOD.
@@ -1950,6 +1976,33 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
   METHOD z2ui5_if_cgui_gui~grid_selected.
 
     result = get_selected_rows( ).
+
+  ENDMETHOD.
+
+  METHOD grid_show.
+
+    READ TABLE mt_cgui_gui_obj INTO DATA(lo_object) INDEX id.
+    IF sy-subrc <> 0 OR gui_alive( id ) = abap_false.
+      RETURN.
+    ENDIF.
+    DATA(lo_grid) = CAST z2ui5_cl_cgui_gui_alv_grid( lo_object ).
+    " the grid shown so far no longer is - this one takes its place
+    CLEAR mv_cgui_grid.
+    lo_grid->show( ).
+
+  ENDMETHOD.
+
+  METHOD gui_alive.
+
+    DATA(lv_id) = id.
+    WHILE lv_id IS NOT INITIAL.
+      READ TABLE mt_cgui_gui INTO DATA(ls_control) INDEX lv_id.
+      IF sy-subrc <> 0 OR ls_control-freed = abap_true.
+        RETURN.
+      ENDIF.
+      lv_id = ls_control-parent.
+    ENDWHILE.
+    result = abap_true.
 
   ENDMETHOD.
 
@@ -2142,9 +2195,22 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
         ENDLOOP.
 
       WHEN z2ui5_if_cgui_gui=>cs_kind-grid.
-        " the grid the ALV shows - another one shows nothing
+        " the grid the ALV shows - another one offers to show it
         IF mv_cgui_grid = id AND mo_cgui_alv IS BOUND.
           alv_render( node ).
+        ELSE.
+          DATA(lv_caption) = CAST z2ui5_cl_cgui_gui_alv_grid( mt_cgui_gui_obj[ id ] )->caption( ).
+          IF lv_caption IS NOT INITIAL.
+            node->ele( `Toolbar`
+                )->tag( `Title`
+                )->a( n = `text` t = lv_caption
+                )->tag( `ToolbarSpacer`
+                )->tag( `Button`
+                )->a( n = `text`  t = CONV #( 'Show'(062) )
+                )->a( n = `icon`  v = `sap-icon://table-view`
+                )->a( n = `press` v = client->_event( val   = cs_ucomm-gui
+                                                      t_arg = VALUE #( ( |{ id }| ) ( cs_gui_show ) ) ) ).
+          ENDIF.
         ENDIF.
 
       WHEN z2ui5_if_cgui_gui=>cs_kind-toolbar.
@@ -3029,10 +3095,15 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
         ENDIF.
 
       WHEN cs_ucomm-gui.
-        " an event of a SAP GUI control: id, event, value
-        gui_event( id    = CONV #( client->get_event_arg( 1 ) )
-                   event = client->get_event_arg( 2 )
-                   value = client->get_event_arg( 3 ) ).
+        " an event of a SAP GUI control: id, event, value - or the switch to
+        " a grid that does not show
+        IF client->get_event_arg( 2 ) = cs_gui_show.
+          grid_show( CONV #( client->get_event_arg( 1 ) ) ).
+        ELSE.
+          gui_event( id    = CONV #( client->get_event_arg( 1 ) )
+                     event = client->get_event_arg( 2 )
+                     value = client->get_event_arg( 3 ) ).
+        ENDIF.
 
       WHEN cs_ucomm-enter.
         IF mv_cgui_screen = cs_screen-dynpro.

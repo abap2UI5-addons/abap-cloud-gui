@@ -1,0 +1,99 @@
+CLASS z2ui5_cl_cgui_r2c_48 DEFINITION PUBLIC
+  INHERITING FROM z2ui5_cl_cgui_report
+  FINAL
+  CREATE PUBLIC.
+
+  PUBLIC SECTION.
+    " global data of the report
+    DATA ok_code TYPE sy-ucomm.
+
+  PROTECTED SECTION.
+    METHODS initialization REDEFINITION.
+    METHODS start_of_selection REDEFINITION.
+    METHODS dynpro_screen REDEFINITION.
+    METHODS dynpro_pbo REDEFINITION.
+    METHODS dynpro_pai REDEFINITION.
+    METHODS at_roundtrip_start REDEFINITION.
+
+  PRIVATE SECTION.
+    " global data of the report typed with its local classes - local types
+    " can type the private section only
+    DATA go_view TYPE REF TO lcl_view.
+
+    METHODS status_0100.
+
+    METHODS user_command_0100.
+ENDCLASS.
+
+
+CLASS z2ui5_cl_cgui_r2c_48 IMPLEMENTATION.
+
+  METHOD initialization.
+
+    " the command field of the SAP GUI: transactions, /n, /o and OK codes
+    set_command_field( ).
+
+    set_title( `Two grids in a splitter` ).
+
+  ENDMETHOD.
+
+  METHOD start_of_selection.
+
+    call_screen( `0100` ).
+
+  ENDMETHOD.
+
+  METHOD dynpro_screen.
+
+    CASE dynnr.
+      WHEN `0100`.
+        screen->custom_control( `CC` ).
+    ENDCASE.
+
+  ENDMETHOD.
+
+  METHOD dynpro_pbo.
+
+    CASE dynnr.
+      WHEN `0100`.
+        status_0100( ).
+    ENDCASE.
+
+  ENDMETHOD.
+
+  METHOD dynpro_pai.
+
+    CASE dynnr.
+      WHEN `0100`.
+        ok_code = ucomm.
+        user_command_0100( ).
+    ENDCASE.
+
+  ENDMETHOD.
+
+  METHOD at_roundtrip_start.
+
+    lcl_r2c=>app = me.
+
+  ENDMETHOD.
+
+  METHOD status_0100.
+
+    IF go_view IS INITIAL.
+      go_view = NEW lcl_view( ).
+      go_view->display( ).
+    ENDIF.
+
+  ENDMETHOD.
+
+  METHOD user_command_0100.
+
+    CASE ok_code.
+      WHEN 'BACK'.
+        leave_to_screen( `0000` ).
+        RETURN.
+    ENDCASE.
+
+  ENDMETHOD.
+
+ENDCLASS.

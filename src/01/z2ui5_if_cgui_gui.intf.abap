@@ -92,6 +92,8 @@ INTERFACE z2ui5_if_cgui_gui PUBLIC.
       layout    TYPE REF TO data,
       sort      TYPE REF TO data,
       functions TYPE ty_t_button,
+      "! whether the grid is the one the ALV shows
+      shown     TYPE abap_bool,
     END OF ty_s_grid,
     ty_t_grid TYPE STANDARD TABLE OF ty_s_grid WITH EMPTY KEY.
 
@@ -129,7 +131,8 @@ INTERFACE z2ui5_if_cgui_gui PUBLIC.
   "! catalog, the layout, the sort (the classic structures, read by the
   "! names of their fields), the functions of its toolbar; the others stay
   "! as they were. The report shows it with its ALV (z2ui5_cl_cgui_alv),
-  "! one grid at a time - the last one displayed
+  "! one grid at a time - the last one displayed; first marks the first
+  "! display, which leaves another grid that shows where it is
   METHODS grid_display
     IMPORTING
       id        TYPE i
@@ -137,7 +140,8 @@ INTERFACE z2ui5_if_cgui_gui PUBLIC.
       fieldcat  TYPE REF TO data OPTIONAL
       layout    TYPE REF TO data OPTIONAL
       sort      TYPE REF TO data OPTIONAL
-      functions TYPE REF TO data OPTIONAL.
+      functions TYPE REF TO data OPTIONAL
+      first     TYPE abap_bool DEFAULT abap_false.
 
   "! what the report keeps of the grid id
   METHODS grid_get

@@ -355,6 +355,37 @@ test("zr2c_27_gridlocal: a grid in a local class - in the custom control area of
   assert.doesNotMatch(xml() ?? "", /MR_CGUI_ALV/);
 });
 
+test("zr2c_48_twogrids: two grids in a splitter - the first one shows, the other offers to show; the double click refreshes the items, which show then; back to the airlines", { skip }, async () => {
+  const rows = () => d.state().models.MAIN.data.MR_CGUI_ALV["*"];
+  const xml = () => d.state().slots.MAIN.xml;
+  const show = (s) => {
+    const a = actionsOf(s, "CGUI_GUI").find((x) => x.args.includes("CGUI_SHOW"));
+    assert.ok(a, `a Show button: ${JSON.stringify(actionsOf(s, "CGUI_GUI").map((x) => x.args))}`);
+    return d.act(s.session, { event: a.id });
+  };
+  // the first grid displayed shows; the second one, displayed after it, waits in its cell
+  let s = await d.start("z2ui5_cl_cgui_r2c_48");
+  assert.deepEqual(rows().map((r) => r.CARRID), ["AA", "LH", "SQ"]);
+  assert.equal(s.tables[0]?.label, "Airlines (3)");
+  assert.match(xml(), /text="Connections \(0\)"/, "the items grid offers to show");
+
+  // the double click on Lufthansa: refresh_table_display( ) of the items shows them
+  s = await d.act(s.session, { event: "CGUI_ALV_LINE_SELECTION", args: ["/MR_CGUI_ALV/*/1"] });
+  assert.deepEqual(rows().map((r) => `${r.CARRID} ${r.CONNID}`), ["LH 0400", "LH 0402", "LH 2402"]);
+  assert.equal(s.tables[0]?.label, "Connections (3)");
+  assert.match(xml(), /text="Airlines \(3\)"/, "now the airlines offer to show");
+
+  // back to the airlines - their handler still answers the double click
+  s = await show(s);
+  assert.deepEqual(rows().map((r) => r.CARRID), ["AA", "LH", "SQ"]);
+  s = await d.act(s.session, { event: "CGUI_ALV_LINE_SELECTION", args: ["/MR_CGUI_ALV/*/0"] });
+  assert.deepEqual(rows().map((r) => `${r.CARRID} ${r.CONNID}`), ["AA 0017"]);
+  // the items again, the airlines in their cell
+  s = await show(s);
+  assert.deepEqual(rows().map((r) => r.CARRID), ["AA", "LH", "SQ"]);
+  assert.match(xml(), /text="Connections \(1\)"/);
+});
+
 test("zr2c_21_lclreport: a local report class that reads the selection screen, writes the list and calls a FORM", { skip }, async () => {
   let s = await d.start("z2ui5_cl_cgui_r2c_21");
   s = await d.act(s.session, { event: "CGUI_EXECUTE" });

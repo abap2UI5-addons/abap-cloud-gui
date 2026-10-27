@@ -707,8 +707,11 @@ Stage 5 - research
       `z2ui5_cl_cgui_gui_picture` and `z2ui5_cl_cgui_gui_simple_tree` - the
       nodes of `MTREESNODE`, lazy children on the first expand, the click as
       `node_double_click` and `selection_changed`
-- [ ] More than one grid, F1 of the editor, the column tree; table
-      controls, subscreens and tabstrips on a dynpro
+- [x] More than one grid: the first one displayed shows, then the one
+      refreshed; the container of another one names it with its rows and
+      shows it at a click (header and items in a splitter)
+- [ ] F1 of the editor, the column tree; table controls, subscreens and
+      tabstrips on a dynpro
 
 Quality, through every stage
 
