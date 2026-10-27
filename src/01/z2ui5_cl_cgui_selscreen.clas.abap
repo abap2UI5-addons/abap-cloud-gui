@@ -38,6 +38,9 @@ CLASS z2ui5_cl_cgui_selscreen DEFINITION PUBLIC FINAL CREATE PRIVATE.
       BEGIN OF cs_event,
         select_option TYPE string VALUE `CGUI_SELECT_OPTION`,
         value_request TYPE string VALUE `CGUI_VALUE_REQUEST`,
+        "! a tab of a tabstrip of a dynpro pressed - its function code the
+        "! first argument
+        tab           TYPE string VALUE `CGUI_TAB`,
         help_request  TYPE string VALUE `CGUI_HELP_REQUEST`,
       END OF cs_event.
 
@@ -276,16 +279,34 @@ CLASS z2ui5_cl_cgui_selscreen DEFINITION PUBLIC FINAL CREATE PRIVATE.
         VALUE(result) TYPE REF TO z2ui5_cl_cgui_selscreen.
 
     "! SELECTION-SCREEN BEGIN OF TABBED BLOCK - the tabs that follow, each
-    "! opened by tab( ), up to tabbed_block_end( )
+    "! opened by tab( ), up to tabbed_block_end( ). name: the tabstrip of a
+    "! dynpro (CONTROLS name TYPE TABSTRIP) - its tabs have function codes,
+    "! the one of name-activetab is selected and a press raises
+    "! cs_event-tab with the function code of the tab
     METHODS tabbed_block_begin
+      IMPORTING
+        name          TYPE clike OPTIONAL
       RETURNING
         VALUE(result) TYPE REF TO z2ui5_cl_cgui_selscreen.
 
     "! SELECTION-SCREEN TAB - a tab; the fields and blocks that follow are
-    "! on it, up to the next tab( ) or tabbed_block_end( )
+    "! on it, up to the next tab( ) or tabbed_block_end( ). fcode: the
+    "! function code of a tab of a dynpro's tabstrip, area: the subscreen
+    "! area it shows (its reference field)
     METHODS tab
       IMPORTING
         text          TYPE clike
+        fcode         TYPE clike OPTIONAL
+        area          TYPE clike OPTIONAL
+      RETURNING
+        VALUE(result) TYPE REF TO z2ui5_cl_cgui_selscreen.
+
+    "! a subscreen area of a dynpro - the report renders the subscreen
+    "! called into it (CALL SUBSCREEN); in a tabstrip on the tab that shows
+    "! the area, the selected one where tabs share it
+    METHODS subscreen
+      IMPORTING
+        area          TYPE clike
       RETURNING
         VALUE(result) TYPE REF TO z2ui5_cl_cgui_selscreen.
 
@@ -430,6 +451,7 @@ CLASS z2ui5_cl_cgui_selscreen DEFINITION PUBLIC FINAL CREATE PRIVATE.
         tab         TYPE string VALUE `TAB`,
         tabbed_end  TYPE string VALUE `TABBED_END`,
         custom      TYPE string VALUE `CUSTOM`,
+        subscreen   TYPE string VALUE `SUBSCREEN`,
       END OF cs_kind.
 
     CONSTANTS:
@@ -781,15 +803,26 @@ CLASS z2ui5_cl_cgui_selscreen IMPLEMENTATION.
 
   METHOD tabbed_block_begin.
 
-    INSERT VALUE #( kind = cs_kind-tabbed ) INTO TABLE mt_item.
+    INSERT VALUE #( kind = cs_kind-tabbed
+                    name = to_upper( name ) ) INTO TABLE mt_item.
     result = me.
 
   ENDMETHOD.
 
   METHOD tab.
 
-    INSERT VALUE #( kind = cs_kind-tab
-                    text = text ) INTO TABLE mt_item.
+    INSERT VALUE #( kind  = cs_kind-tab
+                    text  = text
+                    event = to_upper( fcode )
+                    group = to_upper( area ) ) INTO TABLE mt_item.
+    result = me.
+
+  ENDMETHOD.
+
+  METHOD subscreen.
+
+    INSERT VALUE #( kind = cs_kind-subscreen
+                    name = to_upper( area ) ) INTO TABLE mt_item.
     result = me.
 
   ENDMETHOD.
@@ -1194,6 +1227,15 @@ CLASS z2ui5_cl_cgui_selscreen IMPLEMENTATION.
     DATA lo_tab_items TYPE REF TO z2ui5_cl_ui5_view_builder.
     DATA lv_tabbed TYPE i.
     DATA lv_tab TYPE i.
+    " the tabs of the tabstrip of a dynpro: function code, area, its filter
+    TYPES:
+      BEGIN OF ty_s_strip,
+        fcode TYPE string,
+        area  TYPE string,
+        node  TYPE REF TO z2ui5_cl_ui5_view_builder,
+      END OF ty_s_strip.
+    DATA lt_strip TYPE STANDARD TABLE OF ty_s_strip WITH EMPTY KEY.
+    DATA lv_active TYPE string.
 
     lo_container = node.
 
@@ -1217,14 +1259,31 @@ CLASS z2ui5_cl_cgui_selscreen IMPLEMENTATION.
           CLEAR: lo_line, lv_in_line.
 
         WHEN cs_kind-tabbed.
-          CLEAR: lo_form, lo_line, lv_in_line, lv_tab.
+          CLEAR: lo_form, lo_line, lv_in_line, lv_tab, lt_strip, lv_active.
           lv_tabbed = lv_tabbed + 1.
           DATA(lo_bar) = node->ele( `IconTabBar`
               )->a( n = `expandable` b = abap_false
               )->a( n = `class`      v = `sapUiResponsiveContentPadding` ).
-          READ TABLE mt_tab_bind REFERENCE INTO DATA(lr_tab_bind) WITH KEY index = lv_tabbed.
-          IF sy-subrc = 0.
-            lo_bar->a( n = `selectedKey` v = lr_tab_bind->bind ).
+          IF lr_item->name IS NOT INITIAL.
+            " the tabstrip of a dynpro: name-activetab, else its first tab;
+            " a press is a function of the dynpro
+            IF mi_gui IS BOUND.
+              lv_active = to_upper( mi_gui->tabstrip_active( lr_item->name ) ).
+            ENDIF.
+            IF lv_active IS INITIAL.
+              LOOP AT mt_item INTO DATA(ls_first) FROM sy-tabix WHERE kind = cs_kind-tab.
+                lv_active = ls_first-event.
+                EXIT.
+              ENDLOOP.
+            ENDIF.
+            lo_bar->a( n = `selectedKey` t = lv_active
+                )->a( n = `select`      v = client->_event( val   = cs_event-tab
+                                                            t_arg = VALUE #( ( `${$source>/selectedKey}` ) ) ) ).
+          ELSE.
+            READ TABLE mt_tab_bind REFERENCE INTO DATA(lr_tab_bind) WITH KEY index = lv_tabbed.
+            IF sy-subrc = 0.
+              lo_bar->a( n = `selectedKey` v = lr_tab_bind->bind ).
+            ENDIF.
           ENDIF.
           lo_tab_items = lo_bar->ele( `items` ).
           lo_container = lo_tab_items.
@@ -1237,7 +1296,27 @@ CLASS z2ui5_cl_cgui_selscreen IMPLEMENTATION.
           lv_tab = lv_tab + 1.
           lo_container = lo_tab_items->ele( `IconTabFilter`
               )->a( n = `text` t = lr_item->text
-              )->a( n = `key`  t = |TAB{ lv_tab }| ).
+              )->a( n = `key`  t = COND #( WHEN lr_item->event IS NOT INITIAL THEN lr_item->event ELSE |TAB{ lv_tab }| ) ).
+          INSERT VALUE #( fcode = lr_item->event
+                          area  = lr_item->group
+                          node  = lo_container ) INTO TABLE lt_strip.
+
+        WHEN cs_kind-subscreen.
+          CLEAR: lo_form, lo_line, lv_in_line.
+          " on the tab that shows the area - the selected one where tabs
+          " share it, as the classic pages in the program
+          DATA(lo_area) = lo_container.
+          READ TABLE lt_strip INTO DATA(ls_strip) WITH KEY area = lr_item->name fcode = lv_active.
+          IF sy-subrc <> 0.
+            READ TABLE lt_strip INTO ls_strip WITH KEY area = lr_item->name.
+          ENDIF.
+          IF sy-subrc = 0.
+            lo_area = ls_strip-node.
+          ENDIF.
+          IF mi_gui IS BOUND.
+            mi_gui->subscreen_render( area = lr_item->name
+                                      node = lo_area ).
+          ENDIF.
 
         WHEN cs_kind-tabbed_end.
           CLEAR: lo_form, lo_line, lv_in_line, lo_tab_items.

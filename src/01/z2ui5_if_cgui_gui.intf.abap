@@ -162,6 +162,21 @@ INTERFACE z2ui5_if_cgui_gui PUBLIC.
       name TYPE string
       node TYPE REF TO z2ui5_cl_ui5_view_builder.
 
+  "! the subscreen called into area (CALL SUBSCREEN) rendered into node -
+  "! called by the screen when it renders z2ui5_cl_cgui_selscreen=>subscreen( )
+  METHODS subscreen_render
+    IMPORTING
+      area TYPE string
+      node TYPE REF TO z2ui5_cl_ui5_view_builder.
+
+  "! the function code of the tab of tabstrip name that is selected -
+  "! name-activetab of the report
+  METHODS tabstrip_active
+    IMPORTING
+      name          TYPE string
+    RETURNING
+      VALUE(result) TYPE string.
+
   "! the list output of the run - where the stand-in of cl_demo_output
   "! (z2ui5_cl_cgui_demo_output) writes
   METHODS list

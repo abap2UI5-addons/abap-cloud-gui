@@ -988,6 +988,26 @@ test("a dynpro the converter does not build is refused at its modules - a contro
   assert.match(refused(src.replace("CALL SCREEN 100", "CALL SCREEN gv_dynnr"), xml("", pai)).find((x) => x.startsWith("5:1")), /^5:1 MODULE - CALL SCREEN with a variable/);
   assert.match(refused(src, undefined).find((x) => x.startsWith("5:1")), /^5:1 MODULE - the screens are in the \.prog\.xml \(--texts\), which was not passed/);
   assert.match(refused(src, xml("", ["PROCESS AFTER INPUT.", "  MODULE user_command_0200."])).find((x) => x.startsWith("5:1")), /^5:1 MODULE - screen 0100 calls MODULE user_command_0200, which is not in the report/);
+  // a table control stays refused; a subscreen of another program, an area the screen does not have too
+  assert.match(refused(src, xml("<RPY_DYCATT><TYPE>TABLE_CTRL</TYPE><NAME>TC</NAME></RPY_DYCATT>", pai)).find((x) => x.startsWith("5:1")), /^5:1 MODULE - screen 0100 has a table control TC/);
+  const area = "<RPY_DYCATT><TYPE>SUBSCREEN</TYPE><NAME>SUB</NAME><ELEMENT_OF>SCREEN</ELEMENT_OF></RPY_DYCATT>";
+  assert.match(refused(src, xml(area, ["PROCESS BEFORE OUTPUT.", "  CALL SUBSCREEN sub INCLUDING 'ZOTHER' '0110'.", ...pai])).find((x) => x.startsWith("5:1")),
+    /^5:1 MODULE - screen 0100: CALL SUBSCREEN SUB INCLUDING 'ZOTHER' - a subscreen of another program/);
+  assert.match(refused(src, xml("", ["PROCESS AFTER INPUT.", "  CALL SUBSCREEN sub.", "  MODULE user_command_0100."])).find((x) => x.startsWith("5:1")),
+    /^5:1 MODULE - screen 0100 calls SUBSCREEN SUB, which is no subscreen area of it/);
+});
+
+test("a tabstrip on a dynpro: CONTROLS TYPE TABSTRIP, its tabs with function code and area, CALL SUBSCREEN in PBO and PAI, the subscreens of the report", () => {
+  const cls = classOf("zr2c_51_tabstrip");
+  const { result } = converted.get("zr2c_51_tabstrip");
+  assert.equal(result.ok, true, result.refusals.map((x) => x.message).join("\n"));
+  assert.match(cls, /DATA tabstr +TYPE z2ui5_cl_cgui_report=>ty_s_tabstrip\./);
+  assert.match(cls, /\)->tabbed_block_begin\( `TABSTR`\n\s+\)->tab\( text  = `Airline`\n\s+fcode = `TAB1`\n\s+area  = `SUB`\n\s+\)->tab\( text  = `Seats`\n(.*\n){2}\s+\)->subscreen\( `SUB`\n\s+\)->tabbed_block_end\( \)\./);
+  // the subscreens are screens of their own; the PBO calls the one of the variable, the PAI its PAI
+  assert.match(cls, /WHEN `0110`\.\n\s+screen->parameter\( val  = gv_carrid/);
+  assert.match(cls, /status_0100\( \)\.\n\s+call_subscreen\( area = `SUB` dynnr = gv_dynnr \)\./);
+  assert.match(cls, /call_subscreen_pai\( area = `SUB` ucomm = ucomm \)\.(.*\n){4}\s+user_command_0100\( \)\./);
+  assert.match(cls, /WHEN `0110`\.\n\s+check_0110\( \)\./);
 });
 
 test("a grid created inline, a VALUE field catalog, no selection screen: alv( ) in start_of_selection( ), the IF sy-subrc around CALL SCREEN gone", () => {

@@ -428,6 +428,31 @@ test("zr2c_50_listtree: a list tree - the items of a node on its line, a click o
   assert.deepEqual(toasts(s), ["AA 1"]);
 });
 
+test("zr2c_51_tabstrip: a tabstrip on a dynpro - the tabs, the subscreen of the tab pressed, the PAI of the subscreen, back to the list", { skip }, async () => {
+  const xml = () => d.state().slots.MAIN.xml;
+  const tab = (s, fcode) => {
+    const a = actionsOf(s, "CGUI_TAB")[0];
+    assert.ok(a, `the tabstrip raises CGUI_TAB: ${JSON.stringify(s.actions.map((x) => x.event))}`);
+    return d.act(s.session, { event: "CGUI_TAB", args: [fcode] });
+  };
+  // no selection screen: START-OF-SELECTION calls the screen, its PBO selects the first tab
+  let s = await d.start("z2ui5_cl_cgui_r2c_51");
+  assert.match(xml(), /<IconTabBar[^>]*selectedKey="TAB1"/);
+  assert.match(xml(), /text="Airline"[^>]*key="TAB1"|key="TAB1"[^>]*text="Airline"/);
+  assert.ok(s.fields.some((f) => f.name === "GV_CARRID"), `the field of subscreen 0110: ${JSON.stringify(s.fields.map((f) => f.name))}`);
+
+  // the second tab: its function code goes to the PAI, which calls the other subscreen;
+  // the PAI of subscreen 0110 ran first - the airline typed is upper case
+  s = await d.act(s.session, { values: { GV_CARRID: "aa" }, event: "CGUI_TAB", args: ["TAB2"] });
+  assert.match(xml(), /<IconTabBar[^>]*selectedKey="TAB2"/);
+  assert.ok(s.fields.some((f) => f.name === "GV_FREE"), `the checkbox of subscreen 0120: ${JSON.stringify(s.fields.map((f) => f.name))}`);
+  assert.ok(!s.fields.some((f) => f.name === "GV_CARRID"), "0110 is no longer on the tab");
+
+  // Back: LEAVE TO SCREEN 0, what followed CALL SCREEN writes the list
+  s = await d.act(s.session, { values: { GV_FREE: true }, event: "CGUI_BACK" });
+  assert.deepEqual(d.lines(), ["Airline AA", "Only free seats"]);
+});
+
 test("zr2c_21_lclreport: a local report class that reads the selection screen, writes the list and calls a FORM", { skip }, async () => {
   let s = await d.start("z2ui5_cl_cgui_r2c_21");
   s = await d.act(s.session, { event: "CGUI_EXECUTE" });

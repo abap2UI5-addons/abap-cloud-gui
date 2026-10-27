@@ -48,6 +48,12 @@ CLASS ltcl_gui IMPLEMENTATION.
 
   ENDMETHOD.
 
+  METHOD z2ui5_if_cgui_gui~subscreen_render ##NEEDED.
+  ENDMETHOD.
+
+  METHOD z2ui5_if_cgui_gui~tabstrip_active ##NEEDED.
+  ENDMETHOD.
+
   METHOD z2ui5_if_cgui_gui~custom_render ##NEEDED.
   ENDMETHOD.
 

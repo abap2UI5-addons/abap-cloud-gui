@@ -125,6 +125,21 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
     TYPES ty_t_cgui_handler TYPE STANDARD TABLE OF ty_s_cgui_handler WITH EMPTY KEY.
 
     TYPES:
+      "! CONTROLS name TYPE TABSTRIP - the function code of the selected tab
+      "! of the tabstrip of a dynpro; empty, its first tab is selected
+      BEGIN OF ty_s_tabstrip,
+        activetab TYPE c LENGTH 132,
+      END OF ty_s_tabstrip.
+
+    TYPES:
+      "! the subscreen called into an area of a dynpro (CALL SUBSCREEN)
+      BEGIN OF ty_s_cgui_subscreen,
+        area  TYPE string,
+        dynnr TYPE string,
+      END OF ty_s_cgui_subscreen.
+    TYPES ty_t_cgui_subscreen TYPE STANDARD TABLE OF ty_s_cgui_subscreen WITH EMPTY KEY.
+
+    TYPES:
       "! the selected tab of each tabbed block
       BEGIN OF ty_s_cgui_tab,
         key TYPE string,
@@ -439,6 +454,21 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
       IMPORTING
         dynnr  TYPE string
         screen TYPE REF TO z2ui5_cl_cgui_selscreen.
+
+    "! CALL SUBSCREEN area INCLUDING sy-repid dynnr in the PBO of a dynpro -
+    "! the subscreen dynnr shows in area (z2ui5_cl_cgui_selscreen=>
+    "! subscreen( )), its PBO runs now
+    METHODS call_subscreen
+      IMPORTING
+        area  TYPE clike
+        dynnr TYPE clike.
+
+    "! CALL SUBSCREEN area in the PAI of a dynpro - the PAI of the subscreen
+    "! the PBO called into area
+    METHODS call_subscreen_pai
+      IMPORTING
+        area  TYPE clike
+        ucomm TYPE string.
 
     "! the fields of dynpro dynnr, written onto screen like the selection
     "! screen - report2cloud writes it from the screen of the .prog.xml
@@ -1107,6 +1137,8 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
     " the dynpro shown (CALL SCREEN), the screens it returns to, the next
     " screen of the PAI and whether the PAI left it
     DATA mv_cgui_dynpro        TYPE string.
+    " the subscreens the PBO called into the areas of the dynpro
+    DATA mt_cgui_subscreen     TYPE ty_t_cgui_subscreen.
     DATA mt_cgui_dynpro_stack  TYPE ty_t_cgui_call.
     DATA mv_cgui_dynpro_next   TYPE string.
     DATA mv_cgui_dynpro_left   TYPE abap_bool.
@@ -2015,6 +2047,62 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
     CREATE DATA result LIKE <from>.
     ASSIGN result->* TO <to>.
     <to> = <from>.
+
+  ENDMETHOD.
+
+  METHOD call_subscreen.
+
+    DATA(lv_area) = to_upper( condense( CONV string( area ) ) ).
+    DATA(lv_dynnr) = dynnr_norm( condense( CONV string( dynnr ) ) ).
+    DELETE mt_cgui_subscreen WHERE area = lv_area.
+    IF lv_dynnr IS INITIAL OR lv_dynnr = `0000`.
+      RETURN.
+    ENDIF.
+    INSERT VALUE #( area  = lv_area
+                    dynnr = lv_dynnr ) INTO TABLE mt_cgui_subscreen.
+    dynpro_pbo( lv_dynnr ).
+
+  ENDMETHOD.
+
+  METHOD call_subscreen_pai.
+
+    READ TABLE mt_cgui_subscreen INTO DATA(ls_sub) WITH KEY area = to_upper( condense( CONV string( area ) ) ).
+    IF sy-subrc = 0.
+      dynpro_pai( dynnr = ls_sub-dynnr
+                  ucomm = ucomm ).
+    ENDIF.
+
+  ENDMETHOD.
+
+  METHOD z2ui5_if_cgui_gui~subscreen_render.
+
+    READ TABLE mt_cgui_subscreen INTO DATA(ls_sub) WITH KEY area = to_upper( area ).
+    IF sy-subrc <> 0.
+      RETURN.
+    ENDIF.
+    " the fields of the subscreen, built as those of its dynpro
+    DATA(lo_sub) = z2ui5_cl_cgui_selscreen=>factory( client          = client
+                                                     value_help_auto = abap_true ).
+    lo_sub->set_gui( me ).
+    dynpro_screen( dynnr  = ls_sub-dynnr
+                   screen = lo_sub ).
+    lo_sub->render( node ).
+
+  ENDMETHOD.
+
+  METHOD z2ui5_if_cgui_gui~tabstrip_active.
+
+    FIELD-SYMBOLS <strip> TYPE any.
+
+    DATA(lr_strip) = attri_assign( to_upper( name ) ).
+    IF lr_strip IS NOT BOUND.
+      RETURN.
+    ENDIF.
+    ASSIGN lr_strip->* TO <strip>.
+    ASSIGN COMPONENT `ACTIVETAB` OF STRUCTURE <strip> TO FIELD-SYMBOL(<tab>).
+    IF sy-subrc = 0.
+      result = condense( CONV string( <tab> ) ).
+    ENDIF.
 
   ENDMETHOD.
 
@@ -2961,6 +3049,10 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
   METHOD on_event.
 
     DATA(lv_event) = client->get_event( ).
+    " a tab of the tabstrip of a dynpro: its function code, as a push button
+    IF lv_event = z2ui5_cl_cgui_selscreen=>cs_event-tab.
+      lv_event = to_upper( client->get_event_arg( ) ).
+    ENDIF.
 
     alv_page_sync( ).
     alv_single_sync( ).

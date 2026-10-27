@@ -94,6 +94,11 @@ CLASS ltcl_report DEFINITION INHERITING FROM z2ui5_cl_cgui_report FINAL.
     DATA mv_window   TYPE abap_bool.
     DATA mv_leave    TYPE abap_bool.
     DATA mv_dynpro   TYPE abap_bool.
+    " a tabstrip on dynpro 0100: two tabs on one subscreen area
+    DATA mv_tabs     TYPE abap_bool.
+    DATA tabstr      TYPE z2ui5_cl_cgui_report=>ty_s_tabstrip.
+    DATA mv_sub      TYPE c LENGTH 4.
+    DATA mv_sub_text TYPE c LENGTH 10.
     DATA mv_seats    TYPE i.
     DATA mv_after    TYPE string.
     DATA mv_pai      TYPE string.
@@ -214,6 +219,7 @@ CLASS ltcl_test DEFINITION FINAL FOR TESTING
     METHODS current_screen_afresh FOR TESTING.
     METHODS dynpro_call_and_leave FOR TESTING.
     METHODS dynpro_text_editor FOR TESTING.
+    METHODS dynpro_tabstrip FOR TESTING.
     METHODS alv_box_copy_selection FOR TESTING.
     METHODS url_values_screen_only FOR TESTING.
     METHODS url_skip_screen FOR TESTING.
@@ -327,6 +333,26 @@ CLASS ltcl_report IMPLEMENTATION.
 
   METHOD dynpro_screen.
 
+    IF mv_tabs = abap_true.
+      CASE dynnr.
+        WHEN `0100`.
+          screen->tabbed_block_begin( 'TABSTR'
+              )->tab( text  = `One`
+                      fcode = 'TAB1'
+                      area  = 'SUB'
+              )->tab( text  = `Two`
+                      fcode = 'TAB2'
+                      area  = 'SUB'
+              )->subscreen( 'SUB'
+              )->tabbed_block_end( ).
+        WHEN `0110`.
+          screen->parameter( val  = mv_sub_text
+                             text = `First` ).
+        WHEN `0120`.
+          screen->comment( `Second tab` ).
+      ENDCASE.
+      RETURN.
+    ENDIF.
     IF dynnr = `0100` AND mv_gui = abap_true.
       screen->custom_control( 'CC' ).
       RETURN.
@@ -358,6 +384,15 @@ CLASS ltcl_report IMPLEMENTATION.
       current_screen( )->modify_screen( ls_screen ).
     ENDLOOP.
     mv_pai = |{ mv_pai }PBO{ dynnr };|.
+    " the classic PBO of a tabstrip: the tab and its subscreen
+    IF mv_tabs = abap_true AND dynnr = `0100`.
+      IF tabstr-activetab IS INITIAL.
+        tabstr-activetab = 'TAB1'.
+        mv_sub = '0110'.
+      ENDIF.
+      call_subscreen( area  = 'SUB'
+                      dynnr = mv_sub ).
+    ENDIF.
 
   ENDMETHOD.
 
@@ -367,6 +402,19 @@ CLASS ltcl_report IMPLEMENTATION.
       mo_edit->get_textstream( IMPORTING text = mv_note ).
     ENDIF.
     mv_pai = |{ mv_pai }PAI{ dynnr }:{ ucomm };|.
+    IF mv_tabs = abap_true AND dynnr = `0100`.
+      call_subscreen_pai( area  = 'SUB'
+                          ucomm = ucomm ).
+      CASE ucomm.
+        WHEN `TAB1`.
+          tabstr-activetab = ucomm.
+          mv_sub = '0110'.
+        WHEN `TAB2`.
+          tabstr-activetab = ucomm.
+          mv_sub = '0120'.
+      ENDCASE.
+      RETURN.
+    ENDIF.
     CASE ucomm.
       WHEN `SAVE`.
         leave_to_screen( `0` ).
@@ -970,6 +1018,33 @@ CLASS ltcl_test IMPLEMENTATION.
     cl_abap_unit_assert=>assert_equals( act = mo_cut->mv_cgui_screen
                                         exp = `SELECTION` ).
     cl_abap_unit_assert=>assert_initial( mo_cut->mt_cgui_dynpro_stack ).
+
+  ENDMETHOD.
+
+  METHOD dynpro_tabstrip.
+
+    init( ).
+    mo_report->p_carrid = `LH`.
+    mo_report->mv_dynpro = abap_true.
+    mo_report->mv_tabs = abap_true.
+    event( z2ui5_cl_cgui_report=>cs_ucomm-execute ).
+
+    " the tabstrip: its tabs by function code, the first selected, the
+    " subscreen the PBO called on it - its PBO ran too
+    cl_abap_unit_assert=>assert_equals( act = mo_report->mv_pai
+                                        exp = `PBO0100;PBO0110;` ).
+    cl_abap_unit_assert=>assert_true( xsdbool( mo_client->mv_view CS `IconTabBar` AND mo_client->mv_view CS `selectedKey="TAB1"` ) ).
+    cl_abap_unit_assert=>assert_true( xsdbool( mo_client->mv_view CS `key="TAB2"` AND mo_client->mv_view CS `First` ) ).
+    cl_abap_unit_assert=>assert_true( xsdbool( mo_client->mv_view CS z2ui5_cl_cgui_selscreen=>cs_event-tab ) ).
+
+    " the second tab: a function of the dynpro - its PAI (logged first)
+    " calls that of the subscreen and switches the subscreen
+    event( name = z2ui5_cl_cgui_selscreen=>cs_event-tab
+           args = VALUE #( ( `TAB2` ) ) ).
+    cl_abap_unit_assert=>assert_equals( act = mo_report->mv_pai
+                                        exp = `PBO0100;PBO0110;PAI0100:TAB2;PAI0110:TAB2;PBO0100;PBO0120;` ).
+    cl_abap_unit_assert=>assert_true( xsdbool( mo_client->mv_view CS `selectedKey="TAB2"` AND mo_client->mv_view CS `Second tab` ) ).
+    cl_abap_unit_assert=>assert_false( xsdbool( mo_client->mv_view CS `First` ) ).
 
   ENDMETHOD.
 

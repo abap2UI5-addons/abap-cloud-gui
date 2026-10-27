@@ -719,8 +719,10 @@ Stage 5 - research
       `checkbox_change`
 - [x] `cl_gui_list_tree`: the stand-in `z2ui5_cl_cgui_gui_list_tree` - the
       items of a node on its line, the first its text
-- [ ] F1 of the editor; table controls, subscreens and tabstrips on a
-      dynpro
+- [x] Tabstrips and subscreens on a dynpro: the tabs with their function
+      codes, `activetab`, `CALL SUBSCREEN` in PBO and PAI with the number
+      of the subscreen in a variable (the paging in the program)
+- [ ] F1 of the editor; table controls on a dynpro
 
 Quality, through every stage
 

@@ -1645,7 +1645,7 @@ class Converter {
       const k = kind(s);
       const name = declName(s);
       if (!name) continue;
-      if (["Data", "DataBegin", "Constant", "ConstantBegin", "Parameter", "SelectOption", "Ranges", "Tables"].includes(k)) {
+      if (["Data", "DataBegin", "Constant", "ConstantBegin", "Parameter", "SelectOption", "Ranges", "Tables", "Controls"].includes(k)) {
         if (k === "Data" && this.insideBegin(s)) continue;
         this.globalData.add(lc(name));
         if (RESERVED_METHODS.has(lc(name))) {
@@ -1929,9 +1929,11 @@ class Converter {
    * runtime: dynpro_screen( ) builds the fields with the selection-screen
    * builder, dynpro_pbo( ) and dynpro_pai( ) call the modules of PROCESS
    * BEFORE OUTPUT and AFTER INPUT, and what followed CALL SCREEN goes on
-   * in after_call_screen( ). A screen with a custom control, a subscreen,
-   * a table control or a tabstrip, or flow logic with LOOP or CALL
-   * SUBSCREEN, is refused.
+   * in after_call_screen( ). A tabstrip is a tabbed block of the
+   * builder, a subscreen area subscreen( ), CALL SUBSCREEN in the flow
+   * logic call_subscreen( ) / call_subscreen_pai( ). A screen with a table
+   * control, a custom control without the stand-ins, flow logic with
+   * LOOP or a subscreen of another program is refused.
    */
   resolveDynpro() {
     const bodies = [...this.events.map((e) => e.stmts), ...this.forms.map((f) => f.body), ...this.modules.map((m) => m.body)];
@@ -1963,6 +1965,16 @@ class Converter {
       }
       if (nr && nr !== "0000") reached.add(nr);
     }
+    // a CALL SUBSCREEN reaches its subscreen - with a variable, each one of
+    // the report (type I)
+    for (const d of dynpros.values()) {
+      const flow = parseFlow(d.flow);
+      for (const c of flow.pbo.filter((x) => x.subscreen)) {
+        const lit = /^'?(\d+)'?$/.exec(c.dynnr ?? "");
+        if (lit) reached.add(lit[1].padStart(4, "0"));
+        else for (const x of dynpros.values()) if (x.type === "I") reached.add(x.screen);
+      }
+    }
     const problems = [];
     const screens = [];
     for (const nr of reached) {
@@ -1972,14 +1984,18 @@ class Converter {
         continue;
       }
       const kinds = { CUST_CTRL: "custom control (a SAP GUI control)", SUBSCREEN: "subscreen area", TABLE_CTRL: "table control", STRIP_CTRL: "tabstrip" };
-      // a custom control area holds the stand-ins of the SAP GUI controls
-      const allowed = ["SCREEN", "RADIOGROUP", ...(this.guiVars?.size ? ["CUST_CTRL"] : [])];
+      // a custom control area holds the stand-ins of the SAP GUI controls,
+      // a tabstrip its tabs, a subscreen area what CALL SUBSCREEN calls
+      const allowed = ["SCREEN", "RADIOGROUP", "STRIP_CTRL", "SUBSCREEN", ...(this.guiVars?.size ? ["CUST_CTRL"] : [])];
       for (const c of d.containers.filter((x) => !allowed.includes(x.type))) problems.push(`screen ${nr} has a ${kinds[c.type] ?? c.type} ${c.name}`);
       for (const f of d.fields.filter((x) => !DYNPRO_FIELDS.has(x.type))) problems.push(`screen ${nr} has a field ${f.name || f.text} of type ${f.type}`);
       const flow = parseFlow(d.flow);
       problems.push(...flow.problems.map((p) => `screen ${nr}: ${p}`));
-      for (const c of [...flow.pbo, ...flow.pai, ...flow.pov]) {
+      for (const c of [...flow.pbo, ...flow.pai, ...flow.pov].filter((x) => x.module)) {
         if (!this.modules.some((m) => m.name === c.module)) problems.push(`screen ${nr} calls MODULE ${c.module}, which is not in the report`);
+      }
+      for (const c of [...flow.pbo, ...flow.pai].filter((x) => x.subscreen)) {
+        if (!d.containers.some((x) => x.type === "SUBSCREEN" && x.name === c.subscreen)) problems.push(`screen ${nr} calls SUBSCREEN ${c.subscreen}, which is no subscreen area of it`);
       }
       screens.push({ ...d, ...flow, okcode: lc(d.fields.find((f) => f.type === "OKCODE")?.name ?? "") });
     }
@@ -2296,6 +2312,12 @@ class Converter {
     const { screens } = this.dynpro;
     // PBO calls the OUTPUT module of the name, PAI the INPUT one
     const call = (c, io) => {
+      if (c.subscreen) {
+        const nr = /^'?(\d+)'?$/.exec(c.dynnr ?? "");
+        return io === "OUTPUT"
+          ? `call_subscreen( area = ${literal(c.subscreen)} dynnr = ${nr ? literal(nr[1].padStart(4, "0")) : lc(c.dynnr)} ).`
+          : `call_subscreen_pai( area = ${literal(c.subscreen)} ucomm = ucomm ).`;
+      }
       const f = this.forms.find((x) => x.module?.name === c.module && x.module.io === io)
         ?? this.forms.find((x) => x.module?.name === c.module);
       return this.screenForms().has(f.name) ? `${f.method}( current_screen( ) ).` : `${f.method}( ).`;
@@ -2340,9 +2362,11 @@ class Converter {
    *  line by line, a text before an input its label, frames blocks */
   dynproLayout(d) {
     const text = (t) => t.replace(/_/g, " ").trim();
-    // a custom control area is a line of its own, where its first line is
-    const areas = d.containers.filter((c) => c.type === "CUST_CTRL").map((c) => ({ type: "CUSTOM", name: c.name, line: c.line, column: c.column, height: c.height, length: c.length }));
-    const fields = [...d.fields.filter((f) => f.type !== "OKCODE" && f.line > 0), ...areas].sort((a, b) => a.line - b.line || a.column - b.column);
+    // a custom control area is a line of its own, where its first line is;
+    // so are a tabstrip and a subscreen area of the screen itself
+    const areas = d.containers.filter((c) => c.type === "CUST_CTRL" || c.type === "STRIP_CTRL" || (c.type === "SUBSCREEN" && c.parent === "SCREEN"))
+      .map((c) => ({ type: { CUST_CTRL: "CUSTOM", STRIP_CTRL: "STRIP", SUBSCREEN: "AREA" }[c.type], name: c.name, line: c.line, column: c.column, height: c.height, length: c.length }));
+    const fields = [...d.fields.filter((f) => f.type !== "OKCODE" && f.line > 0 && f.cont !== "STRIP_CTRL"), ...areas].sort((a, b) => a.line - b.line || a.column - b.column);
     const frames = fields.filter((f) => f.type === "FRAME");
     const frameOf = (f) => frames.filter((r) => r !== f && f.line > r.line && f.line < r.line + r.height && f.column >= r.column && f.column < r.column + r.length)
       .sort((a, b) => b.line - a.line)[0];
@@ -2368,11 +2392,25 @@ class Converter {
         } else items.push(f);
       }
       // the areas after the line, the fields of the line together
-      const calls = items.filter((f) => f.type !== "CUSTOM").map((f) => this.dynproField(f, fr)).filter(Boolean);
+      const own = ["CUSTOM", "STRIP", "AREA"];
+      const calls = items.filter((f) => !own.includes(f.type)).map((f) => this.dynproField(f, fr)).filter(Boolean);
       if (calls.length > 1) add("line_begin(");
       calls.forEach((c) => add(c));
       if (calls.length > 1) add("line_end(");
-      for (const f of items.filter((x) => x.type === "CUSTOM")) add(`custom_control( ${literal(f.name)}`);
+      for (const f of items.filter((x) => own.includes(x.type))) {
+        if (f.type === "CUSTOM") add(`custom_control( ${literal(f.name)}`);
+        if (f.type === "AREA") add(`subscreen( ${literal(f.name)}`);
+        if (f.type !== "STRIP") continue;
+        // the tabs in their order, each with its function code and area,
+        // then the areas of the tabstrip
+        add(`tabbed_block_begin( ${literal(f.name)}`);
+        const tabs = d.fields.filter((t) => t.cont === "STRIP_CTRL" && t.contName === f.name && t.type === "PUSH").sort((a, b) => a.line - b.line || a.column - b.column);
+        for (const t of tabs) {
+          add([`tab( text  = ${literal(text(t.text) || t.fcode || t.name)}`, `     fcode = ${literal(t.fcode || t.name)}`, ...(t.ref ? [`     area  = ${literal(t.ref)}`] : [])].join("\n"));
+        }
+        for (const a of d.containers.filter((c) => c.type === "SUBSCREEN" && c.parent === f.name)) add(`subscreen( ${literal(a.name)}`);
+        add("tabbed_block_end(");
+      }
     }
     if (frame) add("block_end(");
     if (!chain.length) return [];
@@ -3898,6 +3936,15 @@ class Converter {
         // a global field-symbol is declared in every method that uses it
         this.globalFieldSymbols = [...(this.globalFieldSymbols ?? []), s];
         this.map(s, "declared in each method that uses it");
+        continue;
+      }
+
+      // CONTROLS ts TYPE TABSTRIP - the tabstrip of a dynpro: its activetab
+      const strip = k === "Controls" ? /^controls\s+(\w+)\s+type\s+tabstrip$/i.exec(renderTokens(stmtTokens(s)).replace(/\s*\.$/, "")) : null;
+      if (strip) {
+        heading("global data of the report");
+        push(`DATA ${lc(strip[1])} TYPE z2ui5_cl_cgui_report=>ty_s_tabstrip.`);
+        this.map(s, "`TYPE z2ui5_cl_cgui_report=>ty_s_tabstrip` - `activetab` is the function code of the selected tab, as before");
         continue;
       }
 
@@ -8073,6 +8120,17 @@ function parseFlow(lines) {
       continue;
     }
     if (/^FIELD:? [\w-]+(?:,? [\w-]+)*$/.test(st)) continue;
+    // CALL SUBSCREEN area INCLUDING prog dynnr in the PBO, CALL SUBSCREEN
+    // area in the PAI - a subscreen of this report
+    const sub = /^CALL SUBSCREEN ([\w/]+)(?: INCLUDING (\S+) (\S+))?$/.exec(st);
+    if (sub && (section === "pbo" ? sub[2] : !sub[2])) {
+      if (sub[2] && !/^(SY-REPID|SY-CPROG)$/i.test(sub[2])) {
+        flow.problems.push(`CALL SUBSCREEN ${sub[1].toUpperCase()} INCLUDING ${sub[2].toUpperCase()} - a subscreen of another program`);
+        continue;
+      }
+      flow[section].push({ subscreen: sub[1].toUpperCase(), dynnr: sub[3] });
+      continue;
+    }
     flow.problems.push(`${st.split(" ").slice(0, 3).join(" ")} in the flow logic`);
   }
   return flow;

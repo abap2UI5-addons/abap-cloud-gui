@@ -149,7 +149,8 @@ const items = (xml, name) => [...xml.matchAll(new RegExp(`<${name}>([\\s\\S]*?)<
 
 /** [{ screen, description, type, containers: [{ type, name, parent }],
  *  fields: [{ cont, contName, type, name, text, line, column, length, height, input,
- *  output, required, group1, fcode, invisible, icon }], flow: [line] }] -
+ *  output, required, group1, fcode, invisible, icon, ref }], flow: [line] }] -
+ *  ref the subscreen area of a tab of a tabstrip (REF_FIELD);
  *  containers with their place as the fields have it; screen with its four digits, the texts as the screen painter has them
  *  (underscores of a template included) */
 export function parseDynpros(xml) {
@@ -176,6 +177,7 @@ export function parseDynpros(xml) {
         input: flag(r, "INPUT_FLD"), output: flag(r, "OUTPUT_FLD") || flag(r, "OUTPUTONLY"),
         required: ["O", "X"].includes(up(r, "REQU_ENTRY")), group1: up(r, "GROUP1"),
         fcode: up(r, "PUSH_FCODE"), invisible: flag(r, "INVISIBLE"), icon: up(r, "ICON_NAME"),
+        ref: up(r, "REF_FIELD"),
       })),
       flow: items(it, "RPY_DYFLOW").map((r) => tag(r, "LINE")),
     });
