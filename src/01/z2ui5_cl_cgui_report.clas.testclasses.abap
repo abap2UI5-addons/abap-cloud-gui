@@ -1431,6 +1431,12 @@ CLASS ltcl_test IMPLEMENTATION.
     cl_abap_unit_assert=>assert_true( xsdbool( mo_client->mv_popup CS `selectedKey="SEATS"` ) ).
     cl_abap_unit_assert=>assert_true( xsdbool( mo_client->mv_popup CS `UA` ) ).
 
+    " the kinds of chart, a column - the pie
+    cl_abap_unit_assert=>assert_true( xsdbool( mo_client->mv_popup CS `SegmentedButton` ) ).
+    event( name = z2ui5_cl_cgui_alv=>cs_event-chart
+           args = VALUE #( ( `KIND` ) ( `PIE` ) ) ).
+    cl_abap_unit_assert=>assert_true( xsdbool( mo_client->mv_popup CS `path d=` OR mo_client->mv_popup CS `circle cx=` ) ).
+
     " the rows counted instead
     event( name = z2ui5_cl_cgui_alv=>cs_event-chart
            args = VALUE #( ( `VALUE` ) ( `%COUNT` ) ) ).

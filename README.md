@@ -613,7 +613,8 @@ Output
 - [x] ALV: a chart over the grid - a bar chart of the rows shown, the filter
       and search applied, a column as the categories and a number summed
       (or the rows counted), drawn as SVG
-- [ ] ALV chart: several columns as series, other kinds of chart
+- [x] ALV chart: up to three number columns as series side by side, and
+      bars, columns, lines or a pie (of the first series)
 - [x] List: `WRITE AT` positions and `UNDER`, columns that line up
       (every item of a positioned line in a box of its width), secondary
       lists (`sy-lsind`, `set_lsind( )`)
