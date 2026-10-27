@@ -137,6 +137,8 @@ CLASS ltcl_handler DEFINITION FINAL FOR TESTING.
       IMPORTING node_key sender.
     METHODS on_item FOR EVENT item_double_click OF z2ui5_cl_cgui_gui_column_tree
       IMPORTING node_key item_name.
+    METHODS on_list_item FOR EVENT item_double_click OF z2ui5_cl_cgui_gui_list_tree
+      IMPORTING node_key item_name.
     METHODS on_link FOR EVENT link_click OF z2ui5_cl_cgui_gui_column_tree
       IMPORTING node_key item_name.
     METHODS on_checkbox FOR EVENT checkbox_change OF z2ui5_cl_cgui_gui_column_tree
@@ -161,6 +163,12 @@ CLASS ltcl_handler IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD on_item.
+
+    mv_log = |{ mv_log }ITEM { node_key } { item_name };|.
+
+  ENDMETHOD.
+
+  METHOD on_list_item.
 
     mv_log = |{ mv_log }ITEM { node_key } { item_name };|.
 
@@ -256,6 +264,7 @@ CLASS ltcl_test DEFINITION FINAL
     METHODS sapevent_links FOR TESTING.
     METHODS simple_tree FOR TESTING.
     METHODS column_tree FOR TESTING.
+    METHODS list_tree FOR TESTING.
     METHODS cursor_field FOR TESTING.
 
 ENDCLASS.
@@ -495,6 +504,41 @@ CLASS ltcl_test IMPLEMENTATION.
                                         exp = `BERLIN` ).
     lo_tree->delete_all_nodes( ).
     cl_abap_unit_assert=>assert_initial( lo_tree->view( ) ).
+
+  ENDMETHOD.
+
+  METHOD list_tree.
+
+    DATA lt_node TYPE z2ui5_cl_cgui_gui_simple_tree=>ty_t_node.
+    DATA lt_item TYPE z2ui5_cl_cgui_gui_column_tree=>ty_t_item.
+
+    DATA(lo_handler) = NEW ltcl_handler( ).
+    DATA(lo_tree) = NEW z2ui5_cl_cgui_gui_list_tree( parent         = mo_cont
+                                                      item_selection = abap_true ).
+    " the first item of a node is its text, the others follow on its line
+    lt_node = VALUE #( ( node_key = 'LH' isfolder = abap_true ) ).
+    lt_item = VALUE #( ( node_key = 'LH' item_name = '1' text = 'Lufthansa' )
+                       ( node_key = 'LH' item_name = '2' length = 10 text = 'FRANKFURT' )
+                       ( node_key = 'LH' item_name = '3' class = z2ui5_cl_cgui_gui_column_tree=>item_class_link text = 'lufthansa.com' ) ).
+    lo_tree->add_nodes_and_items( node_table = lt_node
+                                  item_table = lt_item ).
+    DATA(lt_view) = lo_tree->view( ).
+    cl_abap_unit_assert=>assert_equals( act = lt_view[ 1 ]-text
+                                        exp = `Lufthansa` ).
+    cl_abap_unit_assert=>assert_initial( lo_tree->columns( ) ).
+    DATA(lt_cell) = lo_tree->cells( lt_view[ 1 ]-key ).
+    cl_abap_unit_assert=>assert_equals( act = lines( lt_cell )
+                                        exp = 2 ).
+    cl_abap_unit_assert=>assert_equals( act = lt_cell[ 1 ]-width
+                                        exp = 10 ).
+    cl_abap_unit_assert=>assert_equals( act = lt_cell[ 2 ]-kind
+                                        exp = `LINK` ).
+
+    " a click on the node is one on its first item - by its own name
+    lo_tree->set_handler( handler = lo_handler method = 'ON_LIST_ITEM' event = 'ITEM_DOUBLE_CLICK' ).
+    lo_tree->dispatch( event = `CLICK` value = |{ lt_view[ 1 ]-key }| ).
+    cl_abap_unit_assert=>assert_equals( act = lo_handler->mv_log
+                                        exp = `ITEM LH 1;` ).
 
   ENDMETHOD.
 

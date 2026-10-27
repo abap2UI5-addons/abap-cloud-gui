@@ -714,8 +714,10 @@ Stage 5 - research
       the tree with its header and columns, the items of `MTREEITM` as
       text, link or checkbox, `item_double_click`, `link_click`,
       `checkbox_change`
-- [ ] F1 of the editor, the list tree; table controls, subscreens and
-      tabstrips on a dynpro
+- [x] `cl_gui_list_tree`: the stand-in `z2ui5_cl_cgui_gui_list_tree` - the
+      items of a node on its line, the first its text
+- [ ] F1 of the editor; table controls, subscreens and tabstrips on a
+      dynpro
 
 Quality, through every stage
 

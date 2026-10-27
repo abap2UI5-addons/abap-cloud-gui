@@ -409,6 +409,25 @@ test("zr2c_49_coltree: a column tree - the header, the nodes with their cells be
   assert.deepEqual(toasts(s), ["AA TREE"]);
 });
 
+test("zr2c_50_listtree: a list tree - the items of a node on its line, a click on a node and on a link to the handlers", { skip }, async () => {
+  const xml = () => d.state().slots.MAIN.xml;
+  const press = (s, kind) => {
+    const a = actionsOf(s, "CGUI_GUI").find((x) => x.args[1] === kind);
+    assert.ok(a, `a ${kind}: ${JSON.stringify(actionsOf(s, "CGUI_GUI").map((x) => x.args))}`);
+    return d.act(s.session, { event: a.id });
+  };
+  let s = await d.start("z2ui5_cl_cgui_r2c_50");
+  // the first item the text of the node, the others after it - no header
+  for (const text of ["American Airlines", "Lufthansa", "0400", "FRANKFURT", "NEW YORK"]) assert.match(xml(), new RegExp(`text="${text}"`), text);
+  assert.doesNotMatch(xml(), /design="Bold"/, "no header row");
+  // the address of an airline is a link
+  s = await press(s, "LINK");
+  assert.deepEqual(toasts(s), ["Open AA"]);
+  // a click on a node is one on its first item, by its name
+  s = await press(s, "CLICK");
+  assert.deepEqual(toasts(s), ["AA 1"]);
+});
+
 test("zr2c_21_lclreport: a local report class that reads the selection screen, writes the list and calls a FORM", { skip }, async () => {
   let s = await d.start("z2ui5_cl_cgui_r2c_21");
   s = await d.act(s.session, { event: "CGUI_EXECUTE" });

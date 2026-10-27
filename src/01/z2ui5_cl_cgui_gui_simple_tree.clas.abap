@@ -53,12 +53,14 @@ CLASS z2ui5_cl_cgui_gui_simple_tree DEFINITION PUBLIC
         width TYPE i,
       END OF ty_s_column,
       ty_t_column TYPE STANDARD TABLE OF ty_s_column WITH EMPTY KEY,
-      "! what a node shows in a column - kind is text, link or checkbox
+      "! what a node shows in a column - kind is text, link or checkbox;
+      "! width in characters where no column gives it
       BEGIN OF ty_s_cell,
         name    TYPE string,
         text    TYPE string,
         kind    TYPE string,
         checked TYPE abap_bool,
+        width   TYPE i,
       END OF ty_s_cell,
       ty_t_cell TYPE STANDARD TABLE OF ty_s_cell WITH EMPTY KEY.
 

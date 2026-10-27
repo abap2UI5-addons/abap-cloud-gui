@@ -2214,6 +2214,9 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
                                                          t_arg = VALUE #( ( |{ id }| ) ( `CLICK` ) ( |{ ls_row-key }| ) ) ) ).
           LOOP AT lo_stree->cells( ls_row-key ) INTO DATA(ls_cell).
             ls_tcol = VALUE #( lt_tcol[ name = ls_cell-name ] OPTIONAL ).
+            IF ls_tcol-width = 0.
+              ls_tcol-width = ls_cell-width.
+            ENDIF.
             DATA(lv_cell_width) = COND string( WHEN ls_tcol-width > 0 THEN |{ ls_tcol-width * 2 / 3 }rem| ELSE `12rem` ).
             DATA(lv_cell_arg) = |{ ls_row-key } { ls_cell-name }|.
             CASE ls_cell-kind.

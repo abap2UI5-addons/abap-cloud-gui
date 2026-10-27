@@ -343,10 +343,14 @@ test("cl_gui_simple_tree -> z2ui5_cl_cgui_gui_simple_tree, MTREESNODE its node t
     "  APPEND gs_node TO gt_node.",
     "  go_tree->add_nodes( EXPORTING table_structure_name = 'MTREESNODE' node_table = gt_node ).",
     "  go_tree->expand_node( node_key = 'ROOT' ).",
+    "  DATA(lv_key) = CONV tv_nodekey( 'ROOT' ).",
+    "  go_tree->expand_node( node_key = lv_key ).",
   ].join("\n"), { file: "zt.prog.abap", className: "zcl_t" });
   assert.equal(r.ok, true, r.refusals.map((x) => x.message).join("\n"));
   const all = Object.values(r.draft).join("\n");
   assert.ok(!/cl_gui_simple_tree|TYPE (STANDARD TABLE OF )?mtreesnode/i.test(all), all);
+  // the type of a constructor expression too
+  assert.match(all, /CONV z2ui5_cl_cgui_gui_simple_tree=>ty_node_key\( 'ROOT' \)/);
   assert.match(all, /TYPE REF TO z2ui5_cl_cgui_gui_simple_tree/);
   assert.match(all, /TYPE STANDARD TABLE OF z2ui5_cl_cgui_gui_simple_tree=>ty_s_node/);
   assert.match(all, /z2ui5_cl_cgui_gui_simple_tree=>eventid_node_double_click/);
@@ -1096,7 +1100,7 @@ test("SAP GUI controls: a member, a parameter or an event the stand-ins do not h
   assert.deepEqual(refused("  go_e = NEW #( parent = go_c colour = 1 ).\n"), ["SAP GUI controls: colour is no parameter of the method called in the stand-in - port this statement by hand"]);
   assert.deepEqual(refused("  go_e->set_comments_string( ).\n"), ["SAP GUI controls: go_e->set_comments_string has no counterpart in z2ui5_cl_cgui_gui_textedit - port this statement by hand"]);
   assert.deepEqual(refused("  go_e->set_textstream( text = 'x' colour = 1 ).\n"), ["SAP GUI controls: colour is no parameter of the method called in the stand-in - port this statement by hand"]);
-  assert.deepEqual(refusalOf(`${head}DATA go_p TYPE REF TO cl_gui_list_tree.\n`).map((x) => x.replace(/^\d+:\d+ /, "")), ["SAP GUI controls: cl_gui_list_tree has no counterpart - the containers, cl_gui_textedit, cl_gui_html_viewer, cl_gui_toolbar, cl_gui_picture, cl_gui_simple_tree, cl_gui_column_tree and cl_gui_alv_grid have (z2ui5_cl_cgui_gui*)"]);
+  assert.deepEqual(refusalOf(`${head}DATA go_p TYPE REF TO cl_gui_calendar.\n`).map((x) => x.replace(/^\d+:\d+ /, "")), ["SAP GUI controls: cl_gui_calendar has no counterpart - the containers, cl_gui_textedit, cl_gui_html_viewer, cl_gui_toolbar, cl_gui_picture, cl_gui_simple_tree, cl_gui_column_tree, cl_gui_list_tree and cl_gui_alv_grid have (z2ui5_cl_cgui_gui*)"]);
 });
 
 test("SAP GUI controls: SET HANDLER of a local class's method is set_handler( ) of the stand-in; what it cannot call is refused", () => {

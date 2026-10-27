@@ -188,7 +188,7 @@ const OPENERS = new Set(["If", "Case", "Loop", "Do", "While", "SelectLoop", "Try
 const CLOSERS = new Set(["EndIf", "EndCase", "EndLoop", "EndDo", "EndWhile", "EndSelect", "EndTry", "EndAt", "EndOn", "EndProvide"]);
 
 // SAP GUI controls - they need a dynpro container
-const GUI_CONTROL = /\bcl_gui_(alv_grid|custom_container|docking_container|splitter_container|dialogbox_container|container|html_viewer|textedit|picture|toolbar|simple_tree|column_tree|list_tree|gos_container|easy_splitter_container)\b/;
+const GUI_CONTROL = /\bcl_gui_(alv_grid|custom_container|docking_container|splitter_container|dialogbox_container|container|html_viewer|textedit|picture|toolbar|simple_tree|column_tree|list_tree|gos_container|easy_splitter_container|calendar|abapedit|chart_engine|barchart)\b/;
 
 // z2ui5_cl_cgui_frontend - CL_GUI_FRONTEND_SERVICES in the browser: its
 // constants and methods, the parameters and classic exceptions of each. A
@@ -288,6 +288,7 @@ export const GUI = {
     cl_gui_picture: "z2ui5_cl_cgui_gui_picture",
     cl_gui_simple_tree: "z2ui5_cl_cgui_gui_simple_tree",
     cl_gui_column_tree: "z2ui5_cl_cgui_gui_column_tree",
+    cl_gui_list_tree: "z2ui5_cl_cgui_gui_list_tree",
     cl_gui_alv_grid: "z2ui5_cl_cgui_gui_alv_grid",
     cl_alv_event_toolbar_set: "z2ui5_cl_cgui_gui_alv_toolbar",
   },
@@ -812,6 +813,22 @@ export const GUI = {
           exceptions: [] },
       },
     },
+    z2ui5_cl_cgui_gui_list_tree: {
+      parent: "z2ui5_cl_cgui_gui_column_tree",
+      constants: [],
+      attributes: [],
+      events: [],
+      methods: {
+        constructor: { params: ["parent", "node_selection_mode", "item_selection", "with_headers", "hide_selection", "lifetime", "shellstyle", "name"],
+          exceptions: ["lifetime_error", "cntl_system_error", "create_error", "illegal_node_selection_mode", "failed"] },
+        add_nodes_and_items: { params: [],
+          exceptions: [] },
+        columns: { params: [],
+          exceptions: [] },
+        cells: { params: [],
+          exceptions: [] },
+      },
+    },
     z2ui5_cl_cgui_gui_picture: {
       parent: "z2ui5_cl_cgui_gui",
       constants: ["display_mode_normal", "display_mode_stretch", "display_mode_fit", "display_mode_normal_center", "display_mode_fit_center", "eventid_picture_click"],
@@ -1030,14 +1047,25 @@ function guiEvent(cls, name) {
 
 /** the member of a stand-in or of one of its parents - undefined if none has it */
 function guiMember(cls, name) {
+  let found;
   for (let c = cls; c; c = GUI.members[c]?.parent) {
     const m = GUI.members[c];
-    if (!m) return undefined;
-    if (Object.hasOwn(m.methods, name)) return { kind: "method", ...m.methods[name] };
+    if (!m) return found;
+    // a REDEFINITION lists no parameters - they are those of the class that
+    // declares the method
+    if (Object.hasOwn(m.methods, name)) {
+      found = { kind: "method", ...m.methods[name] };
+      if (found.params.length || found.exceptions.length) return found;
+      continue;
+    }
+    if (found) return found;
     if (m.constants.includes(name) || m.attributes.includes(name)) return { kind: "attribute" };
   }
-  return undefined;
+  return found;
 }
+
+// the constructor operators - the type a token names after one of them
+const CONSTRUCTORS = new Set(["conv", "value", "new", "corresponding", "exact", "cond", "switch", "reduce", "ref", "cast", "filter"]);
 
 // statements a body keeps chained when the report chains them
 const CHAINABLE = new Set(["Clear", "Free", "Data", "DataBegin", "DataEnd", "Constant", "Type", "TypeBegin", "TypeEnd", "Static", "FieldSymbol", "Refresh"]);
@@ -2109,7 +2137,7 @@ class Converter {
     const missing = [...new Set([...t.matchAll(/\bcl_gui_\w+/g)].map((m) => m[0]))]
       .filter((c) => !guiClass(c) && !["cl_gui_cfw", "cl_gui_frontend_services"].includes(c));
     if (this.guiVars?.size && !missing.length) return undefined;
-    if (this.guiVars?.size) return `SAP GUI controls: ${missing.join(", ")} ${missing.length > 1 ? "have" : "has"} no counterpart - the containers, cl_gui_textedit, cl_gui_html_viewer, cl_gui_toolbar, cl_gui_picture, cl_gui_simple_tree, cl_gui_column_tree and cl_gui_alv_grid have (z2ui5_cl_cgui_gui*)`;
+    if (this.guiVars?.size) return `SAP GUI controls: ${missing.join(", ")} ${missing.length > 1 ? "have" : "has"} no counterpart - the containers, cl_gui_textedit, cl_gui_html_viewer, cl_gui_toolbar, cl_gui_picture, cl_gui_simple_tree, cl_gui_column_tree, cl_gui_list_tree and cl_gui_alv_grid have (z2ui5_cl_cgui_gui*)`;
     return "SAP GUI controls (cl_gui_*) need a dynpro container - use alv( ) or an abap2UI5 view";
   }
 
@@ -6033,7 +6061,9 @@ class Converter {
           ov.set(key(val), `'${uc(val.getStr().slice(1, -1).replace(/-(LOW|HIGH)$/i, ""))}'`);
         }
       }
-      if (LVC_TYPES[t] && ["type", "of", "like"].includes(lc(prev))) {
+      // after TYPE / OF / LIKE, or the type of a constructor expression - CONV tv_nodekey( ... )
+      if (LVC_TYPES[t] && (["type", "of", "like"].includes(lc(prev))
+          || (CONSTRUCTORS.has(lc(prev)) && toks[i + 1]?.getStr().startsWith("(")))) {
         ov.set(key(toks[i]), LVC_TYPES[t]);
         if (/^lvc_/.test(t) && !this.lvcNoted) {
           this.lvcNoted = true;

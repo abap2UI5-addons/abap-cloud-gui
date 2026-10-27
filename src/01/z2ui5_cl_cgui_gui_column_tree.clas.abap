@@ -177,6 +177,20 @@ CLASS z2ui5_cl_cgui_gui_column_tree DEFINITION PUBLIC
     DATA mt_column    TYPE ty_t_column.
     DATA mt_item      TYPE ty_t_item.
 
+    "! the name of the item a click on the node is a click on
+    METHODS hierarchy_item
+      IMPORTING
+        node_key      TYPE ty_node_key
+      RETURNING
+        VALUE(result) TYPE ty_item_name.
+
+    "! the cell of an item
+    METHODS cell_of
+      IMPORTING
+        item          TYPE ty_s_item
+      RETURNING
+        VALUE(result) TYPE ty_s_cell.
+
   PRIVATE SECTION.
     "! RAISE EVENT event EXPORTING node_key item_name - and checked
     METHODS raise_item_event
@@ -341,11 +355,8 @@ CLASS z2ui5_cl_cgui_gui_column_tree IMPLEMENTATION.
                                        kind = `TEXT` ).
       READ TABLE mt_item INTO DATA(ls_item) WITH KEY node_key = lv_node_key item_name = CONV ty_item_name( ls_column-name ).
       IF sy-subrc = 0.
-        ls_cell-text = condense( ls_item-text ).
-        ls_cell-checked = ls_item-chosen.
-        ls_cell-kind = COND #( WHEN ls_item-class = item_class_link THEN `LINK`
-                               WHEN ls_item-class = item_class_checkbox THEN `CHECKBOX`
-                               ELSE `TEXT` ).
+        ls_cell = cell_of( ls_item ).
+        CLEAR ls_cell-width.
       ENDIF.
       INSERT ls_cell INTO TABLE result.
     ENDLOOP.
@@ -391,9 +402,27 @@ CLASS z2ui5_cl_cgui_gui_column_tree IMPLEMENTATION.
       IF lv_node_key IS NOT INITIAL.
         raise_item_event( event     = `ITEM_DOUBLE_CLICK`
                           node_key  = lv_node_key
-                          item_name = mv_hierarchy ).
+                          item_name = hierarchy_item( lv_node_key ) ).
       ENDIF.
     ENDIF.
+
+  ENDMETHOD.
+
+  METHOD hierarchy_item.
+
+    result = mv_hierarchy.
+
+  ENDMETHOD.
+
+  METHOD cell_of.
+
+    result = VALUE #( name    = condense( CONV string( item-item_name ) )
+                      text    = condense( item-text )
+                      checked = item-chosen
+                      width   = item-length
+                      kind    = COND #( WHEN item-class = item_class_link THEN `LINK`
+                                        WHEN item-class = item_class_checkbox THEN `CHECKBOX`
+                                        ELSE `TEXT` ) ).
 
   ENDMETHOD.
 
