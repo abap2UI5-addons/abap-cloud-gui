@@ -54,12 +54,32 @@ node tools/report2cloud/cli.mjs <report.prog.abap> [options]
   --check          lint the class with abaplint - v750 and ABAP Cloud, in a scratch
                    copy of this repository (needs git and network for the dependencies)
   --ddic <dir>     abapGit DDIC objects to resolve on-premise tables during --check
+  --atc <file>     the ATC findings of the report as the system found them (the worklist XML
+                   ADT exports, or a CSV with line;priority;check;message): the migration
+                   report says for each what the conversion did on its line
   --partial        write the class even when statements are refused
   --wrappers       a CALL FUNCTION the converter has no counterpart for calls a method of a
                    wrapper class, written beside the class: <class>_fmw, to type and release
   --successors     a SELECT of a table with a released successor whose columns map one to one
                    reads the successor, the columns under their old names
 ```
+
+With `--atc`, the migration report takes the findings of the ABAP Test
+Cockpit of the classic report, as a system found them. That is typically the
+cloud readiness check variant, exported from ADT as the worklist XML; a CSV
+with a header of line, priority, check and message is read too
+(`lib/atc.mjs`). Each finding is set against what the conversion did on its
+line:
+- **converted**: the statement is mapped, and the class has its counterpart.
+- **refused**: rewrite the statement first.
+- **TODO**: the class has the statement, to finish by hand.
+- **to check**: the line went over as it was. The finding stands, unless the
+  object it names is in the table of the release state.
+
+A finding in an include goes to its line in the inlined source; one in an
+include the conversion did not inline is "to check". The ATC of the system
+on the class is the final word. The report puts the findings to do first:
+refused, then to check.
 
 With `--successors`, a `SELECT` of a table whose released successor has the
 same columns under other names (`lib/successors.mjs`: SCARR, SPFLI, SFLIGHT,
@@ -97,7 +117,7 @@ It writes, in abapGit format (BOM in the XML, LF, no trailing blanks, at most
 | `<class>.clas.abap` | the report class |
 | `<class>.clas.xml` | its sidecar, described with the title of the report |
 | `<class>.clas.locals_def.abap`, `.locals_imp.abap` | the local classes and interfaces of the report, if it has any |
-| `<class>.migration.md` | the migration report: refusals, TODOs, the objects to check for ABAP Cloud, abaplint's findings (with `--check`), what was not carried over, and every mapped construct with its line |
+| `<class>.migration.md` | the migration report: refusals, TODOs, the objects to check for ABAP Cloud, abaplint's findings (with `--check`), the ATC findings of the report and what became of them (with `--atc`), what was not carried over, and every mapped construct with its line |
 
 The selection texts, text symbols and the title live in the text pool, not in
 the source. abapGit serializes them into `<report>.prog.xml`; when that file

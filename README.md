@@ -662,7 +662,10 @@ Stage 3 - clean core at the scale of a code base
       field names included, where the mapping is certain (`--successors`)
 - [x] A wrapper stub for an unreleased function module, for a person to type
       and release (`--wrappers`: `<class>_fmw`, the call through its method)
-- [ ] ATC findings in the migration report
+- [x] ATC findings in the migration report: `--atc` takes the findings of
+      the classic report (the ADT worklist XML, or a CSV), and the report
+      says for each what the conversion did on its line - converted,
+      refused, TODO, or to check
 - [x] A whole package converted in one run (`tools/report2cloud/package.mjs`):
       the dependency graph over `SUBMIT` and `PERFORM ... IN PROGRAM`, the
       order to migrate in, one coverage table for the estate, the refusals
