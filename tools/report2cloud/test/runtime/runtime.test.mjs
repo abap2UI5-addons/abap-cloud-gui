@@ -386,6 +386,29 @@ test("zr2c_48_twogrids: two grids in a splitter - the first one shows, the other
   assert.match(xml(), /text="Connections \(1\)"/);
 });
 
+test("zr2c_49_coltree: a column tree - the header, the nodes with their cells beside them, a click on a node and on a link to the handlers", { skip }, async () => {
+  const xml = () => d.state().slots.MAIN.xml;
+  const press = (s, kind) => {
+    const a = actionsOf(s, "CGUI_GUI").find((x) => x.args[1] === kind);
+    assert.ok(a, `a ${kind}: ${JSON.stringify(actionsOf(s, "CGUI_GUI").map((x) => x.args))}`);
+    return d.act(s.session, { event: a.id });
+  };
+  // no selection screen: START-OF-SELECTION calls the screen, its PBO builds the tree
+  let s = await d.start("z2ui5_cl_cgui_r2c_49");
+  // the headers, the text of a node from its item of the hierarchy column
+  for (const text of ["Airline", "From", "To", "American Airlines", "Lufthansa"]) assert.match(xml(), new RegExp(`text="${text}"`), text);
+  // Lufthansa expanded: its connections with the cities in their columns
+  assert.match(xml(), /text="LH 0400"/);
+  assert.match(xml(), /text="NEW YORK"/);
+  assert.doesNotMatch(xml(), /text="AA 0017"/, "American Airlines is not expanded");
+  // the address of an airline is a link: link_click with the node and the item
+  s = await press(s, "LINK");
+  assert.deepEqual(toasts(s), ["Open AA FROM"]);
+  // a click on a node: item_double_click of the hierarchy column
+  s = await press(s, "CLICK");
+  assert.deepEqual(toasts(s), ["AA TREE"]);
+});
+
 test("zr2c_21_lclreport: a local report class that reads the selection screen, writes the list and calls a FORM", { skip }, async () => {
   let s = await d.start("z2ui5_cl_cgui_r2c_21");
   s = await d.act(s.session, { event: "CGUI_EXECUTE" });

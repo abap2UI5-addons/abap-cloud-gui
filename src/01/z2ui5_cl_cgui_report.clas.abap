@@ -2168,9 +2168,29 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
         DATA(lo_stree) = CAST z2ui5_cl_cgui_gui_simple_tree( mt_cgui_gui_obj[ id ] ).
         DATA(lo_nodes) = node->ele( `VBox`
             )->a( n = `class` v = `sapUiTinyMarginTopBottom` ).
+        " a column tree: the headers, the tree in the first column of its
+        " width, the cells of a node after it
+        DATA(lt_tcol) = lo_stree->columns( ).
+        IF lt_tcol IS NOT INITIAL.
+          DATA(lo_head) = lo_nodes->ele( `HBox`
+              )->a( n = `class` v = `sapUiTinyMarginBottom` ).
+          LOOP AT lt_tcol INTO DATA(ls_tcol).
+            lo_head->tag( `Label`
+                )->a( n = `text`   t = ls_tcol-text
+                )->a( n = `design` v = `Bold`
+                )->a( n = `width`  v = COND #( WHEN ls_tcol-width > 0 THEN |{ ls_tcol-width * 2 / 3 }rem| ELSE `12rem` ) ).
+          ENDLOOP.
+        ENDIF.
         LOOP AT lo_stree->view( ) INTO DATA(ls_row).
-          DATA(lo_row) = lo_nodes->ele( `HBox`
+          DATA(lo_line) = lo_nodes->ele( `HBox`
               )->a( n = `alignItems` v = `Center` ).
+          DATA(lo_row) = lo_line.
+          IF lt_tcol IS NOT INITIAL.
+            ls_tcol = lt_tcol[ 1 ].
+            lo_row = lo_line->ele( `HBox`
+                )->a( n = `alignItems` v = `Center`
+                )->a( n = `width`      v = COND #( WHEN ls_tcol-width > 0 THEN |{ ls_tcol-width * 2 / 3 }rem| ELSE `12rem` ) ).
+          ENDIF.
           lo_row->tag( `Text`
               )->a( n = `text`  v = ``
               )->a( n = `width` v = ls_row-indent ).
@@ -2192,6 +2212,30 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
               )->a( n = `emphasized` b = xsdbool( ls_row-key = lo_stree->selected( ) )
               )->a( n = `press`      v = client->_event( val   = cs_ucomm-gui
                                                          t_arg = VALUE #( ( |{ id }| ) ( `CLICK` ) ( |{ ls_row-key }| ) ) ) ).
+          LOOP AT lo_stree->cells( ls_row-key ) INTO DATA(ls_cell).
+            ls_tcol = VALUE #( lt_tcol[ name = ls_cell-name ] OPTIONAL ).
+            DATA(lv_cell_width) = COND string( WHEN ls_tcol-width > 0 THEN |{ ls_tcol-width * 2 / 3 }rem| ELSE `12rem` ).
+            DATA(lv_cell_arg) = |{ ls_row-key } { ls_cell-name }|.
+            CASE ls_cell-kind.
+              WHEN `LINK`.
+                lo_line->tag( `Link`
+                    )->a( n = `text`  t = ls_cell-text
+                    )->a( n = `width` v = lv_cell_width
+                    )->a( n = `press` v = client->_event( val   = cs_ucomm-gui
+                                                          t_arg = VALUE #( ( |{ id }| ) ( `LINK` ) ( lv_cell_arg ) ) ) ).
+              WHEN `CHECKBOX`.
+                lo_line->tag( `CheckBox`
+                    )->a( n = `text`     t = ls_cell-text
+                    )->a( n = `selected` b = ls_cell-checked
+                    )->a( n = `width`    v = lv_cell_width
+                    )->a( n = `select`   v = client->_event( val   = cs_ucomm-gui
+                                                             t_arg = VALUE #( ( |{ id }| ) ( `CHECKBOX` ) ( lv_cell_arg ) ) ) ).
+              WHEN OTHERS.
+                lo_line->tag( `Text`
+                    )->a( n = `text`  t = ls_cell-text
+                    )->a( n = `width` v = lv_cell_width ).
+            ENDCASE.
+          ENDLOOP.
         ENDLOOP.
 
       WHEN z2ui5_if_cgui_gui=>cs_kind-grid.

@@ -177,6 +177,10 @@ const LVC_TYPES = {
   spopli: "z2ui5_cl_cgui_popup=>ty_s_spopli",
   // the nodes of cl_gui_simple_tree
   mtreesnode: "z2ui5_cl_cgui_gui_simple_tree=>ty_s_node", tv_nodekey: "z2ui5_cl_cgui_gui_simple_tree=>ty_node_key",
+  // the nodes, items and header of cl_gui_column_tree
+  treev_node: "z2ui5_cl_cgui_gui_simple_tree=>ty_s_node", treev_ntab: "z2ui5_cl_cgui_gui_simple_tree=>ty_t_node",
+  mtreeitm: "z2ui5_cl_cgui_gui_column_tree=>ty_s_item", treev_hhdr: "z2ui5_cl_cgui_gui_column_tree=>ty_s_hhdr",
+  tv_itmname: "z2ui5_cl_cgui_gui_column_tree=>ty_item_name",
 };
 
 // the statements that open and close a block
@@ -283,6 +287,7 @@ export const GUI = {
     cl_gui_toolbar: "z2ui5_cl_cgui_gui_toolbar",
     cl_gui_picture: "z2ui5_cl_cgui_gui_picture",
     cl_gui_simple_tree: "z2ui5_cl_cgui_gui_simple_tree",
+    cl_gui_column_tree: "z2ui5_cl_cgui_gui_column_tree",
     cl_gui_alv_grid: "z2ui5_cl_cgui_gui_alv_grid",
     cl_alv_event_toolbar_set: "z2ui5_cl_cgui_gui_alv_toolbar",
   },
@@ -768,6 +773,40 @@ export const GUI = {
         view: { params: [],
           exceptions: [] },
         selected: { params: [],
+          exceptions: [] },
+        columns: { params: [],
+          exceptions: [] },
+        cells: { params: ["key"],
+          exceptions: [] },
+        dispatch: { params: [],
+          exceptions: [] },
+      },
+    },
+    z2ui5_cl_cgui_gui_column_tree: {
+      parent: "z2ui5_cl_cgui_gui_simple_tree",
+      constants: ["item_class_text", "item_class_checkbox", "item_class_button", "item_class_link", "item_font_default", "item_font_prop", "item_font_fixed", "align_left", "align_center", "align_right", "align_auto", "eventid_item_double_click", "eventid_link_click", "eventid_checkbox_change"],
+      attributes: [],
+      events: ["item_double_click", "link_click", "checkbox_change"],
+      methods: {
+        constructor: { params: ["parent", "node_selection_mode", "item_selection", "hierarchy_column_name", "hierarchy_header", "no_hierarchy_column", "hide_selection", "lifetime", "shellstyle", "name"],
+          exceptions: ["lifetime_error", "cntl_system_error", "create_error", "illegal_node_selection_mode", "failed", "illegal_column_name"] },
+        add_column: { params: ["name", "width", "alignment", "header_text", "header_tooltip", "header_image", "width_pix", "hidden", "disabled", "predecessor_column"],
+          exceptions: ["column_exists", "illegal_column_name", "too_many_columns", "illegal_alignment", "different_column_types", "cntl_system_error", "failed", "predecessor_column_not_found"] },
+        add_nodes_and_items: { params: ["node_table", "item_table", "item_table_structure_name"],
+          exceptions: ["failed", "cntl_system_error", "error_in_tables", "dp_error", "table_structure_name_not_found"] },
+        item_set_text: { params: ["node_key", "item_name", "text"],
+          exceptions: ["failed", "node_not_found", "item_not_found", "cntl_system_error"] },
+        item_set_chosen: { params: ["node_key", "item_name", "chosen"],
+          exceptions: ["failed", "node_not_found", "item_not_found", "cntl_system_error"] },
+        get_hierarchy_column_name: { params: ["e_hierarchy_column_name"],
+          exceptions: [] },
+        delete_all_nodes: { params: [],
+          exceptions: [] },
+        delete_node: { params: [],
+          exceptions: [] },
+        columns: { params: [],
+          exceptions: [] },
+        cells: { params: [],
           exceptions: [] },
         dispatch: { params: [],
           exceptions: [] },
@@ -2070,7 +2109,7 @@ class Converter {
     const missing = [...new Set([...t.matchAll(/\bcl_gui_\w+/g)].map((m) => m[0]))]
       .filter((c) => !guiClass(c) && !["cl_gui_cfw", "cl_gui_frontend_services"].includes(c));
     if (this.guiVars?.size && !missing.length) return undefined;
-    if (this.guiVars?.size) return `SAP GUI controls: ${missing.join(", ")} ${missing.length > 1 ? "have" : "has"} no counterpart - the containers, cl_gui_textedit, cl_gui_html_viewer, cl_gui_toolbar, cl_gui_picture, cl_gui_simple_tree and cl_gui_alv_grid have (z2ui5_cl_cgui_gui*)`;
+    if (this.guiVars?.size) return `SAP GUI controls: ${missing.join(", ")} ${missing.length > 1 ? "have" : "has"} no counterpart - the containers, cl_gui_textedit, cl_gui_html_viewer, cl_gui_toolbar, cl_gui_picture, cl_gui_simple_tree, cl_gui_column_tree and cl_gui_alv_grid have (z2ui5_cl_cgui_gui*)`;
     return "SAP GUI controls (cl_gui_*) need a dynpro container - use alv( ) or an abap2UI5 view";
   }
 
@@ -5844,7 +5883,8 @@ class Converter {
       const component = (prev === "-" && toks[i - 1].constructor.name === "Dash") || prev === "->" || prev === "=>" || prev === "~";
       if (component) continue;
       // cl_gui_textedit, cl_gui_custom_container, ... - their stand-ins
-      if (this.guiVars?.size && guiClass(t)) {
+      // (not a token the SALV of the stand-in mode rewrote - cl_gui_column_tree=>relat_*)
+      if (this.guiVars?.size && guiClass(t) && !ov.has(key(toks[i]))) {
         ov.set(key(toks[i]), guiClass(t));
         continue;
       }

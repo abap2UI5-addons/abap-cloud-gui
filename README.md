@@ -710,7 +710,11 @@ Stage 5 - research
 - [x] More than one grid: the first one displayed shows, then the one
       refreshed; the container of another one names it with its rows and
       shows it at a click (header and items in a splitter)
-- [ ] F1 of the editor, the column tree; table controls, subscreens and
+- [x] `cl_gui_column_tree`: the stand-in `z2ui5_cl_cgui_gui_column_tree` -
+      the tree with its header and columns, the items of `MTREEITM` as
+      text, link or checkbox, `item_double_click`, `link_click`,
+      `checkbox_change`
+- [ ] F1 of the editor, the list tree; table controls, subscreens and
       tabstrips on a dynpro
 
 Quality, through every stage

@@ -45,6 +45,22 @@ CLASS z2ui5_cl_cgui_gui_simple_tree DEFINITION PUBLIC
         text       TYPE c LENGTH 72,
       END OF ty_s_node.
     TYPES ty_t_node TYPE STANDARD TABLE OF ty_s_node WITH DEFAULT KEY.
+    TYPES:
+      "! a column beside the tree - of the column tree; width in characters
+      BEGIN OF ty_s_column,
+        name  TYPE string,
+        text  TYPE string,
+        width TYPE i,
+      END OF ty_s_column,
+      ty_t_column TYPE STANDARD TABLE OF ty_s_column WITH EMPTY KEY,
+      "! what a node shows in a column - kind is text, link or checkbox
+      BEGIN OF ty_s_cell,
+        name    TYPE string,
+        text    TYPE string,
+        kind    TYPE string,
+        checked TYPE abap_bool,
+      END OF ty_s_cell,
+      ty_t_cell TYPE STANDARD TABLE OF ty_s_cell WITH EMPTY KEY.
 
     "! a click on a node
     EVENTS node_double_click
@@ -185,6 +201,19 @@ CLASS z2ui5_cl_cgui_gui_simple_tree DEFINITION PUBLIC
     METHODS selected
       RETURNING
         VALUE(result) TYPE i.
+
+    "! the columns beside the tree, the first the one of the tree itself -
+    "! none for the simple tree
+    METHODS columns
+      RETURNING
+        VALUE(result) TYPE ty_t_column.
+
+    "! what the node key of view( ) shows in the columns after the first
+    METHODS cells
+      IMPORTING
+        key           TYPE i
+      RETURNING
+        VALUE(result) TYPE ty_t_cell.
 
     METHODS dispatch REDEFINITION.
 
@@ -377,6 +406,12 @@ CLASS z2ui5_cl_cgui_gui_simple_tree IMPLEMENTATION.
 
     result = mv_selected.
 
+  ENDMETHOD.
+
+  METHOD columns ##NEEDED.
+  ENDMETHOD.
+
+  METHOD cells ##NEEDED.
   ENDMETHOD.
 
   METHOD dispatch.
