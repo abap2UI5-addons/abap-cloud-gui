@@ -613,6 +613,28 @@ npm run test:report2cloud:browser                                          # the
   on a system, the process of the test would keep them - it hid that a
   report's static attributes were lost between two roundtrips, until
   `cgui_statics_keep( )` / `cgui_statics_restore( )`.
+- **The semantic test** (`test/runtime/semantic.test.mjs`, run with the
+  runtime test): the expectations are not written by hand here. The
+  classic report itself is transpiled as a program with the classes and run
+  in a process of its own (`test/runtime/program.mjs`) against the same
+  seeded rows. Its class runs in the backend with the same values on the
+  selection screen. The two lists must say the same, line by line.
+  - The transpiler takes a part of the classic only, so the report is
+    prepared first (`test/runtime/program-source.mjs`):
+    - its selection screen is data, filled where the run starts: the
+      defaults, then INITIALIZATION, then the values of the user;
+    - FORMAT is dropped, since it changes no text;
+    - `WRITE /5` is `WRITE /`, because the transpiler misses the new line
+      of a position;
+    - the statements of START-OF-SELECTION and END-OF-SELECTION are FORMs,
+      because the transpiler declares an inline `DATA( )` in a FORM only.
+  - The comparison drops the blanks inside a line and the separator between
+    two digits, and reads a date as YYYYMMDD. The transpiled WRITE pads
+    nothing and writes the format of its locale. The text, the order and
+    the line breaks must be the same.
+  - Six list reports of the corpus are compared. A report the transpiler
+    does not run as a program is left out: a header line (`zr2c_14`,
+    `zr2c_36`) or a FORM with TABLES (`zr2c_03`).
 
   What the runtime found that the lint did not: global data that grew from
   one Execute to the next, END-OF-SELECTION skipped after a RETURN, a

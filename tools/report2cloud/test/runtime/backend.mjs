@@ -46,7 +46,7 @@ export function corePin() {
   return dep && /^\d+\.\d+\.\d+$/.test(String(dep.branch)) ? dep.branch : null;
 }
 
-const OBJECT = /^([a-z0-9_]+)\.(clas|intf|tabl|dtel|ttyp)(\.[a-z_]+)?\.(abap|xml)$/i;
+const OBJECT = /^([a-z0-9_]+)\.(clas|intf|tabl|dtel|ttyp|prog)(\.[a-z_]+)?\.(abap|xml)$/i;
 
 function copyObjects(from, to, withTests = false) {
   if (!existsSync(from)) return;
@@ -159,7 +159,7 @@ export async function buildBackend({ files = {}, ddic, seed = [], sources = ["sr
     downportRel: relative(rt.dir, npm.downportDir(rt.dir)).split(sep).join("/"),
     coreRel: relative(rt.dir, lib.dir).split(sep).join("/"),
   });
-  config.input_filter = ["[\\\\/][a-z0-9_]+\\.(clas|intf|tabl|dtel|ttyp)\\.[a-z_.]*(abap|xml)$"];
+  config.input_filter = ["[\\\\/][a-z0-9_]+\\.(clas|intf|tabl|dtel|ttyp|prog)\\.[a-z_.]*(abap|xml)$"];
   config.write_unit_tests = withTests;
   writeFileSync(join(work, "abap_transpile.json"), JSON.stringify(config, null, 2));
   const transpiler = join(rt.dir, "node_modules", "@abaplint", "transpiler-cli", "abap_transpile");
@@ -210,7 +210,9 @@ export async function buildBackend({ files = {}, ddic, seed = [], sources = ["sr
     .filter((t) => !/<TABCLASS>INTTAB<\/TABCLASS>/.test(readFileSync(join(input, `${t}.tabl.xml`), "utf8")));
   const schema = tableSchema(initText, tables);
   if (schema.length !== tables.length) return { ok: false, dir: work, reason: `CREATE TABLE for ${tables.join(", ")} not found in the transpiler's init.mjs` };
-  const modules = npm.bootOrder(initText, objects.map((o) => `${o}.mjs`).filter((f) => local.has(f)));
+  // a program runs when it is imported - the boot leaves it to the caller
+  const modules = npm.bootOrder(initText, objects.filter((o) => !o.endsWith(".prog")).map((o) => `${o}.mjs`).filter((f) => local.has(f)));
+  const programs = objects.filter((o) => o.endsWith(".prog")).map((o) => `${o}.mjs`).filter((f) => local.has(f));
   writeFileSync(join(apps, "init.mjs"), initSource({ modules, schema, seed, tolerant }));
   if (withTests) {
     if (!existsSync(join(staging, "index.mjs"))) return { ok: false, dir: work, reason: "the transpiler wrote no unit-test runner (index.mjs)" };
@@ -219,7 +221,7 @@ export async function buildBackend({ files = {}, ddic, seed = [], sources = ["sr
     writeFileSync(join(apps, "index.mjs"), folders ? npm.flatRunner(runner) : runner);
   }
   rmSync(staging, { recursive: true, force: true });
-  return { ok: true, dir: work, apps, runtimeDir: rt.dir, version: rt.version, modules, mcp: mcp.dir };
+  return { ok: true, dir: work, apps, runtimeDir: rt.dir, version: rt.version, modules, programs, mcp: mcp.dir };
 }
 
 /** Serve a build on 127.0.0.1:`port` in a child process (host.mjs).

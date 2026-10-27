@@ -725,8 +725,10 @@ Quality, through every stage
       (`ltcl_client` of the report, the ALV's own), beside the selection
       screen's
 - [ ] Samples in the abap2UI5 playground, a documentation page
-- [ ] Semantic tests: the classic report and its class driven against the
-      same seeded rows in the transpiled runtime, their lists compared
+- [x] Semantic tests: the classic report and its class run against the
+      same seeded rows in the transpiled runtime, their lists compared line
+      by line (`test/runtime/semantic.test.mjs`) - six list reports of the
+      corpus
 
 Later
 
