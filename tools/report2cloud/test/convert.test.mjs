@@ -353,6 +353,69 @@ test("cl_gui_simple_tree -> z2ui5_cl_cgui_gui_simple_tree, MTREESNODE its node t
   assert.match(all, /set_handler\(/);
 });
 
+test("POPUP_TO_DECIDE_LIST -> popup_to_decide_list( ) with SPOPLI; an IF that also asks the answer stays after the popup", () => {
+  const r = convert([
+    "REPORT zt.",
+    "DATA gt_sel TYPE STANDARD TABLE OF spopli WITH DEFAULT KEY.",
+    "DATA gs_sel TYPE spopli.",
+    "DATA gv_answer TYPE c LENGTH 1.",
+    "START-OF-SELECTION.",
+    "  gs_sel-varoption = 'Packages'.",
+    "  APPEND gs_sel TO gt_sel.",
+    "  CALL FUNCTION 'POPUP_TO_DECIDE_LIST' EXPORTING titel = 'Selection' textline1 = 'Which objects?' start_col = 20 IMPORTING answer = gv_answer TABLES t_spopli = gt_sel EXCEPTIONS OTHERS = 1.",
+    "  IF sy-subrc <> 0 OR gv_answer = 'A'.",
+    "    RETURN.",
+    "  ENDIF.",
+    "  READ TABLE gt_sel INDEX gv_answer INTO gs_sel.",
+    "  WRITE gs_sel-varoption.",
+  ].join("\n"), { file: "zt.prog.abap", className: "zcl_t" });
+  assert.equal(r.ok, true, r.refusals.map((x) => x.message).join("\n"));
+  const cls = r.draft["zcl_t.clas.abap"];
+  assert.match(cls, /gt_sel\s+TYPE STANDARD TABLE OF z2ui5_cl_cgui_popup=>ty_s_spopli/);
+  assert.match(cls, /popup_to_decide_list\( question = 'Which objects\?'\n\s+list     = gt_sel\n\s+then     = `ON_POPUP_1`\n\s+title    = 'Selection' \)\./);
+  // the cancel check is kept - in the callback sy-subrc is 0
+  assert.match(cls, /METHOD on_popup_1\.\n\n\s+gv_answer = answer\.\n\s+IF sy-subrc <> 0 OR gv_answer = 'A'\.\n\s+RETURN\./);
+});
+
+test("the HTML viewer's history and the container's visible_true / visible_false, get_gui_version, CALL SELECTION-SCREEN of a constant", () => {
+  const r = convert([
+    "REPORT zt.",
+    "PARAMETERS p_a TYPE c LENGTH 10.",
+    "SELECTION-SCREEN BEGIN OF SCREEN 1002 TITLE TEXT-001.",
+    "PARAMETERS p_pass TYPE c LENGTH 30.",
+    "SELECTION-SCREEN END OF SCREEN 1002.",
+    "CONSTANTS c_dynnr TYPE c LENGTH 4 VALUE '1002'.",
+    "DATA go_html TYPE REF TO cl_gui_html_viewer.",
+    "DATA gv_url TYPE c LENGTH 250.",
+    "DATA gv_visible TYPE c LENGTH 1.",
+    "DATA gt_version TYPE STANDARD TABLE OF string WITH DEFAULT KEY.",
+    "DATA gv_rc TYPE i.",
+    "START-OF-SELECTION.",
+    "  CREATE OBJECT go_html EXPORTING parent = cl_gui_container=>default_screen.",
+    "  go_html->go_back( ).",
+    "  go_html->get_current_url( IMPORTING url = gv_url ).",
+    "  gv_visible = cl_gui_container=>visible_false.",
+    "  go_html->set_visible( gv_visible ).",
+    "  cl_gui_frontend_services=>get_gui_version( CHANGING version_table = gt_version rc = gv_rc EXCEPTIONS gui_no_version = 3 OTHERS = 4 ).",
+    "  CALL SELECTION-SCREEN c_dynnr STARTING AT 5 5.",
+  ].join("\n"), { file: "zt.prog.abap", className: "zcl_t" });
+  assert.equal(r.ok, true, r.refusals.map((x) => x.message).join("\n"));
+  const cls = r.draft["zcl_t.clas.abap"];
+  assert.match(cls, /go_html->go_back\( \)\./);
+  assert.match(cls, /go_html->get_current_url\( IMPORTING url = gv_url \)\./);
+  assert.match(cls, /gv_visible = z2ui5_cl_cgui_gui_container=>visible_false\./);
+  assert.match(cls, /z2ui5_cl_cgui_frontend=>get_gui_version\(/);
+  assert.match(cls, /call_selection_screen\( dynnr = `1002`/);
+});
+
+test("CALL METHOD cl_gui_frontend_services=>('CLIPBOARD_EXPORT') - a dynamic call of a literal name is the static one", () => {
+  const r = convert("REPORT zt.\nDATA lt TYPE string_table.\nDATA lv_rc TYPE i.\nSTART-OF-SELECTION.\n  CALL METHOD cl_gui_frontend_services=>('CLIPBOARD_EXPORT') EXPORTING no_auth_check = abap_true IMPORTING data = lt CHANGING rc = lv_rc EXCEPTIONS cntl_error = 1 OTHERS = 2.\n  WRITE lv_rc.", { file: "zt.prog.abap", className: "zcl_t" });
+  assert.equal(r.ok, true, r.refusals.map((x) => x.message).join("\n"));
+  assert.match(r.draft["zcl_t.clas.abap"], /z2ui5_cl_cgui_frontend=>clipboard_export\( EXPORTING no_auth_check = abap_true IMPORTING data = lt CHANGING rc = lv_rc EXCEPTIONS cntl_error = 1 OTHERS = 2 \)\./);
+  // a name the class does not have stays refused
+  assert.equal(convert("REPORT zt.\nSTART-OF-SELECTION.\n  CALL METHOD cl_gui_frontend_services=>('REGISTRY_GET_VALUE').", { file: "zt.prog.abap", className: "zcl_t" }).ok, false);
+});
+
 test("SUBMIT ... AND RETURN starts the class of the called report with the values, CALL SELECTION-SCREEN goes on in after_call_selection_screen( )", () => {
   const cls = classOf("zr2c_15_submit");
   assert.match(cls, /DATA lt_r2c_submit_1 TYPE z2ui5_cl_cgui_variant=>ty_t_value\.\n\s+DATA lt_r2c_lines_1 TYPE z2ui5_cl_cgui_variant=>ty_t_value\.\n\s+CLEAR lt_r2c_submit_1\.\n\s+INSERT VALUE #\( name = `P_CARRID` kind = z2ui5_cl_cgui_variant=>cs_kind-parameter low = p_carrid \) INTO TABLE lt_r2c_submit_1\.\n\s+lt_r2c_lines_1 = z2ui5_cl_cgui_variant=>range_lines_get\( name = `S_FLDATE` range = s_fldate \)\.\n\s+APPEND LINES OF lt_r2c_lines_1 TO lt_r2c_submit_1\.\n\s+INSERT VALUE #\( name = `P_MAX` kind = z2ui5_cl_cgui_variant=>cs_kind-select_option sign = 'E' option = `NE` low = p_max \) INTO TABLE lt_r2c_submit_1\.\n\s+submit\( report = `Z2UI5_CL_CGUI_R2C_02`\n\s+values = lt_r2c_submit_1 \)\./);
@@ -531,9 +594,9 @@ test("the files of the user: cl_gui_frontend_services and GUI_UPLOAD as z2ui5_cl
 });
 
 test("cl_gui_frontend_services: a member or a parameter the browser has no counterpart for is refused", () => {
-  const src = "REPORT zt.\nDATA lv TYPE string.\nSTART-OF-SELECTION.\n  cl_gui_frontend_services=>get_gui_version( CHANGING version_table = lv ).\n  cl_gui_frontend_services=>gui_upload( EXPORTING filename = lv check_bom = abap_true CHANGING data_tab = lv ).\n  CALL FUNCTION 'GUI_UPLOAD' EXPORTING filename = lv no_auth_check = 'X' TABLES data_tab = lv.\n  cl_gui_cfw=>flush( ).\n";
+  const src = "REPORT zt.\nDATA lv TYPE string.\nSTART-OF-SELECTION.\n  cl_gui_frontend_services=>registry_get_value( EXPORTING root = 1 key = lv CHANGING reg_value = lv ).\n  cl_gui_frontend_services=>gui_upload( EXPORTING filename = lv check_bom = abap_true CHANGING data_tab = lv ).\n  CALL FUNCTION 'GUI_UPLOAD' EXPORTING filename = lv no_auth_check = 'X' TABLES data_tab = lv.\n  cl_gui_cfw=>flush( ).\n";
   assert.deepEqual(refusalOf(src).map((x) => x.split(";")[0]), [
-    "4:3 cl_gui_frontend_services - get_gui_version has no counterpart in the browser",
+    "4:3 cl_gui_frontend_services - registry_get_value has no counterpart in the browser",
     "5:3 cl_gui_frontend_services - gui_upload( check_bom = ... ) is not supported",
     "6:3 CALL FUNCTION 'GUI_UPLOAD' - EXPORTING no_auth_check has no counterpart in z2ui5_cl_cgui_frontend=>gui_upload( )",
   ]);

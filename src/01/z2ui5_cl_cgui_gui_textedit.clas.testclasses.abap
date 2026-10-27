@@ -522,6 +522,27 @@ CLASS ltcl_test IMPLEMENTATION.
     lo_html->show_data( ).
     cl_abap_unit_assert=>assert_not_initial( mo_gui->mt_control[ 2 ]-html ).
 
+    " the history: back to the web address, forward to the document again
+    lo_html->go_back( ).
+    lo_html->get_current_url( IMPORTING url = lv_url ).
+    cl_abap_unit_assert=>assert_equals( act = lv_url
+                                        exp = `https://www.sap.com` ).
+    cl_abap_unit_assert=>assert_equals( act = mo_gui->mt_control[ 2 ]-url
+                                        exp = `https://www.sap.com` ).
+    lo_html->go_forward( ).
+    cl_abap_unit_assert=>assert_not_initial( mo_gui->mt_control[ 2 ]-html ).
+    " the first page has none before it
+    lo_html->go_back( ).
+    lo_html->go_back( ).
+    lo_html->go_back( ).
+    cl_abap_unit_assert=>assert_not_initial( mo_gui->mt_control[ 2 ]-html ).
+
+    " cl_gui_container=>visible_false hides the control
+    lo_html->set_visible( z2ui5_cl_cgui_gui=>visible_false ).
+    cl_abap_unit_assert=>assert_true( mo_gui->mt_control[ 2 ]-hidden ).
+    lo_html->set_visible( z2ui5_cl_cgui_gui=>visible_true ).
+    cl_abap_unit_assert=>assert_false( mo_gui->mt_control[ 2 ]-hidden ).
+
   ENDMETHOD.
 
   METHOD sapevent_links.

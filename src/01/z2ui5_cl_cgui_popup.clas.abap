@@ -59,6 +59,16 @@ CLASS z2ui5_cl_cgui_popup DEFINITION PUBLIC FINAL CREATE PRIVATE.
     TYPES ty_t_listbox TYPE STANDARD TABLE OF ty_s_listbox WITH EMPTY KEY.
 
     TYPES:
+      "! a line of POPUP_TO_DECIDE_LIST - SPOPLI of the classic; ABAP Cloud
+      "! has not the DDIC type
+      BEGIN OF ty_s_spopli,
+        selflag   TYPE c LENGTH 1,
+        varoption TYPE c LENGTH 65,
+        inactive  TYPE c LENGTH 1,
+        hide      TYPE c LENGTH 1,
+      END OF ty_s_spopli.
+
+    TYPES:
       BEGIN OF ty_s_result,
         confirmed TYPE abap_bool,
         answer    TYPE string,

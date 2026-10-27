@@ -769,6 +769,17 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
         listbox TYPE z2ui5_cl_cgui_popup=>ty_t_listbox OPTIONAL
         then    TYPE clike                         OPTIONAL.
 
+    "! POPUP_TO_DECIDE_LIST with its SPOPLI table: every VAROPTION one option
+    "! of popup_to_decide( ) - the answer is the number of the line, `A` for
+    "! cancel, as the classic one: every line of the table is an option
+    METHODS popup_to_decide_list
+      IMPORTING
+        question TYPE clike
+        list     TYPE STANDARD TABLE
+        ucomm    TYPE clike OPTIONAL
+        title    TYPE clike OPTIONAL
+        then     TYPE clike OPTIONAL.
+
     "! POPUP_GET_VALUES with its SVAL table: fieldname is the name, fieldtext
     "! the label (the field name when empty), value the start value,
     "! field_obl marks a required field - popup_get_values( ) with them
@@ -6205,6 +6216,29 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
                                                            text    = text
                                                            listbox = listbox
                                                            event   = lv_event ) ).
+
+  ENDMETHOD.
+
+  METHOD popup_to_decide_list.
+
+    DATA lt_option TYPE string_table.
+    FIELD-SYMBOLS <line> TYPE any.
+    FIELD-SYMBOLS <comp> TYPE any.
+
+    LOOP AT list ASSIGNING <line>.
+      ASSIGN COMPONENT `VAROPTION` OF STRUCTURE <line> TO <comp>.
+      IF <comp> IS NOT ASSIGNED.
+        ASSIGN <line> TO <comp>.
+      ENDIF.
+      INSERT condense( CONV string( <comp> ) ) INTO TABLE lt_option.
+      UNASSIGN <comp>.
+    ENDLOOP.
+
+    popup_to_decide( question = question
+                     options  = lt_option
+                     ucomm    = ucomm
+                     title    = title
+                     then     = then ).
 
   ENDMETHOD.
 

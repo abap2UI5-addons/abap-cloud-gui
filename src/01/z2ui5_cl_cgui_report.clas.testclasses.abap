@@ -239,6 +239,7 @@ CLASS ltcl_test DEFINITION FINAL FOR TESTING
     METHODS alv_chart FOR TESTING.
     METHODS transport_popup FOR TESTING.
     METHODS popup_then FOR TESTING.
+    METHODS popup_decide_list FOR TESTING.
     METHODS call_transaction FOR TESTING.
     METHODS read_list_clicked FOR TESTING.
     METHODS roundtrip_start FOR TESTING.
@@ -1348,6 +1349,34 @@ CLASS ltcl_test IMPLEMENTATION.
     mo_cut->call_transaction( `ZGONE` ).
     cl_abap_unit_assert=>assert_not_bound( mo_client->mo_called ).
     cl_abap_unit_assert=>assert_true( mo_cut->mv_cgui_stop ).
+
+  ENDMETHOD.
+
+  METHOD popup_decide_list.
+
+    DATA lt_list TYPE STANDARD TABLE OF z2ui5_cl_cgui_popup=>ty_s_spopli WITH DEFAULT KEY.
+
+    init( ).
+    " POPUP_TO_DECIDE_LIST: each VAROPTION an option, the answer its line
+    lt_list = VALUE #( ( varoption = 'Packages' ) ( varoption = 'Source code' ) ).
+    mo_cut->popup_to_decide_list( question = `Which objects?`
+                                  list     = lt_list
+                                  then     = `ON_SURE` ).
+    DATA(lo_popup) = CAST z2ui5_cl_cgui_popup( mo_client->mo_called ).
+    " the popup's first roundtrip draws it
+    mo_client->mv_init = abap_true.
+    lo_popup->z2ui5_if_app~main( mo_client ).
+    mo_client->mv_init = abap_false.
+    cl_abap_unit_assert=>assert_true( xsdbool( mo_client->mv_popup CS `Source code` ) ).
+    mo_client->mv_event = `CGUI_POP_OPTION_2`.
+    lo_popup->z2ui5_if_app~main( mo_client ).
+    mo_client->mo_prev = lo_popup.
+    mo_client->mv_event = z2ui5_cl_cgui_report=>cs_ucomm-popup_answer.
+    mo_client->mv_navigated = abap_true.
+    mo_cut->z2ui5_if_app~main( mo_client ).
+    mo_client->mv_navigated = abap_false.
+    cl_abap_unit_assert=>assert_equals( act = mo_report->mv_then
+                                        exp = `2` ).
 
   ENDMETHOD.
 

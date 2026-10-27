@@ -95,13 +95,12 @@ const REFUSED = {
 };
 
 // the synchronous popups - a popup of the runtime, the block cut at the call
-const POPUPS = new Set(["POPUP_TO_CONFIRM", "POPUP_TO_CONFIRM_STEP", "POPUP_TO_DECIDE", "POPUP_GET_VALUES"]);
+const POPUPS = new Set(["POPUP_TO_CONFIRM", "POPUP_TO_CONFIRM_STEP", "POPUP_TO_DECIDE", "POPUP_TO_DECIDE_LIST", "POPUP_GET_VALUES"]);
 
 // function modules with no counterpart on a browser app - refused
 const REFUSED_FUNCTIONS = {
   POPUP_TO_CONFIRM_WITH_MESSAGE: "POPUP_TO_CONFIRM_WITH_MESSAGE waits for the answer and shows a T100 message - use popup_to_decide( ) with the message text and go on in at_user_command( )",
   POPUP_TO_DECIDE_WITH_MESSAGE: "POPUP_TO_DECIDE_WITH_MESSAGE waits for the answer and shows a T100 message - use popup_to_decide( ) with the message text and go on in at_user_command( )",
-  POPUP_TO_DECIDE_LIST: "POPUP_TO_DECIDE_LIST waits for the choice - use popup_to_decide( ) with the options and go on in at_user_command( )",
   POPUP_GET_VALUES_DB_CHECKED: "POPUP_GET_VALUES_DB_CHECKED waits for the input and checks it against the DDIC - use popup_get_values( ) and check in at_user_command( )",
   GUI_DOWNLOAD: "GUI_DOWNLOAD writes to the SAP GUI frontend; offer the file with an abap2UI5 download instead",
   GUI_UPLOAD: "GUI_UPLOAD reads from the SAP GUI frontend; use an abap2UI5 file uploader instead",
@@ -174,6 +173,8 @@ const LVC_TYPES = {
   filetable: "z2ui5_cl_cgui_frontend=>ty_t_file_table", file_table: "z2ui5_cl_cgui_frontend=>ty_s_file_table",
   // the events a SAP GUI control registers - set_registered_events( )
   cntl_simple_events: "z2ui5_cl_cgui_gui=>ty_t_simple_events", cntl_simple_event: "z2ui5_cl_cgui_gui=>ty_s_simple_event",
+  // the lines of POPUP_TO_DECIDE_LIST
+  spopli: "z2ui5_cl_cgui_popup=>ty_s_spopli",
   // the nodes of cl_gui_simple_tree
   mtreesnode: "z2ui5_cl_cgui_gui_simple_tree=>ty_s_node", tv_nodekey: "z2ui5_cl_cgui_gui_simple_tree=>ty_node_key",
 };
@@ -216,6 +217,8 @@ export const FRONTEND = {
       exceptions: ["file_open_error", "file_read_error", "no_batch", "gui_refuse_filetransfer", "invalid_type", "no_authority", "unknown_error", "bad_data_format", "header_not_allowed", "separator_not_allowed", "header_too_long", "unknown_dp_error", "access_denied", "dp_out_of_memory", "disk_full", "dp_timeout", "not_supported_by_gui", "error_no_gui"] },
     gui_download: { params: ["bin_filesize", "filename", "filetype", "append", "write_field_separator", "header", "trunc_trailing_blanks", "write_lf", "col_select", "col_select_mask", "dat_mode", "confirm_overwrite", "no_auth_check", "codepage", "ignore_cerr", "replacement", "write_bom", "trunc_trailing_blanks_eol", "show_transfer_status", "fieldnames", "write_lf_after_last_line", "virus_scan_profile", "filelength", "data_tab"],
       exceptions: ["file_write_error", "no_batch", "gui_refuse_filetransfer", "invalid_type", "no_authority", "unknown_error", "header_not_allowed", "separator_not_allowed", "filesize_not_allowed", "header_too_long", "dp_error_create", "dp_error_send", "dp_error_write", "unknown_dp_error", "access_denied", "dp_out_of_memory", "disk_full", "dp_timeout", "file_not_found", "dataprovider_exception", "control_flush_error", "not_supported_by_gui", "error_no_gui"] },
+    get_gui_version: { params: ["version_table", "rc"],
+      exceptions: ["get_gui_version_failed", "cant_write_version_table", "gui_no_version", "cntl_error", "error_no_gui", "not_supported_by_gui"] },
     get_file_separator: { params: ["file_separator"],
       exceptions: ["not_supported_by_gui", "error_no_gui", "cntl_error"] },
     get_desktop_directory: { params: ["desktop_directory"],
@@ -285,14 +288,14 @@ export const GUI = {
   },
   members: {
     z2ui5_cl_cgui_gui: {
-      constants: ["true", "false", "metric_default", "metric_pixel", "metric_mm", "ws_tabstop", "ws_maximizebox", "ws_group", "ws_minimizebox", "ws_thickframe", "ws_sysmenu", "ws_dlgframe", "ws_border", "ws_caption", "ws_maximize", "ws_clipchildren", "ws_clipsiblings", "ws_visible", "ws_child"],
+      constants: ["true", "false", "metric_default", "metric_pixel", "metric_mm", "ws_tabstop", "ws_maximizebox", "ws_group", "ws_minimizebox", "ws_thickframe", "ws_sysmenu", "ws_dlgframe", "ws_border", "ws_caption", "ws_maximize", "ws_clipchildren", "ws_clipsiblings", "ws_visible", "ws_child", "visible_true", "visible_false"],
       attributes: [],
       events: [],
       methods: {
-        get_cursor_field: { params: ["field", "value", "line", "offset"],
-          exceptions: ["not_on_field"] },
         compute_metric_from_dynp: { params: ["metric", "x_or_y", "in"],
           exceptions: [] },
+        get_cursor_field: { params: ["field", "value", "line", "offset"],
+          exceptions: ["not_on_field"] },
         set_report: { params: ["report"],
           exceptions: [] },
         get_report: { params: [],
@@ -413,7 +416,12 @@ export const GUI = {
           exceptions: ["cntl_error", "cnht_error_not_allowed", "cnht_error_parameter", "dp_error_general"] },
         show_data: { params: ["url", "frame", "in_place"],
           exceptions: ["cntl_error", "cnht_error_not_allowed", "cnht_error_parameter", "dp_error_general"] },
-        sapevent_links: { params: ["html"], exceptions: [] },
+        go_back: { params: [],
+          exceptions: ["cntl_error"] },
+        go_forward: { params: [],
+          exceptions: ["cntl_error"] },
+        get_current_url: { params: ["url"],
+          exceptions: ["cntl_error"] },
         set_registered_events: { params: ["events"],
           exceptions: ["cntl_error", "cntl_system_error", "illegal_event_combination"] },
         close_document: { params: [],
@@ -425,6 +433,8 @@ export const GUI = {
         detach_url_in_browser: { params: ["url"],
           exceptions: ["cntl_error"] },
         dispatch: { params: [],
+          exceptions: [] },
+        sapevent_links: { params: ["html"],
           exceptions: [] },
       },
     },
@@ -1006,7 +1016,7 @@ const BASE_METHODS = ["cgui_run_in_background", "at_roundtrip_start",
   "selection_screen_dynnr", "after_call_selection_screen", "write", "format", "get_cursor", "lisel",
   "_msg", "_msg_box", "_popup", "set_prefill_last", "set_fresh_start", "set_job", "set_log", "messages_from_log", "log_display", "set_command_field", "set_catalog", "okcode_execute", "set_cursor_field", "set_selscreen_status", "list", "alv", "tree", "get_selected_rows", "lsind", "message",
   "message_t100", "messages_from_bapiret", "popup_to_confirm", "popup_to_decide",
-  "popup_get_values", "popup_get_values_sval", "popup_values_sval", "popup_answer", "popup_values", "value_help_popup", "vrm_set_values",
+  "popup_get_values", "popup_get_values_sval", "popup_to_decide_list", "popup_values_sval", "popup_answer", "popup_values", "value_help_popup", "vrm_set_values",
   "leave_to_selection_screen", "window", "call_selection_screen", "submit", "call_transaction", "read_list", "set_parameter_id", "get_parameter_id",
   "set_line_count", "set_pf_status", "set_title", "set_variant", "set_variant_store", "set_layout_store", "get_link",
   "current_screen", "dynpro_screen", "dynpro_pbo", "dynpro_pai", "after_call_screen",
@@ -4859,6 +4869,21 @@ class Converter {
     return true;
   }
 
+  /** the literal VALUE of a CONSTANTS of the program named name - of the
+   *  report or of one of its local classes; undefined when there is none or
+   *  it is not a literal */
+  constantValue(name) {
+    const want = lc(name);
+    for (const x of this.stmts) {
+      if (kind(x) !== "Constant" || lc(declName(x) ?? "") !== want) continue;
+      const toks = stmtTokens(x);
+      const at = toks.findIndex((t) => uc(t.getStr()) === "VALUE");
+      const v = at >= 0 ? toks[at + 1]?.getStr() : undefined;
+      return v && /^['`]/.test(v) ? v : undefined;
+    }
+    return undefined;
+  }
+
   /**
    * CALL SELECTION-SCREEN nnnn [STARTING AT x y] -> call_selection_screen(
    * dynnr ): the screen opens as a dialog when the method returns, and its
@@ -4870,7 +4895,10 @@ class Converter {
     const out = b.out;
     const w = words(s);
     const src = child(s, "Source");
-    const nr = nodeText(src).replace(/['`]/g, "").padStart(4, "0");
+    // a constant names the screen as often as a literal does - its VALUE
+    const text = nodeText(src).trim();
+    const value = /^[a-z_][\w]*$/i.test(text) ? this.constantValue(text) : undefined;
+    const nr = (value ?? text).replace(/['`]/g, "").padStart(4, "0");
     const d = this.dynnrScreens?.get(nr);
     if (!d) {
       this.refuse(s, `CALL SELECTION-SCREEN ${nr} - no SELECTION-SCREEN BEGIN OF SCREEN ${nr} in the report; the class calls the screens of selection_screen_dynnr( ) only`);
@@ -5508,7 +5536,14 @@ class Converter {
             const ov = this.rewrites(s, b.ctx, b);
             ov.set(key(toks[0]), null);
             ov.set(key(toks[1]), null);
-            ov.set(key(toks[at + 1]), `${lc(toks[at + 1].getStr())}(`);
+            // =>('CLIPBOARD_EXPORT') is =>clipboard_export(
+            if (toks[at + 1].getStr() === "(") {
+              ov.set(key(toks[at + 1]), `${frontendName(toks, at - 1)}(`);
+              ov.set(key(toks[at + 2]), null);
+              ov.set(key(toks[at + 3]), null);
+            } else {
+              ov.set(key(toks[at + 1]), `${lc(toks[at + 1].getStr())}(`);
+            }
             const last = toks[toks.length - 1];
             ov.set(key(last), `${ov.has(key(last)) ? ov.get(key(last)) : last.getStr()} )`);
             out.push(`${renderTokens(toks, ov, s.getColon()).trim()}.`);
@@ -5838,8 +5873,15 @@ class Converter {
       }
       // cl_gui_frontend_services=>gui_upload, =>action_ok - the frontend
       // services of the runtime, when it has that member
-      if (t === "cl_gui_frontend_services" && toks[i + 1]?.getStr() === "=>" && frontendMember(toks[i + 2]?.getStr())) {
+      if (t === "cl_gui_frontend_services" && toks[i + 1]?.getStr() === "=>" && frontendMember(frontendName(toks, i))) {
         ov.set(key(toks[i]), "z2ui5_cl_cgui_frontend");
+        // =>('CLIPBOARD_EXPORT') - a dynamic call of a literal name is the
+        // static call of that method
+        if (toks[i + 2]?.getStr() === "(") {
+          ov.set(key(toks[i + 2]), frontendName(toks, i));
+          ov.set(key(toks[i + 3]), null);
+          ov.set(key(toks[i + 4]), null);
+        }
         continue;
       }
       const next = toks[i + 1]?.getStr();
@@ -6543,6 +6585,22 @@ class Converter {
       params.push({ name: "ucomm", value: literal(ucomm) });
       if (arg("titel")) params.push({ name: "title", value: arg("titel") });
       if (target("answer")) prologue.push(`${target("answer")} = popup_answer( ).`);
+    } else if (fm === "POPUP_TO_DECIDE_LIST") {
+      // the lines of T_SPOPLI are the options, the answer is the number of
+      // the line or A - as popup_to_decide( ) answers
+      const question = joined("textline1", "textline2", "textline3");
+      const list = target("t_spopli");
+      if (!question || !list) {
+        this.refuse(s, "POPUP_TO_DECIDE_LIST without TEXTLINE1 and TABLES t_spopli - not understood");
+        return;
+      }
+      method = "popup_to_decide_list";
+      params = [{ name: "question", value: question }, { name: "list", value: list }, { name: "ucomm", value: literal(ucomm) }];
+      if (arg("titel")) params.push({ name: "title", value: arg("titel") });
+      if (target("answer")) prologue.push(`${target("answer")} = popup_answer( ).`);
+      if (p.has("start_col") || p.has("start_row") || p.has("cursorline") || p.has("mark_flag")) {
+        this.note("POPUP_TO_DECIDE_LIST ... START_COL / START_ROW / CURSORLINE / MARK_FLAG - dropped, the popup is centred and takes one choice");
+      }
     } else {
       // POPUP_GET_VALUES
       method = "popup_get_values_sval";
@@ -6565,7 +6623,14 @@ class Converter {
     // popup of the runtime raises none, the block is dropped
     const { branch } = this.tailOf(b);
     const first = branch.findIndex((x) => kind(x) !== "Comment");
-    if (first >= 0 && kind(branch[first]) === "If" && /\bsy\s*-\s*subrc\b/i.test(renderTokens(stmtTokens(branch[first])))) {
+    // only an IF on sy-subrc alone: one that also asks the answer (IF
+    // sy-subrc <> 0 OR lv_answer = 'A') stays - in the callback sy-subrc is 0
+    // and the rest of the condition is still the cancel check
+    const onSubrcOnly = (x) => {
+      const ws = stmtTokens(x).map((t) => uc(t.getStr()));
+      return /\bsy\s*-\s*subrc\b/i.test(renderTokens(stmtTokens(x))) && !ws.includes("OR") && !ws.includes("AND");
+    };
+    if (first >= 0 && kind(branch[first]) === "If" && onSubrcOnly(branch[first])) {
       this.skipStmts ??= new Set();
       let depth = 0;
       for (const x of branch.slice(first)) {
@@ -6652,16 +6717,17 @@ class Converter {
   frontendCheck(s) {
     const toks = stmtTokens(s);
     for (let i = 0; i + 2 < toks.length; i++) {
-      if (lc(toks[i].getStr()) === "cl_gui_frontend_services" && toks[i + 1].getStr() === "=>" && !frontendMember(toks[i + 2].getStr())) {
-        return `${lc(toks[i + 2].getStr())} has no counterpart in the browser`;
+      if (lc(toks[i].getStr()) === "cl_gui_frontend_services" && toks[i + 1].getStr() === "=>" && !frontendMember(frontendName(toks, i))) {
+        return `${frontendName(toks, i)} has no counterpart in the browser`;
       }
     }
-    const call = /cl_gui_frontend_services\s*=>\s*(\w+)/i.exec(renderTokens(toks));
-    const m = call && FRONTEND.methods[lc(call[1])];
+    const at = toks.findIndex((t, i) => lc(t.getStr()) === "cl_gui_frontend_services" && toks[i + 1]?.getStr() === "=>");
+    const name = at >= 0 ? frontendName(toks, at) : undefined;
+    const m = name && FRONTEND.methods[name];
     if (!m) return undefined;
     for (const n of findAll(s, "ParameterName").map((x) => lc(nodeText(x)))) {
       // RECEIVING result = ... of a functional method
-      if (!m.params.includes(n) && !m.exceptions.includes(n) && n !== "others" && n !== "result") return `${lc(call[1])}( ${n} = ... ) is not supported`;
+      if (!m.params.includes(n) && !m.exceptions.includes(n) && n !== "others" && n !== "result") return `${name}( ${n} = ... ) is not supported`;
     }
     return undefined;
   }
@@ -7813,7 +7879,7 @@ Object.setPrototypeOf(LVC_TYPES, null);
 // the methods of the runtime the converted code calls, besides BASE_METHODS
 const REPORT_CALLS = ["list", "write", "message", "message_t100", "messages_from_bapiret", "alv", "tree", "set_title",
   "set_pf_status", "set_line_count", "leave_to_selection_screen", "submit", "call_transaction", "read_list", "call_selection_screen", "window",
-  "popup_to_confirm", "popup_to_decide", "popup_get_values", "popup_get_values_sval", "popup_values_sval",
+  "popup_to_confirm", "popup_to_decide", "popup_to_decide_list", "popup_get_values", "popup_get_values_sval", "popup_values_sval",
   "popup_answer", "popup_values", "value_help_popup", "lsind", "set_lsind", "get_selected_rows", "get_cursor",
   "lisel", "set_parameter_id", "get_parameter_id", "set_cursor_field", "vrm_set_values", "current_screen",
   "call_screen", "set_screen", "leave_to_screen", "leave_screen", "screen_left"];
@@ -8042,6 +8108,14 @@ function lineFieldNames(s) {
     out.push(underName(nodeText(ch[i])));
   }
   return out;
+}
+
+/** the member after cl_gui_frontend_services=> at toks[i] - lower case; a
+ *  dynamic name in a literal, =>('CLIPBOARD_EXPORT'), as the static one */
+function frontendName(toks, i) {
+  const t = toks[i + 2]?.getStr();
+  if (t === "(" && /^'\w+'$/.test(toks[i + 3]?.getStr() ?? "") && toks[i + 4]?.getStr() === ")") return lc(unquote(toks[i + 3].getStr()));
+  return t === undefined ? undefined : lc(t);
 }
 
 /** CALL TRANSACTION ... USING / OPTIONS FROM / MESSAGES INTO - batch input */
