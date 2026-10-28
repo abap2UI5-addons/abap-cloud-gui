@@ -2,7 +2,7 @@
 // report2cloud - a classic ABAP report as an abap-cloud-gui report class.
 //
 //   node tools/report2cloud/cli.mjs zreport.prog.abap [--class zcl_name] [--out dir]
-//        [--texts zreport.prog.xml] [--includes dir] [--check] [--ddic dir] [--partial]
+//        [--texts zreport.prog.xml] [--includes dir] [--check] [--ddic dir] [--partial] [--wrappers] [--successors]
 //
 // Writes <class>.clas.abap, <class>.clas.xml (abapGit format), the local
 // types and classes of the report as .clas.locals_def/_imp.abap, and the
@@ -35,7 +35,15 @@ const USAGE = `usage: node tools/report2cloud/cli.mjs <report.prog.abap> [option
   --check          lint the class with abaplint - v750 and ABAP Cloud, in a scratch
                    copy of this repository (needs git and network for the dependencies)
   --ddic <dir>     abapGit DDIC objects to resolve on-premise tables during --check
+  --atc <file>     the ATC findings of the report as the system found them (the worklist XML
+                   ADT exports, or a CSV with line;priority;check;message): the migration
+                   report says for each what the conversion did on its line
   --partial        write the class even when statements are refused
+  --wrappers       a CALL FUNCTION the converter has no counterpart for calls a method of a
+                   wrapper class, written beside the class: <class>_fmw, to type and release
+  --successors     a SELECT of a table with a released successor whose columns map one to one
+                   (the flight model, T001, T005T, MAKT) reads the successor, the columns under
+                   their old names
   --help           this text`;
 
 function args(argv) {
@@ -45,7 +53,9 @@ function args(argv) {
     if (a === "--help" || a === "-h") opts.help = true;
     else if (a === "--check") opts.check = true;
     else if (a === "--partial") opts.partial = true;
-    else if (["--class", "--out", "--texts", "--includes", "--report", "--ddic", "--deps"].includes(a)) {
+    else if (a === "--wrappers") opts.wrappers = true;
+    else if (a === "--successors") opts.successors = true;
+    else if (["--class", "--out", "--texts", "--includes", "--report", "--ddic", "--deps", "--atc"].includes(a)) {
       if (argv[i + 1] === undefined) throw new Error(`${a} needs a value`);
       opts[a.slice(2)] = argv[++i];
     } else if (a.startsWith("--")) throw new Error(`unknown option ${a}`);
@@ -106,6 +116,8 @@ async function main() {
     programName: m ? m[1].replace(/#/g, "/") : undefined,
     textpool,
     origin: includes.origin,
+    wrappers: opts.wrappers === true,
+    successors: opts.successors === true,
     // a report beside the input (or under --includes) is one to convert as
     // well - a SUBMIT of it starts the class report2cloud names it
     classFor: (program) => (read(program) !== undefined ? defaultClassName(program) : undefined),
@@ -135,7 +147,12 @@ async function main() {
 
   const reportFile = opts.report ? resolve(opts.report) : join(out, `${result.className}.migration.md`);
   mkdirSync(dirname(reportFile), { recursive: true });
-  writeFileSync(reportFile, migrationReport(result, { source: file, texts, lint, includes }));
+  let atc;
+  if (opts.atc) {
+    const { parseAtc, atcStates } = await import("./lib/atc.mjs");
+    atc = atcStates(parseAtc(readFileSync(resolve(opts.atc), "utf8")), result, { includes });
+  }
+  writeFileSync(reportFile, migrationReport(result, { source: file, texts, lint, atc, includes }));
 
   const written = Object.keys(write).sort();
   if (!result.ok) {

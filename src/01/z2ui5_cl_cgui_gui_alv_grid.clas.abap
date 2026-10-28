@@ -5,7 +5,10 @@
 "! shows the table as it was then, as the frontend of SAP GUI does. The
 "! events of the browser raise double_click, hotspot_click and
 "! user_command; toolbar is raised before the grid shows, its buttons are
-"! the functions of the grid. One grid of a report is shown at a time
+"! the functions of the grid. One grid of a report is shown at a time: the
+"! first one displayed, then the one refreshed. Each grid keeps a copy of
+"! what it was displayed with, the container of one not shown offers to
+"! show it (show( ))
 CLASS z2ui5_cl_cgui_gui_alv_grid DEFINITION PUBLIC
   INHERITING FROM z2ui5_cl_cgui_gui
   CREATE PUBLIC.
@@ -165,10 +168,34 @@ CLASS z2ui5_cl_cgui_gui_alv_grid DEFINITION PUBLIC
       IMPORTING
         i_ready_for_input TYPE i DEFAULT 1.
 
+    "! the grid shows again with the copies it keeps - the user switched to
+    "! it from another grid
+    METHODS show.
+
+    "! the title of its layout and the number of rows, for the container
+    "! while another grid shows
+    METHODS caption
+      RETURNING
+        VALUE(result) TYPE string.
+
     METHODS dispatch REDEFINITION.
 
   PROTECTED SECTION.
+    " copies of the table, the field catalog, the layout and the sort the
+    " grid was displayed with - kept between roundtrips with the grid
+    DATA mr_outtab   TYPE REF TO data.
+    DATA mr_fieldcat TYPE REF TO data.
+    DATA mr_layout   TYPE REF TO data.
+    DATA mr_sort     TYPE REF TO data.
+
   PRIVATE SECTION.
+    "! a copy of the data val refers to
+    CLASS-METHODS copy
+      IMPORTING
+        val           TYPE REF TO data
+      RETURNING
+        VALUE(result) TYPE REF TO data.
+
     "! raise toolbar and hand its buttons to the report
     METHODS toolbar_functions
       IMPORTING
@@ -199,18 +226,23 @@ CLASS z2ui5_cl_cgui_gui_alv_grid IMPLEMENTATION.
     ENDIF.
     IF it_fieldcatalog IS SUPPLIED.
       lr_fieldcat = REF #( it_fieldcatalog ).
+      mr_fieldcat = copy( lr_fieldcat ).
     ENDIF.
     IF is_layout IS SUPPLIED.
       lr_layout = REF #( is_layout ).
+      mr_layout = copy( lr_layout ).
     ENDIF.
     IF it_sort IS SUPPLIED.
       lr_sort = REF #( it_sort ).
+      mr_sort = copy( lr_sort ).
     ENDIF.
+    mr_outtab = copy( REF #( it_outtab ) ).
     go_report->grid_display( id       = mv_id
                              tab      = REF #( it_outtab )
                              fieldcat = lr_fieldcat
                              layout   = lr_layout
-                             sort     = lr_sort ).
+                             sort     = lr_sort
+                             first    = abap_true ).
     toolbar_functions( abap_false ).
 
   ENDMETHOD.
@@ -218,14 +250,66 @@ CLASS z2ui5_cl_cgui_gui_alv_grid IMPLEMENTATION.
   METHOD refresh_table_display.
 
     IF go_report IS BOUND AND it_outtab IS SUPPLIED.
+      mr_outtab = copy( REF #( it_outtab ) ).
+      IF go_report->grid_get( mv_id )-shown = abap_false.
+        " it shows now, with its field catalog and layout
+        show( ).
+        RETURN.
+      ENDIF.
       go_report->grid_display( id  = mv_id
                                tab = REF #( it_outtab ) ).
     ENDIF.
 
   ENDMETHOD.
 
+  METHOD show.
+
+    IF go_report IS NOT BOUND OR mr_outtab IS NOT BOUND.
+      RETURN.
+    ENDIF.
+    go_report->grid_display( id       = mv_id
+                             tab      = mr_outtab
+                             fieldcat = mr_fieldcat
+                             layout   = mr_layout
+                             sort     = mr_sort ).
+    toolbar_functions( abap_false ).
+
+  ENDMETHOD.
+
+  METHOD caption.
+
+    FIELD-SYMBOLS <tab>   TYPE STANDARD TABLE.
+    FIELD-SYMBOLS <title> TYPE any.
+
+    IF mr_outtab IS NOT BOUND.
+      RETURN.
+    ENDIF.
+    ASSIGN mr_outtab->* TO <tab>.
+    IF mr_layout IS BOUND.
+      ASSIGN mr_layout->('GRID_TITLE') TO <title>.
+      IF sy-subrc = 0 AND <title> IS NOT INITIAL.
+        result = |{ condense( CONV string( <title> ) ) } |.
+      ENDIF.
+    ENDIF.
+    result = |{ result }({ lines( <tab> ) })|.
+
+  ENDMETHOD.
+
+  METHOD copy.
+
+    FIELD-SYMBOLS <from> TYPE any.
+    FIELD-SYMBOLS <to>   TYPE any.
+
+    ASSIGN val->* TO <from>.
+    CREATE DATA result LIKE <from>.
+    ASSIGN result->* TO <to>.
+    <to> = <from>.
+
+  ENDMETHOD.
+
   METHOD set_frontend_fieldcatalog.
 
+    mr_fieldcat = copy( REF #( it_fieldcatalog ) ).
     IF go_report IS BOUND.
       go_report->grid_display( id       = mv_id
                                fieldcat = REF #( it_fieldcatalog ) ).
@@ -251,6 +335,7 @@ CLASS z2ui5_cl_cgui_gui_alv_grid IMPLEMENTATION.
 
   METHOD set_frontend_layout.
 
+    mr_layout = copy( REF #( is_layout ) ).
     IF go_report IS BOUND.
       go_report->grid_display( id     = mv_id
                                layout = REF #( is_layout ) ).
@@ -276,6 +361,7 @@ CLASS z2ui5_cl_cgui_gui_alv_grid IMPLEMENTATION.
 
   METHOD set_sort_criteria.
 
+    mr_sort = copy( REF #( it_sort ) ).
     IF go_report IS BOUND.
       go_report->grid_display( id   = mv_id
                                sort = REF #( it_sort ) ).

@@ -5,7 +5,7 @@
 | Source | `zr2c_26_events.prog.abap` |
 | Text pool | `zr2c_26_events.prog.xml` |
 | Result | **converted** - `z2ui5_cl_cgui_r2c_26.clas.abap`, `z2ui5_cl_cgui_r2c_26.clas.locals_def.abap`, `z2ui5_cl_cgui_r2c_26.clas.locals_imp.abap`, `z2ui5_cl_cgui_r2c_26.clas.xml` |
-| Mapped | 19 construct(s) |
+| Mapped | 18 construct(s) |
 | TODO | 0 |
 | Release state to check | 0 object(s) |
 
@@ -26,7 +26,6 @@ Layout, formatting and behaviour of the classic report that the list, the ALV or
 |---|---|---|
 | 9 | `REPORT zr2c_26_events` | the class, `INHERITING FROM z2ui5_cl_cgui_report` |
 | 13 | `CLASS lcl_app DEFINITION` | locals_def |
-| 31 | `global data - the report restarted after its list` | `CLEAR` of 2 global data object(s) at the start of `start_of_selection( )` |
 | 34 | `CLASS lcl_app IMPLEMENTATION` | locals_imp |
 | 37 | `CREATE OBJECT mo_cont EXPORTING container_name = 'CC'` | `mo_cont = NEW #( )` - the stand-in z2ui5_cl_cgui_gui_container |
 | 40 | `CREATE OBJECT mo_split EXPORTING parent = mo_cont rows = 2 columns = 1` | `mo_split = NEW #( )` - the stand-in z2ui5_cl_cgui_gui_container |

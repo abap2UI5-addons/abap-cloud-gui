@@ -28,6 +28,9 @@ CLASS z2ui5_cl_cgui_r2c_18 IMPLEMENTATION.
 
   METHOD initialization.
 
+    " the command field of the SAP GUI: transactions, /n, /o and OK codes
+    set_command_field( ).
+
     set_title( `An evaluation by the column` ).
     set_line_count( 30 ).
     p_carrid = 'LH'.
@@ -42,12 +45,6 @@ CLASS z2ui5_cl_cgui_r2c_18 IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD start_of_selection.
-
-    " every run starts with the global data of a fresh start - the classic report restarted after its list
-    CLEAR: gt_flight,
-           gs_flight,
-           gv_total.
-    gv_col = 40.
 
     SELECT * FROM sflight INTO TABLE @gt_flight
       WHERE carrid = @p_carrid

@@ -5,7 +5,7 @@
 | Source | `zr2c_43_base64.prog.abap` |
 | Text pool | `zr2c_43_base64.prog.xml` |
 | Result | **converted** - `z2ui5_cl_cgui_r2c_43.clas.abap`, `z2ui5_cl_cgui_r2c_43.clas.xml` |
-| Mapped | 11 construct(s) |
+| Mapped | 10 construct(s) |
 | TODO | 0 |
 | Release state to check | 0 object(s) |
 
@@ -24,7 +24,6 @@ Layout, formatting and behaviour of the classic report that the list, the ALV or
 | Line | Classic | abap-cloud-gui |
 |---|---|---|
 | 8 | `REPORT zr2c_43_base64` | the class, `INHERITING FROM z2ui5_cl_cgui_report` |
-| 12 | `global data - the report restarted after its list` | `CLEAR` of 6 global data object(s) at the start of `start_of_selection( )` |
 | 14 | `PARAMETERS p_text TYPE string LOWER CASE DEFAULT 'See you at noon'` | attribute `p_text`, `screen->parameter( )` |
 | 16 | `START-OF-SELECTION` | `start_of_selection( )` |
 | 23 | `CALL FUNCTION 'SCMS_STRING_TO_XSTRING' EXPORTING text = p_text IMPO...` | `z2ui5_cl_cgui_frontend=>scms_string_to_xstring( )` - the function module as the method of the frontend services, its EXCEPTIONS kept |

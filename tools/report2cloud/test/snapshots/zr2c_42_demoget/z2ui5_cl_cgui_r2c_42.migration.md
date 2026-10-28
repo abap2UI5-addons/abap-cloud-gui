@@ -5,7 +5,7 @@
 | Source | `zr2c_42_demoget.prog.abap` |
 | Text pool | `zr2c_42_demoget.prog.xml` |
 | Result | **converted** - `z2ui5_cl_cgui_r2c_42.clas.abap`, `z2ui5_cl_cgui_r2c_42.clas.xml` |
-| Mapped | 5 construct(s) |
+| Mapped | 4 construct(s) |
 | TODO | 0 |
 | Release state to check | 0 object(s) |
 
@@ -20,7 +20,6 @@ The class uses no database table, DDIC type, function module, class or message c
 | 8 | `REPORT zr2c_42_demoget` | the class, `INHERITING FROM z2ui5_cl_cgui_report` |
 | 18 | `PARAMETERS p_min TYPE i DEFAULT 6` | attribute `p_min`, `screen->parameter( )` |
 | 20 | `START-OF-SELECTION` | `start_of_selection( )` |
-| 24 | `global data - the report restarted after its list` | `CLEAR` of 1 global data object(s) at the start of `start_of_selection( )` |
 | 36 | `WRITE / \|{ lv_total } bottles in the cellar\|` | `write( )` |
 
 ## Next steps

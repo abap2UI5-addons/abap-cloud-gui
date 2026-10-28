@@ -49,6 +49,9 @@ CLASS z2ui5_cl_cgui_r2c_14 IMPLEMENTATION.
 
   METHOD initialization.
 
+    " the command field of the SAP GUI: transactions, /n, /o and OK codes
+    set_command_field( ).
+
     p_carrid = 'LH'.
 
   ENDMETHOD.
@@ -61,15 +64,6 @@ CLASS z2ui5_cl_cgui_r2c_14 IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD start_of_selection.
-
-    " every run starts with the global data of a fresh start - the classic report restarted after its list
-    CLEAR: sflight,
-           gt_sum,
-           wa_gt_sum,
-           gt_flight,
-           wa_gt_flight,
-           gt_log,
-           wa_gt_log.
 
     CLEAR gt_flight.
     CLEAR gt_sum.

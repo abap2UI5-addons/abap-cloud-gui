@@ -5,7 +5,7 @@
 | Source | `zr2c_16_popups.prog.abap` |
 | Text pool | `zr2c_16_popups.prog.xml` |
 | Result | **converted** - `z2ui5_cl_cgui_r2c_16.clas.abap`, `z2ui5_cl_cgui_r2c_16.clas.xml` |
-| Mapped | 31 construct(s) |
+| Mapped | 30 construct(s) |
 | TODO | 1 |
 | Release state to check | 1 object(s) |
 
@@ -32,7 +32,6 @@ Layout, formatting and behaviour of the classic report that the list, the ALV or
 | Line | Classic | abap-cloud-gui |
 |---|---|---|
 | 9 | `REPORT zr2c_16_popups` | the class, `INHERITING FROM z2ui5_cl_cgui_report` |
-| 19 | `global data - the report restarted after its list` | `CLEAR` of 5 global data object(s) at the start of `start_of_selection( )` |
 | 24 | `PARAMETERS p_carrid TYPE sflight-carrid DEFAULT 'LH'` | attribute `p_carrid`, `screen->parameter( )` |
 | 26 | `START-OF-SELECTION` | `start_of_selection( )` |
 | 31 | `WRITE / gs_flight-carrid` | `write( )` |
@@ -41,16 +40,16 @@ Layout, formatting and behaviour of the classic report that the list, the ALV or
 | 31 | `WRITE gs_flight-seatsocc` | `write( )` |
 | 32 | `HIDE gs_flight` | `hide = gs_flight` at the hotspot of the line, restored in `at_line_selection( )` |
 | 35 | `AT LINE-SELECTION` | `at_line_selection( row hide )` - HIDE fields restored from `hide` |
-| 37 | `CALL FUNCTION 'POPUP_TO_DECIDE' EXPORTING textline1 = 'Book the fli...` | `popup_to_decide( )` - the answer arrives in `at_user_command( )` with ucomm `POPUP_1`, where the statements after the call go on |
-| 46 | `CASE lv_answer` | `at_user_command( )` - WHEN `POPUP_1`: the statements after CALL FUNCTION 'POPUP_TO_DECIDE' |
+| 37 | `CALL FUNCTION 'POPUP_TO_DECIDE' EXPORTING textline1 = 'Book the fli...` | `popup_to_decide( )` - the answer arrives in `on_popup_1( answer )`, where the statements after the call go on |
+| 46 | `CASE lv_answer` | `on_popup_1( answer )` - the statements after CALL FUNCTION 'POPUP_TO_DECIDE' |
 | 48 | `PERFORM book USING gs_flight` | `book( )` |
 | 50 | `WRITE / 'On the waiting list:'` | `write( )` |
 | 50 | `WRITE gs_flight-connid` | `write( )` |
 | 52 | `WRITE / 'Nothing booked'` | `write( )` |
 | 55 | `AT USER-COMMAND` | `at_user_command( ucomm )` - sy-ucomm becomes ucomm |
-| 58 | `CALL FUNCTION 'POPUP_TO_CONFIRM' EXPORTING titlebar = 'Cancel booki...` | `popup_to_decide( )` - the answer arrives in `at_user_command( )` with ucomm `POPUP_2`, where the statements after the call go on |
+| 58 | `CALL FUNCTION 'POPUP_TO_CONFIRM' EXPORTING titlebar = 'Cancel booki...` | `popup_to_decide( )` - the answer arrives in `on_popup_2( answer )`, where the statements after the call go on |
 | 70 | `IF sy-subrc <> 0` | dropped - the IF sy-subrc after POPUP_TO_CONFIRM checked its EXCEPTIONS, popup_to_decide( ) raises none |
-| 70 | `IF sy-subrc <> 0` | `at_user_command( )` - WHEN `POPUP_2`: the statements after CALL FUNCTION 'POPUP_TO_CONFIRM' |
+| 70 | `IF sy-subrc <> 0` | `on_popup_2( answer )` - the statements after CALL FUNCTION 'POPUP_TO_CONFIRM' |
 | 75 | `WRITE / 'All bookings cancelled'` | `write( )` |
 | 78 | `PERFORM passenger` | `passenger( )` |
 | 81 | `FORM book USING is_flight TYPE sflight` | private method `book( )` |
@@ -59,7 +58,7 @@ Layout, formatting and behaviour of the classic report that the list, the ALV or
 | 83 | `WRITE 'Bookings of this run:'` | `write( )` |
 | 83 | `WRITE gv_booked` | `write( )` |
 | 86 | `FORM passenger` | private method `passenger( )` |
-| 92 | `CALL FUNCTION 'POPUP_GET_VALUES' EXPORTING popup_title = 'Passenger...` | `popup_get_values_sval( )` - the answer arrives in `at_user_command( )` with ucomm `POPUP_3`, where the statements after the call go on |
+| 92 | `CALL FUNCTION 'POPUP_GET_VALUES' EXPORTING popup_title = 'Passenger...` | `popup_get_values_sval( )` - the answer arrives in `at_user_command( )` with ucomm `POPUP_3` |
 | 102 | `WRITE / 'Passenger:'` | `write( )` |
 | 102 | `WRITE lt_fields[ 1 ]-value` | `write( )` |
 

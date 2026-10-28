@@ -5,7 +5,7 @@
 | Source | `zr2c_10_refused.prog.abap` |
 | Text pool | none - texts are placeholders, see the TODOs |
 | Result | **refused** - 6 statement(s) cannot be mapped, no class written |
-| Mapped | 6 construct(s) |
+| Mapped | 5 construct(s) |
 | TODO | 2 |
 | Release state to check | 0 object(s) |
 
@@ -14,7 +14,7 @@
 These statements have no counterpart in an abap-cloud-gui report. Rewrite them in the report (or delete them) and convert again.
 
 - `zr2c_10_refused.prog.abap:26:3` - ASSIGN of a field of another program ('(PROG)FIELD') - field symbols to screen or foreign program fields are not available in a class or on ABAP Cloud ([why, and the rewrite](https://github.com/abap2UI5-addons/abap-cloud-gui/blob/main/tools/report2cloud/docs/refusals.md#foreign-field))
-- `zr2c_10_refused.prog.abap:28:3` - CALL TRANSACTION - no SAP GUI transaction can be started from a browser app (batch input with USING is no API on ABAP Cloud either); call the released API of the application instead ([why, and the rewrite](https://github.com/abap2UI5-addons/abap-cloud-gui/blob/main/tools/report2cloud/docs/refusals.md#call-transaction))
+- `zr2c_10_refused.prog.abap:28:3` - CALL TRANSACTION ... USING - batch input plays the screens of a transaction, there are none in a browser app and batch input is no API on ABAP Cloud; call the released API of the application instead ([why, and the rewrite](https://github.com/abap2UI5-addons/abap-cloud-gui/blob/main/tools/report2cloud/docs/refusals.md#call-transaction))
 - `zr2c_10_refused.prog.abap:32:3` - EXEC SQL - native SQL is not available on ABAP Cloud; use ABAP SQL on a released CDS view ([why, and the rewrite](https://github.com/abap2UI5-addons/abap-cloud-gui/blob/main/tools/report2cloud/docs/refusals.md#native-sql))
 - `zr2c_10_refused.prog.abap:36:3` - CALL SCREEN - the dynpro is not converted (a dynpro of fields is, from the .prog.xml - see the MODULE refusals); else build the screen as an abap2UI5 view or a popup ([why, and the rewrite](https://github.com/abap2UI5-addons/abap-cloud-gui/blob/main/tools/report2cloud/docs/refusals.md#dynpro))
 - `zr2c_10_refused.prog.abap:38:1` - MODULE - the screens are in the .prog.xml (--texts), which was not passed; with it a dynpro of fields is converted ([why, and the rewrite](https://github.com/abap2UI5-addons/abap-cloud-gui/blob/main/tools/report2cloud/docs/refusals.md#dynpro))
@@ -34,7 +34,6 @@ The class uses no database table, DDIC type, function module, class or message c
 | Line | Classic | abap-cloud-gui |
 |---|---|---|
 | 7 | `REPORT zr2c_10_refused` | the class, `INHERITING FROM z2ui5_cl_cgui_report` |
-| 17 | `global data - the report restarted after its list` | `CLEAR` of 3 global data object(s) at the start of `start_of_selection( )` |
 | 21 | `FIELD-SYMBOLS <gv_vbeln> TYPE any` | declared in each method that uses it |
 | 23 | `PARAMETERS p_vbeln TYPE c LENGTH 10` | attribute `p_vbeln`, `screen->parameter( )` |
 | 25 | `START-OF-SELECTION` | `start_of_selection( )` |

@@ -5,7 +5,7 @@
 | Source | `zr2c_22_files.prog.abap` |
 | Text pool | `zr2c_22_files.prog.xml` |
 | Result | **converted** - `z2ui5_cl_cgui_r2c_22.clas.abap`, `z2ui5_cl_cgui_r2c_22.clas.xml` |
-| Mapped | 23 construct(s) |
+| Mapped | 22 construct(s) |
 | TODO | 0 |
 | Release state to check | 0 object(s) |
 
@@ -25,7 +25,6 @@ Layout, formatting and behaviour of the classic report that the list, the ALV or
 | Line | Classic | abap-cloud-gui |
 |---|---|---|
 | 9 | `REPORT zr2c_22_files` | the class, `INHERITING FROM z2ui5_cl_cgui_report` |
-| 18 | `global data - the report restarted after its list` | `CLEAR` of 2 global data object(s) at the start of `start_of_selection( )` |
 | 21 | `PARAMETERS p_file TYPE string LOWER CASE OBLIGATORY` | attribute `p_file`, `screen->parameter( )` |
 | 22 | `PARAMETERS p_save AS CHECKBOX` | attribute `p_save`, `screen->checkbox( )` |
 | 24 | `AT SELECTION-SCREEN ON VALUE-REQUEST FOR p_file` | `at_value_request( field )` - WHEN `P_FILE`, the field declared with value_help |

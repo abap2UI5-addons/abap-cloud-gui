@@ -5,7 +5,7 @@
 | Source | `zr2c_41_picture.prog.abap` |
 | Text pool | `zr2c_41_picture.prog.xml` |
 | Result | **converted** - `z2ui5_cl_cgui_r2c_41.clas.abap`, `z2ui5_cl_cgui_r2c_41.clas.locals_def.abap`, `z2ui5_cl_cgui_r2c_41.clas.locals_imp.abap`, `z2ui5_cl_cgui_r2c_41.clas.xml` |
-| Mapped | 11 construct(s) |
+| Mapped | 10 construct(s) |
 | TODO | 0 |
 | Release state to check | 0 object(s) |
 
@@ -28,7 +28,6 @@ Layout, formatting and behaviour of the classic report that the list, the ALV or
 | 8 | `REPORT zr2c_41_picture` | the class, `INHERITING FROM z2ui5_cl_cgui_report` |
 | 10 | `CLASS lcl_stamp DEFINITION` | locals_def |
 | 19 | `PARAMETERS p_fit AS CHECKBOX DEFAULT 'X'` | attribute `p_fit`, `screen->checkbox( )` |
-| 21 | `global data - the report restarted after its list` | `CLEAR` of 1 global data object(s) at the start of `start_of_selection( )` |
 | 23 | `CLASS lcl_stamp IMPLEMENTATION` | locals_imp |
 | 32 | `CALL FUNCTION 'DP_CREATE_URL' EXPORTING type = 'image' subtype = 'g...` | `z2ui5_cl_cgui_frontend=>dp_create_url( )` - the function module as the method of the frontend services, its EXCEPTIONS kept |
 | 44 | `MESSAGE 'No URL for the stamp' TYPE 'E'` | `message( )` |

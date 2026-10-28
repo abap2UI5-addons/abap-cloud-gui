@@ -32,6 +32,9 @@ CLASS z2ui5_cl_cgui_r2c_30 IMPLEMENTATION.
 
   METHOD initialization.
 
+    " the command field of the SAP GUI: transactions, /n, /o and OK codes
+    set_command_field( ).
+
     set_title( `Exam Results with Column Names` ).
     p_pass = 50.
 
@@ -45,9 +48,6 @@ CLASS z2ui5_cl_cgui_r2c_30 IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD start_of_selection.
-
-    " every run starts with the global data of a fresh start - the classic report restarted after its list
-    CLEAR gt_result.
 
     gt_result = VALUE #( ( student = 'Anna'  subject = 'Maths'   points = 71 )
                          ( student = 'Ben'   subject = 'Maths'   points = 44 )

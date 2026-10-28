@@ -5,7 +5,7 @@
 | Source | `zr2c_38_confirm.prog.abap` |
 | Text pool | `zr2c_38_confirm.prog.xml` |
 | Result | **converted** - `z2ui5_cl_cgui_r2c_38.clas.abap`, `z2ui5_cl_cgui_r2c_38.clas.xml` |
-| Mapped | 11 construct(s) |
+| Mapped | 10 construct(s) |
 | TODO | 0 |
 | Release state to check | 0 object(s) |
 
@@ -18,11 +18,10 @@ The class uses no database table, DDIC type, function module, class or message c
 | Line | Classic | abap-cloud-gui |
 |---|---|---|
 | 8 | `REPORT zr2c_38_confirm` | the class, `INHERITING FROM z2ui5_cl_cgui_report` |
-| 16 | `global data - the report restarted after its list` | `CLEAR` of 2 global data object(s) at the start of `start_of_selection( )` |
 | 18 | `PARAMETERS p_keep AS CHECKBOX` | attribute `p_keep`, `screen->checkbox( )` |
 | 20 | `START-OF-SELECTION` | `start_of_selection( )` |
-| 26 | `CALL FUNCTION 'POPUP_TO_CONFIRM' EXPORTING titlebar = 'Clean up' te...` | `popup_to_decide( )` - the answer arrives in `at_user_command( )` with ucomm `POPUP_1`, where the statements after the call go on |
-| 38 | `IF lv_answer = '1' AND p_keep = abap_false` | `at_user_command( )` - WHEN `POPUP_1`: the statements after CALL FUNCTION 'POPUP_TO_CONFIRM' |
+| 26 | `CALL FUNCTION 'POPUP_TO_CONFIRM' EXPORTING titlebar = 'Clean up' te...` | `popup_to_decide( )` - the answer arrives in `on_popup_1( answer )`, where the statements after the call go on |
+| 38 | `IF lv_answer = '1' AND p_keep = abap_false` | `on_popup_1( answer )` - the statements after CALL FUNCTION 'POPUP_TO_CONFIRM' |
 | 40 | `WRITE / 'The tasks that are done were deleted.'` | `write( )` |
 | 42 | `WRITE / 'Nothing was deleted.'` | `write( )` |
 | 44 | `ULINE` | `list( )->uline( )` |

@@ -42,6 +42,9 @@ CLASS z2ui5_cl_cgui_r2c_15 IMPLEMENTATION.
 
   METHOD initialization.
 
+    " the command field of the SAP GUI: transactions, /n, /o and OK codes
+    set_command_field( ).
+
     set_title( `Reports call reports` ).
     p_carrid = 'LH'.
     p_max = 20.
@@ -71,10 +74,6 @@ CLASS z2ui5_cl_cgui_r2c_15 IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD start_of_selection.
-
-    " every run starts with the global data of a fresh start - the classic report restarted after its list
-    CLEAR: gv_seats,
-           gt_rspar.
 
     list( )->new_line(
         )->write( 'Flights of'

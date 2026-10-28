@@ -5,7 +5,7 @@
 | Source | `zr2c_05_reuse.prog.abap` |
 | Text pool | none - texts are placeholders, see the TODOs |
 | Result | **converted** - `z2ui5_cl_cgui_r2c_05.clas.abap`, `z2ui5_cl_cgui_r2c_05.clas.xml` |
-| Mapped | 32 construct(s) |
+| Mapped | 31 construct(s) |
 | TODO | 5 |
 | Release state to check | 1 object(s) |
 
@@ -39,7 +39,6 @@ Layout, formatting and behaviour of the classic report that the list, the ALV or
 | 7 | `REPORT zr2c_05_reuse` | the class, `INHERITING FROM z2ui5_cl_cgui_report` |
 | 9 | `TYPE-POOLS slis` | dropped - type pools load by themselves |
 | 11 | `TABLES scarr` | typed work area `DATA scarr TYPE scarr` |
-| 11 | `global data - the report restarted after its list` | `CLEAR` of 3 global data object(s) at the start of `start_of_selection( )` |
 | 15 | `DATA gt_fieldcat TYPE slis_t_fieldcat_alv` | dropped - the ALV object, field catalog or layout is the alv( ) chain now |
 | 16 | `DATA gs_fieldcat TYPE slis_fieldcat_alv` | dropped - the ALV object, field catalog or layout is the alv( ) chain now |
 | 17 | `DATA gs_layout TYPE slis_layout_alv` | dropped - the ALV object, field catalog or layout is the alv( ) chain now |

@@ -48,10 +48,25 @@ CLASS ltcl_gui IMPLEMENTATION.
 
   ENDMETHOD.
 
+  METHOD z2ui5_if_cgui_gui~tablecontrol_render ##NEEDED.
+  ENDMETHOD.
+
+  METHOD z2ui5_if_cgui_gui~subscreen_render ##NEEDED.
+  ENDMETHOD.
+
+  METHOD z2ui5_if_cgui_gui~tabstrip_active ##NEEDED.
+  ENDMETHOD.
+
   METHOD z2ui5_if_cgui_gui~custom_render ##NEEDED.
   ENDMETHOD.
 
   METHOD z2ui5_if_cgui_gui~list ##NEEDED.
+  ENDMETHOD.
+
+  METHOD z2ui5_if_cgui_gui~tree ##NEEDED.
+  ENDMETHOD.
+
+  METHOD z2ui5_if_cgui_gui~tree_handler ##NEEDED.
   ENDMETHOD.
 
   METHOD z2ui5_if_cgui_gui~cursor.
@@ -125,6 +140,18 @@ CLASS ltcl_handler DEFINITION FINAL FOR TESTING.
       IMPORTING e_row_id e_column_id es_row_no.
     METHODS on_user_command FOR EVENT user_command OF z2ui5_cl_cgui_gui_alv_grid
       IMPORTING e_ucomm.
+    METHODS on_node FOR EVENT node_double_click OF z2ui5_cl_cgui_gui_simple_tree
+      IMPORTING node_key.
+    METHODS on_expand FOR EVENT expand_no_children OF z2ui5_cl_cgui_gui_simple_tree
+      IMPORTING node_key sender.
+    METHODS on_item FOR EVENT item_double_click OF z2ui5_cl_cgui_gui_column_tree
+      IMPORTING node_key item_name.
+    METHODS on_list_item FOR EVENT item_double_click OF z2ui5_cl_cgui_gui_list_tree
+      IMPORTING node_key item_name.
+    METHODS on_link FOR EVENT link_click OF z2ui5_cl_cgui_gui_column_tree
+      IMPORTING node_key item_name.
+    METHODS on_checkbox FOR EVENT checkbox_change OF z2ui5_cl_cgui_gui_column_tree
+      IMPORTING node_key item_name checked.
 
 ENDCLASS.
 
@@ -135,6 +162,47 @@ CLASS ltcl_handler IMPLEMENTATION.
 
     mv_log = |{ mv_log }CLOSE { sender->get_id( ) };|.
     sender->free( ).
+
+  ENDMETHOD.
+
+  METHOD on_node.
+
+    mv_log = |{ mv_log }NODE { node_key };|.
+
+  ENDMETHOD.
+
+  METHOD on_item.
+
+    mv_log = |{ mv_log }ITEM { node_key } { item_name };|.
+
+  ENDMETHOD.
+
+  METHOD on_list_item.
+
+    mv_log = |{ mv_log }ITEM { node_key } { item_name };|.
+
+  ENDMETHOD.
+
+  METHOD on_link.
+
+    mv_log = |{ mv_log }LINK { node_key } { item_name };|.
+
+  ENDMETHOD.
+
+  METHOD on_checkbox.
+
+    mv_log = |{ mv_log }CHECKBOX { node_key } { item_name } { checked };|.
+
+  ENDMETHOD.
+
+  METHOD on_expand.
+
+    DATA lt_node TYPE z2ui5_cl_cgui_gui_simple_tree=>ty_t_node.
+
+    mv_log = |{ mv_log }EXPAND { node_key };|.
+    lt_node = VALUE #( ( node_key = 'LH0400' relatkey = node_key relatship = z2ui5_cl_cgui_gui_simple_tree=>relat_last_child
+                         text = 'LH 0400' ) ).
+    sender->add_nodes( lt_node ).
 
   ENDMETHOD.
 
@@ -203,6 +271,9 @@ CLASS ltcl_test DEFINITION FINAL
     METHODS toolbar_buttons FOR TESTING.
     METHODS grid FOR TESTING.
     METHODS sapevent_links FOR TESTING.
+    METHODS simple_tree FOR TESTING.
+    METHODS column_tree FOR TESTING.
+    METHODS list_tree FOR TESTING.
     METHODS cursor_field FOR TESTING.
 
 ENDCLASS.
@@ -326,6 +397,160 @@ CLASS ltcl_test IMPLEMENTATION.
 
   ENDMETHOD.
 
+  METHOD simple_tree.
+
+    DATA lt_node TYPE z2ui5_cl_cgui_gui_simple_tree=>ty_t_node.
+    DATA lv_selected TYPE c LENGTH 12.
+
+    DATA(lo_handler) = NEW ltcl_handler( ).
+    DATA(lo_tree) = NEW z2ui5_cl_cgui_gui_simple_tree( parent = mo_cont ).
+    cl_abap_unit_assert=>assert_equals( act = mo_gui->mt_control[ lo_tree->get_id( ) ]-kind
+                                        exp = z2ui5_if_cgui_gui=>cs_kind-simple_tree ).
+    " MTREESNODE: a root folder, a carrier below it, its flights on expand
+    lt_node = VALUE #( ( node_key = 'ROOT' isfolder = abap_true text = 'Carriers' )
+                       ( node_key = 'LH' relatkey = 'ROOT' relatship = z2ui5_cl_cgui_gui_simple_tree=>relat_last_child
+                         expander = abap_true text = 'Lufthansa' ) ).
+    lo_tree->add_nodes( table_structure_name = 'MTREESNODE'
+                        node_table           = lt_node ).
+    lo_tree->expand_node( 'ROOT' ).
+    DATA(lt_view) = lo_tree->view( ).
+    cl_abap_unit_assert=>assert_equals( act = lines( lt_view )
+                                        exp = 2 ).
+    cl_abap_unit_assert=>assert_equals( act = lt_view[ 2 ]-text
+                                        exp = `Lufthansa` ).
+
+    lo_tree->set_handler( handler = lo_handler
+                          method  = 'ON_EXPAND'
+                          event   = 'EXPAND_NO_CHILDREN' ).
+    lo_tree->set_handler( handler = lo_handler
+                          method  = 'ON_NODE'
+                          event   = 'NODE_DOUBLE_CLICK' ).
+    " the expander of LH - its children come from the handler
+    lo_tree->dispatch( event = `EXPAND`
+                       value = |{ lt_view[ 2 ]-key }| ).
+    lt_view = lo_tree->view( ).
+    cl_abap_unit_assert=>assert_equals( act = lines( lt_view )
+                                        exp = 3 ).
+    cl_abap_unit_assert=>assert_equals( act = lt_view[ 3 ]-text
+                                        exp = `LH 0400` ).
+
+    " a click: the node selected, node_double_click with its key
+    lo_tree->dispatch( event = `CLICK`
+                       value = |{ lt_view[ 3 ]-key }| ).
+    lo_tree->get_selected_node( CHANGING node_key = lv_selected ).
+    cl_abap_unit_assert=>assert_equals( act = lv_selected
+                                        exp = 'LH0400' ).
+    cl_abap_unit_assert=>assert_equals( act = lo_handler->mv_log
+                                        exp = `EXPAND LH;NODE LH0400;` ).
+
+    lo_tree->delete_node( 'LH' ).
+    cl_abap_unit_assert=>assert_equals( act = lines( lo_tree->view( ) )
+                                        exp = 1 ).
+    lo_tree->get_selected_node( CHANGING node_key = lv_selected ).
+    cl_abap_unit_assert=>assert_initial( lv_selected ).
+
+  ENDMETHOD.
+
+  METHOD column_tree.
+
+    DATA lt_node TYPE z2ui5_cl_cgui_gui_simple_tree=>ty_t_node.
+    DATA lt_item TYPE z2ui5_cl_cgui_gui_column_tree=>ty_t_item.
+    DATA lv_column TYPE c LENGTH 12.
+
+    DATA(lo_handler) = NEW ltcl_handler( ).
+    DATA(lo_tree) = NEW z2ui5_cl_cgui_gui_column_tree( parent                = mo_cont
+                                                        hierarchy_column_name = 'Carrier'
+                                                        hierarchy_header      = VALUE #( heading = 'Airline' width = 30 ) ).
+    lo_tree->get_hierarchy_column_name( IMPORTING e_hierarchy_column_name = lv_column ).
+    cl_abap_unit_assert=>assert_equals( act = lv_column
+                                        exp = 'CARRIER' ).
+    lo_tree->add_column( name = 'CITY' width = 20 header_text = 'From' ).
+    lo_tree->add_column( name = 'WEB' width = 20 header_text = 'Web' ).
+    lo_tree->add_column( name = 'DONE' width = 10 header_text = 'Done' ).
+    lo_tree->add_column( EXPORTING  name          = 'CITY'
+                         EXCEPTIONS column_exists = 4 ).
+    cl_abap_unit_assert=>assert_subrc( exp = 4 ).
+
+    " TREEV_NODE has no text - the item of the hierarchy column is it
+    lt_node = VALUE #( ( node_key = 'LH' isfolder = abap_true ) ).
+    lt_item = VALUE #( ( node_key = 'LH' item_name = 'CARRIER' text = 'Lufthansa' )
+                       ( node_key = 'LH' item_name = 'CITY' class = z2ui5_cl_cgui_gui_column_tree=>item_class_text text = 'FRANKFURT' )
+                       ( node_key = 'LH' item_name = 'WEB' class = z2ui5_cl_cgui_gui_column_tree=>item_class_link text = 'lufthansa.com' )
+                       ( node_key = 'LH' item_name = 'DONE' class = z2ui5_cl_cgui_gui_column_tree=>item_class_checkbox editable = abap_true ) ).
+    lo_tree->add_nodes_and_items( node_table = lt_node
+                                  item_table = lt_item ).
+    DATA(lt_view) = lo_tree->view( ).
+    cl_abap_unit_assert=>assert_equals( act = lt_view[ 1 ]-text
+                                        exp = `Lufthansa` ).
+    DATA(lt_column) = lo_tree->columns( ).
+    cl_abap_unit_assert=>assert_equals( act = lines( lt_column )
+                                        exp = 4 ).
+    cl_abap_unit_assert=>assert_equals( act = lt_column[ 1 ]-text
+                                        exp = `Airline` ).
+    DATA(lt_cell) = lo_tree->cells( lt_view[ 1 ]-key ).
+    cl_abap_unit_assert=>assert_equals( act = lt_cell[ 1 ]-text
+                                        exp = `FRANKFURT` ).
+    cl_abap_unit_assert=>assert_equals( act = lt_cell[ 2 ]-kind
+                                        exp = `LINK` ).
+    cl_abap_unit_assert=>assert_equals( act = lt_cell[ 3 ]-kind
+                                        exp = `CHECKBOX` ).
+
+    lo_tree->set_handler( handler = lo_handler method = 'ON_ITEM' event = 'ITEM_DOUBLE_CLICK' ).
+    lo_tree->set_handler( handler = lo_handler method = 'ON_LINK' event = 'LINK_CLICK' ).
+    lo_tree->set_handler( handler = lo_handler method = 'ON_CHECKBOX' event = 'CHECKBOX_CHANGE' ).
+    DATA(lv_key) = |{ lt_view[ 1 ]-key }|.
+    lo_tree->dispatch( event = `CLICK`    value = lv_key ).
+    lo_tree->dispatch( event = `LINK`     value = |{ lv_key } WEB| ).
+    lo_tree->dispatch( event = `CHECKBOX` value = |{ lv_key } DONE| ).
+    cl_abap_unit_assert=>assert_equals( act = lo_handler->mv_log
+                                        exp = `ITEM LH CARRIER;LINK LH WEB;CHECKBOX LH DONE X;` ).
+    lt_cell = lo_tree->cells( lt_view[ 1 ]-key ).
+    cl_abap_unit_assert=>assert_true( lt_cell[ 3 ]-checked ).
+
+    lo_tree->item_set_text( node_key = 'LH' item_name = 'CITY' text = 'BERLIN' ).
+    lt_cell = lo_tree->cells( lt_view[ 1 ]-key ).
+    cl_abap_unit_assert=>assert_equals( act = lt_cell[ 1 ]-text
+                                        exp = `BERLIN` ).
+    lo_tree->delete_all_nodes( ).
+    cl_abap_unit_assert=>assert_initial( lo_tree->view( ) ).
+
+  ENDMETHOD.
+
+  METHOD list_tree.
+
+    DATA lt_node TYPE z2ui5_cl_cgui_gui_simple_tree=>ty_t_node.
+    DATA lt_item TYPE z2ui5_cl_cgui_gui_column_tree=>ty_t_item.
+
+    DATA(lo_handler) = NEW ltcl_handler( ).
+    DATA(lo_tree) = NEW z2ui5_cl_cgui_gui_list_tree( parent         = mo_cont
+                                                      item_selection = abap_true ).
+    " the first item of a node is its text, the others follow on its line
+    lt_node = VALUE #( ( node_key = 'LH' isfolder = abap_true ) ).
+    lt_item = VALUE #( ( node_key = 'LH' item_name = '1' text = 'Lufthansa' )
+                       ( node_key = 'LH' item_name = '2' length = 10 text = 'FRANKFURT' )
+                       ( node_key = 'LH' item_name = '3' class = z2ui5_cl_cgui_gui_column_tree=>item_class_link text = 'lufthansa.com' ) ).
+    lo_tree->add_nodes_and_items( node_table = lt_node
+                                  item_table = lt_item ).
+    DATA(lt_view) = lo_tree->view( ).
+    cl_abap_unit_assert=>assert_equals( act = lt_view[ 1 ]-text
+                                        exp = `Lufthansa` ).
+    cl_abap_unit_assert=>assert_initial( lo_tree->columns( ) ).
+    DATA(lt_cell) = lo_tree->cells( lt_view[ 1 ]-key ).
+    cl_abap_unit_assert=>assert_equals( act = lines( lt_cell )
+                                        exp = 2 ).
+    cl_abap_unit_assert=>assert_equals( act = lt_cell[ 1 ]-width
+                                        exp = 10 ).
+    cl_abap_unit_assert=>assert_equals( act = lt_cell[ 2 ]-kind
+                                        exp = `LINK` ).
+
+    " a click on the node is one on its first item - by its own name
+    lo_tree->set_handler( handler = lo_handler method = 'ON_LIST_ITEM' event = 'ITEM_DOUBLE_CLICK' ).
+    lo_tree->dispatch( event = `CLICK` value = |{ lt_view[ 1 ]-key }| ).
+    cl_abap_unit_assert=>assert_equals( act = lo_handler->mv_log
+                                        exp = `ITEM LH 1;` ).
+
+  ENDMETHOD.
+
   METHOD events.
 
     DATA(lo_handler) = NEW ltcl_handler( ).
@@ -439,6 +664,27 @@ CLASS ltcl_test IMPLEMENTATION.
 
     lo_html->show_data( ).
     cl_abap_unit_assert=>assert_not_initial( mo_gui->mt_control[ 2 ]-html ).
+
+    " the history: back to the web address, forward to the document again
+    lo_html->go_back( ).
+    lo_html->get_current_url( IMPORTING url = lv_url ).
+    cl_abap_unit_assert=>assert_equals( act = lv_url
+                                        exp = `https://www.sap.com` ).
+    cl_abap_unit_assert=>assert_equals( act = mo_gui->mt_control[ 2 ]-url
+                                        exp = `https://www.sap.com` ).
+    lo_html->go_forward( ).
+    cl_abap_unit_assert=>assert_not_initial( mo_gui->mt_control[ 2 ]-html ).
+    " the first page has none before it
+    lo_html->go_back( ).
+    lo_html->go_back( ).
+    lo_html->go_back( ).
+    cl_abap_unit_assert=>assert_not_initial( mo_gui->mt_control[ 2 ]-html ).
+
+    " cl_gui_container=>visible_false hides the control
+    lo_html->set_visible( z2ui5_cl_cgui_gui=>visible_false ).
+    cl_abap_unit_assert=>assert_true( mo_gui->mt_control[ 2 ]-hidden ).
+    lo_html->set_visible( z2ui5_cl_cgui_gui=>visible_true ).
+    cl_abap_unit_assert=>assert_false( mo_gui->mt_control[ 2 ]-hidden ).
 
   ENDMETHOD.
 

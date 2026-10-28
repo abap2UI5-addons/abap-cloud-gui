@@ -25,6 +25,15 @@ CLASS z2ui5_cl_cgui_r2c_16 DEFINITION PUBLIC
     " selection screen
     DATA p_carrid TYPE sflight-carrid.
 
+    " the answers of the popups - the statements after the CALL FUNCTION
+    METHODS on_popup_1
+      IMPORTING
+        answer TYPE string.
+
+    METHODS on_popup_2
+      IMPORTING
+        answer TYPE string.
+
   PROTECTED SECTION.
     METHODS initialization REDEFINITION.
     METHODS selection_screen REDEFINITION.
@@ -45,6 +54,9 @@ CLASS z2ui5_cl_cgui_r2c_16 IMPLEMENTATION.
 
   METHOD initialization.
 
+    " the command field of the SAP GUI: transactions, /n, /o and OK codes
+    set_command_field( ).
+
     set_title( `The synchronous popups` ).
     p_carrid = 'LH'.
 
@@ -58,13 +70,6 @@ CLASS z2ui5_cl_cgui_r2c_16 IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD start_of_selection.
-
-    " every run starts with the global data of a fresh start - the classic report restarted after its list
-    CLEAR: gt_flight,
-           gs_flight,
-           gv_answer,
-           gv_booked,
-           lv_answer.
 
     SELECT * FROM sflight INTO TABLE @gt_flight
       WHERE carrid = @p_carrid
@@ -89,7 +94,7 @@ CLASS z2ui5_cl_cgui_r2c_16 IMPLEMENTATION.
 
     popup_to_decide( question = 'Book the flight' && ` ` && gs_flight-connid
                      options  = VALUE #( ( `Book now` ) ( `Waiting list` ) )
-                     ucomm    = `POPUP_1`
+                     then     = `ON_POPUP_1`
                      title    = 'Booking' ).
 
   ENDMETHOD.
@@ -100,35 +105,39 @@ CLASS z2ui5_cl_cgui_r2c_16 IMPLEMENTATION.
       WHEN 'CANCEL'.
         popup_to_decide( question = 'Cancel all bookings of this run?'
                          options  = VALUE #( ( `Cancel them` ) ( `Keep them` ) )
-                         ucomm    = `POPUP_2`
+                         then     = `ON_POPUP_2`
                          title    = 'Cancel bookings' ).
       WHEN 'PASSENGER'.
         passenger( ).
     ENDCASE.
 
-    " the answers of the popups - the statements after the CALL FUNCTION
-    CASE ucomm.
-      WHEN `POPUP_1`.
-        lv_answer = popup_answer( ).
-        CASE lv_answer.
-          WHEN '1'.
-            book( gs_flight ).
-          WHEN '2'.
-            list( )->new_line(
-                )->write( 'On the waiting list:'
-                )->write( gs_flight-connid ).
-          WHEN OTHERS.
-            list( )->new_line(
-                )->write( 'Nothing booked' ).
-        ENDCASE.
-      WHEN `POPUP_2`.
-        gv_answer = popup_answer( ).
-        IF gv_answer = '1'.
-          gv_booked = 0.
-          list( )->new_line(
-              )->write( 'All bookings cancelled' ).
-        ENDIF.
+  ENDMETHOD.
+
+  METHOD on_popup_1.
+
+    lv_answer = answer.
+    CASE lv_answer.
+      WHEN '1'.
+        book( gs_flight ).
+      WHEN '2'.
+        list( )->new_line(
+            )->write( 'On the waiting list:'
+            )->write( gs_flight-connid ).
+      WHEN OTHERS.
+        list( )->new_line(
+            )->write( 'Nothing booked' ).
     ENDCASE.
+
+  ENDMETHOD.
+
+  METHOD on_popup_2.
+
+    gv_answer = answer.
+    IF gv_answer = '1'.
+      gv_booked = 0.
+      list( )->new_line(
+          )->write( 'All bookings cancelled' ).
+    ENDIF.
 
   ENDMETHOD.
 
@@ -153,6 +162,8 @@ CLASS z2ui5_cl_cgui_r2c_16 IMPLEMENTATION.
     popup_get_values_sval( sval  = lt_fields
                            ucomm = `POPUP_3`
                            title = 'Passenger' ).
+    " TODO in at_user_command( ) with ucomm POPUP_3: lv_rc = SWITCH #( popup_answer( ) WHEN 'A' THEN 'A' ELSE space ).
+    " TODO in at_user_command( ) with ucomm POPUP_3: popup_values_sval( CHANGING sval = lt_fields ).
     IF lv_rc = 'A'.
       RETURN.
     ENDIF.

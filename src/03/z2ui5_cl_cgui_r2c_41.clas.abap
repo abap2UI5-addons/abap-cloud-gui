@@ -11,7 +11,7 @@ CLASS z2ui5_cl_cgui_r2c_41 DEFINITION PUBLIC
     METHODS initialization REDEFINITION.
     METHODS selection_screen REDEFINITION.
     METHODS start_of_selection REDEFINITION.
-    METHODS at_gui_event REDEFINITION.
+    METHODS at_roundtrip_start REDEFINITION.
 
   PRIVATE SECTION.
     " global data of the report typed with its local classes - local types
@@ -25,7 +25,8 @@ CLASS z2ui5_cl_cgui_r2c_41 IMPLEMENTATION.
 
   METHOD initialization.
 
-    lcl_r2c=>app = me.
+    " the command field of the SAP GUI: transactions, /n, /o and OK codes
+    set_command_field( ).
 
     set_title( `A Stamp` ).
     p_fit = abap_true.
@@ -34,8 +35,6 @@ CLASS z2ui5_cl_cgui_r2c_41 IMPLEMENTATION.
 
   METHOD selection_screen.
 
-    lcl_r2c=>app = me.
-
     screen->checkbox( val  = p_fit
                       text = `Fit to width` ).
 
@@ -43,18 +42,13 @@ CLASS z2ui5_cl_cgui_r2c_41 IMPLEMENTATION.
 
   METHOD start_of_selection.
 
-    lcl_r2c=>app = me.
-
-    " every run starts with the global data of a fresh start - the classic report restarted after its list
-    CLEAR go_stamp.
-
     go_stamp = NEW lcl_stamp( ).
     list( )->new_line(
         )->write( 'Click the stamp' ).
 
   ENDMETHOD.
 
-  METHOD at_gui_event.
+  METHOD at_roundtrip_start.
 
     lcl_r2c=>app = me.
 

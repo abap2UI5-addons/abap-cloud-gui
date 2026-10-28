@@ -20,6 +20,7 @@ CLASS z2ui5_cl_cgui_r2c_21 DEFINITION PUBLIC
     METHODS selection_screen REDEFINITION.
     METHODS at_selection_screen_output REDEFINITION.
     METHODS start_of_selection REDEFINITION.
+    METHODS at_roundtrip_start REDEFINITION.
 
   PRIVATE SECTION.
     " global data of the report typed with its local classes - local types
@@ -34,7 +35,8 @@ CLASS z2ui5_cl_cgui_r2c_21 IMPLEMENTATION.
 
   METHOD initialization.
 
-    lcl_r2c=>app = me.
+    " the command field of the SAP GUI: transactions, /n, /o and OK codes
+    set_command_field( ).
 
     p_carrid = 'LH'.
 
@@ -44,8 +46,6 @@ CLASS z2ui5_cl_cgui_r2c_21 IMPLEMENTATION.
 
   METHOD selection_screen.
 
-    lcl_r2c=>app = me.
-
     screen->parameter( p_carrid
         )->select_option( val        = s_connid
                           no_display = abap_true ).
@@ -54,19 +54,11 @@ CLASS z2ui5_cl_cgui_r2c_21 IMPLEMENTATION.
 
   METHOD at_selection_screen_output.
 
-    lcl_r2c=>app = me.
-
     set_cursor_field( 'P_CARRID' ).
 
   ENDMETHOD.
 
   METHOD start_of_selection.
-
-    lcl_r2c=>app = me.
-
-    " every run starts with the global data of a fresh start - the classic report restarted after its list
-    CLEAR: scarr,
-           gv_total.
 
     SELECT SINGLE * FROM scarr INTO @scarr WHERE carrid = @p_carrid.
     IF sy-subrc <> 0.
@@ -78,6 +70,12 @@ CLASS z2ui5_cl_cgui_r2c_21 IMPLEMENTATION.
         )->write( 'Airline:'
         )->write( scarr-carrname ).
     go_report->run( ).
+
+  ENDMETHOD.
+
+  METHOD at_roundtrip_start.
+
+    lcl_r2c=>app = me.
 
   ENDMETHOD.
 

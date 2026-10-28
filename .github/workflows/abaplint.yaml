@@ -4,8 +4,7 @@ name: abaplint
 # keeps it downportable), cloud checks it against the released-API surface of
 # ABAP Cloud, v702 downports a scratch copy (.github/scripts/check-702.sh) and
 # checks that. The core is pinned to a release tag (abaplint.jsonc,
-# scripts/core-pin.mjs); popups and layout-management are still resolved from
-# their main branches. The weekly run is the canary against the core's main
+# scripts/core-pin.mjs), the only dependency of the addon. The weekly run is the canary against the core's main
 # branch: it catches an upstream rename while no pull request is open.
 
 on:

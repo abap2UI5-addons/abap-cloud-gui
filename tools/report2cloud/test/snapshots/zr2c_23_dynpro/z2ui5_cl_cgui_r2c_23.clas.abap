@@ -45,6 +45,9 @@ CLASS z2ui5_cl_cgui_r2c_23 IMPLEMENTATION.
 
   METHOD initialization.
 
+    " the command field of the SAP GUI: transactions, /n, /o and OK codes
+    set_command_field( ).
+
     set_title( `A dynpro of fields` ).
     p_carrid = 'LH'.
 
@@ -59,16 +62,6 @@ CLASS z2ui5_cl_cgui_r2c_23 IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD start_of_selection.
-
-    " every run starts with the global data of a fresh start - the classic report restarted after its list
-    CLEAR: ok_code,
-           gv_connid,
-           gv_seats,
-           gv_window,
-           gv_bus,
-           gv_check,
-           gv_booked.
-    gv_eco = abap_true.
 
     CLEAR: gv_connid, gv_seats, gv_check, gv_booked.
     call_screen( `0100` ).

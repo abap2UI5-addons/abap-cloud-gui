@@ -17,11 +17,27 @@ CLASS ltcl_test DEFINITION FINAL FOR TESTING
     METHODS table_as_text FOR TESTING.
     METHODS url_of_bytes FOR TESTING.
     METHODS bytes_lines_base64 FOR TESTING.
+    METHODS no_gui_version FOR TESTING.
 
 ENDCLASS.
 
 
 CLASS ltcl_test IMPLEMENTATION.
+
+  METHOD no_gui_version.
+
+    DATA lt_version TYPE string_table.
+    DATA lv_rc TYPE i.
+
+    " a browser runs the app: the answer of the classic where no SAP GUI is
+    z2ui5_cl_cgui_frontend=>get_gui_version( CHANGING   version_table  = lt_version
+                                                        rc             = lv_rc
+                                             EXCEPTIONS gui_no_version = 3
+                                                        OTHERS         = 9 ).
+    cl_abap_unit_assert=>assert_subrc( exp = 3 ).
+    cl_abap_unit_assert=>assert_initial( lt_version ).
+
+  ENDMETHOD.
 
   METHOD file_name_without_folder.
 

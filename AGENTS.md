@@ -39,10 +39,13 @@ elements that are released on ABAP Cloud and exist on 7.02 (`MANDT`,
   anything under its `src/99`, never core internals such as
   `z2ui5_cl_ui5_util_context` (copy a helper into `z2ui5_cl_cgui_context`
   instead).
-- [abap2UI5-addons/popups](https://github.com/abap2UI5-addons/popups) —
-  `z2ui5_cl_popup_get_range`, `_to_confirm`, `_to_select`, `_input_val`.
+Nothing else. The popups (value help, ranges, confirmation, decisions,
+values, files, the transport request) are classes of this addon
+(`z2ui5_cl_cgui_popup`, `_select`, `_range`, `_file`, `_transport`), in its
+style - do not bring a dependency on abap2UI5-addons/popups back; copy what
+is needed and adapt it.
 
-abaplint resolves these as git dependencies. The core is **pinned to a
+abaplint resolves abap2UI5 as a git dependency. The core is **pinned to a
 release tag** (the `"branch"` key of the abap2UI5 dependency, abap2UI5
 CONVENTIONS §9): users install a release next to this addon, so the gates
 run against that release and not against the framework's `main`. Three
@@ -52,8 +55,7 @@ read and move them only with `scripts/core-pin.mjs` (`get` fails when they
 disagree). `bump-core.yaml` moves the pin weekly to the newest release after
 the three abaplint gates passed on it, and the scheduled `abaplint` run lints
 once against the core's `main` as the canary (`core-pin.mjs set main`, never
-committed). Do not drop the key: abaplint then clones `main` silently. popups
-and layout-management have no release tags and are resolved from `main`.
+committed). Do not drop the key: abaplint then clones `main` silently.
 
 ## Targets
 
@@ -219,8 +221,8 @@ from it is rewritten by hand), measured weekly by
 - **A class that lints is not a class that runs.**
   `npm run test:report2cloud:runtime` (opt-in; needs an mcp-server checkout
   at `MCP_SERVER_HOME` or `../mcp-server`, git and network) transpiles the
-  corpus classes with `src/01` (its tables and data elements included),
-  the popups and the seeded flight table stubs
+  corpus classes with `src/01` (its tables and data elements included)
+  and the seeded flight table stubs
   against `@abap2ui5/node-runtime` and operates every report through the
   JSON protocol of the frontend (mcp-server's app client): fields, Execute,
   hotspots, grid rows, the F4 popup (a table of the agent snapshot, picked
@@ -262,14 +264,13 @@ from it is rewritten by hand), measured weekly by
 
 ## Verifying at runtime
 
-The views can be driven without an SAP system: transpile `src` plus the
-popups used against `@abap2ui5/node-runtime` (the mcp-server's
+The views can be driven without an SAP system: transpile `src` against
+`@abap2ui5/node-runtime` (the mcp-server's
 `lib/npm-backend.mjs` `buildNpm`), start `lib/npm-host.mjs`, and drive the
 app with Playwright. The unit tests run the same way, in CI
 (`.github/workflows/unit.yaml`) and locally: `npm run unit`
 (`scripts/unit.mjs`, the build of the report2cloud runtime test with the test
-includes; mcp-server at `MCP_SERVER_HOME` or `../mcp-server`, the popups at
-`.deps/popups`). The MCP server's own unit action deploys classes and
+includes; mcp-server at `MCP_SERVER_HOME` or `../mcp-server`). The MCP server's own unit action deploys classes and
 interfaces only - no tables - hence the script.
 Where the UI5 CDN (`sdk.openui5.org`) is not reachable, serve the
 `@openui5/*/src` packages the linter installs in `node_modules` through a

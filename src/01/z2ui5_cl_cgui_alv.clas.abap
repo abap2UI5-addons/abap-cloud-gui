@@ -50,6 +50,8 @@ CLASS z2ui5_cl_cgui_alv DEFINITION PUBLIC FINAL CREATE PUBLIC.
         details_close  TYPE string VALUE `CGUI_ALV_DETAILS_CLOSE`,
         search         TYPE string VALUE `CGUI_ALV_SEARCH`,
         f4             TYPE string VALUE `CGUI_ALV_F4`,
+        chart          TYPE string VALUE `CGUI_ALV_CHART`,
+        chart_close    TYPE string VALUE `CGUI_ALV_CHART_CLOSE`,
       END OF cs_event.
 
     CONSTANTS:
@@ -710,6 +712,32 @@ CLASS z2ui5_cl_cgui_alv DEFINITION PUBLIC FINAL CREATE PUBLIC.
       RETURNING
         VALUE(result) TYPE REF TO z2ui5_cl_cgui_alv.
 
+    "! the chart button of the toolbar - a bar chart of the rows shown, a
+    "! column as the categories, a numeric one summed as the values; on by
+    "! default
+    METHODS set_chart
+      IMPORTING
+        val           TYPE abap_bool DEFAULT abap_true
+      RETURNING
+        VALUE(result) TYPE REF TO z2ui5_cl_cgui_alv.
+
+    "! the chart of the rows of tab in a dialog box - the columns as the
+    "! user picked them last, else the first text and the first number
+    "! a Select of the number columns for one more series of the chart -
+    "! its first item is none
+    METHODS chart_value_select
+      IMPORTING
+        node    TYPE REF TO z2ui5_cl_ui5_view_builder
+        comps   TYPE z2ui5_cl_cgui_context=>ty_t_comp
+        which   TYPE string
+        current TYPE string
+        client  TYPE REF TO z2ui5_if_client.
+
+    METHODS chart_popup
+      IMPORTING
+        client TYPE REF TO z2ui5_if_client
+        tab    TYPE STANDARD TABLE.
+
     "! the details button of the toolbar - the fields of the row selected
     "! in a dialog box; on by default with a selection column
     METHODS set_details
@@ -925,6 +953,13 @@ CLASS z2ui5_cl_cgui_alv DEFINITION PUBLIC FINAL CREATE PUBLIC.
     DATA mv_fixed_columns  TYPE i.
     DATA mv_no_stripes     TYPE abap_bool.
     DATA mv_no_details     TYPE abap_bool.
+    DATA mv_no_chart       TYPE abap_bool.
+    DATA mv_chart_category TYPE string.
+    DATA mv_chart_value    TYPE string.
+    " the second and third series, and the kind of the chart
+    DATA mv_chart_value2   TYPE string.
+    DATA mv_chart_value3   TYPE string.
+    DATA mv_chart_kind     TYPE string.
     DATA mv_no_search      TYPE abap_bool.
     DATA mv_search         TYPE string.
     DATA mv_single_row     TYPE i.
@@ -1760,6 +1795,197 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
 
     mv_no_stripes = xsdbool( val = abap_false ).
     result = me.
+
+  ENDMETHOD.
+
+  METHOD set_chart.
+
+    mv_no_chart = xsdbool( val = abap_false ).
+    result = me.
+
+  ENDMETHOD.
+
+  METHOD chart_value_select.
+
+    DATA(lo_select) = node->ele( `Select`
+        )->a( n = `selectedKey` t = current
+        )->a( n = `change`      v = client->_event( val   = cs_event-chart
+                                                    t_arg = VALUE #( ( which ) ( `${$source>/selectedKey}` ) ) )
+        )->a( n = `class`       v = `sapUiTinyMarginBegin` ).
+    lo_select->tag( n = `Item` ns = `core`
+        )->a( n = `key`  v = ``
+        )->a( n = `text` t = CONV #( '(none)'(028) ) ).
+    LOOP AT comps INTO DATA(ls_comp).
+      IF is_numeric( ls_comp-type_kind ) = abap_true.
+        lo_select->tag( n = `Item` ns = `core`
+            )->a( n = `key`  t = ls_comp-name
+            )->a( n = `text` t = ls_comp-label ).
+      ENDIF.
+    ENDLOOP.
+
+  ENDMETHOD.
+
+  METHOD chart_popup.
+
+    DATA(lt_comp) = columns_visible( tab ).
+    " the columns picked - else the first text and the first number; no
+    " number: the rows are counted
+    " the first text column with more than one value - a column of one
+    " value is one bar
+    IF NOT line_exists( lt_comp[ name = mv_chart_category ] ).
+      CLEAR mv_chart_category.
+      LOOP AT lt_comp INTO DATA(ls_comp) WHERE boolean = abap_false.
+        IF is_numeric( ls_comp-type_kind ) = abap_true.
+          CONTINUE.
+        ENDIF.
+        IF mv_chart_category IS INITIAL.
+          mv_chart_category = ls_comp-name.
+        ENDIF.
+        IF lines( z2ui5_cl_cgui_chart=>bars( tab      = tab
+                                             category = ls_comp-name
+                                             value    = `` ) ) > 1.
+          mv_chart_category = ls_comp-name.
+          EXIT.
+        ENDIF.
+      ENDLOOP.
+    ENDIF.
+    " %COUNT: the rows counted
+    IF mv_chart_value IS NOT INITIAL AND mv_chart_value <> `%COUNT` AND NOT line_exists( lt_comp[ name = mv_chart_value ] ).
+      CLEAR mv_chart_value.
+    ENDIF.
+    IF mv_chart_value IS INITIAL.
+      mv_chart_value = `%COUNT`.
+      LOOP AT lt_comp INTO ls_comp.
+        IF is_numeric( ls_comp-type_kind ) = abap_true.
+          mv_chart_value = ls_comp-name.
+          EXIT.
+        ENDIF.
+      ENDLOOP.
+    ENDIF.
+
+    " the series: the value column and up to two more - the rows counted
+    " are one series of their own
+    DATA lt_value TYPE string_table.
+    DATA lt_name  TYPE string_table.
+    IF mv_chart_value = `%COUNT`.
+      INSERT CONV string( 'Number of rows'(023) ) INTO TABLE lt_name.
+    ELSE.
+      DATA(lt_series) = VALUE string_table( ( mv_chart_value ) ( mv_chart_value2 ) ( mv_chart_value3 ) ).
+      LOOP AT lt_series INTO DATA(lv_series).
+        READ TABLE lt_comp INTO ls_comp WITH KEY name = lv_series.
+        IF sy-subrc = 0 AND is_numeric( ls_comp-type_kind ) = abap_true AND NOT line_exists( lt_value[ table_line = lv_series ] ).
+          INSERT lv_series INTO TABLE lt_value.
+          INSERT ls_comp-label INTO TABLE lt_name.
+        ENDIF.
+      ENDLOOP.
+    ENDIF.
+    IF mv_chart_kind IS INITIAL.
+      mv_chart_kind = z2ui5_cl_cgui_chart=>cs_kind-bar.
+    ENDIF.
+    DATA(lt_point) = z2ui5_cl_cgui_chart=>series( tab      = tab
+                                                  category = mv_chart_category
+                                                  values   = lt_value
+                                                  other    = 'Other'(020) ).
+
+    DATA(lo_dialog) = z2ui5_cl_ui5_view_builder=>factory(
+        )->ele( n = `FragmentDefinition` ns = `core`
+        )->a( n = `xmlns`      v = `sap.m`
+        )->a( n = `xmlns:core` v = `sap.ui.core`
+        )->ele( `Dialog`
+        )->a( n = `title`        t = COND #( WHEN mv_title IS NOT INITIAL THEN mv_title ELSE 'Chart'(019) )
+        )->a( n = `contentWidth` v = `44rem`
+        )->a( n = `resizable`    b = abap_true ).
+    DATA(lo_box) = lo_dialog->ele( `content`
+        )->ele( `VBox`
+        )->a( n = `class` v = `sapUiSmallMargin` ).
+
+    " the two columns to pick - every change draws the chart anew
+    DATA(lo_pick) = lo_box->ele( `HBox`
+        )->a( n = `wrap`       v = `Wrap`
+        )->a( n = `alignItems` v = `Center` ).
+    DATA(lo_cat) = lo_pick->tag( `Label`
+        )->a( n = `text`  t = |{ 'Categories'(021) }:|
+        )->a( n = `class` v = `sapUiTinyMarginEnd`
+        )->ele( `Select`
+        )->a( n = `selectedKey` t = mv_chart_category
+        )->a( n = `change`      v = client->_event( val   = cs_event-chart
+                                                    t_arg = VALUE #( ( `CATEGORY` ) ( `${$source>/selectedKey}` ) ) )
+        )->a( n = `class`       v = `sapUiSmallMarginEnd` ).
+    LOOP AT lt_comp INTO ls_comp.
+      lo_cat->tag( n = `Item` ns = `core`
+          )->a( n = `key`  t = ls_comp-name
+          )->a( n = `text` t = ls_comp-label ).
+    ENDLOOP.
+    DATA(lo_val) = lo_pick->tag( `Label`
+        )->a( n = `text`  t = |{ 'Values'(022) }:|
+        )->a( n = `class` v = `sapUiTinyMarginEnd`
+        )->ele( `Select`
+        )->a( n = `selectedKey` t = mv_chart_value
+        )->a( n = `change`      v = client->_event( val   = cs_event-chart
+                                                    t_arg = VALUE #( ( `VALUE` ) ( `${$source>/selectedKey}` ) ) ) ).
+    lo_val->tag( n = `Item` ns = `core`
+        )->a( n = `key`  v = `%COUNT`
+        )->a( n = `text` t = CONV #( 'Number of rows'(023) ) ).
+    LOOP AT lt_comp INTO ls_comp.
+      IF is_numeric( ls_comp-type_kind ) = abap_true.
+        lo_val->tag( n = `Item` ns = `core`
+            )->a( n = `key`  t = ls_comp-name
+            )->a( n = `text` t = ls_comp-label ).
+      ENDIF.
+    ENDLOOP.
+
+    " two more series beside the first - a pie draws the first only
+    IF mv_chart_value <> `%COUNT`.
+      chart_value_select( node    = lo_pick
+                          comps   = lt_comp
+                          which   = `VALUE2`
+                          current = mv_chart_value2
+                          client  = client ).
+      chart_value_select( node    = lo_pick
+                          comps   = lt_comp
+                          which   = `VALUE3`
+                          current = mv_chart_value3
+                          client  = client ).
+    ENDIF.
+
+    " the kind of the chart
+    DATA(lo_kind) = lo_pick->tag( `Label`
+        )->a( n = `text`  t = |{ 'Chart'(019) }:|
+        )->a( n = `class` v = `sapUiSmallMarginBegin sapUiTinyMarginEnd`
+        )->ele( `SegmentedButton`
+        )->a( n = `selectedKey`     t = mv_chart_kind
+        )->a( n = `selectionChange` v = client->_event( val   = cs_event-chart
+                                                        t_arg = VALUE #( ( `KIND` ) ( `${$source>/selectedKey}` ) ) )
+        )->ele( `items` ).
+    lo_kind->tag( `SegmentedButtonItem`
+        )->a( n = `key`     v = z2ui5_cl_cgui_chart=>cs_kind-bar
+        )->a( n = `icon`    v = `sap-icon://horizontal-bar-chart`
+        )->a( n = `tooltip` t = CONV #( 'Bars'(024) ) ).
+    lo_kind->tag( `SegmentedButtonItem`
+        )->a( n = `key`     v = z2ui5_cl_cgui_chart=>cs_kind-column
+        )->a( n = `icon`    v = `sap-icon://vertical-bar-chart`
+        )->a( n = `tooltip` t = CONV #( 'Columns'(025) ) ).
+    lo_kind->tag( `SegmentedButtonItem`
+        )->a( n = `key`     v = z2ui5_cl_cgui_chart=>cs_kind-line
+        )->a( n = `icon`    v = `sap-icon://line-chart`
+        )->a( n = `tooltip` t = CONV #( 'Lines'(026) ) ).
+    lo_kind->tag( `SegmentedButtonItem`
+        )->a( n = `key`     v = z2ui5_cl_cgui_chart=>cs_kind-pie
+        )->a( n = `icon`    v = `sap-icon://pie-chart`
+        )->a( n = `tooltip` t = CONV #( 'Pie'(027) ) ).
+
+    lo_box->tag( n = `HTML` ns = `core`
+        )->a( n = `content` t = |<div>{ z2ui5_cl_cgui_chart=>chart_svg( points = lt_point
+                                                                       names  = lt_name
+                                                                       kind   = mv_chart_kind ) }</div>| ).
+
+    lo_dialog->ele( `buttons`
+        )->tag( `Button`
+        )->a( n = `text`  t = CONV #( 'Close'(013) )
+        )->a( n = `type`  v = `Emphasized`
+        )->a( n = `press` v = client->_event( cs_event-chart_close ) ).
+
+    client->popup_display( lo_dialog->stringify( ) ).
 
   ENDMETHOD.
 
@@ -2917,8 +3143,23 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
                          tab    = tab
                          row    = lt_selected[ 1 ] ).
         ENDIF.
-      WHEN cs_event-details_close.
+      WHEN cs_event-details_close OR cs_event-chart_close.
         client->popup_destroy( ).
+      WHEN cs_event-chart.
+        CASE client->get_event_arg( 1 ).
+          WHEN `CATEGORY`.
+            mv_chart_category = to_upper( client->get_event_arg( 2 ) ).
+          WHEN `VALUE`.
+            mv_chart_value = to_upper( client->get_event_arg( 2 ) ).
+          WHEN `VALUE2`.
+            mv_chart_value2 = to_upper( client->get_event_arg( 2 ) ).
+          WHEN `VALUE3`.
+            mv_chart_value3 = to_upper( client->get_event_arg( 2 ) ).
+          WHEN `KIND`.
+            mv_chart_kind = to_upper( client->get_event_arg( 2 ) ).
+        ENDCASE.
+        chart_popup( client = client
+                     tab    = tab ).
       WHEN cs_event-search.
         set_search( client->get_event_arg( ) ).
       WHEN OTHERS.
@@ -3144,6 +3385,13 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
           )->a( n = `icon`    v = `sap-icon://action-settings`
           )->a( n = `tooltip` t = CONV #( 'Change Layout'(005) )
           )->a( n = `press`   v = client->_event( cs_event-layout ) ).
+    ENDIF.
+
+    IF mv_no_chart = abap_false.
+      lo_bar->tag( `Button`
+          )->a( n = `icon`    v = `sap-icon://bar-chart`
+          )->a( n = `tooltip` t = CONV #( 'Chart'(019) )
+          )->a( n = `press`   v = client->_event( cs_event-chart ) ).
     ENDIF.
 
     IF mv_no_export = abap_false.

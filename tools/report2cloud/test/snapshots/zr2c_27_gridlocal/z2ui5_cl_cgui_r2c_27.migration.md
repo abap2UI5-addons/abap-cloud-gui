@@ -5,7 +5,7 @@
 | Source | `zr2c_27_gridlocal.prog.abap` |
 | Text pool | `zr2c_27_gridlocal.prog.xml` |
 | Result | **converted** - `z2ui5_cl_cgui_r2c_27.clas.abap`, `z2ui5_cl_cgui_r2c_27.clas.locals_def.abap`, `z2ui5_cl_cgui_r2c_27.clas.locals_imp.abap`, `z2ui5_cl_cgui_r2c_27.clas.xml` |
-| Mapped | 15 construct(s) |
+| Mapped | 14 construct(s) |
 | TODO | 0 |
 | Release state to check | 3 object(s) |
 
@@ -32,7 +32,6 @@ Layout, formatting and behaviour of the classic report that the list, the ALV or
 |---|---|---|
 | 10 | `REPORT zr2c_27_gridlocal` | the class, `INHERITING FROM z2ui5_cl_cgui_report` |
 | 12 | `CLASS lcl_alv DEFINITION FINAL` | locals_def |
-| 30 | `global data - the report restarted after its list` | `CLEAR` of 2 global data object(s) at the start of `start_of_selection( )` |
 | 33 | `CLASS lcl_alv IMPLEMENTATION` | locals_imp |
 | 45 | `SET HANDLER on_toolbar FOR grid` | `grid->set_handler( )` - the stand-in keeps the handler and calls it for the event of the browser |
 | 46 | `SET HANDLER on_user_command FOR grid` | `grid->set_handler( )` - the stand-in keeps the handler and calls it for the event of the browser |

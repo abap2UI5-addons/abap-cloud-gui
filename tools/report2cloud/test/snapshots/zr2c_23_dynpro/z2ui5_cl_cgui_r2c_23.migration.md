@@ -5,7 +5,7 @@
 | Source | `zr2c_23_dynpro.prog.abap` |
 | Text pool | `zr2c_23_dynpro.prog.xml` |
 | Result | **converted** - `z2ui5_cl_cgui_r2c_23.clas.abap`, `z2ui5_cl_cgui_r2c_23.clas.xml` |
-| Mapped | 31 construct(s) |
+| Mapped | 30 construct(s) |
 | TODO | 0 |
 | Release state to check | 0 object(s) |
 
@@ -19,7 +19,6 @@ The class uses no database table, DDIC type, function module, class or message c
 |---|---|---|
 | 12 | `REPORT zr2c_23_dynpro` | the class, `INHERITING FROM z2ui5_cl_cgui_report` |
 | 14 | `PARAMETERS p_carrid TYPE c LENGTH 3 DEFAULT 'LH' OBLIGATORY` | attribute `p_carrid`, `screen->parameter( )` |
-| 16 | `global data - the report restarted after its list` | `CLEAR` of 8 global data object(s) at the start of `start_of_selection( )` |
 | 19 | `DATA gv_window TYPE c LENGTH 1` | `TYPE abap_bool` - a checkbox or radio button of the dynpro |
 | 20 | `DATA gv_eco TYPE c LENGTH 1 VALUE 'X'` | `TYPE abap_bool` - a checkbox or radio button of the dynpro |
 | 21 | `DATA gv_bus TYPE c LENGTH 1` | `TYPE abap_bool` - a checkbox or radio button of the dynpro |

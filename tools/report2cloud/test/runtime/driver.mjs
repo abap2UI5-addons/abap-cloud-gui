@@ -72,13 +72,20 @@ export async function createDriver({ mcp, url }) {
     });
   }
 
+  // the command field of the page header is no field of the screen - it
+  // stands apart as `command`
+  const screen = (s) => {
+    if (!s || !Array.isArray(s.fields)) return s;
+    return { ...s, command: s.fields.find((f) => f.name === "MV_CGUI_OKCODE"), fields: s.fields.filter((f) => f.name !== "MV_CGUI_OKCODE") };
+  };
+
   return {
     client,
     lines,
     /** the frontend state the responses built: slots (view XML) and models */
     state: () => state,
-    start: (app, opts) => client.start(app, opts),
-    act: (session, opts) => client.act(session, opts),
-    describe: (session) => client.describe(session),
+    start: async (app, opts) => screen(await client.start(app, opts)),
+    act: async (session, opts) => screen(await client.act(session, opts)),
+    describe: async (session) => screen(await client.describe(session)),
   };
 }

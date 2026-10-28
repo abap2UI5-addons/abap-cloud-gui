@@ -24,6 +24,9 @@ CLASS z2ui5_cl_cgui_r2c_33 IMPLEMENTATION.
 
   METHOD initialization.
 
+    " the command field of the SAP GUI: transactions, /n, /o and OK codes
+    set_command_field( ).
+
     set_title( `Working with Strings` ).
     p_name = 'ada   augusta  lovelace'.
 
@@ -38,10 +41,6 @@ CLASS z2ui5_cl_cgui_r2c_33 IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD start_of_selection.
-
-    " every run starts with the global data of a fresh start - the classic report restarted after its list
-    CLEAR: lt_part,
-           lv_initials.
 
     DATA(lv_clean) = condense( p_name ).
     SPLIT lv_clean AT space INTO TABLE lt_part.

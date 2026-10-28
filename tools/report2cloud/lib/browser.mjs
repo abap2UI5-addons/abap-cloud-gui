@@ -25,6 +25,14 @@ import { extname, join } from "node:path";
 import { REPO } from "./gate.mjs";
 
 const UI5 = join(REPO, "node_modules", "@openui5");
+// the release of the packages - the CDN has the built themes of it
+const UI5_VERSION = (() => {
+  try {
+    return JSON.parse(readFileSync(join(UI5, "sap.m", "package.json"), "utf8")).version;
+  } catch {
+    return "1.153.0";
+  }
+})();
 
 // what a page error of an unbundled UI5 is when it is not the app's
 const BENIGN = [
@@ -66,8 +74,8 @@ export function ui5File(pathname) {
 
 /** a new page on the backend at url: UI5 from the packages, the errors of
  *  the page and of the backend collected */
-async function openPage(browser, url) {
-  const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+async function openPage(browser, url, viewport = { width: 1280, height: 900 }, themes = false) {
+  const context = await browser.newContext({ viewport, ignoreHTTPSErrors: themes });
   const page = await context.newPage();
   const errors = [];
   page.on("pageerror", (e) => { if (!benign(e.message)) errors.push(`page error: ${e.message.split("\n")[0].slice(0, 200)}`); });
@@ -82,8 +90,16 @@ async function openPage(browser, url) {
     return route.fulfill({ response, body: allowSourceUi5(await response.text()) });
   });
   await page.route("**://sdk.openui5.org/**", (route) => {
-    const hit = ui5File(new URL(route.request().url()).pathname);
-    return hit ? route.fulfill({ status: 200, contentType: hit.type, body: hit.body }) : route.fulfill({ status: 404, body: "" });
+    const path = new URL(route.request().url()).pathname;
+    const hit = ui5File(path);
+    if (hit) return route.fulfill({ status: 200, contentType: hit.type, body: hit.body });
+    // a theme is built from LESS sources the packages have, not the CSS:
+    // it comes from the CDN, of the release of the packages
+    const at = path.indexOf("/resources/");
+    if (themes && at >= 0 && /\/themes\//.test(path)) {
+      return route.continue({ url: `https://sdk.openui5.org/${UI5_VERSION}/resources/${path.slice(at + "/resources/".length)}` }).catch(() => route.abort().catch(() => {}));
+    }
+    return route.fulfill({ status: 404, body: "" });
   });
   return { context, page, errors };
 }
@@ -111,20 +127,29 @@ async function settle(page) {
  * Start every app of `classes` on the backend at `url` in Chromium. Resolves
  * [{ cls, ok, booted, executed, errors }]. execute: press Execute when the
  * first screen is a selection screen (a button with the text Execute).
+ * check(page, errors, cls): awaited with the page of each app, after Execute -
+ * the caller drives it further; an error it pushes fails the app.
  * after(row): awaited after each app - an error it pushes fails the app.
+ * themes: the built themes from the CDN (sdk.openui5.org, the release of
+ * the packages) - a layout is judged themed only.
+ * viewport: the size of the page ({ width, height }); below 600px wide it is
+ * a phone, and a page wider than it fails the app.
  */
-export async function browserRun(classes, { url, execute = true, timeoutMs = 60_000, after = async () => {}, onLine = () => {} } = {}) {
+export async function browserRun(classes, { url, execute = true, timeoutMs = 60_000, viewport, themes = false, check = async () => {}, after = async () => {}, onLine = () => {} } = {}) {
   const { chromium } = await import("playwright");
   // the Chromium of this Playwright, else REPORT2CLOUD_CHROMIUM or one
   // installed beside it (a sandbox with a browser of another release)
   const own = chromium.executablePath();
   const executablePath = process.env.REPORT2CLOUD_CHROMIUM
     ?? (existsSync(own) ? undefined : ["/opt/pw-browsers/chromium"].find((p) => existsSync(p)));
-  const browser = await chromium.launch(executablePath ? { executablePath } : {});
+  // the themes come from the CDN - through the proxy of the environment, if
+  // there is one, and to the backend directly
+  const proxy = themes && process.env.HTTPS_PROXY ? { server: process.env.HTTPS_PROXY, bypass: "127.0.0.1,localhost" } : undefined;
+  const browser = await chromium.launch({ ...(executablePath ? { executablePath } : {}), ...(proxy ? { proxy } : {}) });
   const out = [];
   try {
     for (const cls of classes) {
-      const { context, page, errors } = await openPage(browser, url);
+      const { context, page, errors } = await openPage(browser, url, viewport, themes);
       let booted = false;
       let executed = false;
       // one app at most twice the time - a page that hangs Playwright itself
@@ -144,6 +169,26 @@ export async function browserRun(classes, { url, execute = true, timeoutMs = 60_
               await settle(page);
               executed = true;
             }
+          }
+          if (booted) await check(page, errors, cls);
+          // on a phone the screen fits the width - no page that scrolls sideways
+          if (themes && !(await page.evaluate(() => /72/.test(getComputedStyle(document.body).fontFamily)))) {
+            errors.push("the theme did not load - the layout is that of no theme");
+          }
+          if (viewport && viewport.width < 600) {
+            // UI5 clips what does not fit - a field or button whose right
+            // edge lies beyond the screen cannot be reached
+            const cut = await page.evaluate(() => [...document.querySelectorAll(".sapMInputBase, .sapMBtn, .sapMCb, .sapMRb, .sapMSlt")]
+              .filter((e) => e.offsetParent !== null && e.getBoundingClientRect().width > 0)
+              .filter((e) => e.getBoundingClientRect().right > window.innerWidth + 1)
+              .map((e) => e.id || e.className.split(" ")[0]));
+            if (cut.length) errors.push(`beyond the right edge of the phone: ${cut.slice(0, 4).join(", ")}`);
+            // a short text squeezed until it breaks letter by letter ("t" / "o")
+            const squeezed = await page.evaluate(() => [...document.querySelectorAll(".sapMText, .sapMLabel")]
+              .filter((e) => e.offsetParent !== null && e.textContent.trim().length > 0 && e.textContent.trim().length <= 12 && !/\s/.test(e.textContent.trim()))
+              .filter((e) => e.getBoundingClientRect().height > 1.6 * (parseFloat(getComputedStyle(e).lineHeight) || 18))
+              .map((e) => e.textContent.trim()));
+            if (squeezed.length) errors.push(`squeezed onto more than one line on the phone: ${squeezed.slice(0, 4).join(", ")}`);
           }
           const popup = await errorPopup(page);
           if (popup) errors.push(`error popup: ${popup}`);

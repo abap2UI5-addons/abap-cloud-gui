@@ -119,7 +119,9 @@ test("BEGIN OF BLOCK WITH FRAME TITLE TEXT-001: the text of the text pool", () =
 
 test("TOP-OF-PAGE, END-OF-SELECTION, HIDE and AT LINE-SELECTION", () => {
   const abap = classOf("zr2c_02_flights");
-  assert.match(abap, /METHOD start_of_selection\.\n\n {4}" every run starts [^\n]*\n {4}CLEAR: gt_flight,\n {11}gs_flight,\n {11}gv_total\.\n\n {4}SELECT /);
+  // the global data starts fresh on its own - the runtime restarts the
+  // report on Back from the list (set_fresh_start( )), no CLEAR is written
+  assert.match(abap, /METHOD start_of_selection\.\n\n {4}SELECT /);
   assert.match(abap, /METHODS top_of_page REDEFINITION\./);
   // END-OF-SELECTION is the event of the runtime, which runs it after the
   // RETURN of START-OF-SELECTION as well
@@ -246,13 +248,176 @@ test("refusals: every statement without a counterpart, with file, row and column
   assert.deepEqual(result.files, {}, "no class is written");
   assert.deepEqual(result.refusals.map((r) => `${r.row}:${r.col} ${r.message.split(" - ")[0]}`), [
     "26:3 ASSIGN of a field of another program ('(PROG)FIELD')",
-    "28:3 CALL TRANSACTION",
+    "28:3 CALL TRANSACTION ... USING",
     "32:3 EXEC SQL",
     "36:3 CALL SCREEN",
     "38:1 MODULE",
     "42:1 MODULE",
   ]);
   assert.match(result.draft["z2ui5_cl_cgui_r2c_10.clas.abap"], /" report2cloud refused \(line 36\): CALL SCREEN 100/);
+});
+
+test("CALL TRANSACTION [AND SKIP FIRST SCREEN] -> call_transaction( ), the class of the catalog; USING stays refused", () => {
+  const r = convert([
+    "REPORT zt.",
+    "DATA gv_tcode TYPE c LENGTH 20 VALUE 'ZFLY'.",
+    "START-OF-SELECTION.",
+    "  SET PARAMETER ID 'CAR' FIELD 'LH'.",
+    "  CALL TRANSACTION 'ZFLY' AND SKIP FIRST SCREEN.",
+    "  CALL TRANSACTION gv_tcode WITH AUTHORITY-CHECK.",
+  ].join("\n"), { file: "zt.prog.abap", className: "zcl_t" });
+  assert.equal(r.ok, true, r.refusals.map((x) => x.message).join("\n"));
+  const cls = r.draft["zcl_t.clas.abap"];
+  assert.match(cls, /call_transaction\( code       = 'ZFLY'\n\s+skip_first = abap_true \)\./);
+  assert.match(cls, /call_transaction\( gv_tcode \)\./);
+  assert.ok(r.todos.some((t) => /the transaction must be in the catalog/.test(t.message)));
+  assert.ok(r.todos.some((t) => /the statements after CALL TRANSACTION ran when the transaction came back/.test(t.message)));
+  const u = convert("REPORT zt.\nDATA gt TYPE STANDARD TABLE OF i WITH DEFAULT KEY.\nSTART-OF-SELECTION.\n  CALL TRANSACTION 'VA02' USING gt MODE 'N'.", { file: "zt.prog.abap", className: "zcl_t" });
+  assert.equal(u.ok, false);
+});
+
+test("READ LINE / MODIFY LINE ... FIELD VALUE -> read_list( )->read_field( ) / modify_field( ) by the name of the WRITE, the checkbox ready for input", () => {
+  const r = convert([
+    "REPORT zt.",
+    "DATA gv_check TYPE c LENGTH 1.",
+    "DATA gv_carrid TYPE c LENGTH 3.",
+    "DATA gv_line TYPE string.",
+    "START-OF-SELECTION.",
+    "  gv_carrid = 'LH'.",
+    "  WRITE: / gv_check AS CHECKBOX, gv_carrid.",
+    "AT USER-COMMAND.",
+    "  DO.",
+    "    READ LINE sy-index FIELD VALUE gv_check gv_carrid INTO gv_line.",
+    "    IF sy-subrc <> 0.",
+    "      EXIT.",
+    "    ENDIF.",
+    "    IF gv_check = 'X'.",
+    "      MODIFY LINE sy-index FIELD VALUE gv_check FROM space LINE FORMAT COLOR 5.",
+    "    ENDIF.",
+    "  ENDDO.",
+    "AT LINE-SELECTION.",
+    "  READ CURRENT LINE LINE VALUE INTO gv_line.",
+  ].join("\n"), { file: "zt.prog.abap", className: "zcl_t" });
+  assert.equal(r.ok, true, r.refusals.map((x) => x.message).join("\n"));
+  const cls = r.draft["zcl_t.clas.abap"];
+  assert.match(cls, /write_as_checkbox\( val   = gv_check\n\s+input = abap_true\n\s+name  = `GV_CHECK`/);
+  assert.match(cls, /write\( val  = gv_carrid\n\s+name = `GV_CARRID`/);
+  assert.match(cls, /read_list\( \)->read_field\( EXPORTING  line    = sy-index\n\s+name    = `GV_CHECK`\n\s+CHANGING   value   = gv_check\n\s+EXCEPTIONS no_line = 4 \)\./);
+  assert.match(cls, /name    = `GV_CARRID`\n\s+CHANGING   value   = gv_line\n/);
+  assert.match(cls, /read_list\( \)->modify_field\( EXPORTING  line    = sy-index\n\s+name    = `GV_CHECK`\n\s+value   = space\n\s+EXCEPTIONS no_line = 4 \)\./);
+  // CURRENT LINE of the line selection is row
+  assert.match(cls, /gv_line = read_list\( \)->line_text\( row \)\.\n\s+read_list\( \)->read_field\( EXPORTING  line    = row\n\s+EXCEPTIONS no_line = 4 \)\./);
+  // INDEX of another list level stays refused
+  const u = convert("REPORT zt.\nDATA gv TYPE c LENGTH 1.\nSTART-OF-SELECTION.\n  READ LINE 2 INDEX 1 FIELD VALUE gv.", { file: "zt.prog.abap", className: "zcl_t" });
+  assert.equal(u.ok, false);
+});
+
+test("cl_gui_simple_tree -> z2ui5_cl_cgui_gui_simple_tree, MTREESNODE its node type, the handler of node_double_click set", () => {
+  const r = convert([
+    "REPORT zt.",
+    "CLASS lcl_handler DEFINITION.",
+    "  PUBLIC SECTION.",
+    "    METHODS on_node FOR EVENT node_double_click OF cl_gui_simple_tree IMPORTING node_key.",
+    "ENDCLASS.",
+    "CLASS lcl_handler IMPLEMENTATION.",
+    "  METHOD on_node.",
+    "    MESSAGE node_key TYPE 'S'.",
+    "  ENDMETHOD.",
+    "ENDCLASS.",
+    "DATA go_cont TYPE REF TO cl_gui_docking_container.",
+    "DATA go_tree TYPE REF TO cl_gui_simple_tree.",
+    "DATA go_handler TYPE REF TO lcl_handler.",
+    "DATA gt_node TYPE STANDARD TABLE OF mtreesnode WITH DEFAULT KEY.",
+    "DATA gs_node TYPE mtreesnode.",
+    "DATA gt_events TYPE cntl_simple_events.",
+    "DATA gs_event TYPE cntl_simple_event.",
+    "START-OF-SELECTION.",
+    "  CREATE OBJECT go_cont EXPORTING repid = sy-repid dynnr = '1000' extension = 300.",
+    "  CREATE OBJECT go_tree EXPORTING parent = go_cont node_selection_mode = cl_gui_simple_tree=>node_sel_mode_single.",
+    "  gs_event-eventid = cl_gui_simple_tree=>eventid_node_double_click.",
+    "  APPEND gs_event TO gt_events.",
+    "  go_tree->set_registered_events( EXPORTING events = gt_events ).",
+    "  CREATE OBJECT go_handler.",
+    "  SET HANDLER go_handler->on_node FOR go_tree.",
+    "  gs_node-node_key = 'ROOT'. gs_node-isfolder = 'X'. gs_node-text = 'Carriers'.",
+    "  APPEND gs_node TO gt_node.",
+    "  go_tree->add_nodes( EXPORTING table_structure_name = 'MTREESNODE' node_table = gt_node ).",
+    "  go_tree->expand_node( node_key = 'ROOT' ).",
+    "  DATA(lv_key) = CONV tv_nodekey( 'ROOT' ).",
+    "  go_tree->expand_node( node_key = lv_key ).",
+  ].join("\n"), { file: "zt.prog.abap", className: "zcl_t" });
+  assert.equal(r.ok, true, r.refusals.map((x) => x.message).join("\n"));
+  const all = Object.values(r.draft).join("\n");
+  assert.ok(!/cl_gui_simple_tree|TYPE (STANDARD TABLE OF )?mtreesnode/i.test(all), all);
+  // the type of a constructor expression too
+  assert.match(all, /CONV z2ui5_cl_cgui_gui_simple_tree=>ty_node_key\( 'ROOT' \)/);
+  assert.match(all, /TYPE REF TO z2ui5_cl_cgui_gui_simple_tree/);
+  assert.match(all, /TYPE STANDARD TABLE OF z2ui5_cl_cgui_gui_simple_tree=>ty_s_node/);
+  assert.match(all, /z2ui5_cl_cgui_gui_simple_tree=>eventid_node_double_click/);
+  assert.match(all, /set_handler\(/);
+});
+
+test("POPUP_TO_DECIDE_LIST -> popup_to_decide_list( ) with SPOPLI; an IF that also asks the answer stays after the popup", () => {
+  const r = convert([
+    "REPORT zt.",
+    "DATA gt_sel TYPE STANDARD TABLE OF spopli WITH DEFAULT KEY.",
+    "DATA gs_sel TYPE spopli.",
+    "DATA gv_answer TYPE c LENGTH 1.",
+    "START-OF-SELECTION.",
+    "  gs_sel-varoption = 'Packages'.",
+    "  APPEND gs_sel TO gt_sel.",
+    "  CALL FUNCTION 'POPUP_TO_DECIDE_LIST' EXPORTING titel = 'Selection' textline1 = 'Which objects?' start_col = 20 IMPORTING answer = gv_answer TABLES t_spopli = gt_sel EXCEPTIONS OTHERS = 1.",
+    "  IF sy-subrc <> 0 OR gv_answer = 'A'.",
+    "    RETURN.",
+    "  ENDIF.",
+    "  READ TABLE gt_sel INDEX gv_answer INTO gs_sel.",
+    "  WRITE gs_sel-varoption.",
+  ].join("\n"), { file: "zt.prog.abap", className: "zcl_t" });
+  assert.equal(r.ok, true, r.refusals.map((x) => x.message).join("\n"));
+  const cls = r.draft["zcl_t.clas.abap"];
+  assert.match(cls, /gt_sel\s+TYPE STANDARD TABLE OF z2ui5_cl_cgui_popup=>ty_s_spopli/);
+  assert.match(cls, /popup_to_decide_list\( question = 'Which objects\?'\n\s+list     = gt_sel\n\s+then     = `ON_POPUP_1`\n\s+title    = 'Selection' \)\./);
+  // the cancel check is kept - in the callback sy-subrc is 0
+  assert.match(cls, /METHOD on_popup_1\.\n\n\s+gv_answer = answer\.\n\s+IF sy-subrc <> 0 OR gv_answer = 'A'\.\n\s+RETURN\./);
+});
+
+test("the HTML viewer's history and the container's visible_true / visible_false, get_gui_version, CALL SELECTION-SCREEN of a constant", () => {
+  const r = convert([
+    "REPORT zt.",
+    "PARAMETERS p_a TYPE c LENGTH 10.",
+    "SELECTION-SCREEN BEGIN OF SCREEN 1002 TITLE TEXT-001.",
+    "PARAMETERS p_pass TYPE c LENGTH 30.",
+    "SELECTION-SCREEN END OF SCREEN 1002.",
+    "CONSTANTS c_dynnr TYPE c LENGTH 4 VALUE '1002'.",
+    "DATA go_html TYPE REF TO cl_gui_html_viewer.",
+    "DATA gv_url TYPE c LENGTH 250.",
+    "DATA gv_visible TYPE c LENGTH 1.",
+    "DATA gt_version TYPE STANDARD TABLE OF string WITH DEFAULT KEY.",
+    "DATA gv_rc TYPE i.",
+    "START-OF-SELECTION.",
+    "  CREATE OBJECT go_html EXPORTING parent = cl_gui_container=>default_screen.",
+    "  go_html->go_back( ).",
+    "  go_html->get_current_url( IMPORTING url = gv_url ).",
+    "  gv_visible = cl_gui_container=>visible_false.",
+    "  go_html->set_visible( gv_visible ).",
+    "  cl_gui_frontend_services=>get_gui_version( CHANGING version_table = gt_version rc = gv_rc EXCEPTIONS gui_no_version = 3 OTHERS = 4 ).",
+    "  CALL SELECTION-SCREEN c_dynnr STARTING AT 5 5.",
+  ].join("\n"), { file: "zt.prog.abap", className: "zcl_t" });
+  assert.equal(r.ok, true, r.refusals.map((x) => x.message).join("\n"));
+  const cls = r.draft["zcl_t.clas.abap"];
+  assert.match(cls, /go_html->go_back\( \)\./);
+  assert.match(cls, /go_html->get_current_url\( IMPORTING url = gv_url \)\./);
+  assert.match(cls, /gv_visible = z2ui5_cl_cgui_gui_container=>visible_false\./);
+  assert.match(cls, /z2ui5_cl_cgui_frontend=>get_gui_version\(/);
+  assert.match(cls, /call_selection_screen\( dynnr = `1002`/);
+});
+
+test("CALL METHOD cl_gui_frontend_services=>('CLIPBOARD_EXPORT') - a dynamic call of a literal name is the static one", () => {
+  const r = convert("REPORT zt.\nDATA lt TYPE string_table.\nDATA lv_rc TYPE i.\nSTART-OF-SELECTION.\n  CALL METHOD cl_gui_frontend_services=>('CLIPBOARD_EXPORT') EXPORTING no_auth_check = abap_true IMPORTING data = lt CHANGING rc = lv_rc EXCEPTIONS cntl_error = 1 OTHERS = 2.\n  WRITE lv_rc.", { file: "zt.prog.abap", className: "zcl_t" });
+  assert.equal(r.ok, true, r.refusals.map((x) => x.message).join("\n"));
+  assert.match(r.draft["zcl_t.clas.abap"], /z2ui5_cl_cgui_frontend=>clipboard_export\( EXPORTING no_auth_check = abap_true IMPORTING data = lt CHANGING rc = lv_rc EXCEPTIONS cntl_error = 1 OTHERS = 2 \)\./);
+  // a name the class does not have stays refused
+  assert.equal(convert("REPORT zt.\nSTART-OF-SELECTION.\n  CALL METHOD cl_gui_frontend_services=>('REGISTRY_GET_VALUE').", { file: "zt.prog.abap", className: "zcl_t" }).ok, false);
 });
 
 test("SUBMIT ... AND RETURN starts the class of the called report with the values, CALL SELECTION-SCREEN goes on in after_call_selection_screen( )", () => {
@@ -433,9 +598,9 @@ test("the files of the user: cl_gui_frontend_services and GUI_UPLOAD as z2ui5_cl
 });
 
 test("cl_gui_frontend_services: a member or a parameter the browser has no counterpart for is refused", () => {
-  const src = "REPORT zt.\nDATA lv TYPE string.\nSTART-OF-SELECTION.\n  cl_gui_frontend_services=>get_gui_version( CHANGING version_table = lv ).\n  cl_gui_frontend_services=>gui_upload( EXPORTING filename = lv check_bom = abap_true CHANGING data_tab = lv ).\n  CALL FUNCTION 'GUI_UPLOAD' EXPORTING filename = lv no_auth_check = 'X' TABLES data_tab = lv.\n  cl_gui_cfw=>flush( ).\n";
+  const src = "REPORT zt.\nDATA lv TYPE string.\nSTART-OF-SELECTION.\n  cl_gui_frontend_services=>registry_get_value( EXPORTING root = 1 key = lv CHANGING reg_value = lv ).\n  cl_gui_frontend_services=>gui_upload( EXPORTING filename = lv check_bom = abap_true CHANGING data_tab = lv ).\n  CALL FUNCTION 'GUI_UPLOAD' EXPORTING filename = lv no_auth_check = 'X' TABLES data_tab = lv.\n  cl_gui_cfw=>flush( ).\n";
   assert.deepEqual(refusalOf(src).map((x) => x.split(";")[0]), [
-    "4:3 cl_gui_frontend_services - get_gui_version has no counterpart in the browser",
+    "4:3 cl_gui_frontend_services - registry_get_value has no counterpart in the browser",
     "5:3 cl_gui_frontend_services - gui_upload( check_bom = ... ) is not supported",
     "6:3 CALL FUNCTION 'GUI_UPLOAD' - EXPORTING no_auth_check has no counterpart in z2ui5_cl_cgui_frontend=>gui_upload( )",
   ]);
@@ -520,20 +685,23 @@ test("a tab without DEFAULT SCREEN, a subscreen on no tab, a FUNCTION KEY withou
   assert.ok(r.todos.some((t) => /subscreen 0300 is on no tab/.test(t.message)));
 });
 
-test("the synchronous popups: popup_to_decide( ) / popup_get_values_sval( ), the block cut at the call and continued in at_user_command( )", () => {
+test("the synchronous popups: popup_to_decide( ) / popup_get_values_sval( ), the block cut at the call and continued in the callback on_popup_n( answer )", () => {
   const cls = classOf("zr2c_16_popups");
   const { result } = converted.get("zr2c_16_popups");
   assert.equal(result.ok, true);
   // POPUP_TO_DECIDE in AT LINE-SELECTION: the two lines joined, the options, the CASE on the answer continued
-  assert.match(cls, /METHOD at_line_selection\.\n\n(.*\n)*?\s+popup_to_decide\( question = 'Book the flight' && ` ` && gs_flight-connid\n\s+options  = VALUE #\( \( `Book now` \) \( `Waiting list` \) \)\n\s+ucomm    = `POPUP_1`\n\s+title    = 'Booking' \)\.\n\n\s+ENDMETHOD\./);
-  assert.match(cls, /WHEN `POPUP_1`\.\n\s+lv_answer = popup_answer\( \)\.\n\s+CASE lv_answer\.\n\s+WHEN '1'\.\n\s+book\( gs_flight \)\./);
+  assert.match(cls, /METHOD at_line_selection\.\n\n(.*\n)*?\s+popup_to_decide\( question = 'Book the flight' && ` ` && gs_flight-connid\n\s+options  = VALUE #\( \( `Book now` \) \( `Waiting list` \) \)\n\s+then     = `ON_POPUP_1`\n\s+title    = 'Booking' \)\.\n\n\s+ENDMETHOD\./);
+  // the callbacks are public methods - the runtime calls them by name
+  assert.match(cls, /PUBLIC SECTION\.\n(.*\n)*?\s+METHODS on_popup_1\n\s+IMPORTING\n\s+answer TYPE string\.\n(.*\n)*?\s+PROTECTED SECTION\./);
+  assert.ok(!/METHODS at_user_command REDEFINITION/.test(cls) || /CASE ucomm/.test(cls));
+  assert.match(cls, /METHOD on_popup_1\.\n\n\s+lv_answer = answer\.\n\s+CASE lv_answer\.\n\s+WHEN '1'\.\n\s+book\( gs_flight \)\./);
   // POPUP_TO_CONFIRM inside a WHEN: the branch continued, the IF sy-subrc of the EXCEPTIONS dropped, the other WHEN kept
-  assert.match(cls, /WHEN 'CANCEL'\.\n\s+popup_to_decide\( question = 'Cancel all bookings of this run\?'\n\s+options  = VALUE #\( \( `Cancel them` \) \( `Keep them` \) \)\n\s+ucomm    = `POPUP_2`\n\s+title    = 'Cancel bookings' \)\.\n\s+WHEN 'PASSENGER'\./);
-  assert.match(cls, /WHEN `POPUP_2`\.\n\s+gv_answer = popup_answer\( \)\.\n\s+IF gv_answer = '1'\./);
+  assert.match(cls, /WHEN 'CANCEL'\.\n\s+popup_to_decide\( question = 'Cancel all bookings of this run\?'\n\s+options  = VALUE #\( \( `Cancel them` \) \( `Keep them` \) \)\n\s+then     = `ON_POPUP_2`\n\s+title    = 'Cancel bookings' \)\.\n\s+WHEN 'PASSENGER'\./);
+  assert.match(cls, /METHOD on_popup_2\.\n\n\s+gv_answer = answer\.\n\s+IF gv_answer = '1'\./);
   assert.ok(!/sy-subrc/.test(cls));
   assert.ok(!/could not be shown/.test(cls));
-  // POPUP_GET_VALUES in a FORM: converted, not cut - a TODO
-  assert.match(cls, /popup_get_values_sval\( sval  = lt_fields\n\s+ucomm = `POPUP_3`\n\s+title = 'Passenger' \)\./);
+  // POPUP_GET_VALUES in a FORM: converted, not cut - the ucomm, a TODO, the answer lines as TODOs
+  assert.match(cls, /popup_get_values_sval\( sval  = lt_fields\n\s+ucomm = `POPUP_3`\n\s+title = 'Passenger' \)\.\n\s+" TODO in at_user_command\( \) with ucomm POPUP_3: lv_rc = /);
   assert.ok(result.todos.some((t) => /POPUP_GET_VALUES' in FORM passenger/.test(t.message)));
   assert.ok(result.mapped.some((m) => /dropped - the IF sy-subrc after POPUP_TO_CONFIRM/.test(m.target)));
 });
@@ -557,9 +725,10 @@ test("a popup at the top of an event block: the answer and the SVAL values first
     "  ENDIF.",
   ].join("\n"), { file: "zt.prog.abap", className: "zcl_t" });
   const cls = r.draft["zcl_t.clas.abap"];
-  assert.match(cls, /WHEN `POPUP_1`\.\n\s+lv_rc = SWITCH #\( popup_answer\( \) WHEN 'A' THEN 'A' ELSE space \)\.\n\s+popup_values_sval\( CHANGING sval = lt_fields \)\.\n\s+IF lv_rc = 'A'\./);
+  assert.match(cls, /METHOD on_popup_1\.\n\n(.*\n)*?\s+lv_rc = SWITCH #\( answer WHEN 'A' THEN 'A' ELSE space \)\.\n\s+popup_values_sval\( CHANGING sval = lt_fields \)\.\n\s+IF lv_rc = 'A'\./);
   // the second popup is cut out of the first continuation
-  assert.match(cls, /WHEN `POPUP_2`\.\n\s+lv_rc = SWITCH #\( popup_answer\( \) WHEN '1' THEN 'J' WHEN '2' THEN 'N' ELSE 'A' \)\.\n\s+IF lv_rc = 'J'\./);
+  assert.match(cls, /then\s+= `ON_POPUP_2`/);
+  assert.match(cls, /METHOD on_popup_2\.\n\n\s+lv_rc = SWITCH #\( answer WHEN '1' THEN 'J' WHEN '2' THEN 'N' ELSE 'A' \)\.\n\s+IF lv_rc = 'J'\./);
   assert.ok(r.todos.some((t) => /lv_n was declared inline before the call/.test(t.message)));
 });
 
@@ -682,7 +851,7 @@ test("SET PF-STATUS: the buttons and function keys of the status in the .prog.xm
 });
 
 test("SET PF-STATUS without the .prog.xml, of another program, by a field, space; AT PFnn", () => {
-  const conv = (src) => convert(src, { file: "zt.prog.abap", className: "zcl_t" });
+  const conv = (src) => convert(src, { file: "zt.prog.abap", className: "zcl_t", commandField: false });
   const r = conv("REPORT zt.\nDATA gv TYPE string.\nSTART-OF-SELECTION.\n  SET PF-STATUS 'MAIN'.\n  SET PF-STATUS gv.\n  SET PF-STATUS 'X' OF PROGRAM 'ZOTHER'.\n  SET PF-STATUS space.\n  SET TITLEBAR 'T01'.\n");
   assert.deepEqual(r.todos.map((t) => t.message.split(" - ")[0].split(":")[0]), [
     "SET PF-STATUS 'MAIN' dropped",
@@ -749,8 +918,6 @@ test("a global table with a header line is a table and a work area attribute, an
   assert.match(cls, /DATA gt_sum LIKE STANDARD TABLE OF wa_gt_sum WITH DEFAULT KEY\./);
   assert.match(cls, /gt_car TYPE STANDARD TABLE OF scarr WITH DEFAULT KEY,/);
   assert.match(cls, /DATA wa_gt_car LIKE LINE OF gt_car\./);
-  // the work areas start fresh with the globals
-  assert.match(cls, /CLEAR: gt_num,\n\s+wa_gt_num,\n\s+gt_sum,\n\s+wa_gt_sum,/);
   // the short forms
   assert.match(cls, /CLEAR gt_num\.\n\s+wa_gt_num = 1\.\n\s+APPEND wa_gt_num TO gt_num\./);
   assert.match(cls, /wa_gt_sum-key = 'A'\.\n\s+wa_gt_sum-val = 2\./);
@@ -821,6 +988,58 @@ test("a dynpro the converter does not build is refused at its modules - a contro
   assert.match(refused(src.replace("CALL SCREEN 100", "CALL SCREEN gv_dynnr"), xml("", pai)).find((x) => x.startsWith("5:1")), /^5:1 MODULE - CALL SCREEN with a variable/);
   assert.match(refused(src, undefined).find((x) => x.startsWith("5:1")), /^5:1 MODULE - the screens are in the \.prog\.xml \(--texts\), which was not passed/);
   assert.match(refused(src, xml("", ["PROCESS AFTER INPUT.", "  MODULE user_command_0200."])).find((x) => x.startsWith("5:1")), /^5:1 MODULE - screen 0100 calls MODULE user_command_0200, which is not in the report/);
+  // a table control stays refused; a subscreen of another program, an area the screen does not have too
+  assert.match(refused(src, xml("<RPY_DYCATT><TYPE>TABLE_CTRL</TYPE><NAME>TC</NAME></RPY_DYCATT>", pai)).find((x) => x.startsWith("5:1")), /^5:1 MODULE - screen 0100 has a table control TC/);
+  const area = "<RPY_DYCATT><TYPE>SUBSCREEN</TYPE><NAME>SUB</NAME><ELEMENT_OF>SCREEN</ELEMENT_OF></RPY_DYCATT>";
+  assert.match(refused(src, xml(area, ["PROCESS BEFORE OUTPUT.", "  CALL SUBSCREEN sub INCLUDING 'ZOTHER' '0110'.", ...pai])).find((x) => x.startsWith("5:1")),
+    /^5:1 MODULE - screen 0100: CALL SUBSCREEN SUB INCLUDING 'ZOTHER' - a subscreen of another program/);
+  assert.match(refused(src, xml("", ["PROCESS AFTER INPUT.", "  CALL SUBSCREEN sub.", "  MODULE user_command_0100."])).find((x) => x.startsWith("5:1")),
+    /^5:1 MODULE - screen 0100 calls SUBSCREEN SUB, which is no subscreen area of it/);
+});
+
+test("a table control on a dynpro: CONTROLS TYPE TABLEVIEW, its columns, LOOP WITH CONTROL in PBO and PAI a line at a time", () => {
+  const cls = classOf("zr2c_52_tablecontrol");
+  const { result } = converted.get("zr2c_52_tablecontrol");
+  assert.equal(result.ok, true, result.refusals.map((x) => x.message).join("\n"));
+  assert.match(cls, /DATA tc_seats +TYPE z2ui5_cl_cgui_report=>ty_s_tableview\./);
+  assert.match(cls, /screen->table_control\( name    = `TC_SEATS`\n\s+title   = `Seats per connection`\n\s+columns = VALUE #\( \( text = `Flight` width = 4 \)\n\s+\( text = `Seats` input = abap_true width = 10 \) \) \)\./);
+  // PBO: the modules of the loop for each line, then its values
+  assert.match(cls, /tablecontrol_begin\( `TC_SEATS` \)\.\n\s+DO tc_seats-lines TIMES\.\n\s+tc_seats-current_line = sy-index\.\n\s+fill_0100\( \)\.\n\s+tablecontrol_row\( name   = `TC_SEATS`\n\s+values = VALUE #\( \( \|\{ gs_seat-connid \}\| \) \( \|\{ gs_seat-seats \}\| \) \) \)\.\n\s+ENDDO\./);
+  // PAI: every field of the line from the browser, then the modules
+  assert.match(cls, /DO tablecontrol_count\( `TC_SEATS` \) TIMES\.\n\s+tc_seats-current_line = sy-index\.\n\s+gs_seat-connid = tablecontrol_cell\( name = `TC_SEATS` row = sy-index col = 1 \)\.\n\s+gs_seat-seats = tablecontrol_cell\( name = `TC_SEATS` row = sy-index col = 2 \)\.\n\s+read_0100\( \)\.\n\s+ENDDO\./);
+});
+
+test("LOOP AT itab INTO wa WITH CONTROL: the table read into the work area; a header line, another field type in a table control refused", () => {
+  const xml = (field, flow) => `<abapGit><asx:abap><asx:values><DYNPROS><item><HEADER><PROGRAM>ZT</PROGRAM><SCREEN>0100</SCREEN><TYPE>N</TYPE></HEADER>
+<CONTAINERS><RPY_DYCATT><TYPE>SCREEN</TYPE><NAME>SCREEN</NAME></RPY_DYCATT><RPY_DYCATT><TYPE>TABLE_CTRL</TYPE><NAME>TC</NAME><ELEMENT_OF>SCREEN</ELEMENT_OF><LINE>001</LINE><COLUMN>001</COLUMN></RPY_DYCATT></CONTAINERS>
+<FIELDS><RPY_DYFATC><CONT_TYPE>TABLE_CTRL</CONT_TYPE><CONT_NAME>TC</CONT_NAME><TYPE>${field}</TYPE><NAME>GS-A</NAME><LINE>001</LINE><COLUMN>001</COLUMN><LENGTH>005</LENGTH><INPUT_FLD>X</INPUT_FLD></RPY_DYFATC>
+<RPY_DYFATC><CONT_TYPE>SCREEN</CONT_TYPE><TYPE>OKCODE</TYPE><NAME>OK_CODE</NAME></RPY_DYFATC></FIELDS>
+<FLOW_LOGIC>${flow.map((l) => `<RPY_DYFLOW><LINE>${l}</LINE></RPY_DYFLOW>`).join("")}</FLOW_LOGIC></item></DYNPROS></asx:values></asx:abap></abapGit>`;
+  const src = "REPORT zt.\nTYPES: BEGIN OF ty, a TYPE c LENGTH 5, END OF ty.\nCONTROLS tc TYPE TABLEVIEW USING SCREEN 100.\nDATA gt TYPE STANDARD TABLE OF ty WITH DEFAULT KEY.\nDATA gs TYPE ty.\nDATA ok_code TYPE sy-ucomm.\n" +
+    "START-OF-SELECTION.\n  CALL SCREEN 100.\nMODULE keep INPUT.\n  MODIFY gt FROM gs INDEX tc-current_line.\nENDMODULE.\n";
+  const flow = (loop) => ["PROCESS BEFORE OUTPUT.", `  ${loop}.`, "  ENDLOOP.", "PROCESS AFTER INPUT.", `  ${loop}.`, "    MODULE keep.", "  ENDLOOP."];
+  const r = convert(src, { file: "zt.prog.abap", className: "zcl_t", textpool: parseTextpool(xml("TEMPLATE", flow("LOOP AT gt INTO gs WITH CONTROL tc CURSOR tc-top_line"))) });
+  assert.deepEqual(r.refusals.map((x) => x.message), []);
+  const cls = r.files["zcl_t.clas.abap"];
+  assert.match(cls, /LOOP AT gt INTO gs\.\n\s+tc-current_line = sy-tabix\.\n\s+tablecontrol_row\(/);
+  assert.match(cls, /DO tablecontrol_count\( `TC` \) TIMES\.\n\s+tc-current_line = sy-index\.\n\s+READ TABLE gt INTO gs INDEX sy-index\.\n\s+gs-a = tablecontrol_cell\(/);
+  const refused = (field, loop) => convert(src, { file: "zt.prog.abap", className: "zcl_t", textpool: parseTextpool(xml(field, flow(loop))) }).refusals.map((x) => x.message).join("\n");
+  assert.match(refused("TEMPLATE", "LOOP AT gt WITH CONTROL tc"), /LOOP AT GT WITH CONTROL without INTO - a table with a header line/);
+  assert.match(refused("CHECK", "LOOP WITH CONTROL tc"), /a field GS-A of type CHECK in the table control TC/);
+  assert.match(refused("TEMPLATE", "LOOP WITH CONTROL tx"), /loops WITH CONTROL TX, which is no table control of it/);
+});
+
+test("a tabstrip on a dynpro: CONTROLS TYPE TABSTRIP, its tabs with function code and area, CALL SUBSCREEN in PBO and PAI, the subscreens of the report", () => {
+  const cls = classOf("zr2c_51_tabstrip");
+  const { result } = converted.get("zr2c_51_tabstrip");
+  assert.equal(result.ok, true, result.refusals.map((x) => x.message).join("\n"));
+  assert.match(cls, /DATA tabstr +TYPE z2ui5_cl_cgui_report=>ty_s_tabstrip\./);
+  assert.match(cls, /\)->tabbed_block_begin\( `TABSTR`\n\s+\)->tab\( text  = `Airline`\n\s+fcode = `TAB1`\n\s+area  = `SUB`\n\s+\)->tab\( text  = `Seats`\n(.*\n){2}\s+\)->subscreen\( `SUB`\n\s+\)->tabbed_block_end\( \)\./);
+  // the subscreens are screens of their own; the PBO calls the one of the variable, the PAI its PAI
+  assert.match(cls, /WHEN `0110`\.\n\s+screen->parameter\( val  = gv_carrid/);
+  assert.match(cls, /status_0100\( \)\.\n\s+call_subscreen\( area = `SUB` dynnr = gv_dynnr \)\./);
+  assert.match(cls, /call_subscreen_pai\( area = `SUB` ucomm = ucomm \)\.(.*\n){4}\s+user_command_0100\( \)\./);
+  assert.match(cls, /WHEN `0110`\.\n\s+check_0110\( \)\./);
 });
 
 test("a grid created inline, a VALUE field catalog, no selection screen: alv( ) in start_of_selection( ), the IF sy-subrc around CALL SCREEN gone", () => {
@@ -828,7 +1047,7 @@ test("a grid created inline, a VALUE field catalog, no selection screen: alv( ) 
   const { result } = converted.get("zr2c_24_gridinline");
   assert.equal(result.ok, true, result.refusals.map((x) => x.message).join("\n"));
   // INITIALIZATION went straight on with START-OF-SELECTION - its statements are there
-  assert.match(cls, /METHOD initialization\.\n\n\s+set_title\( `Connections in a grid` \)\.\n\n\s+ENDMETHOD\./);
+  assert.match(cls, /METHOD initialization\.\n\n\s+" the command field[^\n]*\n\s+set_command_field\( \)\.\n\n\s+set_title\( `Connections in a grid` \)\.\n\n\s+ENDMETHOD\./);
   assert.match(cls, /METHOD start_of_selection\.\n\n\s+SELECT \* FROM spfli INTO TABLE @DATA\(connections\)/);
   assert.match(cls, /alv\( connections\n\s+\)->set_column_text\( name = `CARRID`\n\s+text = 'Airline'\n(.*\n){4}\s+\)->set_column_text\( name = `CITYTO`\n\s+text = 'To'\n\s+\)->set_column_hidden\( `MANDT` \)\./);
   assert.doesNotMatch(cls, /cl_gui_|DATA\(grid\)|DATA\(fcat\)|IF sy-subrc/i);
@@ -837,8 +1056,11 @@ test("a grid created inline, a VALUE field catalog, no selection screen: alv( ) 
 
 test("a report with a selection screen keeps its INITIALIZATION; an IF of the source that is empty stays", () => {
   const src = "REPORT zt.\nPARAMETERS p TYPE i.\nINITIALIZATION.\n  p = 1.\nSTART-OF-SELECTION.\n  IF p = 2.\n  ENDIF.\n  WRITE p.\n";
-  const r = convert(src, { file: "zt.prog.abap", className: "zcl_t" });
+  const r = convert(src, { file: "zt.prog.abap", className: "zcl_t", commandField: false });
   assert.match(r.files["zcl_t.clas.abap"], /METHOD initialization\.\n\n\s+p = 1\./);
+  // by default the command field of the SAP GUI comes first
+  const on = convert(src, { file: "zt.prog.abap", className: "zcl_t" });
+  assert.match(on.files["zcl_t.clas.abap"], /METHOD initialization\.\n\n\s+" the command field[^\n]*\n\s+set_command_field\( \)\.\n\n\s+p = 1\./);
   assert.match(r.files["zcl_t.clas.abap"], /IF p = 2\.\n\s+ENDIF\./);
 });
 
@@ -930,7 +1152,7 @@ test("SAP GUI controls: a member, a parameter or an event the stand-ins do not h
   assert.deepEqual(refused("  go_e = NEW #( parent = go_c colour = 1 ).\n"), ["SAP GUI controls: colour is no parameter of the method called in the stand-in - port this statement by hand"]);
   assert.deepEqual(refused("  go_e->set_comments_string( ).\n"), ["SAP GUI controls: go_e->set_comments_string has no counterpart in z2ui5_cl_cgui_gui_textedit - port this statement by hand"]);
   assert.deepEqual(refused("  go_e->set_textstream( text = 'x' colour = 1 ).\n"), ["SAP GUI controls: colour is no parameter of the method called in the stand-in - port this statement by hand"]);
-  assert.deepEqual(refusalOf(`${head}DATA go_p TYPE REF TO cl_gui_simple_tree.\n`).map((x) => x.replace(/^\d+:\d+ /, "")), ["SAP GUI controls: cl_gui_simple_tree has no counterpart - the containers, cl_gui_textedit, cl_gui_html_viewer, cl_gui_toolbar, cl_gui_picture and cl_gui_alv_grid have (z2ui5_cl_cgui_gui*)"]);
+  assert.deepEqual(refusalOf(`${head}DATA go_p TYPE REF TO cl_gui_calendar.\n`).map((x) => x.replace(/^\d+:\d+ /, "")), ["SAP GUI controls: cl_gui_calendar has no counterpart - the containers, cl_gui_textedit, cl_gui_html_viewer, cl_gui_toolbar, cl_gui_picture, cl_gui_simple_tree, cl_gui_column_tree, cl_gui_list_tree and cl_gui_alv_grid have (z2ui5_cl_cgui_gui*)"]);
 });
 
 test("SAP GUI controls: SET HANDLER of a local class's method is set_handler( ) of the stand-in; what it cannot call is refused", () => {
@@ -1065,6 +1287,34 @@ test("SAP GUI controls: a control handed to a class of the report's own is refus
   assert.deepEqual(refusalOf(src).map((x) => x.replace(/^\d+:\d+ /, "")), ["SAP GUI controls: go_c, a SAP GUI control, is handed to a method that is no stand-in - it takes a cl_gui_* object - port this statement by hand"]);
 });
 
+test("the inline target of a SELECT read in another event block: the row of its table, the columns read, COUNT( * )", () => {
+  const all = convert("REPORT zt.\nSTART-OF-SELECTION.\n  SELECT * FROM sflight INTO TABLE @DATA(flights).\nEND-OF-SELECTION.\n  WRITE lines( flights ).\n", { file: "zt.prog.abap", className: "zcl_t" });
+  assert.deepEqual(all.refusals, []);
+  assert.match(all.files["zcl_t.clas.abap"], /DATA flights TYPE STANDARD TABLE OF sflight WITH EMPTY KEY\./);
+
+  const cols = convert("REPORT zt.\nSTART-OF-SELECTION.\n  SELECT bname, gltgv AS valid_from FROM usr02 INTO TABLE @DATA(users).\nEND-OF-SELECTION.\n  WRITE lines( users ).\n", { file: "zt.prog.abap", className: "zcl_t" });
+  assert.deepEqual(cols.refusals, []);
+  const cls = cols.files["zcl_t.clas.abap"];
+  assert.match(cls, /TYPES: BEGIN OF ty_users,\n\s+bname\s+TYPE usr02-bname,\n\s+valid_from\s+TYPE usr02-gltgv,\n\s+END OF ty_users\./);
+  assert.match(cls, /DATA users TYPE STANDARD TABLE OF ty_users WITH EMPTY KEY\./);
+
+  const count = convert("REPORT zt.\nINITIALIZATION.\n  SELECT COUNT( * ) AS count FROM zlogs INTO @DATA(n).\nSTART-OF-SELECTION.\n  WRITE n.\n", { file: "zt.prog.abap", className: "zcl_t" });
+  assert.deepEqual(count.refusals, []);
+  assert.match(count.files["zcl_t.clas.abap"], /DATA n TYPE i\./);
+
+  // a join is not told - refused as before
+  const join = convert("REPORT zt.\nSTART-OF-SELECTION.\n  SELECT a~carrid FROM sflight AS a INNER JOIN scarr AS b ON a~carrid = b~carrid INTO TABLE @DATA(j).\nEND-OF-SELECTION.\n  WRITE lines( j ).\n", { file: "zt.prog.abap", className: "zcl_t" });
+  assert.match(join.refusals[0].message, /^j is declared inline in an event block/);
+});
+
+test("an inline declaration typed by a DDIC type the repository does not carry is declared with that type", () => {
+  const src = "REPORT zt.\nINITIALIZATION.\n  DATA(h) = zcl_hash=>of( `x` ).\nSTART-OF-SELECTION.\n  WRITE h.\n";
+  const hash = "CLASS zcl_hash DEFINITION PUBLIC CREATE PUBLIC.\n  PUBLIC SECTION.\n    CLASS-METHODS of IMPORTING v TYPE string RETURNING VALUE(r) TYPE hash160.\nENDCLASS.\nCLASS zcl_hash IMPLEMENTATION.\n  METHOD of.\n  ENDMETHOD.\nENDCLASS.\n";
+  const r = convert(src, { file: "zt.prog.abap", className: "zcl_t", deps: [{ name: "zcl_hash.clas.abap", text: hash }] });
+  assert.deepEqual(r.refusals, []);
+  assert.match(r.files["zcl_t.clas.abap"], /DATA h TYPE hash160\./);
+});
+
 test("the dependencies of a report type what it reads of them - an inline declaration of an event block read in another one", () => {
   const src = "REPORT zt.\nINITIALIZATION.\n  DATA(lo_log) = zcl_app_factory=>create_logger( ).\nSTART-OF-SELECTION.\n  lo_log->add( `x` ).\n";
   const factory = "CLASS zcl_app_factory DEFINITION PUBLIC CREATE PUBLIC.\n  PUBLIC SECTION.\n    CLASS-METHODS create_logger RETURNING VALUE(result) TYPE REF TO zcl_app_log.\nENDCLASS.\nCLASS zcl_app_factory IMPLEMENTATION.\n  METHOD create_logger.\n  ENDMETHOD.\nENDCLASS.\n";
@@ -1137,4 +1387,42 @@ test("the converter runs in the browser too - no node: import in convert.mjs and
   walk("convert.mjs");
   walk("report.mjs");
   assert.ok(seen.has("abap.mjs") && seen.has("refusals.mjs"));
+});
+
+test("wrappers: a function module without a counterpart behind a method of a wrapper class - the parameters as the call passes them, the EXCEPTIONS and sy-subrc kept", () => {
+  const src = "REPORT zt.\nDATA lv TYPE string.\nDATA lt TYPE STANDARD TABLE OF string.\nSTART-OF-SELECTION.\n" +
+    "  CALL FUNCTION 'Z_LEGACY_READ'\n    EXPORTING\n      iv_key = 'A'\n    IMPORTING\n      ev_text = lv\n    TABLES\n      et_lines = lt\n    EXCEPTIONS\n      not_found = 1\n      OTHERS = 2.\n" +
+    "  WRITE lv.\n";
+  const off = convert(src, { file: "zt.prog.abap", className: "zcl_t" });
+  assert.match(off.files["zcl_t.clas.abap"], /CALL FUNCTION 'Z_LEGACY_READ'/);
+  assert.equal(off.files["zcl_t_fmw.clas.abap"], undefined);
+
+  const r = convert(src, { file: "zt.prog.abap", className: "zcl_t", wrappers: true });
+  assert.equal(r.ok, true, r.refusals.map((x) => x.message).join("\n"));
+  const cls = r.files["zcl_t.clas.abap"];
+  assert.doesNotMatch(cls, /CALL FUNCTION/);
+  assert.match(cls, /zcl_t_fmw=>z_legacy_read\( EXPORTING\s+iv_key\s+= 'A'\n\s+IMPORTING\s+ev_text\s+= lv\n\s+CHANGING\s+et_lines\s+= lt\n\s+EXCEPTIONS not_found = 1\n\s+OTHERS\s+= 2 \)\./);
+  const w = r.files["zcl_t_fmw.clas.abap"];
+  assert.match(w, /CLASS-METHODS z_legacy_read\n\s+IMPORTING\n\s+iv_key TYPE any OPTIONAL\n\s+EXPORTING\n\s+ev_text TYPE any\n\s+CHANGING\n\s+et_lines TYPE STANDARD TABLE\n\s+EXCEPTIONS\n\s+not_found\n\s+error\./);
+  assert.match(w, /CALL FUNCTION 'Z_LEGACY_READ'[\s\S]*TABLES\n\s+et_lines = et_lines[\s\S]*WHEN 1\.\n\s+RAISE not_found\./);
+  assert.ok(r.files["zcl_t_fmw.clas.xml"]);
+  // the function module is still one to check - in the wrapper
+  assert.deepEqual(r.release.filter((x) => x.kind === "function module").map((x) => `${x.name} ${x.file}`), ["Z_LEGACY_READ zcl_t_fmw.clas.abap"]);
+});
+
+test("successors: a SELECT of a table with a released successor reads it - the columns under their old names, only when every column maps", () => {
+  const src = "REPORT zt.\nPARAMETERS p_carr TYPE c LENGTH 3.\nDATA gt TYPE STANDARD TABLE OF sflight.\nDATA gs TYPE scarr.\nSTART-OF-SELECTION.\n" +
+    "  SELECT carrid connid fldate FROM sflight INTO CORRESPONDING FIELDS OF TABLE gt WHERE carrid = p_carr ORDER BY fldate.\n" +
+    "  SELECT SINGLE url FROM scarr INTO gs-url WHERE carrid = p_carr.\n" +
+    "  SELECT SINGLE * FROM scarr INTO gs WHERE carrid = p_carr.\n  WRITE gs-carrid.\n";
+  const off = convert(src, { file: "zt.prog.abap", className: "zcl_t" });
+  assert.doesNotMatch(off.files["zcl_t.clas.abap"], /\/dmo\//);
+  const r = convert(src, { file: "zt.prog.abap", className: "zcl_t", successors: true });
+  const cls = r.files["zcl_t.clas.abap"];
+  assert.match(cls, /SELECT carrier_id AS carrid, connection_id AS connid, flight_date AS fldate FROM \/dmo\/flight INTO CORRESPONDING FIELDS OF TABLE @gt WHERE carrier_id = @p_carr ORDER BY flight_date\./);
+  // a column without a certain counterpart, and SELECT *: the table stays
+  assert.match(cls, /SELECT SINGLE url FROM scarr/);
+  assert.match(cls, /SELECT SINGLE \* FROM scarr/);
+  assert.ok(r.todos.some((t) => /url has no certain counterpart in \/dmo\/carrier/.test(t.message)));
+  assert.ok(r.todos.some((t) => /SELECT \* FROM scarr/.test(t.message)));
 });

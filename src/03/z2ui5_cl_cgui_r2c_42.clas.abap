@@ -32,6 +32,9 @@ CLASS z2ui5_cl_cgui_r2c_42 IMPLEMENTATION.
 
   METHOD initialization.
 
+    " the command field of the SAP GUI: transactions, /n, /o and OK codes
+    set_command_field( ).
+
     set_title( `A Cellar` ).
     p_min = 6.
 
@@ -45,9 +48,6 @@ CLASS z2ui5_cl_cgui_r2c_42 IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD start_of_selection.
-
-    " every run starts with the global data of a fresh start - the classic report restarted after its list
-    CLEAR lv_total.
 
     DATA(lt_shelf) = VALUE ty_t_shelf( ( wine = 'Riesling' vintage = '2019' bottles = 12 )
                                        ( wine = 'Merlot'   vintage = '2016' bottles = 4 )

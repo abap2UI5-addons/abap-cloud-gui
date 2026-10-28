@@ -41,6 +41,9 @@ CLASS z2ui5_cl_cgui_r2c_25 IMPLEMENTATION.
 
   METHOD initialization.
 
+    " the command field of the SAP GUI: transactions, /n, /o and OK codes
+    set_command_field( ).
+
     set_title( `Notes in a text editor` ).
     p_carrid = 'LH'.
 
@@ -54,15 +57,6 @@ CLASS z2ui5_cl_cgui_r2c_25 IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD start_of_selection.
-
-    " every run starts with the global data of a fresh start - the classic report restarted after its list
-    CLEAR: ok_code,
-           go_notes,
-           go_editor,
-           go_preview,
-           go_html,
-           gt_notes,
-           gv_saved.
 
     CLEAR gv_saved.
     gt_notes = VALUE #( ( 'First line of the notes' ) ( 'Second line' ) ).

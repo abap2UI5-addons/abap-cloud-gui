@@ -7,8 +7,8 @@ name: report2cloud
 # that breaks the classes the converter writes fails here too
 # (tools/report2cloud/README.md).
 #
-# The job `runtime` runs the generated classes: transpiled with src/01 and
-# the popups against @abap2ui5/node-runtime, the flight table stubs seeded,
+# The job `runtime` runs the generated classes: transpiled with src/01
+# against @abap2ui5/node-runtime, the flight table stubs seeded,
 # every report started, filled, executed and clicked through the JSON
 # protocol of the UI5 frontend (npm run test:report2cloud:runtime). It uses
 # the abap2UI5 MCP server as a library (its npm backend and its app client),
@@ -54,7 +54,6 @@ jobs:
         node-version: '22'
         cache: 'npm'
     - run: npm ci
-    - run: git clone --depth 1 https://github.com/abap2UI5-addons/popups .deps/popups
     - run: git clone --depth 1 --branch "$MCP_SERVER_REF" https://github.com/abap2UI5/mcp-server ../mcp-server
     - run: npm run test:report2cloud:runtime
 
@@ -75,6 +74,5 @@ jobs:
         cache: 'npm'
     - run: npm ci
     - run: npx playwright install --with-deps chromium
-    - run: git clone --depth 1 https://github.com/abap2UI5-addons/popups .deps/popups
     - run: git clone --depth 1 --branch "$MCP_SERVER_REF" https://github.com/abap2UI5/mcp-server ../mcp-server
     - run: npm run test:report2cloud:browser

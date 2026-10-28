@@ -1,17 +1,19 @@
 // The migration report - what a conversion did and what is left, as
 // markdown for the person (or the AI step) that takes the class from here:
 // the refusals with file:row:col, the TODOs, the objects whose release state
-// on ABAP Cloud has to be checked, the findings of abaplint when it ran, and
-// every mapped construct with its line.
+// on ABAP Cloud has to be checked, the findings of abaplint when it ran, the
+// ATC findings of the classic report with what the conversion did on their
+// line (lib/atc.mjs), and every mapped construct with its line.
 import { refusalLink, refusalOf } from "./refusals.mjs";
 
 const cell = (s) => String(s).replace(/\|/g, "\\|").replace(/\n/g, " ");
 
 /** the markdown report of a conversion result; lint: { v750, cloud } as
- *  lists of abaplint findings, when the gates ran; includes: what
+ *  lists of abaplint findings, when the gates ran; atc: the findings of
+ *  atcStates( ) (lib/atc.mjs), when an ATC export was given; includes: what
  *  lib/includes.mjs inlined (`included`, `missing`) and its `origin( )`,
  *  so a position of a row from an include names the include */
-export function migrationReport(result, { source, texts, lint, includes } = {}) {
+export function migrationReport(result, { source, texts, lint, atc, includes } = {}) {
   const cls = result.className;
   const files = Object.keys(result.draft).sort();
   const lines = [];
@@ -34,6 +36,10 @@ export function migrationReport(result, { source, texts, lint, includes } = {}) 
   push(`| TODO | ${result.todos.length} |`);
   push(`| Release state to check | ${result.release.length} object(s) |`);
   if (lint) push(`| abaplint | v750: ${lint.v750.length} finding(s), ABAP Cloud: ${lint.cloud.length} finding(s) |`);
+  if (atc) {
+    const count = (state) => atc.filter((f) => f.state === state).length;
+    push(`| ATC of the report | ${atc.length} finding(s): ${count("converted")} converted, ${count("refused")} refused, ${count("TODO")} TODO, ${count("to check")} to check |`);
+  }
   push("");
 
   if (result.refusals.length) {
@@ -70,6 +76,21 @@ export function migrationReport(result, { source, texts, lint, includes } = {}) 
       push(`### ${title}`, "");
       if (!list.length) push("No findings.");
       for (const i of list) push(`- \`${i.file.replace(/^src\/r2c\//, "")}:${i.row}:${i.col}\` [${i.key}] ${i.message}`);
+      push("");
+    }
+  }
+
+  if (atc) {
+    push("## ATC findings of the report", "");
+    push("What the ATC of the system found in the classic report, and what the conversion did on the line: **converted** - the statement is mapped, the class has the counterpart; **refused** - rewrite it first; **TODO** - the class has it, to finish by hand; **to check** - the line went over as it was, run the ATC on the class.", "");
+    if (!atc.length) push("No findings.", "");
+    else {
+      push("| Line | Priority | Check | Finding | After the conversion |", "|---|---|---|---|---|");
+      const order = { refused: 0, "to check": 1, TODO: 2, converted: 3 };
+      for (const f of [...atc].sort((a, b) => order[a.state] - order[b.state] || (a.row ?? 0) - (b.row ?? 0))) {
+        const where = f.object && f.object !== String(result.programName).toLowerCase() ? `${f.object}:${f.row ?? "-"}` : f.row ?? "-";
+        push(`| ${where} | ${f.priority ?? "-"} | ${cell(f.check)} | ${cell(f.message)} | **${f.state}** - ${cell(f.detail)} |`);
+      }
       push("");
     }
   }

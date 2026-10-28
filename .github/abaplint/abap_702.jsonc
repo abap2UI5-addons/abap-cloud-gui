@@ -1,13 +1,11 @@
 {
   // 7.02 gate - used by .github/scripts/check-702.sh on a scratch copy in
   // build/702, never on src/ itself: `abaplint --fix` downports the copy,
-  // then this config checks it with the v702 syntax. The popups addon has no
-  // 702 branch, so its main branch is cloned into the copy and downported
-  // with it; abap2UI5 and layout-management publish a 702 branch. Only the
-  // popups themselves and their context (src, src/00) are taken - the
-  // addon's samples and its on-premise search helps are not used here.
+  // then this config checks it with the v702 syntax against the 702 branch
+  // abap2UI5 publishes. The addon has no other dependency - its popups are
+  // classes of its own.
   "global": {
-    "files": ["/src/**/*.*", "/popups/src/*.*", "/popups/src/00/*.*"]
+    "files": ["/src/**/*.*"]
   },
   "dependencies": [
     {
@@ -21,12 +19,6 @@
       "url": "https://github.com/abap2UI5/abap2UI5",
       "branch": "1.148.0-702",
       "folder": "/abap2UI5",
-      "files": "/src/**/*.*"
-    },
-    {
-      "url": "https://github.com/abap2UI5-addons/layout-management",
-      "branch": "702",
-      "folder": "/layout-management",
       "files": "/src/**/*.*"
     }
   ],

@@ -97,6 +97,23 @@ CLASS z2ui5_cl_cgui_gui_html_viewer DEFINITION PUBLIC
         cnht_error_parameter
         dp_error_general.
 
+    "! the document shown before - the history is the one of show_url( )
+    METHODS go_back
+      EXCEPTIONS
+        cntl_error.
+
+    METHODS go_forward
+      EXCEPTIONS
+        cntl_error.
+
+    "! the URL of the document shown - the one show_url( ) or load_data( )
+    "! named
+    METHODS get_current_url
+      EXPORTING
+        url TYPE clike
+      EXCEPTIONS
+        cntl_error.
+
     METHODS set_registered_events
       IMPORTING
         events TYPE STANDARD TABLE
@@ -141,6 +158,11 @@ CLASS z2ui5_cl_cgui_gui_html_viewer DEFINITION PUBLIC
         VALUE(result) TYPE ty_t_link.
 
   PROTECTED SECTION.
+    " the URLs shown, oldest first, and the one shown now - kept with the
+    " control from one roundtrip to the next, as the history of the browser
+    DATA mt_history  TYPE string_table.
+    DATA mv_position TYPE i.
+
   PRIVATE SECTION.
     TYPES:
       BEGIN OF ty_s_document,
@@ -149,6 +171,11 @@ CLASS z2ui5_cl_cgui_gui_html_viewer DEFINITION PUBLIC
       END OF ty_s_document.
 
     DATA mt_document TYPE STANDARD TABLE OF ty_s_document WITH EMPTY KEY.
+
+    "! the document of url into the control - from load_data( ), else a link
+    METHODS display
+      IMPORTING
+        url TYPE string.
 
     METHODS text_of
       IMPORTING
@@ -185,8 +212,21 @@ CLASS z2ui5_cl_cgui_gui_html_viewer IMPLEMENTATION.
 
   METHOD show_url.
 
-    DATA(ls_control) = get( ).
     DATA(lv_url) = condense( CONV string( url ) ).
+    " a new page: what lay ahead of the one shown is gone
+    WHILE lines( mt_history ) > mv_position.
+      DELETE mt_history INDEX lines( mt_history ).
+    ENDWHILE.
+    INSERT lv_url INTO TABLE mt_history.
+    mv_position = lines( mt_history ).
+    display( lv_url ).
+
+  ENDMETHOD.
+
+  METHOD display.
+
+    DATA(ls_control) = get( ).
+    DATA(lv_url) = url.
     READ TABLE mt_document INTO DATA(ls_document) WITH KEY url = lv_url.
     IF sy-subrc = 0.
       ls_control-html = ls_document-html.
@@ -206,6 +246,33 @@ CLASS z2ui5_cl_cgui_gui_html_viewer IMPLEMENTATION.
       lv_url = mt_document[ lines( mt_document ) ]-url.
     ENDIF.
     show_url( lv_url ).
+
+  ENDMETHOD.
+
+  METHOD go_back.
+
+    IF mv_position > 1.
+      mv_position = mv_position - 1.
+      display( mt_history[ mv_position ] ).
+    ENDIF.
+
+  ENDMETHOD.
+
+  METHOD go_forward.
+
+    IF mv_position < lines( mt_history ).
+      mv_position = mv_position + 1.
+      display( mt_history[ mv_position ] ).
+    ENDIF.
+
+  ENDMETHOD.
+
+  METHOD get_current_url.
+
+    CLEAR url.
+    IF mv_position > 0.
+      url = mt_history[ mv_position ].
+    ENDIF.
 
   ENDMETHOD.
 

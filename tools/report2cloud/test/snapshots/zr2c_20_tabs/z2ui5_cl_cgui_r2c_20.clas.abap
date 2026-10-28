@@ -31,6 +31,9 @@ CLASS z2ui5_cl_cgui_r2c_20 IMPLEMENTATION.
 
   METHOD initialization.
 
+    " the command field of the SAP GUI: transactions, /n, /o and OK codes
+    set_command_field( ).
+
     set_title( `Tabs, function keys and F1` ).
     p_carrid = 'LH'.
     p_max = 50.

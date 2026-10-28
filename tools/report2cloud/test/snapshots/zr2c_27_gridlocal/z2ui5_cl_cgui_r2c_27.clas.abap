@@ -13,7 +13,7 @@ CLASS z2ui5_cl_cgui_r2c_27 DEFINITION PUBLIC
     METHODS dynpro_screen REDEFINITION.
     METHODS dynpro_pbo REDEFINITION.
     METHODS dynpro_pai REDEFINITION.
-    METHODS at_gui_event REDEFINITION.
+    METHODS at_roundtrip_start REDEFINITION.
 
   PRIVATE SECTION.
     " global data of the report typed with its local classes - local types
@@ -30,7 +30,8 @@ CLASS z2ui5_cl_cgui_r2c_27 IMPLEMENTATION.
 
   METHOD initialization.
 
-    lcl_r2c=>app = me.
+    " the command field of the SAP GUI: transactions, /n, /o and OK codes
+    set_command_field( ).
 
     set_title( `A grid in a local class` ).
 
@@ -38,19 +39,11 @@ CLASS z2ui5_cl_cgui_r2c_27 IMPLEMENTATION.
 
   METHOD start_of_selection.
 
-    lcl_r2c=>app = me.
-
-    " every run starts with the global data of a fresh start - the classic report restarted after its list
-    CLEAR: go_alv,
-           ok_code.
-
     call_screen( `0100` ).
 
   ENDMETHOD.
 
   METHOD dynpro_screen.
-
-    lcl_r2c=>app = me.
 
     CASE dynnr.
       WHEN `0100`.
@@ -61,8 +54,6 @@ CLASS z2ui5_cl_cgui_r2c_27 IMPLEMENTATION.
 
   METHOD dynpro_pbo.
 
-    lcl_r2c=>app = me.
-
     CASE dynnr.
       WHEN `0100`.
         status_0100( ).
@@ -72,8 +63,6 @@ CLASS z2ui5_cl_cgui_r2c_27 IMPLEMENTATION.
 
   METHOD dynpro_pai.
 
-    lcl_r2c=>app = me.
-
     CASE dynnr.
       WHEN `0100`.
         ok_code = ucomm.
@@ -82,7 +71,7 @@ CLASS z2ui5_cl_cgui_r2c_27 IMPLEMENTATION.
 
   ENDMETHOD.
 
-  METHOD at_gui_event.
+  METHOD at_roundtrip_start.
 
     lcl_r2c=>app = me.
 

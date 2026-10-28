@@ -7,7 +7,7 @@ A refused statement has no counterpart in an abap-cloud-gui report. The converte
 | Refusal | |
 |---|---|
 | [Dynpros: CALL SCREEN, MODULE, SET SCREEN, CONTROLS](#dynpro) | `dynpro` |
-| [CALL TRANSACTION and batch input](#call-transaction) | `call-transaction` |
+| [CALL TRANSACTION ... USING and batch input](#call-transaction) | `call-transaction` |
 | [Native SQL: EXEC SQL](#native-sql) | `native-sql` |
 | [INCLUDE without its file](#include-missing) | `include-missing` |
 | [Logical databases: NODES, GET, REJECT, dynamic and free selections](#logical-database) | `logical-database` |
@@ -46,7 +46,7 @@ A refused statement has no counterpart in an abap-cloud-gui report. The converte
 
 ## Dynpros: CALL SCREEN, MODULE, SET SCREEN, CONTROLS
 
-**Why.** A dynpro is a screen of the SAP GUI with its own flow logic. A browser app has no screens of that kind: abap-cloud-gui has the selection screen, the list, the ALV and popups. Two kinds of screen are converted. A dynpro of fields - texts, inputs, checkboxes, radio buttons, frames and push buttons, read from the screens abapGit writes into the .prog.xml: the modules become methods, the flow logic `dynpro_pbo( )` and `dynpro_pai( )`, `CALL SCREEN` becomes `call_screen( )` and what follows it `after_call_screen( )`. And the screen of one `cl_gui_alv_grid` - its PBO modules go where `CALL SCREEN` stood, its PAI modules become `at_user_command( )`. A screen with a custom control, a subscreen, a table control or a tabstrip, or flow logic with LOOP or CALL SUBSCREEN, is refused.
+**Why.** A dynpro is a screen of the SAP GUI with its own flow logic. A browser app has no screens of that kind: abap-cloud-gui has the selection screen, the list, the ALV and popups. Two kinds of screen are converted. A dynpro of fields - texts, inputs, checkboxes, radio buttons, frames and push buttons, read from the screens abapGit writes into the .prog.xml: the modules become methods, the flow logic `dynpro_pbo( )` and `dynpro_pai( )`, `CALL SCREEN` becomes `call_screen( )` and what follows it `after_call_screen( )`. And the screen of one `cl_gui_alv_grid` - its PBO modules go where `CALL SCREEN` stood, its PAI modules become `at_user_command( )`. Tabstrips, subscreen areas and table controls of such a dynpro are converted too - CALL SUBSCREEN of a subscreen of the report and LOOP WITH CONTROL a line at a time included. A table control with other fields than input/output fields, a custom control other than one of the stand-ins, another LOOP of the flow logic, or a subscreen of another program is refused.
 
 **Rewrite.**
 
@@ -70,13 +70,13 @@ IF sy-subrc = 0.
 ENDIF.
 ```
 
-A screen with a table control, a subscreen or a tabstrip is on the roadmap (Stage 5).
+Tabstrips, subscreens and table controls are converted.
 
 <a id="call-transaction"></a>
 
-## CALL TRANSACTION and batch input
+## CALL TRANSACTION ... USING and batch input
 
-**Why.** No SAP GUI transaction can be started from a browser app, and batch input (`CALL TRANSACTION ... USING`, `BDC_*` sessions) plays a dynpro - there is none, and on ABAP Cloud batch input is no API at all.
+**Why.** Batch input (`CALL TRANSACTION ... USING`, `BDC_*` sessions) plays the screens of a transaction - there are none in a browser app, and on ABAP Cloud batch input is no API at all. A plain `CALL TRANSACTION` is converted: `call_transaction( )` starts the report class the catalog names.
 
 **Rewrite.**
 
@@ -93,7 +93,7 @@ MODIFY ENTITIES OF i_salesordertp
 COMMIT ENTITIES.
 ```
 
-To open another app, a converted report can `submit( )` its class.
+To open another app, a converted report can `submit( )` its class or `call_transaction( )` a transaction of the catalog.
 
 <a id="native-sql"></a>
 
@@ -162,7 +162,7 @@ Pass the value as a parameter, or read it again from the database. Within the re
 
 ## The SAP GUI frontend: controls, the frontend services the browser has no counterpart for
 
-**Why.** There is no SAP GUI on the other side: no custom container to put a control in, no file system of the user. A `cl_gui_alv_grid` is converted to `alv( )`. The containers, `cl_gui_textedit`, `cl_gui_html_viewer` and `cl_gui_toolbar` of a report without a grid become stand-ins with the same methods (`z2ui5_cl_cgui_gui*`): a custom control area of a dynpro holds them, the text editor is a text area of the page, the HTML viewer shows its document, the toolbar its buttons. A `cl_gui_alv_grid` of a local class is `z2ui5_cl_cgui_gui_alv_grid`, the ALV of the report in its container - `refresh_table_display( )` is passed the table it shows, which must be in reach. `SET HANDLER` of a handler method of a local class is `set_handler( )`: the stand-in raises `function_selected`, `dropdown_clicked`, `sapevent` and `close` from the browser. Refused are the other controls (pictures, trees), an event a stand-in does not raise, a handler for all instances or a static one, and a member the stand-ins do not have. The files are converted: `cl_gui_frontend_services` is `z2ui5_cl_cgui_frontend` - `file_open_dialog` in an F4 opens an upload in the browser and runs the F4 again with the file, `gui_upload` reads it, `gui_download` is a download of the browser, `GUI_UPLOAD` / `GUI_DOWNLOAD` become its methods. What it does not have - the registry, the GUI version, an option of a method it does not take - is refused.
+**Why.** There is no SAP GUI on the other side: no custom container to put a control in, no file system of the user. A `cl_gui_alv_grid` is converted to `alv( )`. The containers, `cl_gui_textedit`, `cl_gui_html_viewer`, `cl_gui_toolbar`, `cl_gui_picture` and `cl_gui_simple_tree` of a report without a grid become stand-ins with the same methods (`z2ui5_cl_cgui_gui*`): a custom control area of a dynpro holds them, the text editor is a text area of the page, the HTML viewer shows its document, the toolbar its buttons, the tree its nodes (`MTREESNODE`). A `cl_gui_alv_grid` of a local class is `z2ui5_cl_cgui_gui_alv_grid`, the ALV of the report in its container - `refresh_table_display( )` is passed the table it shows, which must be in reach. `SET HANDLER` of a handler method of a local class is `set_handler( )`: the stand-in raises `function_selected`, `dropdown_clicked`, `sapevent`, `picture_click`, `node_double_click`, `selection_changed`, `expand_no_children` and `close` from the browser. Refused are the other controls (the column and list trees, the calendar), an event a stand-in does not raise, a handler for all instances or a static one, and a member the stand-ins do not have. The files are converted: `cl_gui_frontend_services` is `z2ui5_cl_cgui_frontend` - `file_open_dialog` in an F4 opens an upload in the browser and runs the F4 again with the file, `gui_upload` reads it, `gui_download` is a download of the browser, `GUI_UPLOAD` / `GUI_DOWNLOAD` become its methods. What it does not have - the registry, the GUI version, an option of a method it does not take - is refused.
 
 **Rewrite.**
 
@@ -360,7 +360,7 @@ Correct the name, or merge the blocks of the same field (two F4 of `-LOW`, two F
 
 ## An inline declaration of an event block, used in another one, of a type that cannot be told
 
-**Why.** Event blocks open no scope: `DATA(x) = ...` in `INITIALIZATION` is a global of the report, and `START-OF-SELECTION` may use it. In the class it becomes an attribute, which needs its type. The converter takes it from a constructor expression (`NEW lcl( )`, `VALUE ty( )`) or from abaplint's syntax check - not from a method of a class that is not part of the input.
+**Why.** Event blocks open no scope: `DATA(x) = ...` in `INITIALIZATION` is a global of the report, and `START-OF-SELECTION` may use it. In the class it becomes an attribute, which needs its type. The converter takes it from a constructor expression (`NEW lcl( )`, `VALUE ty( )`), from the `SELECT` that fills it (`*` or the columns of one table, `COUNT( * )`), or from abaplint's syntax check over the report and its repository - a DDIC type the repository does not carry by its name. Not from a method of a class that is not part of the input, and not from a join.
 
 **Rewrite.**
 

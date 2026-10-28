@@ -3,7 +3,6 @@
 [![abap2UI5-addons](https://img.shields.io/badge/abap2UI5--addons-library-1873b4)](https://github.com/abap2UI5-addons)
 [![ABAP](https://img.shields.io/badge/ABAP-Cloud%20%7C%20Standard%20%E2%89%A5%207.50%20%7C%207.02-blue)](#installation)
 [![abap2UI5](https://img.shields.io/badge/requires-abap2UI5-blue)](https://github.com/abap2UI5/abap2UI5)
-[![popups](https://img.shields.io/badge/requires-popups-blue)](https://github.com/abap2UI5-addons/popups)
 [![License](https://img.shields.io/github/license/abap2UI5-addons/abap-cloud-gui)](LICENSE)
 <br>
 [![abaplint](https://img.shields.io/github/actions/workflow/status/abap2UI5-addons/abap-cloud-gui/abaplint.yaml?branch=main&label=abaplint)](https://github.com/abap2UI5-addons/abap-cloud-gui/actions/workflows/abaplint.yaml)
@@ -55,15 +54,14 @@ What it is not:
 
 - ABAP Cloud (BTP ABAP Environment, S/4HANA Cloud) or Standard ABAP 7.50 or
   higher; NetWeaver 7.02 with a downported copy (see [Compatibility](#compatibility))
-- [abap2UI5](https://github.com/abap2UI5/abap2UI5)
-- [abap2UI5-addons/popups](https://github.com/abap2UI5-addons/popups) - the
-  value helps and confirmation popups
+- [abap2UI5](https://github.com/abap2UI5/abap2UI5) - nothing else: the popups
+  (value help, ranges, confirmation, values, transport request) are classes
+  of this addon
 
 **Steps** - with [abapGit](https://abapgit.org), in this order:
 
 1. [abap2UI5](https://github.com/abap2UI5/abap2UI5)
-2. [abap2UI5-addons/popups](https://github.com/abap2UI5-addons/popups)
-3. this repository (branch `main`) - classes, two interfaces and the two
+2. this repository (branch `main`) - classes, two interfaces and the two
    tables `Z2UI5_CGUI_VAR` / `Z2UI5_CGUI_LAY`; nothing else to set up
 
 **Start** - run a sample like any abap2UI5 app, e.g.
@@ -157,6 +155,97 @@ the popover, and a click on it puts the cursor into the field. Fields
 declared `obligatory` are checked before `at_selection_screen`, each empty
 one with a message of its own.
 
+The short API, in the style of abap2UI5, says the same in fewer words, and
+its calls chain:
+
+```abap
+_msg( )->w( `Only the first 100 flights` )->s( `Flights read` ).
+_msg( )->e( text = `Enter a carrier` field = `P_CARRID` ).      " MESSAGE ... TYPE 'E'
+_msg_box( )->i( `Saved` ).                                    " a box of its own, the run goes on
+_popup( )->confirm( question = `Post the document?` ucomm = `POST` ).
+_popup( )->decide( question = `Which copy?` options = VALUE #( ( `Original` ) ( `Copy` ) ) ucomm = `PICK` ).
+```
+
+`_msg( )` is `message( )`, `_msg_box( )` a message box whatever the type -
+not in the popover, an error does not stop the run - and `_popup( )` has the
+popups of the report: the answer comes as `at_user_command( ucomm )`.
+
+Or the answer goes to a method of its own: with `then` instead of `ucomm` the
+popup calls a public method of the report with `IMPORTING answer TYPE string`
+- `1`, `2`, ... for the option, `A` for Cancel (Yes and No of a confirm are
+`1` and `A`). The statements after a classic `CALL FUNCTION 'POPUP_TO_...'`
+fit there as they are:
+
+```abap
+METHODS on_post IMPORTING answer TYPE string.   " PUBLIC SECTION
+
+_popup( )->confirm( question = `Post the document?` then = `ON_POST` ).
+
+METHOD on_post.
+  IF answer = '1'.
+    post( ).
+  ENDIF.
+ENDMETHOD.
+```
+
+### The application log
+
+`set_log( )` gives the report an application log: every message - `MESSAGE`,
+`message( )`, `_msg( )` - goes into it as well. `z2ui5_cl_cgui_log` keeps the
+messages in memory; an adapter of the installation implements
+`z2ui5_if_cgui_log` (`add`, `get`) and writes them where the system keeps its
+logs. `messages_from_log( )` puts the messages of a log into the message
+popover - a BAPI's return table, read with `add_table( )`, or a log of the
+system - and `log_display( )` shows a log as a popup, as SLG1 does.
+
+```abap
+" an adapter on ABAP Cloud - cl_bali_log
+METHOD z2ui5_if_cgui_log~add.
+  mo_log->add_item( cl_bali_free_text_setter=>create( severity = type text = CONV #( text ) ) ).
+ENDMETHOD.
+
+" an adapter for the ABAP Logger
+METHOD z2ui5_if_cgui_log~add.
+  CASE type.
+    WHEN 'E'. mo_logger->e( text ).
+    WHEN 'W'. mo_logger->w( text ).
+    WHEN OTHERS. mo_logger->i( text ).
+  ENDCASE.
+ENDMETHOD.
+```
+
+### The command field
+
+`set_command_field( )` in `initialization( )` puts the command field of the
+SAP GUI into the page header - a converted report has it from the start:
+
+| Typed | What happens |
+|---|---|
+| `ZFLIGHTS` | a transaction of the catalog starts, Back returns |
+| `/nZFLIGHTS`, `/n` | the transaction, or this report anew |
+| `/oZFLIGHTS`, `/o` | the same in a new browser tab |
+| `ONLI`, `BACK`, `PRI` | Execute, Back, Print |
+| any other code | `at_user_command( )`, as a function of the screen |
+
+The transactions come from the installation: an object of
+`z2ui5_if_cgui_catalog` (`set_catalog( )`) returns code, report class, text
+and the variant to start with; a report class name works without a catalog.
+`Ctrl+K` (`Cmd+K` on a Mac) opens the command palette - the transactions and
+the functions of the screen in a popup to search.
+
+The code starts the same way: `call_transaction( code = 'ZFLIGHTS' )` is
+`CALL TRANSACTION`, `skip_first = abap_true` its `AND SKIP FIRST SCREEN` -
+the report class of the catalog with its variant, Back returns here.
+
+### The last entries
+
+Every field remembers what was run with it: the last ten values - of a
+parameter, or the first line of a select-option - stay in the browser's local
+storage, one history per report, and the field suggests them as the user
+types. `set_prefill_last( )` in `initialization( )` goes one step further: an
+empty field starts with its latest entry. A parameter ID fills a field first,
+a start variant and the URL win over the history.
+
 ### A dynamic selection screen
 
 `MODIF ID`, `USER-COMMAND` and `LOOP AT SCREEN` work as in a classic report:
@@ -244,6 +333,12 @@ METHOD initialization.
 ENDMETHOD.
 ```
 
+The user parameters - `SET` / `GET PARAMETER ID`, `MEMORY ID` - live in the
+same store: one entry per user, so every report of the user sees them, on
+every device. `SU3` in the command field opens them in a popup to change, add
+or delete (an empty value deletes the parameter). Without a server store
+they stay in the browser's local storage.
+
 ### ALV layouts
 
 The layout button of every ALV opens the classic "Change Layout": the
@@ -258,11 +353,35 @@ variants.
 
 ### Output to keep
 
+**Chart** shows the rows of the ALV - its filter and search applied - as a
+bar chart in a dialog: the user picks the column of the categories and the
+number to sum, or counts the rows; the 20 largest bars, the rest as one.
+OpenUI5 has no sap.viz, so `z2ui5_cl_cgui_chart` draws it as SVG of plain
+attributes, which the page's content security policy lets in.
+`set_chart( abap_false )` takes the button off the toolbar.
+
 **Export** writes the ALV as CSV or as an Excel file (Office Open XML, zipped
-with `CL_ABAP_ZIP` - no `CL_SALV_TABLE`), **Print** hands the list to the
-browser as a text file - ABAP Cloud has no spool. There is no "Execute in
-Background" button: a report runs without a browser through
-`cgui_run_in_background( )`, e.g. in an application job of your own.
+with `CL_ABAP_ZIP` - no `CL_SALV_TABLE`). **Print** hands the output to the
+browser as a PDF - ABAP Cloud has no spool. The PDF is written in ABAP
+(`z2ui5_cl_cgui_pdf`) in Courier, a font every PDF reader has, so nothing is
+embedded; a wide list turns the page to landscape and shrinks the font.
+
+**Execute in Background** shows on the selection screen once the report has
+a job: `set_job( )` in `initialization( )` with an object of
+`z2ui5_if_cgui_job`. The button runs the checks of Execute and hands the
+report class and the values of the screen to `schedule( )`; how the job runs
+is up to the installation - an application job on ABAP Cloud, a background
+job on premise. The job creates the class and runs it without a browser:
+
+```abap
+" in the job - report and values as schedule( ) got them
+DATA lo_report TYPE REF TO z2ui5_cl_cgui_report.
+CREATE OBJECT lo_report TYPE (report).
+lo_report->cgui_run_in_background( EXPORTING values   = values
+                                   IMPORTING pdf      = DATA(lv_pdf)
+                                             messages = DATA(lt_msg) ).
+" lv_pdf as the attachment of a mail, or into a table of your own
+```
 
 ## Samples
 
@@ -367,7 +486,7 @@ Known limitations:
   `SELECT ... WHERE ... IN` work as usual.
 - `WRITE ... CURRENCY` takes the decimals of the currency from ISO 4217,
   `UNIT` formats the number as it is — `TCURX` and `T006` are not released on
-  ABAP Cloud. Print is a text file, not a spool request.
+  ABAP Cloud. Print is a PDF in the browser, not a spool request.
 - Value tables are read on premise only — on ABAP Cloud the DDIC is not
   read, and the standard F4 is the domain's fixed values.
 - `alv( )` binds a PUBLIC attribute directly; any other table is copied into
@@ -442,9 +561,11 @@ Stage 1 - the converter: the constructs that stop the most reports
       values handed over; a screen of the report's own as a dialog, the
       statements after the call continued in `after_call_selection_screen( )`
       - reports call reports
+- [x] `CALL TRANSACTION` (without batch input) as `call_transaction( )` -
+      the report class the catalog names for the code
 - [x] The synchronous popups (`POPUP_TO_CONFIRM`, `POPUP_TO_CONFIRM_STEP`,
       `POPUP_TO_DECIDE`, `POPUP_GET_VALUES`): the event block cut at the
-      call, the rest continued in `at_user_command( )` - the one
+      call, the rest continued in a callback `on_popup_n( answer )` - the one
       transformation that changes a block's shape, and the one in every
       report that posts something
 - [x] `SET PF-STATUS`, `SET TITLEBAR`, `AT PFnn` as `set_pf_status( )`,
@@ -453,6 +574,9 @@ Stage 1 - the converter: the constructs that stop the most reports
 - [x] Secondary lists (`sy-lsind`) and `WRITE AT` positions, in a column
       mode of the list (every item of a line with a position in a box of
       its width in characters) - the evaluations that live by the column
+- [x] `READ LINE` / `MODIFY LINE ... FIELD VALUE` as `read_list( )->read_field(
+      )` / `modify_field( )` - the checkboxes of a list read back by the
+      names of their `WRITE`s
 - [x] `cl_gui_alv_grid` in a container with its simple handlers (hotspot,
       double click, toolbar, user command) as `alv( )`, the screen's PBO and
       PAI modules resolved - the ALV every report since 2005 is written with
@@ -467,12 +591,15 @@ Stage 2 - the runtime: what a report's user sees
 
 Selection screen
 
+- [x] F4 inside the range popup of a select-option - `at_value_request( )`
+      of the select-option, the values picked become lines of the popup
 - [ ] Value helps: CDS value helps (`@Consumption.valueHelpDefinition`),
-      text tables beside value tables, search helps, F4 inside the range
-      popup of a select-option
-- [ ] `AT SELECTION-SCREEN ON BLOCK`, `ON RADIOBUTTON GROUP`, `AS LISTBOX`
-- [ ] `MEMORY ID`
-- [ ] A phone layout of the selection screen
+      text tables beside value tables, search helps
+- [x] `AT SELECTION-SCREEN ON BLOCK`, `ON RADIOBUTTON GROUP`, `AS LISTBOX`
+- [x] `MEMORY ID`
+- [x] A phone layout of the selection screen: labels above the fields, a
+      select-option's from and to and a line of fields wrap instead of
+      squeezing (the browser test checks it at 390 px, themed)
 - [x] Selection variants on the server (table `Z2UI5_CGUI_VAR`): shared
       and protected variants, a pluggable store beside the browser's local
       storage, dynamic date values
@@ -481,59 +608,76 @@ Output
 
 - [x] ALV: Excel export (Office Open XML), layouts on the server (table
       `Z2UI5_CGUI_LAY`, shared, protected, a default per user)
-- [ ] ALV: user-formatted dates, times and amounts, totals and subtotals,
-      hotspot per column, toolbar with own functions, editable cells
-- [ ] ALV: a chart over the grid - the columns as series, the layout's
-      sort and filter applied
+- [x] ALV: formatted dates, times and amounts (the locale of the browser),
+      totals and subtotals, hotspot per column, toolbar with own functions,
+      editable cells
+- [x] ALV: a chart over the grid - a bar chart of the rows shown, the filter
+      and search applied, a column as the categories and a number summed
+      (or the rows counted), drawn as SVG
+- [x] ALV chart: up to three number columns as series side by side, and
+      bars, columns, lines or a pie (of the first series)
 - [x] List: `WRITE AT` positions and `UNDER`, columns that line up
       (every item of a positioned line in a box of its width), secondary
       lists (`sy-lsind`, `set_lsind( )`)
-- [ ] Print as PDF; "Execute in background" as an application job with the
-      list as a file or a mail
+- [x] Print as PDF; "Execute in background" hands report and values to a job
+      of the installation (`set_job( )`), which gets the list and its PDF
 
 Messages and logging
 
-- [ ] Short API in the style of abap2UI5: `_msg( )->e( )`, `_msg_box( )->e( )`
-- [ ] Application log (BAL) and [ABAP Logger](https://github.com/ABAP-Logger/ABAP-Logger)
-      as a source for the message popover and a log popup; the internal
-      message table is replaced by the log
+- [x] Short API in the style of abap2UI5: `_msg( )->e( )`, `_msg_box( )->e( )`,
+      `_popup( )->decide( )` / `confirm( )` / `get_values( )`
+- [x] Application log (BAL) and [ABAP Logger](https://github.com/ABAP-Logger/ABAP-Logger)
+      as a source for the message popover and a log popup: `set_log( )`,
+      `messages_from_log( )`, `log_display( )` over `z2ui5_if_cgui_log`
 
 Dialogs and screens
 
-- [ ] Popups: `_popup( )->decide` (`POPUP_TO_DECIDE`), `POPUP_GET_VALUES`,
-      transport request selection (from [abap2UI5-addons/popups](https://github.com/abap2UI5-addons/popups))
-- [ ] `CALL SCREEN` and back, also of a screen in another class
+- [x] Popups: transport request selection - `popup_transport( )` /
+      `_popup( )->transport( )`, `z2ui5_cl_cgui_transport`, beside
+      `POPUP_TO_DECIDE` and `POPUP_GET_VALUES`; no popup of another addon is
+      needed any more
+- [ ] `CALL SCREEN` of a screen in another class - `CALL SCREEN` of the
+      report's own screens and back is there
 - [ ] `CALL SELECTION-SCREEN` of another report, as a popup or by screen number
 
 Navigation and transactions
 
 - [ ] Launchpad tiles and intent navigation for a converted class
-- [ ] Command field instead of a plain input: transaction codes, `/n`, `/o`
-- [ ] Command palette (`Cmd+K` / `Ctrl+K`) to search and start reports
-- [ ] Input history: the last entries of a field, opened with the space bar
+- [x] Command field instead of a plain input: transaction codes, `/n`, `/o`
+      (`set_command_field( )`, `set_catalog( )`)
+- [x] Command palette (`Cmd+K` / `Ctrl+K`) to search and start reports
+- [x] Input history: the last ten entries of a field, in the browser's local
+      storage, suggested as the user types
 - [x] Keyboard shortcuts: F8 Execute, F3 Back, `AT PFnn` and the function
       keys of a GUI status (`set_pf_status( shortcuts = )`)
-- [ ] Transaction logic: start with a variant, prefill the last entries,
-      create a draft
-- [ ] `SET` / `GET PARAMETER ID` with user parameters (like SU3), system
-      parameters and customizing parameters
+- [x] Transaction logic: start with a variant, prefill the last entries
+      (`set_prefill_last( )`)
+- [ ] Transaction logic: create a draft
+- [x] `SET` / `GET PARAMETER ID` with user parameters on the server, `SU3` in
+      the command field to maintain them
+- [ ] System parameters and customizing parameters beside the user parameters
 
 Stage 3 - clean core at the scale of a code base
 
-- [ ] A `SELECT` from a table with a known released successor rewritten,
-      field names included, where the mapping is certain; a typed wrapper
-      stub for an unreleased function module, for a person to fill
-- [ ] ATC findings in the migration report
-- [ ] A whole package or transport converted in one run: the dependency
-      graph over `SUBMIT` and `PERFORM ... IN PROGRAM`, one coverage table
-      for the estate, the refusals ranked across it
+- [x] A `SELECT` from a table with a known released successor rewritten,
+      field names included, where the mapping is certain (`--successors`)
+- [x] A wrapper stub for an unreleased function module, for a person to type
+      and release (`--wrappers`: `<class>_fmw`, the call through its method)
+- [x] ATC findings in the migration report: `--atc` takes the findings of
+      the classic report (the ADT worklist XML, or a CSV), and the report
+      says for each what the conversion did on its line - converted,
+      refused, TODO, or to check
+- [x] A whole package converted in one run (`tools/report2cloud/package.mjs`):
+      the dependency graph over `SUBMIT` and `PERFORM ... IN PROGRAM`, the
+      order to migrate in, one coverage table for the estate, the refusals
+      ranked across it
 
 Stage 4 - in the browser, and with an agent
 
 - [ ] The converter in the abap2UI5 playground: drop a `.prog.abap` into the
       AI Studio, the class runs on the stage, the refusals are the model's
       work list - nothing to install
-- [ ] `migrate_report` in the MCP server with the class deployed into the
+- [x] `migrate_report` in the MCP server with the class deployed into the
       sandbox and its first screen answered
 - [ ] An evaluation harness for the AI loop: a model works the migration
       reports of the corpus, and the share that ends clean is measured
@@ -563,20 +707,44 @@ Stage 5 - research
 - [x] `cl_demo_output` (in 72 reports of the web corpus): the stand-in
       `z2ui5_cl_cgui_demo_output` writes into the list - values, structures
       and tables as columns, sections as headings
-- [ ] More than one grid, F1 of the editor, the tree and the picture; table
-      controls, subscreens and tabstrips on a dynpro
+- [x] `cl_gui_picture` and `cl_gui_simple_tree`: the stand-ins
+      `z2ui5_cl_cgui_gui_picture` and `z2ui5_cl_cgui_gui_simple_tree` - the
+      nodes of `MTREESNODE`, lazy children on the first expand, the click as
+      `node_double_click` and `selection_changed`
+- [x] More than one grid: the first one displayed shows, then the one
+      refreshed; the container of another one names it with its rows and
+      shows it at a click (header and items in a splitter)
+- [x] `cl_gui_column_tree`: the stand-in `z2ui5_cl_cgui_gui_column_tree` -
+      the tree with its header and columns, the items of `MTREEITM` as
+      text, link or checkbox, `item_double_click`, `link_click`,
+      `checkbox_change`
+- [x] `cl_gui_list_tree`: the stand-in `z2ui5_cl_cgui_gui_list_tree` - the
+      items of a node on its line, the first its text
+- [x] Tabstrips and subscreens on a dynpro: the tabs with their function
+      codes, `activetab`, `CALL SUBSCREEN` in PBO and PAI with the number
+      of the subscreen in a variable (the paging in the program)
+- [x] Table controls on a dynpro: `LOOP WITH CONTROL` a line at a time in
+      PBO and PAI, the columns ready for input inputs of a table
+- [ ] F1 of the editor
 
 Quality, through every stage
 
-- [ ] Tests for the report runtime and the ALV with a client test double
-      (the selection screen has them), samples in the abap2UI5 playground,
-      documentation page
-- [ ] Semantic tests: the classic report and its class driven against the
-      same seeded rows in the transpiled runtime, their lists compared
+- [x] Tests for the report runtime and the ALV with a client test double
+      (`ltcl_client` of the report, the ALV's own), beside the selection
+      screen's
+- [ ] Samples in the abap2UI5 playground, a documentation page
+- [x] Semantic tests: the classic report and its class run against the
+      same seeded rows in the transpiled runtime, their lists compared line
+      by line (`test/runtime/semantic.test.mjs`) - six list reports of the
+      corpus
 
 Later
 
-- [ ] Tree lists
+- [x] Tree lists: `RS_TREE_CONSTRUCT` / `RS_TREE_LIST_DISPLAY` as the ALV tree
+      of the report
+- [x] `CL_SALV_TREE` as a stand-in, as `CL_SALV_TABLE` is: the nodes, their
+      relationships, the columns, the tree settings, `double_click` and
+      `checkbox_change` to the handlers
 
 ## Development
 
@@ -587,7 +755,7 @@ npm run check:cloud     # abaplint, ABAP Cloud
 npm run check:702       # downport a scratch copy to 7.02 and check it
 npm run check:abap2ui5  # abap2UI5-linter over apps and views
 npm run check:regex     # no regular expressions in src/
-npm run unit            # ABAP Unit in the transpiled backend (needs ../mcp-server and .deps/popups)
+npm run unit            # ABAP Unit in the transpiled backend (needs ../mcp-server)
 npm run test:report2cloud  # the report converter: snapshots and abaplint over its output
 npm run site            # the GitHub Pages site with the converter playground into build/site (-- --serve: on :8080)
 ```

@@ -38,6 +38,9 @@ CLASS z2ui5_cl_cgui_selscreen DEFINITION PUBLIC FINAL CREATE PRIVATE.
       BEGIN OF cs_event,
         select_option TYPE string VALUE `CGUI_SELECT_OPTION`,
         value_request TYPE string VALUE `CGUI_VALUE_REQUEST`,
+        "! a tab of a tabstrip of a dynpro pressed - its function code the
+        "! first argument
+        tab           TYPE string VALUE `CGUI_TAB`,
         help_request  TYPE string VALUE `CGUI_HELP_REQUEST`,
       END OF cs_event.
 
@@ -276,22 +279,57 @@ CLASS z2ui5_cl_cgui_selscreen DEFINITION PUBLIC FINAL CREATE PRIVATE.
         VALUE(result) TYPE REF TO z2ui5_cl_cgui_selscreen.
 
     "! SELECTION-SCREEN BEGIN OF TABBED BLOCK - the tabs that follow, each
-    "! opened by tab( ), up to tabbed_block_end( )
+    "! opened by tab( ), up to tabbed_block_end( ). name: the tabstrip of a
+    "! dynpro (CONTROLS name TYPE TABSTRIP) - its tabs have function codes,
+    "! the one of name-activetab is selected and a press raises
+    "! cs_event-tab with the function code of the tab
     METHODS tabbed_block_begin
+      IMPORTING
+        name          TYPE clike OPTIONAL
       RETURNING
         VALUE(result) TYPE REF TO z2ui5_cl_cgui_selscreen.
 
     "! SELECTION-SCREEN TAB - a tab; the fields and blocks that follow are
-    "! on it, up to the next tab( ) or tabbed_block_end( )
+    "! on it, up to the next tab( ) or tabbed_block_end( ). fcode: the
+    "! function code of a tab of a dynpro's tabstrip, area: the subscreen
+    "! area it shows (its reference field)
     METHODS tab
       IMPORTING
         text          TYPE clike
+        fcode         TYPE clike OPTIONAL
+        area          TYPE clike OPTIONAL
+      RETURNING
+        VALUE(result) TYPE REF TO z2ui5_cl_cgui_selscreen.
+
+    "! a table control of a dynpro (CONTROLS name TYPE TABLEVIEW) - the
+    "! report renders the lines its PBO handed over in the columns
+    METHODS table_control
+      IMPORTING
+        name          TYPE clike
+        title         TYPE clike OPTIONAL
+        columns       TYPE z2ui5_if_cgui_gui=>ty_t_tc_column
+      RETURNING
+        VALUE(result) TYPE REF TO z2ui5_cl_cgui_selscreen.
+
+    "! a subscreen area of a dynpro - the report renders the subscreen
+    "! called into it (CALL SUBSCREEN); in a tabstrip on the tab that shows
+    "! the area, the selected one where tabs share it
+    METHODS subscreen
+      IMPORTING
+        area          TYPE clike
       RETURNING
         VALUE(result) TYPE REF TO z2ui5_cl_cgui_selscreen.
 
     METHODS tabbed_block_end
       RETURNING
         VALUE(result) TYPE REF TO z2ui5_cl_cgui_selscreen.
+
+    "! the last entries of field name, the latest first - offered as
+    "! suggestions of its input (the input history of the SAP GUI)
+    METHODS set_history
+      IMPORTING
+        name   TYPE clike
+        values TYPE string_table.
 
     "! VRM_SET_VALUES - the values of the listbox of field name
     METHODS set_listbox_values
@@ -423,6 +461,8 @@ CLASS z2ui5_cl_cgui_selscreen DEFINITION PUBLIC FINAL CREATE PRIVATE.
         tab         TYPE string VALUE `TAB`,
         tabbed_end  TYPE string VALUE `TABBED_END`,
         custom      TYPE string VALUE `CUSTOM`,
+        subscreen   TYPE string VALUE `SUBSCREEN`,
+        table       TYPE string VALUE `TABLE_CONTROL`,
       END OF cs_kind.
 
     CONSTANTS:
@@ -499,7 +539,20 @@ CLASS z2ui5_cl_cgui_selscreen DEFINITION PUBLIC FINAL CREATE PRIVATE.
     DATA mv_value_help_auto TYPE abap_bool.
     DATA mv_preview         TYPE abap_bool.
     DATA mt_listbox         TYPE ty_t_listbox.
+    TYPES:
+      BEGIN OF ty_s_history,
+        name   TYPE string,
+        values TYPE string_table,
+      END OF ty_s_history.
+    DATA mt_history         TYPE STANDARD TABLE OF ty_s_history WITH EMPTY KEY.
     DATA mt_tab_bind        TYPE ty_t_tab_bind.
+    " the columns of the table controls, by name
+    TYPES:
+      BEGIN OF ty_s_tc,
+        name    TYPE string,
+        columns TYPE z2ui5_if_cgui_gui=>ty_t_tc_column,
+      END OF ty_s_tc.
+    DATA mt_tc              TYPE STANDARD TABLE OF ty_s_tc WITH EMPTY KEY.
     DATA mt_function_key    TYPE ty_t_function_key.
     " BEGIN OF BLOCK ... NO INTERVALS - the blocks open that have it
     DATA mv_block_depth     TYPE i.
@@ -768,15 +821,39 @@ CLASS z2ui5_cl_cgui_selscreen IMPLEMENTATION.
 
   METHOD tabbed_block_begin.
 
-    INSERT VALUE #( kind = cs_kind-tabbed ) INTO TABLE mt_item.
+    INSERT VALUE #( kind = cs_kind-tabbed
+                    name = to_upper( name ) ) INTO TABLE mt_item.
     result = me.
 
   ENDMETHOD.
 
   METHOD tab.
 
-    INSERT VALUE #( kind = cs_kind-tab
-                    text = text ) INTO TABLE mt_item.
+    INSERT VALUE #( kind  = cs_kind-tab
+                    text  = text
+                    event = to_upper( fcode )
+                    group = to_upper( area ) ) INTO TABLE mt_item.
+    result = me.
+
+  ENDMETHOD.
+
+  METHOD table_control.
+
+    DATA(lv_name) = to_upper( condense( CONV string( name ) ) ).
+    INSERT VALUE #( kind = cs_kind-table
+                    name = lv_name
+                    text = title ) INTO TABLE mt_item.
+    DELETE mt_tc WHERE name = lv_name.
+    INSERT VALUE #( name    = lv_name
+                    columns = columns ) INTO TABLE mt_tc.
+    result = me.
+
+  ENDMETHOD.
+
+  METHOD subscreen.
+
+    INSERT VALUE #( kind = cs_kind-subscreen
+                    name = to_upper( area ) ) INTO TABLE mt_item.
     result = me.
 
   ENDMETHOD.
@@ -785,6 +862,17 @@ CLASS z2ui5_cl_cgui_selscreen IMPLEMENTATION.
 
     INSERT VALUE #( kind = cs_kind-tabbed_end ) INTO TABLE mt_item.
     result = me.
+
+  ENDMETHOD.
+
+  METHOD set_history.
+
+    DATA(lv_name) = to_upper( name ).
+    DELETE mt_history WHERE name = lv_name.
+    IF values IS NOT INITIAL.
+      INSERT VALUE #( name   = lv_name
+                      values = values ) INTO TABLE mt_history.
+    ENDIF.
 
   ENDMETHOD.
 
@@ -1170,6 +1258,15 @@ CLASS z2ui5_cl_cgui_selscreen IMPLEMENTATION.
     DATA lo_tab_items TYPE REF TO z2ui5_cl_ui5_view_builder.
     DATA lv_tabbed TYPE i.
     DATA lv_tab TYPE i.
+    " the tabs of the tabstrip of a dynpro: function code, area, its filter
+    TYPES:
+      BEGIN OF ty_s_strip,
+        fcode TYPE string,
+        area  TYPE string,
+        node  TYPE REF TO z2ui5_cl_ui5_view_builder,
+      END OF ty_s_strip.
+    DATA lt_strip TYPE STANDARD TABLE OF ty_s_strip WITH EMPTY KEY.
+    DATA lv_active TYPE string.
 
     lo_container = node.
 
@@ -1193,14 +1290,31 @@ CLASS z2ui5_cl_cgui_selscreen IMPLEMENTATION.
           CLEAR: lo_line, lv_in_line.
 
         WHEN cs_kind-tabbed.
-          CLEAR: lo_form, lo_line, lv_in_line, lv_tab.
+          CLEAR: lo_form, lo_line, lv_in_line, lv_tab, lt_strip, lv_active.
           lv_tabbed = lv_tabbed + 1.
           DATA(lo_bar) = node->ele( `IconTabBar`
               )->a( n = `expandable` b = abap_false
               )->a( n = `class`      v = `sapUiResponsiveContentPadding` ).
-          READ TABLE mt_tab_bind REFERENCE INTO DATA(lr_tab_bind) WITH KEY index = lv_tabbed.
-          IF sy-subrc = 0.
-            lo_bar->a( n = `selectedKey` v = lr_tab_bind->bind ).
+          IF lr_item->name IS NOT INITIAL.
+            " the tabstrip of a dynpro: name-activetab, else its first tab;
+            " a press is a function of the dynpro
+            IF mi_gui IS BOUND.
+              lv_active = to_upper( mi_gui->tabstrip_active( lr_item->name ) ).
+            ENDIF.
+            IF lv_active IS INITIAL.
+              LOOP AT mt_item INTO DATA(ls_first) FROM sy-tabix WHERE kind = cs_kind-tab.
+                lv_active = ls_first-event.
+                EXIT.
+              ENDLOOP.
+            ENDIF.
+            lo_bar->a( n = `selectedKey` t = lv_active
+                )->a( n = `select`      v = client->_event( val   = cs_event-tab
+                                                            t_arg = VALUE #( ( `${$source>/selectedKey}` ) ) ) ).
+          ELSE.
+            READ TABLE mt_tab_bind REFERENCE INTO DATA(lr_tab_bind) WITH KEY index = lv_tabbed.
+            IF sy-subrc = 0.
+              lo_bar->a( n = `selectedKey` v = lr_tab_bind->bind ).
+            ENDIF.
           ENDIF.
           lo_tab_items = lo_bar->ele( `items` ).
           lo_container = lo_tab_items.
@@ -1213,7 +1327,27 @@ CLASS z2ui5_cl_cgui_selscreen IMPLEMENTATION.
           lv_tab = lv_tab + 1.
           lo_container = lo_tab_items->ele( `IconTabFilter`
               )->a( n = `text` t = lr_item->text
-              )->a( n = `key`  t = |TAB{ lv_tab }| ).
+              )->a( n = `key`  t = COND #( WHEN lr_item->event IS NOT INITIAL THEN lr_item->event ELSE |TAB{ lv_tab }| ) ).
+          INSERT VALUE #( fcode = lr_item->event
+                          area  = lr_item->group
+                          node  = lo_container ) INTO TABLE lt_strip.
+
+        WHEN cs_kind-subscreen.
+          CLEAR: lo_form, lo_line, lv_in_line.
+          " on the tab that shows the area - the selected one where tabs
+          " share it, as the classic pages in the program
+          DATA(lo_area) = lo_container.
+          READ TABLE lt_strip INTO DATA(ls_strip) WITH KEY area = lr_item->name fcode = lv_active.
+          IF sy-subrc <> 0.
+            READ TABLE lt_strip INTO ls_strip WITH KEY area = lr_item->name.
+          ENDIF.
+          IF sy-subrc = 0.
+            lo_area = ls_strip-node.
+          ENDIF.
+          IF mi_gui IS BOUND.
+            mi_gui->subscreen_render( area = lr_item->name
+                                      node = lo_area ).
+          ENDIF.
 
         WHEN cs_kind-tabbed_end.
           CLEAR: lo_form, lo_line, lv_in_line, lo_tab_items.
@@ -1224,6 +1358,16 @@ CLASS z2ui5_cl_cgui_selscreen IMPLEMENTATION.
           IF mi_gui IS BOUND.
             mi_gui->custom_render( name = lr_item->name
                                    node = lo_container ).
+          ENDIF.
+
+        WHEN cs_kind-table.
+          CLEAR: lo_form, lo_line, lv_in_line.
+          READ TABLE mt_tc INTO DATA(ls_tc) WITH KEY name = lr_item->name.
+          IF mi_gui IS BOUND AND sy-subrc = 0.
+            mi_gui->tablecontrol_render( name    = lr_item->name
+                                         title   = lr_item->text
+                                         columns = ls_tc-columns
+                                         node    = lo_container ).
           ENDIF.
 
         WHEN cs_kind-uline.
@@ -1256,7 +1400,9 @@ CLASS z2ui5_cl_cgui_selscreen IMPLEMENTATION.
           IF lv_in_line = abap_true AND lo_line IS NOT BOUND.
             lo_form->tag( `Label`
                 )->a( n = `text` t = lv_line_text ).
+            " the fields of one line - on a phone they wrap
             lo_line = lo_form->ele( `HBox`
+                )->a( n = `wrap`       v = `Wrap`
                 )->a( n = `alignItems` v = `Center` ).
           ENDIF.
           IF lo_line IS BOUND.
@@ -1475,7 +1621,8 @@ CLASS z2ui5_cl_cgui_selscreen IMPLEMENTATION.
                         item = item ).
 
       WHEN OTHERS.
-        node->tag( `Input`
+        " ele( ): the input itself - its suggestions are children of it
+        DATA(lo_input) = node->ele( `Input`
             )->a( n = `value`    v = item-bind
             )->a( n = `required` b = item-required
             )->a( n = `editable` b = xsdbool( item-read_only = abap_false ) ).
@@ -1498,6 +1645,18 @@ CLASS z2ui5_cl_cgui_selscreen IMPLEMENTATION.
           node->a( n = `showValueHelp`    b = abap_true
               )->a( n = `valueHelpRequest` v = client->_event( val = cs_event-value_request
                                                                arg = item-name ) ).
+        ENDIF.
+        " the last entries of the field - suggested from its first character
+        READ TABLE mt_history INTO DATA(ls_history) WITH KEY name = item-name.
+        IF sy-subrc = 0 AND item-invisible = abap_false AND item-read_only = abap_false.
+          node->a( n = `xmlns:core`     v = `sap.ui.core` ).
+          node->a( n = `showSuggestion` b = abap_true ).
+          DATA(lo_items) = lo_input->ele( `suggestionItems` ).
+          LOOP AT ls_history-values INTO DATA(lv_value).
+            lo_items->tag( n = `Item` ns = `core`
+                )->a( n = `key`  t = lv_value
+                )->a( n = `text` t = lv_value ).
+          ENDLOOP.
         ENDIF.
 
     ENDCASE.
@@ -1599,8 +1758,10 @@ CLASS z2ui5_cl_cgui_selscreen IMPLEMENTATION.
 
     " the classic select-option: from, to and the button of the multiple
     " selection - emphasized while the range holds more than its first line
+    " on a phone from and to wrap onto lines of their own
     DATA(lo_box) = node->ele( `HBox`
         )->a( n = `width`      v = `100%`
+        )->a( n = `wrap`       v = `Wrap`
         )->a( n = `alignItems` v = `Center` ).
 
     render_range_field( node = lo_box
@@ -1682,7 +1843,8 @@ CLASS z2ui5_cl_cgui_selscreen IMPLEMENTATION.
     ENDIF.
     lo_field->ele( `layoutData`
         )->tag( `FlexItemData`
-        )->a( n = `growFactor` v = `1` ).
+        )->a( n = `growFactor` v = `1`
+        )->a( n = `baseSize`   v = `8rem` ).
 
   ENDMETHOD.
 

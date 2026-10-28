@@ -33,6 +33,9 @@ CLASS z2ui5_cl_cgui_gui DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
     CONSTANTS ws_clipsiblings TYPE i VALUE 67108864.
     CONSTANTS ws_visible      TYPE i VALUE 268435456.
     CONSTANTS ws_child        TYPE i VALUE 1073741824.
+    " cl_gui_control - set_visible( ) takes them
+    CONSTANTS visible_true  TYPE c LENGTH 1 VALUE '1'.
+    CONSTANTS visible_false TYPE c LENGTH 1 VALUE '0'.
 
     TYPES:
       "! CNTL_SIMPLE_EVENT(S) - the events set_registered_events( ) of a

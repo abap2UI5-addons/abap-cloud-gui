@@ -5,7 +5,7 @@
 | Source | `zr2c_09_localclass.prog.abap` |
 | Text pool | none - texts are placeholders, see the TODOs |
 | Result | **converted** - `z2ui5_cl_cgui_r2c_09.clas.abap`, `z2ui5_cl_cgui_r2c_09.clas.locals_def.abap`, `z2ui5_cl_cgui_r2c_09.clas.locals_imp.abap`, `z2ui5_cl_cgui_r2c_09.clas.xml` |
-| Mapped | 13 construct(s) |
+| Mapped | 12 construct(s) |
 | TODO | 1 |
 | Release state to check | 0 object(s) |
 
@@ -25,7 +25,6 @@ The class uses no database table, DDIC type, function module, class or message c
 | 9 | `INTERFACE lif_rounding` | locals_def |
 | 15 | `CLASS lcl_calculator DEFINITION FINAL` | locals_def |
 | 27 | `CLASS lcl_calculator IMPLEMENTATION` | locals_imp |
-| 41 | `global data - the report restarted after its list` | `CLEAR` of 1 global data object(s) at the start of `start_of_selection( )` |
 | 43 | `PARAMETERS p_a TYPE decfloat34 DEFAULT '1.005'` | attribute `p_a`, `screen->parameter( )` |
 | 44 | `PARAMETERS p_b TYPE decfloat34 DEFAULT '2.5'` | attribute `p_b`, `screen->parameter( )` |
 | 45 | `PARAMETERS p_dec TYPE i DEFAULT 2` | attribute `p_dec`, `screen->parameter( )` |

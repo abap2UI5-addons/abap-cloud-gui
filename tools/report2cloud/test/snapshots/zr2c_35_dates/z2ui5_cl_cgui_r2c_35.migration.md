@@ -5,7 +5,7 @@
 | Source | `zr2c_35_dates.prog.abap` |
 | Text pool | `zr2c_35_dates.prog.xml` |
 | Result | **converted** - `z2ui5_cl_cgui_r2c_35.clas.abap`, `z2ui5_cl_cgui_r2c_35.clas.xml` |
-| Mapped | 21 construct(s) |
+| Mapped | 20 construct(s) |
 | TODO | 0 |
 | Release state to check | 0 object(s) |
 
@@ -22,7 +22,6 @@ The class uses no database table, DDIC type, function module, class or message c
 | 11 | `PARAMETERS p_end TYPE d DEFAULT '20260320'` | attribute `p_end`, `screen->parameter( )` |
 | 12 | `PARAMETERS p_days TYPE i DEFAULT 10` | attribute `p_days`, `screen->parameter( )` |
 | 14 | `START-OF-SELECTION` | `start_of_selection( )` |
-| 17 | `global data - the report restarted after its list` | `CLEAR` of 4 global data object(s) at the start of `start_of_selection( )` |
 | 22 | `MESSAGE 'The end is before the start' TYPE 'E'` | `message( )` |
 | 27 | `WRITE / 'Days between start and end:'` | `write( )` |
 | 27 | `WRITE lv_between` | `write( )` |

@@ -232,6 +232,20 @@ CLASS z2ui5_cl_cgui_frontend DEFINITION PUBLIC FINAL CREATE PRIVATE.
         error_no_gui
         not_supported_by_gui.
 
+    "! the version of the SAP GUI - there is none, a browser runs the app:
+    "! gui_no_version, the answer the classic gives where no SAP GUI is
+    CLASS-METHODS get_gui_version
+      CHANGING
+        version_table TYPE STANDARD TABLE
+        rc            TYPE i
+      EXCEPTIONS
+        get_gui_version_failed
+        cant_write_version_table
+        gui_no_version
+        cntl_error
+        error_no_gui
+        not_supported_by_gui.
+
     "! the files the user uploaded - the only folder there is; filter is a
     "! pattern of the name (*.csv), folders there are none
     CLASS-METHODS directory_list_files
@@ -683,6 +697,14 @@ CLASS z2ui5_cl_cgui_frontend IMPLEMENTATION.
     go_report->download( name    = lv_name
                               mime    = mime_type( lv_name )
                               content = lv_content ).
+
+  ENDMETHOD.
+
+  METHOD get_gui_version.
+
+    CLEAR version_table.
+    rc = 0.
+    RAISE gui_no_version.
 
   ENDMETHOD.
 

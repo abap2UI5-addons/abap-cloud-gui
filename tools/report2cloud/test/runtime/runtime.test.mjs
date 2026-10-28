@@ -1,7 +1,7 @@
 // report2cloud, golden master lite: the generated classes RUN.
 //
-// The corpus is converted, the classes are transpiled with src/01 and the
-// popups against @abap2ui5/node-runtime (backend.mjs), the stubs of the flight
+// The corpus is converted, the classes are transpiled with src/01
+// against @abap2ui5/node-runtime (backend.mjs), the stubs of the flight
 // tables are seeded (seed.mjs), and every report is operated the way a user
 // operates it - start the app, fill the selection screen, Execute, click a
 // line - through the JSON protocol of the UI5 frontend (driver.mjs, the app
@@ -15,8 +15,7 @@
 //
 // Opt-in, like the abaplint gates it complements: it needs an mcp-server
 // checkout (MCP_SERVER_HOME or ../mcp-server), git and network for the first
-// install of the runtime (A2UI5_MCP_WORKSPACE, default ~/.abap2ui5-mcp) and
-// the popups (.deps/popups, ../popups or a clone into build/popups). Without
+// install of the runtime (A2UI5_MCP_WORKSPACE, default ~/.abap2ui5-mcp). Without
 // an mcp-server checkout every test is skipped with the reason.
 import { after, before, test } from "node:test";
 import assert from "node:assert/strict";
@@ -72,6 +71,8 @@ test("zr2c_01_hello: parameters, OBLIGATORY, a DO loop of WRITEs", { skip }, asy
   let s = await d.start("z2ui5_cl_cgui_r2c_01");
   assert.equal(s.title, "Hello World");
   assert.deepEqual(fieldsOf(s), ['P_NAME=""*', "P_TIMES=3"]);
+  // the command field of the SAP GUI in the page header, empty
+  assert.equal(s.command?.value, "");
   assert.deepEqual(s.fields.map((f) => f.label), ["Your name", "Lines"]);
 
   s = await d.act(s.session, { event: "CGUI_EXECUTE" });
@@ -352,6 +353,122 @@ test("zr2c_27_gridlocal: a grid in a local class - in the custom control area of
   // Back: LEAVE TO SCREEN 0 of the PAI module
   s = await d.act(s.session, { event: "CGUI_BACK" });
   assert.doesNotMatch(xml() ?? "", /MR_CGUI_ALV/);
+});
+
+test("zr2c_48_twogrids: two grids in a splitter - the first one shows, the other offers to show; the double click refreshes the items, which show then; back to the airlines", { skip }, async () => {
+  const rows = () => d.state().models.MAIN.data.MR_CGUI_ALV["*"];
+  const xml = () => d.state().slots.MAIN.xml;
+  const show = (s) => {
+    const a = actionsOf(s, "CGUI_GUI").find((x) => x.args.includes("CGUI_SHOW"));
+    assert.ok(a, `a Show button: ${JSON.stringify(actionsOf(s, "CGUI_GUI").map((x) => x.args))}`);
+    return d.act(s.session, { event: a.id });
+  };
+  // the first grid displayed shows; the second one, displayed after it, waits in its cell
+  let s = await d.start("z2ui5_cl_cgui_r2c_48");
+  assert.deepEqual(rows().map((r) => r.CARRID), ["AA", "LH", "SQ"]);
+  assert.equal(s.tables[0]?.label, "Airlines (3)");
+  assert.match(xml(), /text="Connections \(0\)"/, "the items grid offers to show");
+
+  // the double click on Lufthansa: refresh_table_display( ) of the items shows them
+  s = await d.act(s.session, { event: "CGUI_ALV_LINE_SELECTION", args: ["/MR_CGUI_ALV/*/1"] });
+  assert.deepEqual(rows().map((r) => `${r.CARRID} ${r.CONNID}`), ["LH 0400", "LH 0402", "LH 2402"]);
+  assert.equal(s.tables[0]?.label, "Connections (3)");
+  assert.match(xml(), /text="Airlines \(3\)"/, "now the airlines offer to show");
+
+  // back to the airlines - their handler still answers the double click
+  s = await show(s);
+  assert.deepEqual(rows().map((r) => r.CARRID), ["AA", "LH", "SQ"]);
+  s = await d.act(s.session, { event: "CGUI_ALV_LINE_SELECTION", args: ["/MR_CGUI_ALV/*/0"] });
+  assert.deepEqual(rows().map((r) => `${r.CARRID} ${r.CONNID}`), ["AA 0017"]);
+  // the items again, the airlines in their cell
+  s = await show(s);
+  assert.deepEqual(rows().map((r) => r.CARRID), ["AA", "LH", "SQ"]);
+  assert.match(xml(), /text="Connections \(1\)"/);
+});
+
+test("zr2c_49_coltree: a column tree - the header, the nodes with their cells beside them, a click on a node and on a link to the handlers", { skip }, async () => {
+  const xml = () => d.state().slots.MAIN.xml;
+  const press = (s, kind) => {
+    const a = actionsOf(s, "CGUI_GUI").find((x) => x.args[1] === kind);
+    assert.ok(a, `a ${kind}: ${JSON.stringify(actionsOf(s, "CGUI_GUI").map((x) => x.args))}`);
+    return d.act(s.session, { event: a.id });
+  };
+  // no selection screen: START-OF-SELECTION calls the screen, its PBO builds the tree
+  let s = await d.start("z2ui5_cl_cgui_r2c_49");
+  // the headers, the text of a node from its item of the hierarchy column
+  for (const text of ["Airline", "From", "To", "American Airlines", "Lufthansa"]) assert.match(xml(), new RegExp(`text="${text}"`), text);
+  // Lufthansa expanded: its connections with the cities in their columns
+  assert.match(xml(), /text="LH 0400"/);
+  assert.match(xml(), /text="NEW YORK"/);
+  assert.doesNotMatch(xml(), /text="AA 0017"/, "American Airlines is not expanded");
+  // the address of an airline is a link: link_click with the node and the item
+  s = await press(s, "LINK");
+  assert.deepEqual(toasts(s), ["Open AA FROM"]);
+  // a click on a node: item_double_click of the hierarchy column
+  s = await press(s, "CLICK");
+  assert.deepEqual(toasts(s), ["AA TREE"]);
+});
+
+test("zr2c_50_listtree: a list tree - the items of a node on its line, a click on a node and on a link to the handlers", { skip }, async () => {
+  const xml = () => d.state().slots.MAIN.xml;
+  const press = (s, kind) => {
+    const a = actionsOf(s, "CGUI_GUI").find((x) => x.args[1] === kind);
+    assert.ok(a, `a ${kind}: ${JSON.stringify(actionsOf(s, "CGUI_GUI").map((x) => x.args))}`);
+    return d.act(s.session, { event: a.id });
+  };
+  let s = await d.start("z2ui5_cl_cgui_r2c_50");
+  // the first item the text of the node, the others after it - no header
+  for (const text of ["American Airlines", "Lufthansa", "0400", "FRANKFURT", "NEW YORK"]) assert.match(xml(), new RegExp(`text="${text}"`), text);
+  assert.doesNotMatch(xml(), /design="Bold"/, "no header row");
+  // the address of an airline is a link
+  s = await press(s, "LINK");
+  assert.deepEqual(toasts(s), ["Open AA"]);
+  // a click on a node is one on its first item, by its name
+  s = await press(s, "CLICK");
+  assert.deepEqual(toasts(s), ["AA 1"]);
+});
+
+test("zr2c_51_tabstrip: a tabstrip on a dynpro - the tabs, the subscreen of the tab pressed, the PAI of the subscreen, back to the list", { skip }, async () => {
+  const xml = () => d.state().slots.MAIN.xml;
+  const tab = (s, fcode) => {
+    const a = actionsOf(s, "CGUI_TAB")[0];
+    assert.ok(a, `the tabstrip raises CGUI_TAB: ${JSON.stringify(s.actions.map((x) => x.event))}`);
+    return d.act(s.session, { event: "CGUI_TAB", args: [fcode] });
+  };
+  // no selection screen: START-OF-SELECTION calls the screen, its PBO selects the first tab
+  let s = await d.start("z2ui5_cl_cgui_r2c_51");
+  assert.match(xml(), /<IconTabBar[^>]*selectedKey="TAB1"/);
+  assert.match(xml(), /text="Airline"[^>]*key="TAB1"|key="TAB1"[^>]*text="Airline"/);
+  assert.ok(s.fields.some((f) => f.name === "GV_CARRID"), `the field of subscreen 0110: ${JSON.stringify(s.fields.map((f) => f.name))}`);
+
+  // the second tab: its function code goes to the PAI, which calls the other subscreen;
+  // the PAI of subscreen 0110 ran first - the airline typed is upper case
+  s = await d.act(s.session, { values: { GV_CARRID: "aa" }, event: "CGUI_TAB", args: ["TAB2"] });
+  assert.match(xml(), /<IconTabBar[^>]*selectedKey="TAB2"/);
+  assert.ok(s.fields.some((f) => f.name === "GV_FREE"), `the checkbox of subscreen 0120: ${JSON.stringify(s.fields.map((f) => f.name))}`);
+  assert.ok(!s.fields.some((f) => f.name === "GV_CARRID"), "0110 is no longer on the tab");
+
+  // Back: LEAVE TO SCREEN 0, what followed CALL SCREEN writes the list
+  s = await d.act(s.session, { values: { GV_FREE: true }, event: "CGUI_BACK" });
+  assert.deepEqual(d.lines(), ["Airline AA", "Only free seats"]);
+});
+
+test("zr2c_52_tablecontrol: a table control on a dynpro - the PBO loop fills its lines, the PAI loop writes back what the user typed", { skip }, async () => {
+  const rows = () => d.state().models.MAIN.data.MT_CGUI_TC_ROW;
+  const xml = () => d.state().slots.MAIN.xml;
+  let s = await d.start("z2ui5_cl_cgui_r2c_52");
+  // the lines of the PBO loop, a column ready for input
+  assert.deepEqual(rows().map((r) => `${r.C01} ${r.C02}`), ["0400 10", "0402 20", "2402 30"]);
+  assert.match(xml(), /<Input value="\{C02\}"/);
+  assert.match(xml(), /text="Seats per connection"/);
+
+  // the seats of the second line changed: Enter runs the PAI loop, MODIFY at current_line
+  s = await d.act(s.session, { values: { "/MT_CGUI_TC_ROW/1/C02": "25" }, event: "CGUI_ENTER" });
+  assert.deepEqual(rows().map((r) => `${r.C01} ${r.C02}`), ["0400 10", "0402 25", "2402 30"]);
+
+  // Back: what followed CALL SCREEN lists the table as the PAI left it
+  s = await d.act(s.session, { event: "CGUI_BACK" });
+  assert.deepEqual(d.lines(), ["0400 10", "0402 25", "2402 30"]);
 });
 
 test("zr2c_21_lclreport: a local report class that reads the selection screen, writes the list and calls a FORM", { skip }, async () => {
@@ -748,4 +865,38 @@ test("zr2c_45_salvlocal: a SALV kept by a local class - a function of its own ov
   // the item is a hotspot - link_click with row and column
   s = await d.act(s.session, { event: "CGUI_ALV_HOTSPOT", args: [`${t.path}/2`, "ITEM"] });
   assert.deepEqual(toasts(s), ["Item 003 (ITEM)"]);
+});
+
+test("zr2c_46_treelist: RS_TREE_CONSTRUCT and RS_TREE_LIST_DISPLAY - the nodes as the tree of the report, TLEVEL the hierarchy", { skip }, async () => {
+  let s = await d.start("z2ui5_cl_cgui_r2c_46");
+  if (!s.tables.length) s = await d.act(s.session, { event: "CGUI_EXECUTE" });
+  const [t] = s.tables;
+  assert.ok(t, "the tree");
+  assert.equal(t.label, "Flights as a tree list");
+  // the nodes in their order, LEVEL from TLEVEL - every node open
+  const view = d.state().models.MAIN.data.MT_CGUI_TREE_VIEW;
+  assert.deepEqual(view.map((n) => `${n.LEVEL} ${n.TEXT}`), [
+    "0 Airlines",
+    "1 LH Lufthansa",
+    "2 0400 Frankfurt - New York",
+    "2 0402 Frankfurt - New York",
+    "1 AA American Airlines",
+    "2 0017 New York - San Francisco",
+  ]);
+});
+
+test("zr2c_47_salvtree: CL_SALV_TREE as the stand-in - the nodes below their related node, a sibling beside it, the header, a click to the handler", { skip }, async () => {
+  let s = await d.start("z2ui5_cl_cgui_r2c_47");
+  if (!s.tables.length) s = await d.act(s.session, { event: "CGUI_EXECUTE" });
+  const [t] = s.tables;
+  assert.ok(t, "the tree");
+  assert.equal(t.label, "Seats per flight");
+  const view = d.state().models.MAIN.data.MT_CGUI_TREE_VIEW;
+  // American Airlines the next sibling of Lufthansa - a root as well
+  assert.deepEqual(view.map((n) => `${n.LEVEL} ${n.TEXT}`), ["0 Lufthansa", "1 0400", "1 0402", "0 American Airlines", "1 0017"]);
+  // the columns of the table: CARRID hidden, SEATS with its text
+  assert.deepEqual(t.columns.map((c) => c.label), ["Airline", "CONNID", "Free seats"]);
+  // a click on 0402 - double_click with its key, the handler reads its text
+  s = await d.act(s.session, { event: "CGUI_TREE_NODE", args: [String(view[2].KEY)] });
+  assert.deepEqual(toasts(s), ["0402 picked"]);
 });

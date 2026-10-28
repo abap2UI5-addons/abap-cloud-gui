@@ -46,6 +46,9 @@ CLASS z2ui5_cl_cgui_r2c_02 IMPLEMENTATION.
 
     DATA ls_s_fldate LIKE LINE OF s_fldate.
 
+    " the command field of the SAP GUI: transactions, /n, /o and OK codes
+    set_command_field( ).
+
     set_title( `Flights of an Airline` ).
     p_carrid = 'LH'.
     p_max = 100.
@@ -83,11 +86,6 @@ CLASS z2ui5_cl_cgui_r2c_02 IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD start_of_selection.
-
-    " every run starts with the global data of a fresh start - the classic report restarted after its list
-    CLEAR: gt_flight,
-           gs_flight,
-           gv_total.
 
     SELECT carrid, connid, fldate, price, currency, seatsmax, seatsocc
       FROM sflight

@@ -39,6 +39,9 @@ CLASS z2ui5_cl_cgui_r2c_22 IMPLEMENTATION.
 
   METHOD initialization.
 
+    " the command field of the SAP GUI: transactions, /n, /o and OK codes
+    set_command_field( ).
+
     set_title( `Upload and download` ).
 
   ENDMETHOD.
@@ -56,10 +59,6 @@ CLASS z2ui5_cl_cgui_r2c_22 IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD start_of_selection.
-
-    " every run starts with the global data of a fresh start - the classic report restarted after its list
-    CLEAR: gt_seats,
-           gv_total.
 
     z2ui5_cl_cgui_frontend=>gui_upload( EXPORTING  filename            = p_file
                                                    filetype            = 'ASC'

@@ -5,7 +5,7 @@
 | Source | `zr2c_03_forms.prog.abap` |
 | Text pool | none - texts are placeholders, see the TODOs |
 | Result | **converted** - `z2ui5_cl_cgui_r2c_03.clas.abap`, `z2ui5_cl_cgui_r2c_03.clas.xml` |
-| Mapped | 28 construct(s) |
+| Mapped | 27 construct(s) |
 | TODO | 4 |
 | Release state to check | 0 object(s) |
 
@@ -25,7 +25,6 @@ The class uses no database table, DDIC type, function module, class or message c
 | Line | Classic | abap-cloud-gui |
 |---|---|---|
 | 7 | `REPORT zr2c_03_forms` | the class, `INHERITING FROM z2ui5_cl_cgui_report` |
-| 19 | `global data - the report restarted after its list` | `CLEAR` of 4 global data object(s) at the start of `start_of_selection( )` |
 | 24 | `PARAMETERS p_items TYPE i DEFAULT 5 OBLIGATORY` | attribute `p_items`, `screen->parameter( )` |
 | 25 | `PARAMETERS p_disc TYPE p LENGTH 3 DECIMALS 2 DEFAULT '0.05'` | attribute `p_disc`, `screen->parameter( )` |
 | 26 | `PARAMETERS p_vat AS CHECKBOX DEFAULT 'X'` | attribute `p_vat`, `screen->checkbox( )` |

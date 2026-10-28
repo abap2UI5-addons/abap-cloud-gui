@@ -5,7 +5,7 @@
 | Source | `zr2c_11_legacy.prog.abap` |
 | Text pool | none - texts are placeholders, see the TODOs |
 | Result | **converted** - `z2ui5_cl_cgui_r2c_11.clas.abap`, `z2ui5_cl_cgui_r2c_11.clas.xml` |
-| Mapped | 16 construct(s) |
+| Mapped | 15 construct(s) |
 | TODO | 4 |
 | Release state to check | 0 object(s) |
 
@@ -25,7 +25,6 @@ The class uses no database table, DDIC type, function module, class or message c
 | Line | Classic | abap-cloud-gui |
 |---|---|---|
 | 8 | `REPORT zr2c_11_legacy` | the class, `INHERITING FROM z2ui5_cl_cgui_report` |
-| 10 | `global data - the report restarted after its list` | `CLEAR` of 4 global data object(s) at the start of `start_of_selection( )` |
 | 15 | `FIELD-SYMBOLS <gv_number> TYPE i` | declared in each method that uses it |
 | 17 | `SELECT-OPTIONS s_range FOR gv_sum DEFAULT 1 TO 20` | range attribute `s_range`, `screen->select_option( )` |
 | 18 | `PARAMETERS p_title TYPE c LENGTH 30 DEFAULT 'Numbers'` | attribute `p_title`, `screen->parameter( )` |

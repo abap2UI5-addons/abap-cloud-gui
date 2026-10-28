@@ -31,18 +31,14 @@ CLASS z2ui5_cl_cgui_r2c_44 IMPLEMENTATION.
 
   METHOD initialization.
 
+    " the command field of the SAP GUI: transactions, /n, /o and OK codes
+    set_command_field( ).
+
     set_title( `Peaks` ).
 
   ENDMETHOD.
 
   METHOD start_of_selection.
-
-    " every run starts with the global data of a fresh start - the classic report restarted after its list
-    CLEAR: gs_peak,
-           gt_peak,
-           lv_field,
-           lv_value,
-           lv_line.
 
     gt_peak = VALUE #( ( name = 'Zugspitze'  height = 2962 )
                        ( name = 'Watzmann'   height = 2713 )

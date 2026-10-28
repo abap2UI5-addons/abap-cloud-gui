@@ -15,7 +15,19 @@ INTERFACE z2ui5_if_cgui_gui PUBLIC.
       grid      TYPE string VALUE `GRID`,
       picture   TYPE string VALUE `PICTURE`,
       salv      TYPE string VALUE `SALV`,
+      "! cl_gui_simple_tree - the control object keeps its nodes
+      simple_tree TYPE string VALUE `SIMPLE_TREE`,
     END OF cs_kind.
+
+  TYPES:
+    "! a column of a table control of a dynpro - its heading, whether it is
+    "! ready for input, its width in characters
+    BEGIN OF ty_s_tc_column,
+      text  TYPE string,
+      input TYPE abap_bool,
+      width TYPE i,
+    END OF ty_s_tc_column,
+    ty_t_tc_column TYPE STANDARD TABLE OF ty_s_tc_column WITH EMPTY KEY.
 
   TYPES:
     "! GET CURSOR - the field of a WRITE clicked, its value, line and offset
@@ -90,6 +102,8 @@ INTERFACE z2ui5_if_cgui_gui PUBLIC.
       layout    TYPE REF TO data,
       sort      TYPE REF TO data,
       functions TYPE ty_t_button,
+      "! whether the grid is the one the ALV shows
+      shown     TYPE abap_bool,
     END OF ty_s_grid,
     ty_t_grid TYPE STANDARD TABLE OF ty_s_grid WITH EMPTY KEY.
 
@@ -127,7 +141,8 @@ INTERFACE z2ui5_if_cgui_gui PUBLIC.
   "! catalog, the layout, the sort (the classic structures, read by the
   "! names of their fields), the functions of its toolbar; the others stay
   "! as they were. The report shows it with its ALV (z2ui5_cl_cgui_alv),
-  "! one grid at a time - the last one displayed
+  "! one grid at a time - the last one displayed; first marks the first
+  "! display, which leaves another grid that shows where it is
   METHODS grid_display
     IMPORTING
       id        TYPE i
@@ -135,7 +150,8 @@ INTERFACE z2ui5_if_cgui_gui PUBLIC.
       fieldcat  TYPE REF TO data OPTIONAL
       layout    TYPE REF TO data OPTIONAL
       sort      TYPE REF TO data OPTIONAL
-      functions TYPE REF TO data OPTIONAL.
+      functions TYPE REF TO data OPTIONAL
+      first     TYPE abap_bool DEFAULT abap_false.
 
   "! what the report keeps of the grid id
   METHODS grid_get
@@ -156,6 +172,32 @@ INTERFACE z2ui5_if_cgui_gui PUBLIC.
       name TYPE string
       node TYPE REF TO z2ui5_cl_ui5_view_builder.
 
+  "! the table control name of a dynpro rendered into node - the lines the
+  "! PBO handed over (LOOP WITH CONTROL), its columns as the screen has
+  "! them; called by the screen when it renders z2ui5_cl_cgui_selscreen=>
+  "! table_control( )
+  METHODS tablecontrol_render
+    IMPORTING
+      name    TYPE string
+      title   TYPE string
+      columns TYPE ty_t_tc_column
+      node    TYPE REF TO z2ui5_cl_ui5_view_builder.
+
+  "! the subscreen called into area (CALL SUBSCREEN) rendered into node -
+  "! called by the screen when it renders z2ui5_cl_cgui_selscreen=>subscreen( )
+  METHODS subscreen_render
+    IMPORTING
+      area TYPE string
+      node TYPE REF TO z2ui5_cl_ui5_view_builder.
+
+  "! the function code of the tab of tabstrip name that is selected -
+  "! name-activetab of the report
+  METHODS tabstrip_active
+    IMPORTING
+      name          TYPE string
+    RETURNING
+      VALUE(result) TYPE string.
+
   "! the list output of the run - where the stand-in of cl_demo_output
   "! (z2ui5_cl_cgui_demo_output) writes
   METHODS list
@@ -167,5 +209,16 @@ INTERFACE z2ui5_if_cgui_gui PUBLIC.
   METHODS cursor
     RETURNING
       VALUE(result) TYPE ty_s_cursor.
+
+  "! the ALV tree of the run, new - where the stand-in of cl_salv_tree
+  "! (z2ui5_cl_cgui_salv_tree) adds its nodes
+  METHODS tree
+    RETURNING
+      VALUE(result) TYPE REF TO z2ui5_cl_cgui_tree.
+
+  "! who hears the clicks of that tree besides the report
+  METHODS tree_handler
+    IMPORTING
+      handler TYPE REF TO z2ui5_if_cgui_tree_handler.
 
 ENDINTERFACE.

@@ -29,6 +29,9 @@ CLASS z2ui5_cl_cgui_r2c_11 IMPLEMENTATION.
 
   METHOD initialization.
 
+    " the command field of the SAP GUI: transactions, /n, /o and OK codes
+    set_command_field( ).
+
     s_range = VALUE #( ( sign = `I` option = `BT` low = 1 high = 20 ) ).
     p_title = 'Numbers'.
 
@@ -44,12 +47,6 @@ CLASS z2ui5_cl_cgui_r2c_11 IMPLEMENTATION.
   METHOD start_of_selection.
 
     FIELD-SYMBOLS <gv_number> TYPE i.
-
-    " every run starts with the global data of a fresh start - the classic report restarted after its list
-    CLEAR: gt_numbers,
-           gv_text,
-           gv_sum,
-           gv_sum_txt.
 
     DO 20 TIMES.
       IF z2ui5_cl_cgui_context=>range_check( val = sy-index range = s_range ) = abap_true.

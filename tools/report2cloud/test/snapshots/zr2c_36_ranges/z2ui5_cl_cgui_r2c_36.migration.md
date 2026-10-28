@@ -5,7 +5,7 @@
 | Source | `zr2c_36_ranges.prog.abap` |
 | Text pool | `zr2c_36_ranges.prog.xml` |
 | Result | **converted** - `z2ui5_cl_cgui_r2c_36.clas.abap`, `z2ui5_cl_cgui_r2c_36.clas.xml` |
-| Mapped | 13 construct(s) |
+| Mapped | 12 construct(s) |
 | TODO | 0 |
 | Release state to check | 0 object(s) |
 
@@ -18,7 +18,6 @@ The class uses no database table, DDIC type, function module, class or message c
 | Line | Classic | abap-cloud-gui |
 |---|---|---|
 | 8 | `REPORT zr2c_36_ranges` | the class, `INHERITING FROM z2ui5_cl_cgui_report` |
-| 17 | `global data - the report restarted after its list` | `CLEAR` of 2 global data object(s) at the start of `start_of_selection( )` |
 | 20 | `SELECT-OPTIONS s_name FOR gs_product-name` | range attribute `s_name`, `screen->select_option( )` |
 | 21 | `SELECT-OPTIONS s_price FOR gs_product-price` | range attribute `s_price`, `screen->select_option( )` |
 | 22 | `PARAMETERS p_uniq AS CHECKBOX DEFAULT 'X'` | attribute `p_uniq`, `screen->checkbox( )` |

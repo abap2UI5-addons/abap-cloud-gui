@@ -29,6 +29,9 @@ CLASS z2ui5_cl_cgui_r2c_29 IMPLEMENTATION.
 
   METHOD initialization.
 
+    " the command field of the SAP GUI: transactions, /n, /o and OK codes
+    set_command_field( ).
+
     set_title( `Inventory with cl_demo_output` ).
     p_min = 5.
 

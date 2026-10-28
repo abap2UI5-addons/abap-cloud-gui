@@ -25,6 +25,9 @@ CLASS z2ui5_cl_cgui_r2c_07 IMPLEMENTATION.
 
   METHOD initialization.
 
+    " the command field of the SAP GUI: transactions, /n, /o and OK codes
+    set_command_field( ).
+
     p_type = 'S'.
     p_num = 42.
 
@@ -56,9 +59,6 @@ CLASS z2ui5_cl_cgui_r2c_07 IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD start_of_selection.
-
-    " every run starts with the global data of a fresh start - the classic report restarted after its list
-    CLEAR gv_text.
 
     CASE p_type.
       WHEN 'S'.
