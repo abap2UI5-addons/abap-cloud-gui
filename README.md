@@ -591,9 +591,10 @@ Stage 2 - the runtime: what a report's user sees
 
 Selection screen
 
+- [x] F4 inside the range popup of a select-option - `at_value_request( )`
+      of the select-option, the values picked become lines of the popup
 - [ ] Value helps: CDS value helps (`@Consumption.valueHelpDefinition`),
-      text tables beside value tables, search helps, F4 inside the range
-      popup of a select-option
+      text tables beside value tables, search helps
 - [x] `AT SELECTION-SCREEN ON BLOCK`, `ON RADIOBUTTON GROUP`, `AS LISTBOX`
 - [x] `MEMORY ID`
 - [x] A phone layout of the selection screen: labels above the fields, a
