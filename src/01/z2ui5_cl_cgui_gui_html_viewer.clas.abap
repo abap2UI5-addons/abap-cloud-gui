@@ -1,9 +1,14 @@
 "! The stand-in of cl_gui_html_viewer - HTML in its container.
 "! load_data( ) keeps the lines of data_table as a document of its own and
 "! answers with its URL, show_url( ) of that URL (or show_data( )) shows the
-"! document - as sap.ui.core.HTML with sanitized content: no script, no
-"! event handler. show_url( ) of an address on the web is a link that opens
-"! it. The events of the viewer (SAPEVENT) have no counterpart yet
+"! document. Where the frontend has the custom control z2ui5.cc.HTMLFrame
+"! (abap2UI5 after 1.148), the document is shown as it is, its styles
+"! included, in a frame under the page's policy - no script of it runs - and
+"! its SAPEVENT links and the forms posted to a SAPEVENT action raise the
+"! event sapevent with getdata and postdata, as in the SAP GUI. On an older
+"! frontend it is sap.ui.core.HTML with sanitized content, its SAPEVENT links
+"! as links below it. show_url( ) of an address on the web is a link that
+"! opens it.
 CLASS z2ui5_cl_cgui_gui_html_viewer DEFINITION PUBLIC
   INHERITING FROM z2ui5_cl_cgui_gui
   CREATE PUBLIC.
@@ -26,8 +31,9 @@ CLASS z2ui5_cl_cgui_gui_html_viewer DEFINITION PUBLIC
       END OF ty_s_link,
       ty_t_link TYPE STANDARD TABLE OF ty_s_link WITH DEFAULT KEY.
 
-    "! a link SAPEVENT:action?query of the document - shown as a link below
-    "! it (the document is sanitized), a click raises the event
+    "! a link SAPEVENT:action?query of the document, or a form posted to
+    "! SAPEVENT:action - postdata the fields of the form, urlencoded, in
+    "! lines of 255 characters
     EVENTS sapevent
       EXPORTING
         VALUE(action)      TYPE c OPTIONAL
@@ -308,9 +314,22 @@ CLASS z2ui5_cl_cgui_gui_html_viewer IMPLEMENTATION.
       INSERT VALUE #( name  = to_upper( lv_name )
                       value = lv_value ) INTO TABLE lt_query.
     ENDLOOP.
+    " the fields of a posted form, urlencoded, in lines of 255 characters
+    DATA lt_post TYPE ty_t_post.
+    DATA(lv_post) = post.
+    WHILE lv_post IS NOT INITIAL.
+      IF strlen( lv_post ) > 255.
+        INSERT CONV ty_c255( lv_post(255) ) INTO TABLE lt_post.
+        lv_post = lv_post+255.
+      ELSE.
+        INSERT CONV ty_c255( lv_post ) INTO TABLE lt_post.
+        CLEAR lv_post.
+      ENDIF.
+    ENDWHILE.
     raise_event( event  = `SAPEVENT`
                  params = VALUE #( ( name = `ACTION`      kind = cl_abap_objectdescr=>exporting value = REF #( lv_action ) )
                                    ( name = `GETDATA`     kind = cl_abap_objectdescr=>exporting value = REF #( lv_getdata ) )
+                                   ( name = `POSTDATA`    kind = cl_abap_objectdescr=>exporting value = REF #( lt_post ) )
                                    ( name = `QUERY_TABLE` kind = cl_abap_objectdescr=>exporting value = REF #( lt_query ) ) ) ).
 
   ENDMETHOD.

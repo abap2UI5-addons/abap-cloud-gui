@@ -123,7 +123,8 @@ CLASS z2ui5_cl_cgui_gui DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
     METHODS dispatch
       IMPORTING
         event TYPE string
-        value TYPE string OPTIONAL.
+        value TYPE string OPTIONAL
+        post  TYPE string OPTIONAL.
 
   PROTECTED SECTION.
     CLASS-DATA go_report TYPE REF TO z2ui5_if_cgui_gui.

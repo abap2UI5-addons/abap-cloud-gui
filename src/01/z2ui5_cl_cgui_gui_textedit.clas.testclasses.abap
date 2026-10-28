@@ -132,6 +132,8 @@ CLASS ltcl_handler DEFINITION FINAL FOR TESTING.
       IMPORTING fcode.
     METHODS on_sapevent FOR EVENT sapevent OF z2ui5_cl_cgui_gui_html_viewer
       IMPORTING action query_table.
+    METHODS on_sapevent_post FOR EVENT sapevent OF z2ui5_cl_cgui_gui_html_viewer
+      IMPORTING action getdata postdata.
     METHODS on_toolbar FOR EVENT toolbar OF z2ui5_cl_cgui_gui_alv_grid
       IMPORTING e_object e_interactive.
     METHODS on_double_click FOR EVENT double_click OF z2ui5_cl_cgui_gui_alv_grid
@@ -222,6 +224,16 @@ CLASS ltcl_handler IMPLEMENTATION.
 
   ENDMETHOD.
 
+  METHOD on_sapevent_post.
+
+    mv_log = |{ mv_log }SAPEVENT { action } { getdata } { lines( postdata ) }|.
+    LOOP AT postdata INTO DATA(lv_line).
+      mv_log = |{ mv_log } { strlen( lv_line ) }|.
+    ENDLOOP.
+    mv_log = |{ mv_log };|.
+
+  ENDMETHOD.
+
   METHOD on_toolbar.
 
     APPEND VALUE #( function = 'FULL' icon = `sap-icon://accept` text = 'Full' ) TO e_object->mt_toolbar.
@@ -271,6 +283,7 @@ CLASS ltcl_test DEFINITION FINAL
     METHODS toolbar_buttons FOR TESTING.
     METHODS grid FOR TESTING.
     METHODS sapevent_links FOR TESTING.
+    METHODS sapevent_form FOR TESTING.
     METHODS simple_tree FOR TESTING.
     METHODS column_tree FOR TESTING.
     METHODS list_tree FOR TESTING.
@@ -685,6 +698,24 @@ CLASS ltcl_test IMPLEMENTATION.
     cl_abap_unit_assert=>assert_true( mo_gui->mt_control[ 2 ]-hidden ).
     lo_html->set_visible( z2ui5_cl_cgui_gui=>visible_true ).
     cl_abap_unit_assert=>assert_false( mo_gui->mt_control[ 2 ]-hidden ).
+
+  ENDMETHOD.
+
+  METHOD sapevent_form.
+
+    " a form of the document posted to SAPEVENT:save - its fields, urlencoded,
+    " reach the handler as postdata in lines of 255 characters
+    DATA(lo_handler) = NEW ltcl_handler( ).
+    DATA(lo_html) = NEW z2ui5_cl_cgui_gui_html_viewer( parent = mo_cont ).
+    lo_html->set_handler( handler = lo_handler
+                          method  = 'ON_SAPEVENT_POST'
+                          event   = 'SAPEVENT' ).
+    DATA(lv_post) = |name={ repeat( val = `x` occ = 300 ) }&ok=Save|.
+    lo_html->dispatch( event = `SAPEVENT`
+                       value = `save?mode=edit`
+                       post  = lv_post ).
+    cl_abap_unit_assert=>assert_equals( act = lo_handler->mv_log
+                                        exp = |SAPEVENT save mode=edit 2 255 { strlen( lv_post ) - 255 };| ).
 
   ENDMETHOD.
 
