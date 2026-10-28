@@ -301,6 +301,16 @@ CLASS z2ui5_cl_cgui_selscreen DEFINITION PUBLIC FINAL CREATE PRIVATE.
       RETURNING
         VALUE(result) TYPE REF TO z2ui5_cl_cgui_selscreen.
 
+    "! a table control of a dynpro (CONTROLS name TYPE TABLEVIEW) - the
+    "! report renders the lines its PBO handed over in the columns
+    METHODS table_control
+      IMPORTING
+        name          TYPE clike
+        title         TYPE clike OPTIONAL
+        columns       TYPE z2ui5_if_cgui_gui=>ty_t_tc_column
+      RETURNING
+        VALUE(result) TYPE REF TO z2ui5_cl_cgui_selscreen.
+
     "! a subscreen area of a dynpro - the report renders the subscreen
     "! called into it (CALL SUBSCREEN); in a tabstrip on the tab that shows
     "! the area, the selected one where tabs share it
@@ -452,6 +462,7 @@ CLASS z2ui5_cl_cgui_selscreen DEFINITION PUBLIC FINAL CREATE PRIVATE.
         tabbed_end  TYPE string VALUE `TABBED_END`,
         custom      TYPE string VALUE `CUSTOM`,
         subscreen   TYPE string VALUE `SUBSCREEN`,
+        table       TYPE string VALUE `TABLE_CONTROL`,
       END OF cs_kind.
 
     CONSTANTS:
@@ -535,6 +546,13 @@ CLASS z2ui5_cl_cgui_selscreen DEFINITION PUBLIC FINAL CREATE PRIVATE.
       END OF ty_s_history.
     DATA mt_history         TYPE STANDARD TABLE OF ty_s_history WITH EMPTY KEY.
     DATA mt_tab_bind        TYPE ty_t_tab_bind.
+    " the columns of the table controls, by name
+    TYPES:
+      BEGIN OF ty_s_tc,
+        name    TYPE string,
+        columns TYPE z2ui5_if_cgui_gui=>ty_t_tc_column,
+      END OF ty_s_tc.
+    DATA mt_tc              TYPE STANDARD TABLE OF ty_s_tc WITH EMPTY KEY.
     DATA mt_function_key    TYPE ty_t_function_key.
     " BEGIN OF BLOCK ... NO INTERVALS - the blocks open that have it
     DATA mv_block_depth     TYPE i.
@@ -815,6 +833,19 @@ CLASS z2ui5_cl_cgui_selscreen IMPLEMENTATION.
                     text  = text
                     event = to_upper( fcode )
                     group = to_upper( area ) ) INTO TABLE mt_item.
+    result = me.
+
+  ENDMETHOD.
+
+  METHOD table_control.
+
+    DATA(lv_name) = to_upper( condense( CONV string( name ) ) ).
+    INSERT VALUE #( kind = cs_kind-table
+                    name = lv_name
+                    text = title ) INTO TABLE mt_item.
+    DELETE mt_tc WHERE name = lv_name.
+    INSERT VALUE #( name    = lv_name
+                    columns = columns ) INTO TABLE mt_tc.
     result = me.
 
   ENDMETHOD.
@@ -1327,6 +1358,16 @@ CLASS z2ui5_cl_cgui_selscreen IMPLEMENTATION.
           IF mi_gui IS BOUND.
             mi_gui->custom_render( name = lr_item->name
                                    node = lo_container ).
+          ENDIF.
+
+        WHEN cs_kind-table.
+          CLEAR: lo_form, lo_line, lv_in_line.
+          READ TABLE mt_tc INTO DATA(ls_tc) WITH KEY name = lr_item->name.
+          IF mi_gui IS BOUND AND sy-subrc = 0.
+            mi_gui->tablecontrol_render( name    = lr_item->name
+                                         title   = lr_item->text
+                                         columns = ls_tc-columns
+                                         node    = lo_container ).
           ENDIF.
 
         WHEN cs_kind-uline.

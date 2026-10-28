@@ -722,7 +722,9 @@ Stage 5 - research
 - [x] Tabstrips and subscreens on a dynpro: the tabs with their function
       codes, `activetab`, `CALL SUBSCREEN` in PBO and PAI with the number
       of the subscreen in a variable (the paging in the program)
-- [ ] F1 of the editor; table controls on a dynpro
+- [x] Table controls on a dynpro: `LOOP WITH CONTROL` a line at a time in
+      PBO and PAI, the columns ready for input inputs of a table
+- [ ] F1 of the editor
 
 Quality, through every stage
 

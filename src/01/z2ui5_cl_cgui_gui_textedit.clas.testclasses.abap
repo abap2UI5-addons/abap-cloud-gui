@@ -48,6 +48,9 @@ CLASS ltcl_gui IMPLEMENTATION.
 
   ENDMETHOD.
 
+  METHOD z2ui5_if_cgui_gui~tablecontrol_render ##NEEDED.
+  ENDMETHOD.
+
   METHOD z2ui5_if_cgui_gui~subscreen_render ##NEEDED.
   ENDMETHOD.
 

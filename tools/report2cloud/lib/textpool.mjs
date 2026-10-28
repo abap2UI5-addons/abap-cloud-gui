@@ -177,7 +177,8 @@ export function parseDynpros(xml) {
         input: flag(r, "INPUT_FLD"), output: flag(r, "OUTPUT_FLD") || flag(r, "OUTPUTONLY"),
         required: ["O", "X"].includes(up(r, "REQU_ENTRY")), group1: up(r, "GROUP1"),
         fcode: up(r, "PUSH_FCODE"), invisible: flag(r, "INVISIBLE"), icon: up(r, "ICON_NAME"),
-        ref: up(r, "REF_FIELD"),
+        ref: up(r, "REF_FIELD"), heading: flag(r, "TC_HEADING"), title: flag(r, "TC_TITLE"),
+        visLength: Number(tag(r, "VISLENGTH")) || 0,
       })),
       flow: items(it, "RPY_DYFLOW").map((r) => tag(r, "LINE")),
     });

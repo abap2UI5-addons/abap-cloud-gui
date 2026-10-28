@@ -1931,9 +1931,10 @@ class Converter {
    * BEFORE OUTPUT and AFTER INPUT, and what followed CALL SCREEN goes on
    * in after_call_screen( ). A tabstrip is a tabbed block of the
    * builder, a subscreen area subscreen( ), CALL SUBSCREEN in the flow
-   * logic call_subscreen( ) / call_subscreen_pai( ). A screen with a table
-   * control, a custom control without the stand-ins, flow logic with
-   * LOOP or a subscreen of another program is refused.
+   * logic call_subscreen( ) / call_subscreen_pai( ), a table control
+   * table_control( ) with LOOP WITH CONTROL a line at a time
+   * (tableLoop( )). A custom control without the stand-ins, another LOOP
+   * of the flow logic or a subscreen of another program is refused.
    */
   resolveDynpro() {
     const bodies = [...this.events.map((e) => e.stmts), ...this.forms.map((f) => f.body), ...this.modules.map((m) => m.body)];
@@ -1986,12 +1987,23 @@ class Converter {
       const kinds = { CUST_CTRL: "custom control (a SAP GUI control)", SUBSCREEN: "subscreen area", TABLE_CTRL: "table control", STRIP_CTRL: "tabstrip" };
       // a custom control area holds the stand-ins of the SAP GUI controls,
       // a tabstrip its tabs, a subscreen area what CALL SUBSCREEN calls
-      const allowed = ["SCREEN", "RADIOGROUP", "STRIP_CTRL", "SUBSCREEN", ...(this.guiVars?.size ? ["CUST_CTRL"] : [])];
+      const allowed = ["SCREEN", "RADIOGROUP", "STRIP_CTRL", "SUBSCREEN", "TABLE_CTRL", ...(this.guiVars?.size ? ["CUST_CTRL"] : [])];
       for (const c of d.containers.filter((x) => !allowed.includes(x.type))) problems.push(`screen ${nr} has a ${kinds[c.type] ?? c.type} ${c.name}`);
       for (const f of d.fields.filter((x) => !DYNPRO_FIELDS.has(x.type))) problems.push(`screen ${nr} has a field ${f.name || f.text} of type ${f.type}`);
       const flow = parseFlow(d.flow);
       problems.push(...flow.problems.map((p) => `screen ${nr}: ${p}`));
-      for (const c of [...flow.pbo, ...flow.pai, ...flow.pov].filter((x) => x.module)) {
+      for (const c of [...flow.pbo, ...flow.pai].filter((x) => x.tableloop)) {
+        if (!d.containers.some((x) => x.type === "TABLE_CTRL" && x.name === c.tableloop)) problems.push(`screen ${nr} loops WITH CONTROL ${c.tableloop}, which is no table control of it`);
+      }
+      for (const t of d.containers.filter((x) => x.type === "TABLE_CTRL")) {
+        const cols = tcColumns(d, t.name);
+        if (!cols.length) problems.push(`screen ${nr} has a table control ${t.name} without columns`);
+        if (cols.length > 16) problems.push(`screen ${nr} has a table control ${t.name} of ${cols.length} columns - 16 are shown`);
+        for (const f of d.fields.filter((x) => x.cont === "TABLE_CTRL" && x.contName === t.name && !["TEXT", "TEMPLATE"].includes(x.type))) {
+          problems.push(`screen ${nr} has a field ${f.name || f.text} of type ${f.type} in the table control ${t.name}`);
+        }
+      }
+      for (const c of [...flow.pbo, ...flow.pai, ...flow.pov].flatMap((x) => (x.tableloop ? x.modules : [x])).filter((x) => x.module)) {
         if (!this.modules.some((m) => m.name === c.module)) problems.push(`screen ${nr} calls MODULE ${c.module}, which is not in the report`);
       }
       for (const c of [...flow.pbo, ...flow.pai].filter((x) => x.subscreen)) {
@@ -2311,7 +2323,8 @@ class Converter {
   dynproMethods() {
     const { screens } = this.dynpro;
     // PBO calls the OUTPUT module of the name, PAI the INPUT one
-    const call = (c, io) => {
+    const call = (c, io, d) => {
+      if (c.tableloop) return this.tableLoop(c, io, d, call);
       if (c.subscreen) {
         const nr = /^'?(\d+)'?$/.exec(c.dynnr ?? "");
         return io === "OUTPUT"
@@ -2325,7 +2338,7 @@ class Converter {
     const methods = [];
     methods.push({ name: "dynpro_screen", body: caseBody("dynnr", screens.map((d) => ({ field: d.screen, body: this.dynproLayout(d) }))) });
     const pbo = screens.filter((d) => d.pbo.length);
-    if (pbo.length) methods.push({ name: "dynpro_pbo", body: caseBody("dynnr", pbo.map((d) => ({ field: d.screen, body: d.pbo.map((c) => call(c, "OUTPUT")) }))) });
+    if (pbo.length) methods.push({ name: "dynpro_pbo", body: caseBody("dynnr", pbo.map((d) => ({ field: d.screen, body: d.pbo.map((c) => call(c, "OUTPUT", d)) }))) });
     const leftCheck = ["IF screen_left( ) = abap_true.", "  RETURN.", "ENDIF."];
     const pai = screens.filter((d) => d.pai.length || d.okcode);
     if (pai.length) {
@@ -2337,12 +2350,12 @@ class Converter {
           const exits = d.pai.filter((c) => c.cond === "exit");
           if (exits.length) {
             body.push("\" AT EXIT-COMMAND - the functions that leave", "IF ucomm = `BACK` OR ucomm = `EXIT` OR ucomm = `CANC` OR ucomm = `CANCEL`.");
-            for (const c of exits) body.push(`  ${call(c, "INPUT")}`, ...leftCheck.map((l) => `  ${l}`));
+            for (const c of exits) body.push(`  ${call(c, "INPUT", d)}`, ...leftCheck.map((l) => `  ${l}`));
             body.push("ENDIF.");
           }
           const rest = d.pai.filter((c) => c.cond !== "exit");
           rest.forEach((c, i) => {
-            const line = call(c, "INPUT");
+            const line = call(c, "INPUT", d);
             if (c.cond === "input") body.push(`IF ${lc(c.field)} IS NOT INITIAL.`, `  ${line}`, "ENDIF.");
             else if (c.cond === "cursor") body.push("IF ucomm = `PICK`.", `  ${line}`, "ENDIF.");
             else body.push(line);
@@ -2358,15 +2371,47 @@ class Converter {
     return methods;
   }
 
+  /** LOOP WITH CONTROL of a flow logic - the lines of the table control
+   *  one at a time, as the classic loops: in the PBO the modules of the
+   *  loop and then the values of the line for the browser, in the PAI the
+   *  values the user left into the fields of the line and then the
+   *  modules. LOOP AT itab INTO wa reads the line into wa first. */
+  tableLoop(c, io, d, call) {
+    const tc = lc(c.tableloop);
+    const name = literal(c.tableloop);
+    const cols = tcColumns(d, c.tableloop);
+    const modules = c.modules.map((m) => {
+      const line = call(m, io, d);
+      return m.cond === "input" ? [`IF ${lc(m.field)} IS NOT INITIAL.`, `  ${line}`, "ENDIF."] : [line];
+    }).flat();
+    const out = [];
+    if (io === "OUTPUT") {
+      out.push(`" LOOP${c.itab ? ` AT ${c.itab} INTO ${c.wa}` : ""} WITH CONTROL ${tc} - a line of the table control at a time`, `tablecontrol_begin( ${name} ).`);
+      const row = [`tablecontrol_row( name   = ${name}`, `                  values = VALUE #( ${cols.map((x) => `( |{ ${x.field} }| )`).join(" ")} ) ).`];
+      if (c.itab) out.push(`LOOP AT ${c.itab} INTO ${c.wa}.`, `  ${tc}-current_line = sy-tabix.`);
+      else out.push(`DO ${tc}-lines TIMES.`, `  ${tc}-current_line = sy-index.`);
+      out.push(...modules.map((l) => `  ${l}`), ...row.map((l) => `  ${l}`), c.itab ? "ENDLOOP." : "ENDDO.");
+      return out.join("\n");
+    }
+    out.push(`" LOOP${c.itab ? ` AT ${c.itab} INTO ${c.wa}` : ""} WITH CONTROL ${tc} - the lines the table control showed, as the user left them`,
+      `DO tablecontrol_count( ${name} ) TIMES.`, `  ${tc}-current_line = sy-index.`);
+    if (c.itab) out.push(`  READ TABLE ${c.itab} INTO ${c.wa} INDEX sy-index.`);
+    // every field of the line goes back, as the classic transports output
+    // fields too
+    cols.forEach((x, i) => out.push(`  ${x.field} = tablecontrol_cell( name = ${name} row = sy-index col = ${i + 1} ).`));
+    out.push(...modules.map((l) => `  ${l}`), "ENDDO.");
+    return out.join("\n");
+  }
+
   /** the fields of a screen as a chain of the selection-screen builder:
    *  line by line, a text before an input its label, frames blocks */
   dynproLayout(d) {
     const text = (t) => t.replace(/_/g, " ").trim();
     // a custom control area is a line of its own, where its first line is;
     // so are a tabstrip and a subscreen area of the screen itself
-    const areas = d.containers.filter((c) => c.type === "CUST_CTRL" || c.type === "STRIP_CTRL" || (c.type === "SUBSCREEN" && c.parent === "SCREEN"))
-      .map((c) => ({ type: { CUST_CTRL: "CUSTOM", STRIP_CTRL: "STRIP", SUBSCREEN: "AREA" }[c.type], name: c.name, line: c.line, column: c.column, height: c.height, length: c.length }));
-    const fields = [...d.fields.filter((f) => f.type !== "OKCODE" && f.line > 0 && f.cont !== "STRIP_CTRL"), ...areas].sort((a, b) => a.line - b.line || a.column - b.column);
+    const areas = d.containers.filter((c) => ["CUST_CTRL", "STRIP_CTRL", "TABLE_CTRL"].includes(c.type) || (c.type === "SUBSCREEN" && c.parent === "SCREEN"))
+      .map((c) => ({ type: { CUST_CTRL: "CUSTOM", STRIP_CTRL: "STRIP", SUBSCREEN: "AREA", TABLE_CTRL: "TABLE" }[c.type], name: c.name, line: c.line, column: c.column, height: c.height, length: c.length }));
+    const fields = [...d.fields.filter((f) => f.type !== "OKCODE" && f.line > 0 && f.cont !== "STRIP_CTRL" && f.cont !== "TABLE_CTRL"), ...areas].sort((a, b) => a.line - b.line || a.column - b.column);
     const frames = fields.filter((f) => f.type === "FRAME");
     const frameOf = (f) => frames.filter((r) => r !== f && f.line > r.line && f.line < r.line + r.height && f.column >= r.column && f.column < r.column + r.length)
       .sort((a, b) => b.line - a.line)[0];
@@ -2392,7 +2437,7 @@ class Converter {
         } else items.push(f);
       }
       // the areas after the line, the fields of the line together
-      const own = ["CUSTOM", "STRIP", "AREA"];
+      const own = ["CUSTOM", "STRIP", "AREA", "TABLE"];
       const calls = items.filter((f) => !own.includes(f.type)).map((f) => this.dynproField(f, fr)).filter(Boolean);
       if (calls.length > 1) add("line_begin(");
       calls.forEach((c) => add(c));
@@ -2400,6 +2445,14 @@ class Converter {
       for (const f of items.filter((x) => own.includes(x.type))) {
         if (f.type === "CUSTOM") add(`custom_control( ${literal(f.name)}`);
         if (f.type === "AREA") add(`subscreen( ${literal(f.name)}`);
+        if (f.type === "TABLE") {
+          // the columns in their order: the heading of the column, ready
+          // for input, the visible length
+          const cols = tcColumns(d, f.name).map((c) => `( ${[`text = ${literal(c.text)}`, ...(c.input ? ["input = abap_true"] : []), ...(c.width ? [`width = ${c.width}`] : [])].join(" ")} )`);
+          const title = d.fields.find((x) => x.cont === "TABLE_CTRL" && x.contName === f.name && x.type === "TEXT" && x.title);
+          add([`table_control( name    = ${literal(f.name)}`, ...(title ? [`               title   = ${literal(text(title.text))}`] : []),
+            `               columns = VALUE #( ${cols.join("\n                                  ")} )`].join("\n"));
+        }
         if (f.type !== "STRIP") continue;
         // the tabs in their order, each with its function code and area,
         // then the areas of the tabstrip
@@ -3939,12 +3992,17 @@ class Converter {
         continue;
       }
 
-      // CONTROLS ts TYPE TABSTRIP - the tabstrip of a dynpro: its activetab
-      const strip = k === "Controls" ? /^controls\s+(\w+)\s+type\s+tabstrip$/i.exec(renderTokens(stmtTokens(s)).replace(/\s*\.$/, "")) : null;
-      if (strip) {
+      // CONTROLS ts TYPE TABSTRIP - the tabstrip of a dynpro: its activetab;
+      // CONTROLS tc TYPE TABLEVIEW USING SCREEN n - a table control: lines,
+      // current_line, top_line
+      const ctl = k === "Controls" ? /^controls\s+(\w+)\s+type\s+(tabstrip|tableview\s+using\s+screen\s+\S+)$/i.exec(renderTokens(stmtTokens(s)).replace(/\s*\.$/, "")) : null;
+      if (ctl) {
+        const type = /^tabstrip$/i.test(ctl[2]) ? "ty_s_tabstrip" : "ty_s_tableview";
         heading("global data of the report");
-        push(`DATA ${lc(strip[1])} TYPE z2ui5_cl_cgui_report=>ty_s_tabstrip.`);
-        this.map(s, "`TYPE z2ui5_cl_cgui_report=>ty_s_tabstrip` - `activetab` is the function code of the selected tab, as before");
+        push(`DATA ${lc(ctl[1])} TYPE z2ui5_cl_cgui_report=>${type}.`);
+        this.map(s, type === "ty_s_tabstrip"
+          ? "`TYPE z2ui5_cl_cgui_report=>ty_s_tabstrip` - `activetab` is the function code of the selected tab, as before"
+          : "`TYPE z2ui5_cl_cgui_report=>ty_s_tableview` - `lines`, `current_line`, `top_line` as before; the browser shows every line, `cols` is not there");
         continue;
       }
 
@@ -8089,6 +8147,16 @@ const radioGroup = (name) => name.replace(/^%A_?/, "RB_").slice(0, 10) || "RB1";
 // radio buttons, frames, push buttons and the OK code field
 const DYNPRO_FIELDS = new Set(["TEXT", "TEMPLATE", "CHECK", "RADIO", "FRAME", "PUSH", "OKCODE"]);
 
+/** the columns of table control name of dynpro d, in their order: { field,
+ *  text (the heading of its column), input, width } */
+function tcColumns(d, name) {
+  const of = d.fields.filter((f) => f.cont === "TABLE_CTRL" && f.contName === name);
+  return of.filter((f) => f.type === "TEMPLATE").sort((a, b) => a.column - b.column).map((f) => {
+    const head = of.find((h) => h.type === "TEXT" && h.heading && h.column === f.column);
+    return { field: lc(f.name), text: (head?.text ?? f.name).replace(/_/g, " ").trim(), input: f.input, width: f.visLength || f.length };
+  });
+}
+
 /**
  * The flow logic of a dynpro: { pbo, pai, pov: [{ module, cond, field }],
  * poh, request, problems } - cond "exit" for AT EXIT-COMMAND, "input" for
@@ -8097,6 +8165,8 @@ const DYNPRO_FIELDS = new Set(["TEXT", "TEMPLATE", "CHECK", "RADIO", "FRAME", "P
  */
 function parseFlow(lines) {
   const flow = { pbo: [], pai: [], pov: [], poh: false, request: false, problems: [] };
+  // LOOP ... WITH CONTROL tc: the modules of the loop go into it
+  let loop;
   const source = lines.filter((l) => !/^\s*\*/.test(l)).map((l) => l.replace(/".*$/, "")).join(" ");
   let section;
   for (const raw of source.split(".")) {
@@ -8108,6 +8178,20 @@ function parseFlow(lines) {
       continue;
     }
     if (/^(CHAIN|ENDCHAIN)$/.test(st)) continue;
+    const lp = /^LOOP(?: AT ([\w-]+)(?: INTO ([\w-]+))?)? WITH CONTROL ([\w-]+)(?: CURSOR [\w-]+)?$/.exec(st);
+    if (lp && (section === "pbo" || section === "pai") && !loop) {
+      if (lp[1] && !lp[2]) {
+        flow.problems.push(`LOOP AT ${lp[1]} WITH CONTROL without INTO - a table with a header line`);
+        continue;
+      }
+      loop = { tableloop: lp[3], itab: lp[1]?.toLowerCase(), wa: lp[2]?.toLowerCase(), modules: [] };
+      flow[section].push(loop);
+      continue;
+    }
+    if (st === "ENDLOOP" && loop) {
+      loop = undefined;
+      continue;
+    }
     if (section === "poh") {
       flow.poh = true;
       continue;
@@ -8116,7 +8200,7 @@ function parseFlow(lines) {
     if (m && section) {
       const cond = { "AT EXIT-COMMAND": "exit", "ON INPUT": m[1] ? "input" : undefined, "AT CURSOR-SELECTION": "cursor" }[m[3]];
       if (/REQUEST|CHAIN-INPUT/.test(m[3] ?? "")) flow.request = true;
-      flow[section].push({ module: m[2].toLowerCase(), cond, field: m[1] });
+      (loop ? loop.modules : flow[section]).push({ module: m[2].toLowerCase(), cond, field: m[1] });
       continue;
     }
     if (/^FIELD:? [\w-]+(?:,? [\w-]+)*$/.test(st)) continue;

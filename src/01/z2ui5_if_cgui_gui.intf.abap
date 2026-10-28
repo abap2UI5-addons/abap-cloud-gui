@@ -20,6 +20,16 @@ INTERFACE z2ui5_if_cgui_gui PUBLIC.
     END OF cs_kind.
 
   TYPES:
+    "! a column of a table control of a dynpro - its heading, whether it is
+    "! ready for input, its width in characters
+    BEGIN OF ty_s_tc_column,
+      text  TYPE string,
+      input TYPE abap_bool,
+      width TYPE i,
+    END OF ty_s_tc_column,
+    ty_t_tc_column TYPE STANDARD TABLE OF ty_s_tc_column WITH EMPTY KEY.
+
+  TYPES:
     "! GET CURSOR - the field of a WRITE clicked, its value, line and offset
     BEGIN OF ty_s_cursor,
       field  TYPE string,
@@ -161,6 +171,17 @@ INTERFACE z2ui5_if_cgui_gui PUBLIC.
     IMPORTING
       name TYPE string
       node TYPE REF TO z2ui5_cl_ui5_view_builder.
+
+  "! the table control name of a dynpro rendered into node - the lines the
+  "! PBO handed over (LOOP WITH CONTROL), its columns as the screen has
+  "! them; called by the screen when it renders z2ui5_cl_cgui_selscreen=>
+  "! table_control( )
+  METHODS tablecontrol_render
+    IMPORTING
+      name    TYPE string
+      title   TYPE string
+      columns TYPE ty_t_tc_column
+      node    TYPE REF TO z2ui5_cl_ui5_view_builder.
 
   "! the subscreen called into area (CALL SUBSCREEN) rendered into node -
   "! called by the screen when it renders z2ui5_cl_cgui_selscreen=>subscreen( )

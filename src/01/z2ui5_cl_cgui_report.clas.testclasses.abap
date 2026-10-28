@@ -99,6 +99,11 @@ CLASS ltcl_report DEFINITION INHERITING FROM z2ui5_cl_cgui_report FINAL.
     DATA tabstr      TYPE z2ui5_cl_cgui_report=>ty_s_tabstrip.
     DATA mv_sub      TYPE c LENGTH 4.
     DATA mv_sub_text TYPE c LENGTH 10.
+    " a table control on dynpro 0100: its lines, the work area of the loop
+    DATA mv_tc       TYPE abap_bool.
+    DATA tc          TYPE z2ui5_cl_cgui_report=>ty_s_tableview.
+    DATA mt_seat     TYPE ty_t_row.
+    DATA ms_seat     TYPE ty_s_row.
     DATA mv_seats    TYPE i.
     DATA mv_after    TYPE string.
     DATA mv_pai      TYPE string.
@@ -220,6 +225,7 @@ CLASS ltcl_test DEFINITION FINAL FOR TESTING
     METHODS dynpro_call_and_leave FOR TESTING.
     METHODS dynpro_text_editor FOR TESTING.
     METHODS dynpro_tabstrip FOR TESTING.
+    METHODS dynpro_table_control FOR TESTING.
     METHODS alv_box_copy_selection FOR TESTING.
     METHODS url_values_screen_only FOR TESTING.
     METHODS url_skip_screen FOR TESTING.
@@ -333,6 +339,13 @@ CLASS ltcl_report IMPLEMENTATION.
 
   METHOD dynpro_screen.
 
+    IF mv_tc = abap_true.
+      screen->table_control( name    = 'TC'
+                             title   = `Seats`
+                             columns = VALUE #( ( text = `Airline` )
+                                                ( text = `Seats` input = abap_true width = 5 ) ) ).
+      RETURN.
+    ENDIF.
     IF mv_tabs = abap_true.
       CASE dynnr.
         WHEN `0100`.
@@ -384,6 +397,17 @@ CLASS ltcl_report IMPLEMENTATION.
       current_screen( )->modify_screen( ls_screen ).
     ENDLOOP.
     mv_pai = |{ mv_pai }PBO{ dynnr };|.
+    " the classic PBO of a table control: a line of it at a time
+    IF mv_tc = abap_true.
+      tablecontrol_begin( 'TC' ).
+      tc-lines = lines( mt_seat ).
+      DO tc-lines TIMES.
+        tc-current_line = sy-index.
+        ms_seat = mt_seat[ tc-current_line ].
+        tablecontrol_row( name   = 'TC'
+                          values = VALUE #( ( CONV #( ms_seat-carrid ) ) ( |{ ms_seat-seats }| ) ) ).
+      ENDDO.
+    ENDIF.
     " the classic PBO of a tabstrip: the tab and its subscreen
     IF mv_tabs = abap_true AND dynnr = `0100`.
       IF tabstr-activetab IS INITIAL.
@@ -402,6 +426,19 @@ CLASS ltcl_report IMPLEMENTATION.
       mo_edit->get_textstream( IMPORTING text = mv_note ).
     ENDIF.
     mv_pai = |{ mv_pai }PAI{ dynnr }:{ ucomm };|.
+    " the classic PAI of a table control: its line into the work area,
+    " MODIFY at current_line
+    IF mv_tc = abap_true.
+      DO tablecontrol_count( 'TC' ) TIMES.
+        tc-current_line = sy-index.
+        ms_seat = mt_seat[ tc-current_line ].
+        ms_seat-seats = tablecontrol_cell( name = 'TC'
+                                           row  = sy-index
+                                           col  = 2 ).
+        MODIFY mt_seat FROM ms_seat INDEX tc-current_line.
+      ENDDO.
+      RETURN.
+    ENDIF.
     IF mv_tabs = abap_true AND dynnr = `0100`.
       call_subscreen_pai( area  = 'SUB'
                           ucomm = ucomm ).
@@ -1018,6 +1055,34 @@ CLASS ltcl_test IMPLEMENTATION.
     cl_abap_unit_assert=>assert_equals( act = mo_cut->mv_cgui_screen
                                         exp = `SELECTION` ).
     cl_abap_unit_assert=>assert_initial( mo_cut->mt_cgui_dynpro_stack ).
+
+  ENDMETHOD.
+
+  METHOD dynpro_table_control.
+
+    init( ).
+    mo_report->p_carrid = `LH`.
+    mo_report->mv_dynpro = abap_true.
+    mo_report->mv_tc = abap_true.
+    mo_report->mt_seat = VALUE #( ( carrid = 'LH' seats = 10 ) ( carrid = 'AA' seats = 20 ) ).
+    event( z2ui5_cl_cgui_report=>cs_ucomm-execute ).
+
+    " the lines of the PBO loop, a table bound to them - the seats an input
+    cl_abap_unit_assert=>assert_equals( act = lines( mo_cut->mt_cgui_tc_row )
+                                        exp = 2 ).
+    cl_abap_unit_assert=>assert_equals( act = mo_cut->mt_cgui_tc_row[ 2 ]-c01
+                                        exp = `AA` ).
+    cl_abap_unit_assert=>assert_true( xsdbool( mo_client->mv_view CS `<Table` AND mo_client->mv_view CS `<Input value="{C02}"` ) ).
+    cl_abap_unit_assert=>assert_true( xsdbool( mo_client->mv_view CS `<Text text="{C01}"` AND mo_client->mv_view CS `Seats` ) ).
+
+    " the user changes a cell: the PAI loop reads it into the work area and
+    " modifies its line; the PBO hands the lines over anew
+    mo_cut->mt_cgui_tc_row[ 2 ]-c02 = `25`.
+    event( `CHECK` ).
+    cl_abap_unit_assert=>assert_equals( act = mo_report->mt_seat[ 2 ]-seats
+                                        exp = 25 ).
+    cl_abap_unit_assert=>assert_equals( act = mo_cut->mt_cgui_tc_row[ 2 ]-c02
+                                        exp = `25` ).
 
   ENDMETHOD.
 

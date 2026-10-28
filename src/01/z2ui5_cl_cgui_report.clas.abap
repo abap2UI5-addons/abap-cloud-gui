@@ -132,6 +132,49 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
       END OF ty_s_tabstrip.
 
     TYPES:
+      "! CONTROLS name TYPE TABLEVIEW - the table control of a dynpro: its
+      "! lines, the line the loop is at, the first line shown
+      BEGIN OF ty_s_tableview,
+        fixed_cols    TYPE i,
+        lines         TYPE i,
+        top_line      TYPE i,
+        current_line  TYPE i,
+        left_col      TYPE i,
+        line_sel_mode TYPE i,
+        col_sel_mode  TYPE i,
+        line_selector TYPE c LENGTH 1,
+        h_grid        TYPE c LENGTH 1,
+        v_grid        TYPE c LENGTH 1,
+        invisible     TYPE c LENGTH 1,
+      END OF ty_s_tableview.
+
+    TYPES:
+      "! a line of the table control the browser shows - its cells as text,
+      "! the columns in their order
+      BEGIN OF ty_s_cgui_tc_row,
+        c01 TYPE string,
+        c02 TYPE string,
+        c03 TYPE string,
+        c04 TYPE string,
+        c05 TYPE string,
+        c06 TYPE string,
+        c07 TYPE string,
+        c08 TYPE string,
+        c09 TYPE string,
+        c10 TYPE string,
+        c11 TYPE string,
+        c12 TYPE string,
+        c13 TYPE string,
+        c14 TYPE string,
+        c15 TYPE string,
+        c16 TYPE string,
+      END OF ty_s_cgui_tc_row.
+    TYPES ty_t_cgui_tc_row TYPE STANDARD TABLE OF ty_s_cgui_tc_row WITH EMPTY KEY.
+
+    "! the most columns a table control shows
+    CONSTANTS cv_cgui_tc_columns TYPE i VALUE 16.
+
+    TYPES:
       "! the subscreen called into an area of a dynpro (CALL SUBSCREEN)
       BEGIN OF ty_s_cgui_subscreen,
         area  TYPE string,
@@ -194,6 +237,9 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
     "! the input fields of the list (WRITE ... INPUT) - every field is bound
     "! to its line
     DATA mt_cgui_list_input TYPE z2ui5_cl_cgui_list=>ty_t_input.
+    "! the lines of the table control of the dynpro (LOOP WITH CONTROL) -
+    "! bound to its inputs
+    DATA mt_cgui_tc_row TYPE ty_t_cgui_tc_row.
     "! the SAP GUI controls of the report (z2ui5_if_cgui_gui) - a text
     "! editor is bound to its line
     DATA mt_cgui_gui TYPE z2ui5_if_cgui_gui=>ty_t_control.
@@ -454,6 +500,37 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
       IMPORTING
         dynnr  TYPE string
         screen TYPE REF TO z2ui5_cl_cgui_selscreen.
+
+    "! LOOP WITH CONTROL name in the PBO of a dynpro, before its first line:
+    "! the table control shows the lines handed over by tablecontrol_row( )
+    METHODS tablecontrol_begin
+      IMPORTING
+        name TYPE clike.
+
+    "! a line of the table control name in the PBO loop - the values of its
+    "! columns in their order, after the modules of the loop ran
+    METHODS tablecontrol_row
+      IMPORTING
+        name   TYPE clike
+        values TYPE string_table.
+
+    "! LOOP WITH CONTROL name in the PAI: the lines the table control
+    "! showed
+    METHODS tablecontrol_count
+      IMPORTING
+        name          TYPE clike
+      RETURNING
+        VALUE(result) TYPE i.
+
+    "! the value of column col of line row of the table control name as
+    "! the user left it - into its field before the modules of the PAI loop
+    METHODS tablecontrol_cell
+      IMPORTING
+        name          TYPE clike
+        row           TYPE i
+        col           TYPE i
+      RETURNING
+        VALUE(result) TYPE string.
 
     "! CALL SUBSCREEN area INCLUDING sy-repid dynnr in the PBO of a dynpro -
     "! the subscreen dynnr shows in area (z2ui5_cl_cgui_selscreen=>
@@ -1139,6 +1216,8 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
     DATA mv_cgui_dynpro        TYPE string.
     " the subscreens the PBO called into the areas of the dynpro
     DATA mt_cgui_subscreen     TYPE ty_t_cgui_subscreen.
+    " the table control whose lines mt_cgui_tc_row holds
+    DATA mv_cgui_tc            TYPE string.
     DATA mt_cgui_dynpro_stack  TYPE ty_t_cgui_call.
     DATA mv_cgui_dynpro_next   TYPE string.
     DATA mv_cgui_dynpro_left   TYPE abap_bool.
@@ -2071,6 +2150,98 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
       dynpro_pai( dynnr = ls_sub-dynnr
                   ucomm = ucomm ).
     ENDIF.
+
+  ENDMETHOD.
+
+  METHOD tablecontrol_begin.
+
+    mv_cgui_tc = to_upper( condense( CONV string( name ) ) ).
+    CLEAR mt_cgui_tc_row.
+
+  ENDMETHOD.
+
+  METHOD tablecontrol_row.
+
+    DATA ls_row TYPE ty_s_cgui_tc_row.
+
+    IF to_upper( condense( CONV string( name ) ) ) <> mv_cgui_tc.
+      RETURN.
+    ENDIF.
+    LOOP AT values INTO DATA(lv_value).
+      IF sy-tabix > cv_cgui_tc_columns.
+        EXIT.
+      ENDIF.
+      ASSIGN COMPONENT sy-tabix OF STRUCTURE ls_row TO FIELD-SYMBOL(<cell>).
+      <cell> = lv_value.
+    ENDLOOP.
+    INSERT ls_row INTO TABLE mt_cgui_tc_row.
+
+  ENDMETHOD.
+
+  METHOD tablecontrol_count.
+
+    IF to_upper( condense( CONV string( name ) ) ) = mv_cgui_tc.
+      result = lines( mt_cgui_tc_row ).
+    ENDIF.
+
+  ENDMETHOD.
+
+  METHOD tablecontrol_cell.
+
+    IF to_upper( condense( CONV string( name ) ) ) <> mv_cgui_tc OR col < 1 OR col > cv_cgui_tc_columns.
+      RETURN.
+    ENDIF.
+    READ TABLE mt_cgui_tc_row ASSIGNING FIELD-SYMBOL(<row>) INDEX row.
+    IF sy-subrc = 0.
+      ASSIGN COMPONENT col OF STRUCTURE <row> TO FIELD-SYMBOL(<cell>).
+      result = <cell>.
+    ENDIF.
+
+  ENDMETHOD.
+
+  METHOD z2ui5_if_cgui_gui~tablecontrol_render.
+
+    IF to_upper( name ) <> mv_cgui_tc.
+      RETURN.
+    ENDIF.
+    " the lines of the PBO, the cells of a column ready for input inputs
+    DATA(lo_table) = node->ele( `Table`
+        )->a( n = `items`      v = client->_bind( mt_cgui_tc_row )
+        )->a( n = `growing`    b = abap_true
+        )->a( n = `growingThreshold` v = `50`
+        )->a( n = `class`      v = `sapUiSmallMarginBottom` ).
+    IF title IS NOT INITIAL.
+      lo_table->ele( `headerToolbar`
+          )->ele( `Toolbar`
+          )->tag( `Title`
+          )->a( n = `text` t = title ).
+    ENDIF.
+    DATA(lo_columns) = lo_table->ele( `columns` ).
+    LOOP AT columns INTO DATA(ls_column).
+      IF sy-tabix > cv_cgui_tc_columns.
+        EXIT.
+      ENDIF.
+      lo_columns->ele( `Column`
+          )->a( n = `width` v = COND #( WHEN ls_column-width > 0 THEN |{ ls_column-width * 2 / 3 + 2 }rem| )
+          )->tag( `Text`
+          )->a( n = `text` t = ls_column-text ).
+    ENDLOOP.
+    DATA(lo_cells) = lo_table->ele( `items`
+        )->ele( `ColumnListItem`
+        )->ele( `cells` ).
+    LOOP AT columns INTO ls_column.
+      IF sy-tabix > cv_cgui_tc_columns.
+        EXIT.
+      ENDIF.
+      DATA(lv_cell) = |\{C{ sy-tabix WIDTH = 2 ALIGN = RIGHT PAD = '0' }\}|.
+      IF ls_column-input = abap_true.
+        lo_cells->tag( `Input`
+            )->a( n = `value` v = lv_cell ).
+      ELSE.
+        lo_cells->tag( `Text`
+            )->a( n = `text` v = lv_cell ).
+      ENDIF.
+    ENDLOOP.
 
   ENDMETHOD.
 

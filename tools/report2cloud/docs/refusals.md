@@ -46,7 +46,7 @@ A refused statement has no counterpart in an abap-cloud-gui report. The converte
 
 ## Dynpros: CALL SCREEN, MODULE, SET SCREEN, CONTROLS
 
-**Why.** A dynpro is a screen of the SAP GUI with its own flow logic. A browser app has no screens of that kind: abap-cloud-gui has the selection screen, the list, the ALV and popups. Two kinds of screen are converted. A dynpro of fields - texts, inputs, checkboxes, radio buttons, frames and push buttons, read from the screens abapGit writes into the .prog.xml: the modules become methods, the flow logic `dynpro_pbo( )` and `dynpro_pai( )`, `CALL SCREEN` becomes `call_screen( )` and what follows it `after_call_screen( )`. And the screen of one `cl_gui_alv_grid` - its PBO modules go where `CALL SCREEN` stood, its PAI modules become `at_user_command( )`. Tabstrips and subscreen areas of such a dynpro are converted too - CALL SUBSCREEN of a subscreen of the report included. A screen with a table control, a custom control other than one of the stand-ins, flow logic with LOOP, or a subscreen of another program is refused.
+**Why.** A dynpro is a screen of the SAP GUI with its own flow logic. A browser app has no screens of that kind: abap-cloud-gui has the selection screen, the list, the ALV and popups. Two kinds of screen are converted. A dynpro of fields - texts, inputs, checkboxes, radio buttons, frames and push buttons, read from the screens abapGit writes into the .prog.xml: the modules become methods, the flow logic `dynpro_pbo( )` and `dynpro_pai( )`, `CALL SCREEN` becomes `call_screen( )` and what follows it `after_call_screen( )`. And the screen of one `cl_gui_alv_grid` - its PBO modules go where `CALL SCREEN` stood, its PAI modules become `at_user_command( )`. Tabstrips, subscreen areas and table controls of such a dynpro are converted too - CALL SUBSCREEN of a subscreen of the report and LOOP WITH CONTROL a line at a time included. A table control with other fields than input/output fields, a custom control other than one of the stand-ins, another LOOP of the flow logic, or a subscreen of another program is refused.
 
 **Rewrite.**
 
@@ -70,7 +70,7 @@ IF sy-subrc = 0.
 ENDIF.
 ```
 
-A screen with a table control is on the roadmap (Stage 5); tabstrips and subscreens are converted.
+Tabstrips, subscreens and table controls are converted.
 
 <a id="call-transaction"></a>
 

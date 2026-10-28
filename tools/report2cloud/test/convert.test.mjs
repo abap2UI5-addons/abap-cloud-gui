@@ -997,6 +997,38 @@ test("a dynpro the converter does not build is refused at its modules - a contro
     /^5:1 MODULE - screen 0100 calls SUBSCREEN SUB, which is no subscreen area of it/);
 });
 
+test("a table control on a dynpro: CONTROLS TYPE TABLEVIEW, its columns, LOOP WITH CONTROL in PBO and PAI a line at a time", () => {
+  const cls = classOf("zr2c_52_tablecontrol");
+  const { result } = converted.get("zr2c_52_tablecontrol");
+  assert.equal(result.ok, true, result.refusals.map((x) => x.message).join("\n"));
+  assert.match(cls, /DATA tc_seats +TYPE z2ui5_cl_cgui_report=>ty_s_tableview\./);
+  assert.match(cls, /screen->table_control\( name    = `TC_SEATS`\n\s+title   = `Seats per connection`\n\s+columns = VALUE #\( \( text = `Flight` width = 4 \)\n\s+\( text = `Seats` input = abap_true width = 10 \) \) \)\./);
+  // PBO: the modules of the loop for each line, then its values
+  assert.match(cls, /tablecontrol_begin\( `TC_SEATS` \)\.\n\s+DO tc_seats-lines TIMES\.\n\s+tc_seats-current_line = sy-index\.\n\s+fill_0100\( \)\.\n\s+tablecontrol_row\( name   = `TC_SEATS`\n\s+values = VALUE #\( \( \|\{ gs_seat-connid \}\| \) \( \|\{ gs_seat-seats \}\| \) \) \)\.\n\s+ENDDO\./);
+  // PAI: every field of the line from the browser, then the modules
+  assert.match(cls, /DO tablecontrol_count\( `TC_SEATS` \) TIMES\.\n\s+tc_seats-current_line = sy-index\.\n\s+gs_seat-connid = tablecontrol_cell\( name = `TC_SEATS` row = sy-index col = 1 \)\.\n\s+gs_seat-seats = tablecontrol_cell\( name = `TC_SEATS` row = sy-index col = 2 \)\.\n\s+read_0100\( \)\.\n\s+ENDDO\./);
+});
+
+test("LOOP AT itab INTO wa WITH CONTROL: the table read into the work area; a header line, another field type in a table control refused", () => {
+  const xml = (field, flow) => `<abapGit><asx:abap><asx:values><DYNPROS><item><HEADER><PROGRAM>ZT</PROGRAM><SCREEN>0100</SCREEN><TYPE>N</TYPE></HEADER>
+<CONTAINERS><RPY_DYCATT><TYPE>SCREEN</TYPE><NAME>SCREEN</NAME></RPY_DYCATT><RPY_DYCATT><TYPE>TABLE_CTRL</TYPE><NAME>TC</NAME><ELEMENT_OF>SCREEN</ELEMENT_OF><LINE>001</LINE><COLUMN>001</COLUMN></RPY_DYCATT></CONTAINERS>
+<FIELDS><RPY_DYFATC><CONT_TYPE>TABLE_CTRL</CONT_TYPE><CONT_NAME>TC</CONT_NAME><TYPE>${field}</TYPE><NAME>GS-A</NAME><LINE>001</LINE><COLUMN>001</COLUMN><LENGTH>005</LENGTH><INPUT_FLD>X</INPUT_FLD></RPY_DYFATC>
+<RPY_DYFATC><CONT_TYPE>SCREEN</CONT_TYPE><TYPE>OKCODE</TYPE><NAME>OK_CODE</NAME></RPY_DYFATC></FIELDS>
+<FLOW_LOGIC>${flow.map((l) => `<RPY_DYFLOW><LINE>${l}</LINE></RPY_DYFLOW>`).join("")}</FLOW_LOGIC></item></DYNPROS></asx:values></asx:abap></abapGit>`;
+  const src = "REPORT zt.\nTYPES: BEGIN OF ty, a TYPE c LENGTH 5, END OF ty.\nCONTROLS tc TYPE TABLEVIEW USING SCREEN 100.\nDATA gt TYPE STANDARD TABLE OF ty WITH DEFAULT KEY.\nDATA gs TYPE ty.\nDATA ok_code TYPE sy-ucomm.\n" +
+    "START-OF-SELECTION.\n  CALL SCREEN 100.\nMODULE keep INPUT.\n  MODIFY gt FROM gs INDEX tc-current_line.\nENDMODULE.\n";
+  const flow = (loop) => ["PROCESS BEFORE OUTPUT.", `  ${loop}.`, "  ENDLOOP.", "PROCESS AFTER INPUT.", `  ${loop}.`, "    MODULE keep.", "  ENDLOOP."];
+  const r = convert(src, { file: "zt.prog.abap", className: "zcl_t", textpool: parseTextpool(xml("TEMPLATE", flow("LOOP AT gt INTO gs WITH CONTROL tc CURSOR tc-top_line"))) });
+  assert.deepEqual(r.refusals.map((x) => x.message), []);
+  const cls = r.files["zcl_t.clas.abap"];
+  assert.match(cls, /LOOP AT gt INTO gs\.\n\s+tc-current_line = sy-tabix\.\n\s+tablecontrol_row\(/);
+  assert.match(cls, /DO tablecontrol_count\( `TC` \) TIMES\.\n\s+tc-current_line = sy-index\.\n\s+READ TABLE gt INTO gs INDEX sy-index\.\n\s+gs-a = tablecontrol_cell\(/);
+  const refused = (field, loop) => convert(src, { file: "zt.prog.abap", className: "zcl_t", textpool: parseTextpool(xml(field, flow(loop))) }).refusals.map((x) => x.message).join("\n");
+  assert.match(refused("TEMPLATE", "LOOP AT gt WITH CONTROL tc"), /LOOP AT GT WITH CONTROL without INTO - a table with a header line/);
+  assert.match(refused("CHECK", "LOOP WITH CONTROL tc"), /a field GS-A of type CHECK in the table control TC/);
+  assert.match(refused("TEMPLATE", "LOOP WITH CONTROL tx"), /loops WITH CONTROL TX, which is no table control of it/);
+});
+
 test("a tabstrip on a dynpro: CONTROLS TYPE TABSTRIP, its tabs with function code and area, CALL SUBSCREEN in PBO and PAI, the subscreens of the report", () => {
   const cls = classOf("zr2c_51_tabstrip");
   const { result } = converted.get("zr2c_51_tabstrip");
