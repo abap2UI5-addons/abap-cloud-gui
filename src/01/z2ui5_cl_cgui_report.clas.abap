@@ -4933,7 +4933,11 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
     ENDLOOP.
 
     LOOP AT lt_history INTO DATA(ls_history).
-      INSERT concat_lines_of( table = VALUE string_table( ( ls_history-name ) ( LINES OF ls_history-values ) )
+      " the name, then its values - APPEND LINES OF rather than LINES OF in
+      " VALUE, which the transpiler of the abap2UI5 playground does not take
+      DATA(lt_cells) = VALUE string_table( ( ls_history-name ) ).
+      APPEND LINES OF ls_history-values TO lt_cells.
+      INSERT concat_lines_of( table = lt_cells
                               sep   = cl_abap_char_utilities=>horizontal_tab ) INTO TABLE lt_line.
     ENDLOOP.
     DATA(lv_history) = concat_lines_of( table = lt_line sep = cl_abap_char_utilities=>newline ).
