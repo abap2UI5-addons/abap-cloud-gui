@@ -129,7 +129,8 @@ globals and the selection screen, F01 with the FORMs - and abapGit writes each
 include as a `.prog.abap` of its own. The converter reads them from beside the
 source (or from `--includes`) and inlines them before the parse, recursively,
 so the class holds the whole report; a position in a refusal, a TODO or the
-mapping table names the include and its own line. `INCLUDE x IF FOUND.`
+mapping table names the include and its own line. The chained
+`INCLUDE: a, b, c.` is inlined include by include. `INCLUDE x IF FOUND.`
 without a file is dropped, as the compiler drops it; a plain `INCLUDE` without
 a file is refused, naming the file it looked for. The classes, interfaces and DDIC
 objects of the report's repository (`--deps`) are parsed beside it, never
@@ -312,7 +313,7 @@ class `ZR2C` must exist in the target system.
 
 | Classic | abap-cloud-gui |
 |---|---|
-| `INCLUDE x` | the include's source, inlined before the parse from `x.prog.abap` beside the report (or `--includes`), recursively; `IF FOUND` without a file is dropped |
+| `INCLUDE x`, `INCLUDE: x, y` | the include's source, inlined before the parse from `x.prog.abap` beside the report (or `--includes`), recursively, a chain include by include; `IF FOUND` without a file is dropped |
 | `DEFINE` ... `END-OF-DEFINITION`, a macro call | the statements of the macro at every call, with the spacing of its body; the definition and the call are not carried over |
 | `REPORT` / `PROGRAM` | the class, `INHERITING FROM z2ui5_cl_cgui_report`; `MESSAGE-ID` is the class of every short `MESSAGE e001`; the title of the text pool is `set_title( )`; `LINE-COUNT n` is `set_line_count( n )` in `initialization( )` - the runtime counts the lines of the list without header and footer, the classic `n` counted them too (noted) |
 | `PARAMETERS p TYPE/LIKE ...` | a PUBLIC attribute and `screen->parameter( )`; `LIKE` a DDIC field becomes `TYPE`, `p(10)` / `TYPE c LENGTH 10` / `DECIMALS` are kept; `TYPE (name)` / `FOR (name)` of a fixed name - a literal, or a DATA with a literal VALUE nothing else names - is typed with it (`FOR` through a `DATA s_type TYPE name`) |
