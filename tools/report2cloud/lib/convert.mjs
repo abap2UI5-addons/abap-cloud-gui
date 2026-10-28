@@ -316,7 +316,7 @@ export const GUI = {
           exceptions: [] },
         set_handler: { params: ["event", "method", "handler", "class", "activation"],
           exceptions: [] },
-        dispatch: { params: ["event", "value"],
+        dispatch: { params: ["event", "value", "post"],
           exceptions: [] },
       },
     },

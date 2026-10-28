@@ -1218,6 +1218,8 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
     DATA mt_cgui_subscreen     TYPE ty_t_cgui_subscreen.
     " the table control whose lines mt_cgui_tc_row holds
     DATA mv_cgui_tc            TYPE string.
+    " HTMLFrame of the frontend: initial not yet asked, X there, - not there
+    DATA mv_cgui_html_frame    TYPE c LENGTH 1.
     DATA mt_cgui_dynpro_stack  TYPE ty_t_cgui_call.
     DATA mv_cgui_dynpro_next   TYPE string.
     DATA mv_cgui_dynpro_left   TYPE abap_bool.
@@ -1236,7 +1238,14 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
       IMPORTING
         id    TYPE i
         event TYPE string
-        value TYPE string.
+        value TYPE string
+        post  TYPE string OPTIONAL.
+
+    "! whether the frontend has the custom control z2ui5.cc.HTMLFrame - its
+    "! mirror class is part of the same abap2UI5 release
+    METHODS gui_html_frame
+      RETURNING
+        VALUE(result) TYPE abap_bool.
 
     "! the event of the button that shows a grid that does not show
     CONSTANTS cs_gui_show TYPE string VALUE `CGUI_SHOW`.
@@ -2295,7 +2304,20 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
     ENDIF.
     at_gui_event( ).
     CAST z2ui5_cl_cgui_gui( lo_object )->dispatch( event = event
-                                                   value = value ).
+                                                   value = value
+                                                   post  = post ).
+
+  ENDMETHOD.
+
+  METHOD gui_html_frame.
+
+    IF mv_cgui_html_frame IS INITIAL.
+      cl_abap_typedescr=>describe_by_name( EXPORTING  p_name         = `Z2UI5_CL_UI5F_HTMLFRM_JS`
+                                           EXCEPTIONS type_not_found = 1
+                                                      OTHERS         = 2 ).
+      mv_cgui_html_frame = COND #( WHEN sy-subrc = 0 THEN abap_true ELSE `-` ).
+    ENDIF.
+    result = xsdbool( mv_cgui_html_frame = abap_true ).
 
   ENDMETHOD.
 
@@ -2376,7 +2398,25 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
             )->a( n = `class`    v = `sapUiTinyMarginTopBottom` ).
 
       WHEN z2ui5_if_cgui_gui=>cs_kind-html.
-        IF <control>-html IS NOT INITIAL.
+        IF <control>-html IS NOT INITIAL AND gui_html_frame( ) = abap_true.
+          " the document as it is, in a frame under the page's policy: its
+          " styles apply, no script of it runs; a SAPEVENT link or a form
+          " posted to a SAPEVENT action is the event, its action, query and
+          " fields the arguments. content is bound - the braces of its CSS
+          " would be read as a binding in the view
+          node->tag( n = `HTMLFrame` ns = `z2ui5`
+              )->a( n = `xmlns:z2ui5` v = `z2ui5.cc`
+              )->a( n = `content`     v = client->_bind( val       = <control>-html
+                                                         tab       = mt_cgui_gui
+                                                         tab_index = id )
+              )->a( n = `width`       v = `100%`
+              )->a( n = `height`      v = `40rem`
+              )->a( n = `sapevent`    v = client->_event( val   = cs_ucomm-gui
+                                                          t_arg = VALUE #( ( |{ id }| ) ( `SAPEVENT` )
+                                                                           ( `${$parameters>/action}` )
+                                                                           ( `${$parameters>/getdata}` )
+                                                                           ( `${$parameters>/postdata}` ) ) ) ).
+        ELSEIF <control>-html IS NOT INITIAL.
           " sanitized: no script, no event handler of the document
           node->tag( n = `HTML` ns = `core`
               )->a( n = `xmlns:core`      v = `sap.ui.core`
@@ -3410,9 +3450,16 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
         IF client->get_event_arg( 2 ) = cs_gui_show.
           grid_show( CONV #( client->get_event_arg( 1 ) ) ).
         ELSE.
+          " the SAPEVENT of an HTMLFrame: action, query and posted fields
+          " apart - the value is action?query, as a link of the document has it
+          DATA(lv_value) = client->get_event_arg( 3 ).
+          IF client->get_event_arg( 4 ) IS NOT INITIAL.
+            lv_value = |{ lv_value }?{ client->get_event_arg( 4 ) }|.
+          ENDIF.
           gui_event( id    = CONV #( client->get_event_arg( 1 ) )
                      event = client->get_event_arg( 2 )
-                     value = client->get_event_arg( 3 ) ).
+                     value = lv_value
+                     post  = client->get_event_arg( 5 ) ).
         ENDIF.
 
       WHEN cs_ucomm-enter.

@@ -696,7 +696,7 @@ Stage 5 - research
       the containers, the text editor and the HTML viewer as stand-ins of the
       same methods (`z2ui5_cl_cgui_gui*`), in a local class too
 - [x] Their events: the toolbar (`function_selected`, `dropdown_clicked`),
-      the SAPEVENT links of the HTML viewer, the close of a dialog box -
+      the SAPEVENT links and forms of the HTML viewer, the close of a dialog box -
       `SET HANDLER` as `set_handler( )` of the stand-in
 - [x] The grid in a local class: the stand-in `z2ui5_cl_cgui_gui_alv_grid`,
       the ALV of the report in its container, with its toolbar, user
