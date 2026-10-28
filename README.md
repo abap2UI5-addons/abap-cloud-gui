@@ -725,6 +725,9 @@ Stage 5 - research
 - [x] Tabstrips and subscreens on a dynpro: the tabs with their function
       codes, `activetab`, `CALL SUBSCREEN` in PBO and PAI with the number
       of the subscreen in a variable (the paging in the program)
+- [x] The classes of the report's repository a control is handed to - a
+      view class with its container, an ALV wrapper - converted with the
+      report, their `cl_gui_*` the stand-ins, under their own names
 - [x] Table controls on a dynpro: `LOOP WITH CONTROL` a line at a time in
       PBO and PAI, the columns ready for input inputs of a table
 - [ ] F1 of the editor
