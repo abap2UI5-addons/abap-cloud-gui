@@ -83,14 +83,12 @@ ENDCLASS.</code></pre>
         <strong>Execute</strong> runs the report and shows the list, <strong>Back</strong> returns.</p>
     </section>
 
-    <section id="playground" class="wrap">
+    <section id="playground" class="wide">
       <h2>report2cloud playground</h2>
-      <p>Paste a classic report of your own, or pick an example, and it is converted as you type. The converter
-        runs in this page - the same code as <code>npm run report2cloud</code>; nothing is sent anywhere.
-        Includes and the repository's DDIC are not there, so a report that needs them converts with TODOs.
-        <strong>Run in the playground</strong> opens the report in the <a href="playground/">abap2UI5 playground</a> of
-        this site: Run converts it there and starts the class in your browser, with the report runtime of this
-        addon - the selection screen, Execute, the list.</p>
+      <p class="muted">Paste a classic report of your own, or pick an example. It is converted as you type, and
+        <strong>Run</strong> starts the class it becomes - all three side by side, here in the page: the converter
+        and the abap2UI5 runtime run in your browser, nothing is sent anywhere. Includes and the repository's DDIC
+        are not there; the flight tables SCARR, SPFLI and SFLIGHT are, with rows to list.</p>
 
       <div class="toolbar">
         <div class="segmented" role="group" aria-label="Source">
@@ -103,38 +101,58 @@ ENDCLASS.</code></pre>
         <label>Class name
           <input id="classname" placeholder="zcl_ + the report name" spellcheck="false">
         </label>
-        <button id="convert" class="button primary" type="button">Convert</button>
-        <button id="run" class="button" type="button" title="Open the report in the playground of this site: Run converts it and starts the class">Run in the playground</button>
+        <button id="convert" class="button" type="button">Convert</button>
+        <button id="run" class="button primary" type="button">Run</button>
       </div>
 
-      <div class="panes">
+      <div class="three">
         <div class="pane">
-          <div class="pane-head">Report <span class="muted">.prog.abap</span>
+          <div class="pane-head"><span><span class="step-no">1</span> The classic report <span class="muted">.prog.abap</span></span>
             <button id="clear" class="link" type="button">Clear</button>
           </div>
           <textarea id="source" wrap="off" spellcheck="false" aria-label="ABAP report source"
             placeholder="Paste a classic report here - REPORT zmy_report. PARAMETERS ... START-OF-SELECTION. WRITE ...&#10;&#10;It is converted as you type (Ctrl+Enter converts at once)."></textarea>
           <details id="texts" class="texts">
-            <summary>Text pool <span class="muted">.prog.xml, optional - the selection texts and text symbols</span></summary>
+            <summary>Text pool <span class="muted">.prog.xml, optional - the selection texts, text symbols and screens</span></summary>
             <textarea id="textpool" wrap="off" spellcheck="false" aria-label="abapGit .prog.xml of the report"
-              placeholder="Paste the .prog.xml abapGit wrote for the report - its TPOOL gives the fields their labels"></textarea>
+              placeholder="Paste the .prog.xml abapGit wrote for the report - its TPOOL gives the fields their labels, its DYNPROS the screens"></textarea>
           </details>
         </div>
         <div class="pane">
           <div class="pane-head">
-            <div id="tabs" class="tabs" role="tablist"></div>
+            <span><span class="step-no">2</span> The class report2cloud writes</span>
             <span class="head-actions">
               <button id="copy" class="link" type="button">Copy</button>
               <button id="download" class="link" type="button">Download</button>
               <button id="download-all" class="link" type="button">All files</button>
             </span>
           </div>
+          <div id="tabs" class="tabs" role="tablist"></div>
           <pre id="output" class="output" tabindex="0"><span class="muted">The generated class appears here.</span></pre>
+        </div>
+        <div class="pane">
+          <div class="pane-head"><span><span class="step-no">3</span> abap2UI5, running in your browser</span>
+            <span id="app-state" class="muted"></span>
+          </div>
+          <div class="app">
+            <iframe id="app" title="The converted report, running" src="about:blank"></iframe>
+            <div id="app-cover" class="app-cover">Press <strong>Run</strong> to start the class.</div>
+          </div>
         </div>
       </div>
 
       <div id="status" class="status" role="status"></div>
-      <div id="findings" class="findings"></div>
+      <div class="info">
+        <div class="card info-card wide-card">
+          <h3>What happened</h3>
+          <ol id="steps" class="steps"></ol>
+        </div>
+        <div class="card info-card"><h3>Refused <span id="n-refused" class="badge"></span></h3><div id="refused" class="muted">Nothing.</div></div>
+        <div class="card info-card"><h3>To do <span id="n-todo" class="badge"></span></h3><div id="todo" class="muted">Nothing.</div></div>
+        <div class="card info-card"><h3>ABAP Cloud release check <span id="n-release" class="badge"></span></h3><div id="release" class="muted">Nothing to check.</div></div>
+        <div class="card info-card wide-card"><h3>Mapped - classic to abap-cloud-gui <span id="n-mapped" class="badge"></span></h3><div id="mapped" class="muted">Nothing yet.</div></div>
+        <div class="card info-card wide-card"><details><summary><h3>Migration report <span class="muted">- the .migration.md, as the CLI writes it</span></h3></summary><pre id="migration" class="code"></pre></details></div>
+      </div>
     </section>
 
     <section class="wrap grid3">

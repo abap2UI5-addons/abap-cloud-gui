@@ -676,9 +676,10 @@ Stage 4 - in the browser, and with an agent
 
 - [x] Converted reports run in the browser: the site has its own copy of
       the abap2UI5 playground (`site/playground/`) - a `.prog.abap` (and its
-      `.prog.xml`) as the first file, or **Run in the playground** on the
-      converter page, is converted on Run and its class runs on the stage;
-      the refusals are underlined in the report - nothing to install
+      `.prog.xml`) as the first file is converted on Run and its class runs on
+      the stage; the converter page shows the classic report, the class and
+      the running app side by side, and step by step what happened - nothing
+      to install
 - [x] `migrate_report` in the MCP server with the class deployed into the
       sandbox and its first screen answered
 - [ ] An evaluation harness for the AI loop: a model works the migration
