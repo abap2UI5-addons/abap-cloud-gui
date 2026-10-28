@@ -7607,8 +7607,14 @@ class Converter {
           const body = this.convertBody(b.body, { method: key, local: { cls: n, declared: own } });
           const was = [...(this.methodWa.get(key) ?? new Map())].map(([tab, wa]) => `DATA ${wa} LIKE LINE OF ${tab}.`);
           const pre = [...was, ...(this.prelude.get(key) ?? []), ...this.fieldSymbolDecls(body)];
-          const calls = new Set([...BASE_METHODS, ...REPORT_CALLS, ...formMethods].filter((x) => !(methodsOf.get(n) ?? new Set()).has(x)));
-          const lines = [...pre, ...trimBlank(body)].map((l) => prefixCalls(l, calls, this.appRef));
+          const mine = methodsOf.get(n) ?? new Set();
+          const calls = new Set([...BASE_METHODS, ...REPORT_CALLS, ...formMethods].filter((x) => !mine.has(x)));
+          // a method of the runtime the local class has one of its own name
+          // of - list( ), message( ): a call of it stays the local class's,
+          // but the chained one, list( )->write( ), is what a WRITE became,
+          // and that is the report's
+          const chained = new Set([...BASE_METHODS, ...REPORT_CALLS].filter((x) => mine.has(x)));
+          const lines = [...pre, ...trimBlank(body)].map((l) => prefixCalls(l, calls, this.appRef, chained));
           const pad = (this.lines[b.stmt.getFirstToken().getRow() - 1].match(/^\s*/)[0]) + "  ";
           replace.push({ from: b.stmt.getLastToken().getRow() + 1, to: b.end.getFirstToken().getRow() - 1, lines: lines.map((l) => indent(l, pad.length)) });
           friends.add(n);
@@ -8131,10 +8137,12 @@ const REPORT_CALLS = ["list", "write", "message", "message_t100", "messages_from
  * list( ), message( ), a FORM - prefixed with ref-> in a line of converted
  * code of a local class; strings and the text of templates are left alone.
  */
-function prefixCalls(line, names, ref) {
+function prefixCalls(line, names, ref, chained = new Set()) {
   let out = "";
   let i = 0;
-  const code = (seg) => seg.replace(/(^|[^\w>~=-])([a-z_][\w]*)\(/gi, (all, pre, name) => (names.has(name.toLowerCase()) ? `${pre}${ref}->${name}(` : all));
+  const code = (seg) => seg
+    .replace(/(^|[^\w>~=-])([a-z_][\w]*)\(/gi, (all, pre, name) => (names.has(name.toLowerCase()) ? `${pre}${ref}->${name}(` : all))
+    .replace(/(^|[^\w>~=-])([a-z_][\w]*)\( \)->/gi, (all, pre, name) => (chained.has(name.toLowerCase()) ? `${pre}${ref}->${name}( )->` : all));
   while (i < line.length) {
     const c = line[i];
     if (c === "'" || c === "`") {

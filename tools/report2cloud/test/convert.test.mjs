@@ -1287,6 +1287,14 @@ test("SAP GUI controls: a control handed to a class of the report's own is refus
   assert.deepEqual(refusalOf(src).map((x) => x.replace(/^\d+:\d+ /, "")), ["SAP GUI controls: go_c, a SAP GUI control, is handed to a method that is no stand-in - it takes a cl_gui_* object - port this statement by hand"]);
 });
 
+test("a local class with a method named like one of the runtime's writes the list of the report", () => {
+  const src = "REPORT zt.\nCLASS lcl_f DEFINITION.\n  PUBLIC SECTION.\n    CLASS-METHODS list.\nENDCLASS.\nCLASS lcl_f IMPLEMENTATION.\n  METHOD list.\n    WRITE / 'x'.\n  ENDMETHOD.\nENDCLASS.\nSTART-OF-SELECTION.\n  lcl_f=>list( ).\n";
+  const r = convert(src, { file: "zt.prog.abap", className: "zcl_t" });
+  assert.deepEqual(r.refusals, []);
+  const imp = r.files["zcl_t.clas.locals_imp.abap"];
+  assert.match(imp, /lcl_r2c=>app->list\( \)->new_line\(/);
+});
+
 test("the inline target of a SELECT read in another event block: the row of its table, the columns read, COUNT( * )", () => {
   const all = convert("REPORT zt.\nSTART-OF-SELECTION.\n  SELECT * FROM sflight INTO TABLE @DATA(flights).\nEND-OF-SELECTION.\n  WRITE lines( flights ).\n", { file: "zt.prog.abap", className: "zcl_t" });
   assert.deepEqual(all.refusals, []);

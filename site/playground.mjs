@@ -5,6 +5,14 @@
 // .prog.xml when that is pasted too, and kept in this browser (localStorage)
 // for the next visit. The examples are the reports of the converter's own
 // corpus (examples.json, written by the build with their text pools).
+//
+// Run in the playground opens the report - with its .prog.xml - in the
+// abap2UI5 playground beside this page (playground/, built with
+// report2cloud by scripts/build-playground.mjs): there Run converts it and
+// starts the class on the stage, the refusals underlined in the report. The
+// files travel in the fragment of the link, as the playground's own share
+// links carry them (src/shell/share.mjs there: "2", then the JSON of the
+// files deflated and base64url) - nothing goes to a server.
 import { convert, defaultClassName } from "../tools/report2cloud/lib/convert.mjs";
 import { migrationReport } from "../tools/report2cloud/lib/report.mjs";
 import { parseTextpool } from "../tools/report2cloud/lib/textpool.mjs";
@@ -111,6 +119,25 @@ function run() {
   list("Mapped", result.mapped, (m) => el("li", {}, rowOf(m), el("code", {}, m.classic.slice(0, 90)), " → ", m.target));
 }
 
+// the files for the playground: the report - the first file, the app - and
+// its text pool. abapGit's name of it, lower case; a namespace (/abc/rep)
+// has no file name the playground takes, so such a report goes as zreport
+async function playgroundLink() {
+  const text = source.value;
+  const program = /^\s*(?:report|program)\s+([\w/]+)/im.exec(text)?.[1]?.toLowerCase() ?? "zreport";
+  const name = /^[a-z][a-z0-9_]*$/.test(program) ? program : "zreport";
+  const chosen = mode === "example" ? examples.find((e) => e.name === example.value && e.source === text) : undefined;
+  const xml = mode === "own" ? textpoolXml.value.trim() : chosen?.xml;
+  const list = [{ name: `${name}.prog.abap`, source: text }];
+  if (xml) list.push({ name: `${name}.prog.xml`, source: xml });
+  const bytes = new TextEncoder().encode(JSON.stringify(list));
+  const deflated = new Uint8Array(await new Response(new Blob([bytes]).stream().pipeThrough(new CompressionStream("deflate-raw"))).arrayBuffer());
+  let binary = "";
+  for (let i = 0; i < deflated.length; i += 0x8000) binary += String.fromCharCode(...deflated.subarray(i, i + 0x8000));
+  const fragment = `2${btoa(binary).replaceAll("+", "-").replaceAll("/", "_").replace(/=+$/, "")}`;
+  return new URL(`playground/#${fragment}`, document.baseURI).href;
+}
+
 // your own report: kept in this browser - an empty or blocked storage is no error
 const save = () => {
   if (mode !== "own") return;
@@ -163,6 +190,14 @@ function setMode(next) {
 
 $("mode-own").onclick = () => setMode("own");
 $("mode-example").onclick = () => setMode("example");
+$("run").onclick = async () => {
+  if (!source.value.trim()) {
+    status.className = "status bad";
+    status.textContent = "Paste a report first - or pick an example.";
+    return;
+  }
+  window.open(await playgroundLink(), "_blank", "noopener");
+};
 $("convert").onclick = () => {
   save();
   run();

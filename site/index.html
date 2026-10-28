@@ -87,7 +87,10 @@ ENDCLASS.</code></pre>
       <h2>report2cloud playground</h2>
       <p>Paste a classic report of your own, or pick an example, and it is converted as you type. The converter
         runs in this page - the same code as <code>npm run report2cloud</code>; nothing is sent anywhere.
-        Includes and the repository's DDIC are not there, so a report that needs them converts with TODOs.</p>
+        Includes and the repository's DDIC are not there, so a report that needs them converts with TODOs.
+        <strong>Run in the playground</strong> opens the report in the <a href="playground/">abap2UI5 playground</a> of
+        this site: Run converts it there and starts the class in your browser, with the report runtime of this
+        addon - the selection screen, Execute, the list.</p>
 
       <div class="toolbar">
         <div class="segmented" role="group" aria-label="Source">
@@ -101,6 +104,7 @@ ENDCLASS.</code></pre>
           <input id="classname" placeholder="zcl_ + the report name" spellcheck="false">
         </label>
         <button id="convert" class="button primary" type="button">Convert</button>
+        <button id="run" class="button" type="button" title="Open the report in the playground of this site: Run converts it and starts the class">Run in the playground</button>
       </div>
 
       <div class="panes">
