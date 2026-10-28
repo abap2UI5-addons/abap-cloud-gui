@@ -1431,12 +1431,13 @@ class Converter {
     };
     for (const v of inEvents) {
       if (!v.name || this.hoisted.has(v.name) || this.globalData.has(v.name) || !elsewhere(v.e, v.name)) continue;
-      let type = this.inlineType(v);
+      const type = this.inlineType(v);
       if (!type) {
         this.refuse(v.d, `${v.name} is declared inline in an event block and used in another one - event blocks open no scope, so it is a global of the report; its type cannot be told here (a dependency of the report): declare it with DATA in the report`);
         continue;
       }
-      this.hoisted.set(v.name, { decl: `DATA ${v.name} ${type}.`, stmt: v.s, keys: new Set(v.d.getTokens().map(key)) });
+      const { types, data } = typeof type === "string" ? { data: type } : type;
+      this.hoisted.set(v.name, { decl: `DATA ${v.name} ${data}.`, types, stmt: v.s, keys: new Set(v.d.getTokens().map(key)) });
       this.globalData.add(v.name);
     }
   }
@@ -1453,9 +1454,17 @@ class Converter {
     if (m) return `TYPE ${lc(m[2])}`;
     m = new RegExp(`^DATA\\(\\s*${esc}\\s*\\)\\s*=\\s*CAST\\s+([\\w/]+)\\s*\\(`, "i").exec(text);
     if (m) return `TYPE REF TO ${lc(m[1])}`;
+    // abaplint leaves the target of a SELECT untyped (SELECT_todo)
+    if (/^SELECT\b/i.test(text)) return selectTargetType(text, lc(name));
     const t = this.programTypes().get(lc(name));
     if (!t) return undefined;
     const cls = t.constructor.name;
+    // a RETURNING type of the DDIC the repository does not carry (a data
+    // element of the system): the class names it as the report's method does
+    if (cls === "UnknownType") {
+      const unknown = /^([\w/]+) not found/i.exec(t.getError?.() ?? "");
+      return unknown && !/^[yz]/i.test(unknown[1]) ? `TYPE ${lc(unknown[1])}` : undefined;
+    }
     if (["VoidType", "UnknownType", "GenericObjectReferenceType", "AnyType", "DataType", "SimpleType"].includes(cls)) return undefined;
     let abap;
     try {
@@ -4103,6 +4112,7 @@ class Converter {
     // the inline declarations of the event blocks that other blocks read
     for (const [name, h] of this.hoisted ?? []) {
       const local = [...this.localNames].some((n) => new RegExp(`\\b${n}\\b`, "i").test(h.decl));
+      if (h.types) sections.types.push(...h.types);
       if (local) this.privateDataLines.push(h.decl);
       else {
         if (!sections.data.length || !sections.data.some((l) => /^"/.test(l))) { /* the heading is added below */ }
@@ -7949,6 +7959,59 @@ export function declName(s) {
 }
 
 /** zflight_list -> zcl_flight_list, /abc/flights -> /abc/cl_flights */
+/**
+ * The type of the inline target of a SELECT from one table - `INTO
+ * [TABLE] @DATA(x)` - as the declaration of an attribute: its row the
+ * table's (`SELECT *`), a structure of the columns read (a plain field list,
+ * an alias each may have), or an integer (`COUNT( * )` alone). Answers
+ * { types, data } - the TYPES of the structure, if any, and the TYPE
+ * addition - or undefined for anything else (a join, an expression, a
+ * subquery): then the declaration is refused as before.
+ */
+export function selectTargetType(text, name) {
+  const t = text.replace(/\s+/g, " ").replace(/\s*\.\s*$/, "");
+  const into = new RegExp(`\\bINTO (TABLE )?@DATA\\(\\s*${name.replace(/[<>]/g, "\\$&")}\\s*\\)`, "i").exec(t);
+  if (!into) return undefined;
+  const table = Boolean(into[1]);
+  // SELECT [SINGLE] [DISTINCT] <fields> FROM <t> ... or SELECT FROM <t> FIELDS <fields> ...
+  let m = /^SELECT (?:SINGLE )?(?:DISTINCT )?(.+?) FROM ([\w/]+)(?: AS \w+)?(?= |$)(.*)$/i.exec(t);
+  let fields;
+  let from;
+  let rest;
+  if (m && !/^FROM\b/i.test(m[1])) [, fields, from, rest] = m;
+  else {
+    m = /^SELECT (?:SINGLE )?FROM ([\w/]+)(?: AS \w+)? FIELDS (?:DISTINCT )?(.+?) (?=INTO |WHERE |ORDER |GROUP |UP |$)(.*)$/i.exec(t);
+    if (!m) return undefined;
+    [, from, fields, rest] = m;
+  }
+  if (/\bJOIN\b/i.test(rest) || /\(/.test(from)) return undefined;
+  const tab = lc(from);
+  const wrap = (row) => (table ? `TYPE STANDARD TABLE OF ${row} WITH EMPTY KEY` : `TYPE ${row}`);
+  const list = fields.trim();
+  if (list === "*") return { data: wrap(tab) };
+  if (/^COUNT\( ?\* ?\)( AS \w+)?$/i.test(list)) return table ? undefined : { data: "TYPE i" };
+  // a comma-separated list (the strict syntax) or a space-separated one,
+  // each column a field of the table, with an alias or without
+  const words = list.includes(",") ? list.split(/\s*,\s*/) : list.split(" ").reduce((acc, w, i, all) => {
+    if (/^AS$/i.test(w) || /^AS$/i.test(all[i - 1] ?? "")) acc[acc.length - 1] += ` ${w}`;
+    else acc.push(w);
+    return acc;
+  }, []);
+  const merged = [];
+  for (const piece of words) {
+    const c = /^(?:[\w/]+~)?([\w/]+)(?: AS ([\w/]+))?$/i.exec(piece.trim());
+    if (!c) return undefined;
+    merged.push({ field: lc(c[1]), as: lc(c[2] ?? c[1]) });
+  }
+  if (!merged.length) return undefined;
+  if (merged.length === 1 && !table) return { data: `TYPE ${tab}-${merged[0].field}` };
+  const ty = `ty_${name}`.slice(0, 30);
+  return {
+    types: [`TYPES: BEGIN OF ${ty},`, ...merged.map((c) => `         ${c.as} TYPE ${tab}-${c.field},`), `       END OF ${ty}.`],
+    data: wrap(ty),
+  };
+}
+
 export function defaultClassName(program) {
   const p = lc(program);
   const ns = /^(\/\w+\/)(.*)$/.exec(p);

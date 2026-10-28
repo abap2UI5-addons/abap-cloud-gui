@@ -1287,6 +1287,34 @@ test("SAP GUI controls: a control handed to a class of the report's own is refus
   assert.deepEqual(refusalOf(src).map((x) => x.replace(/^\d+:\d+ /, "")), ["SAP GUI controls: go_c, a SAP GUI control, is handed to a method that is no stand-in - it takes a cl_gui_* object - port this statement by hand"]);
 });
 
+test("the inline target of a SELECT read in another event block: the row of its table, the columns read, COUNT( * )", () => {
+  const all = convert("REPORT zt.\nSTART-OF-SELECTION.\n  SELECT * FROM sflight INTO TABLE @DATA(flights).\nEND-OF-SELECTION.\n  WRITE lines( flights ).\n", { file: "zt.prog.abap", className: "zcl_t" });
+  assert.deepEqual(all.refusals, []);
+  assert.match(all.files["zcl_t.clas.abap"], /DATA flights TYPE STANDARD TABLE OF sflight WITH EMPTY KEY\./);
+
+  const cols = convert("REPORT zt.\nSTART-OF-SELECTION.\n  SELECT bname, gltgv AS valid_from FROM usr02 INTO TABLE @DATA(users).\nEND-OF-SELECTION.\n  WRITE lines( users ).\n", { file: "zt.prog.abap", className: "zcl_t" });
+  assert.deepEqual(cols.refusals, []);
+  const cls = cols.files["zcl_t.clas.abap"];
+  assert.match(cls, /TYPES: BEGIN OF ty_users,\n\s+bname\s+TYPE usr02-bname,\n\s+valid_from\s+TYPE usr02-gltgv,\n\s+END OF ty_users\./);
+  assert.match(cls, /DATA users TYPE STANDARD TABLE OF ty_users WITH EMPTY KEY\./);
+
+  const count = convert("REPORT zt.\nINITIALIZATION.\n  SELECT COUNT( * ) AS count FROM zlogs INTO @DATA(n).\nSTART-OF-SELECTION.\n  WRITE n.\n", { file: "zt.prog.abap", className: "zcl_t" });
+  assert.deepEqual(count.refusals, []);
+  assert.match(count.files["zcl_t.clas.abap"], /DATA n TYPE i\./);
+
+  // a join is not told - refused as before
+  const join = convert("REPORT zt.\nSTART-OF-SELECTION.\n  SELECT a~carrid FROM sflight AS a INNER JOIN scarr AS b ON a~carrid = b~carrid INTO TABLE @DATA(j).\nEND-OF-SELECTION.\n  WRITE lines( j ).\n", { file: "zt.prog.abap", className: "zcl_t" });
+  assert.match(join.refusals[0].message, /^j is declared inline in an event block/);
+});
+
+test("an inline declaration typed by a DDIC type the repository does not carry is declared with that type", () => {
+  const src = "REPORT zt.\nINITIALIZATION.\n  DATA(h) = zcl_hash=>of( `x` ).\nSTART-OF-SELECTION.\n  WRITE h.\n";
+  const hash = "CLASS zcl_hash DEFINITION PUBLIC CREATE PUBLIC.\n  PUBLIC SECTION.\n    CLASS-METHODS of IMPORTING v TYPE string RETURNING VALUE(r) TYPE hash160.\nENDCLASS.\nCLASS zcl_hash IMPLEMENTATION.\n  METHOD of.\n  ENDMETHOD.\nENDCLASS.\n";
+  const r = convert(src, { file: "zt.prog.abap", className: "zcl_t", deps: [{ name: "zcl_hash.clas.abap", text: hash }] });
+  assert.deepEqual(r.refusals, []);
+  assert.match(r.files["zcl_t.clas.abap"], /DATA h TYPE hash160\./);
+});
+
 test("the dependencies of a report type what it reads of them - an inline declaration of an event block read in another one", () => {
   const src = "REPORT zt.\nINITIALIZATION.\n  DATA(lo_log) = zcl_app_factory=>create_logger( ).\nSTART-OF-SELECTION.\n  lo_log->add( `x` ).\n";
   const factory = "CLASS zcl_app_factory DEFINITION PUBLIC CREATE PUBLIC.\n  PUBLIC SECTION.\n    CLASS-METHODS create_logger RETURNING VALUE(result) TYPE REF TO zcl_app_log.\nENDCLASS.\nCLASS zcl_app_factory IMPLEMENTATION.\n  METHOD create_logger.\n  ENDMETHOD.\nENDCLASS.\n";

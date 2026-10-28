@@ -360,7 +360,7 @@ Correct the name, or merge the blocks of the same field (two F4 of `-LOW`, two F
 
 ## An inline declaration of an event block, used in another one, of a type that cannot be told
 
-**Why.** Event blocks open no scope: `DATA(x) = ...` in `INITIALIZATION` is a global of the report, and `START-OF-SELECTION` may use it. In the class it becomes an attribute, which needs its type. The converter takes it from a constructor expression (`NEW lcl( )`, `VALUE ty( )`) or from abaplint's syntax check - not from a method of a class that is not part of the input.
+**Why.** Event blocks open no scope: `DATA(x) = ...` in `INITIALIZATION` is a global of the report, and `START-OF-SELECTION` may use it. In the class it becomes an attribute, which needs its type. The converter takes it from a constructor expression (`NEW lcl( )`, `VALUE ty( )`), from the `SELECT` that fills it (`*` or the columns of one table, `COUNT( * )`), or from abaplint's syntax check over the report and its repository - a DDIC type the repository does not carry by its name. Not from a method of a class that is not part of the input, and not from a join.
 
 **Rewrite.**
 
