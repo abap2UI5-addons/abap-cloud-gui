@@ -674,9 +674,11 @@ Stage 3 - clean core at the scale of a code base
 
 Stage 4 - in the browser, and with an agent
 
-- [ ] The converter in the abap2UI5 playground: drop a `.prog.abap` into the
-      AI Studio, the class runs on the stage, the refusals are the model's
-      work list - nothing to install
+- [x] The converter in the abap2UI5 playground: a `.prog.abap` (and its
+      `.prog.xml`) as the first file of the [playground](https://abap2ui5.github.io/playground/)
+      or the AI Studio is converted on Run and its class runs on the stage;
+      the refusals are underlined in the report, the model's work list -
+      nothing to install
 - [x] `migrate_report` in the MCP server with the class deployed into the
       sandbox and its first screen answered
 - [ ] An evaluation harness for the AI loop: a model works the migration
