@@ -1295,6 +1295,44 @@ test("a local class with a method named like one of the runtime's writes the lis
   assert.match(imp, /lcl_r2c=>app->list\( \)->new_line\(/);
 });
 
+test("a class of the repository a SAP GUI control is handed to is converted beside the report", () => {
+  const src = "REPORT zt.\nDATA go_c TYPE REF TO cl_gui_docking_container.\nSTART-OF-SELECTION.\n  go_c = NEW #( ratio = 50 ).\n  zcl_my_view=>show( go_c ).\n";
+  const view = [
+    "CLASS zcl_my_view DEFINITION PUBLIC FINAL CREATE PUBLIC.",
+    "  PUBLIC SECTION.",
+    "    CLASS-METHODS show IMPORTING io_parent TYPE REF TO cl_gui_container.",
+    "    CLASS-METHODS on_close FOR EVENT close OF cl_gui_dialogbox_container.",
+    "  PRIVATE SECTION.",
+    "    CLASS-DATA go_text TYPE REF TO cl_gui_textedit.",
+    "ENDCLASS.",
+    "CLASS zcl_my_view IMPLEMENTATION.",
+    "  METHOD show.",
+    "    CREATE OBJECT go_text EXPORTING parent = io_parent.",
+    "    go_text->set_textstream( `hello` ).",
+    "  ENDMETHOD.",
+    "  METHOD on_close.",
+    "  ENDMETHOD.",
+    "ENDCLASS.",
+  ].join("\n");
+  const r = convert(src, { file: "zt.prog.abap", className: "zcl_t", deps: [{ name: "zcl_my_view.clas.abap", text: view }] });
+  assert.deepEqual(r.refusals, []);
+  const cls = r.files["zcl_my_view.clas.abap"];
+  assert.ok(cls, Object.keys(r.files).join(", "));
+  assert.ok(r.files["zcl_my_view.clas.xml"]);
+  // its header as it was, its controls the stand-ins
+  assert.match(cls, /^CLASS zcl_my_view DEFINITION PUBLIC FINAL CREATE PUBLIC\./m);
+  assert.match(cls, /io_parent TYPE REF TO z2ui5_cl_cgui_gui_container/);
+  assert.match(cls, /go_text TYPE REF TO z2ui5_cl_cgui_gui_textedit/);
+  assert.doesNotMatch(cls, /cl_gui_|lcl_r2c|z2ui5_cl_cgui_r2c_gui_class/i);
+  // the report calls it as it did
+  assert.match(r.files["zcl_t.clas.abap"], /zcl_my_view=>show\( go_c \)/);
+
+  // a class whose method writes the list needs the report - refused, at its file
+  const writer = view.replace("go_text->set_textstream( `hello` ).", "WRITE / 'x'.");
+  const w = convert(src, { file: "zt.prog.abap", className: "zcl_t", deps: [{ name: "zcl_my_view.clas.abap", text: writer }] });
+  assert.match(w.refusals[0].message, /^zcl_my_view\.clas\.abap(:\d+)? - its methods use the report/);
+});
+
 test("the inline target of a SELECT read in another event block: the row of its table, the columns read, COUNT( * )", () => {
   const all = convert("REPORT zt.\nSTART-OF-SELECTION.\n  SELECT * FROM sflight INTO TABLE @DATA(flights).\nEND-OF-SELECTION.\n  WRITE lines( flights ).\n", { file: "zt.prog.abap", className: "zcl_t" });
   assert.deepEqual(all.refusals, []);

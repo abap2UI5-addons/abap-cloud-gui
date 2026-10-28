@@ -1130,6 +1130,9 @@ class Converter {
     this.origin = opts.origin ?? ((row) => ({ file: this.file, row }));
     this.pool = opts.textpool ?? { title: "", symbols: new Map(), selection: new Map() };
     this.deps = opts.deps ?? [];
+    // the classes of the report's repository it hands a SAP GUI control to -
+    // converted beside the report (convertGuiClasses( ) of convert( ))
+    this.guiDeps = new Set();
     this.programName = opts.programName;
     this.className = opts.className;
     // classFor(program) names the class of another report of the input -
@@ -1489,6 +1492,7 @@ class Converter {
     this.className = lc(this.className ?? defaultClassName(this.programName));
     this.analyze();
     const out = this.generate();
+    out.guiDeps = [...this.guiDeps];
     return out;
   }
 
@@ -2067,6 +2071,16 @@ class Converter {
         if (ev && this.guiVars.has(ev[2])) this.guiVars.set(ev[1], this.guiVars.get(ev[2]));
         continue;
       }
+      // a parameter of a method of a local class - a container handed in
+      if (kind(x) === "MethodDef") {
+        // not the RETURNING one: a control handed on through a call's result
+        // is no handover the checks can follow
+        for (const p of t.replace(/\breturning\b[\s\S]*$/, "").matchAll(/(?:!|\bvalue\s*\(\s*)?([\w/]+)\s*\)?\s+type\s+ref\s+to\s+(cl_gui_\w+|cl_salv_\w+)\b/g)) {
+          // a container (or any control) to put the class's own controls in
+          if (["z2ui5_cl_cgui_gui_container", "z2ui5_cl_cgui_gui"].includes(guiClass(p[2])) && !["type", "ref", "to"].includes(p[1])) this.guiVars.set(p[1], guiClass(p[2]));
+        }
+        continue;
+      }
       if (!["Data", "Static", "ClassData"].includes(kind(x)) || this.insideBegin(x)) continue;
       const m = /type\s+ref\s+to\s+(cl_gui_\w+|cl_salv_\w+)\b/.exec(t);
       if (m && guiClass(m[1])) this.guiVars.set(lc(declName(x)), guiClass(m[1]));
@@ -2242,6 +2256,63 @@ class Converter {
     return hits.size === 1 ? [...hits][0] : undefined;
   }
 
+  /** the classes of the report's repository that use SAP GUI controls or
+   *  the SALV - name -> source; the ones a control can be handed to */
+  guiDepClasses() {
+    this.guiDepMap ??= new Map(this.deps
+      .filter((d) => /\.clas\.abap$/.test(d.name) && /\bcl_(gui|salv)_\w+/i.test(d.text))
+      .map((d) => [lc(d.name.split("/").pop().replace(/\.clas\.abap$/, "").replace(/#/g, "/")), d.text]));
+    return this.guiDepMap;
+  }
+
+  /** the variables of the report typed with a class: name -> class */
+  refTypes() {
+    if (this.refTypeMap) return this.refTypeMap;
+    this.refTypeMap = new Map();
+    for (const x of this.stmts) {
+      const t = lc(renderTokens(stmtTokens(x)));
+      const m = /^(?:data|class-data|statics)\s*:?\s*([\w/]+)\s+type\s+ref\s+to\s+([\w/]+)/.exec(t)
+        ?? /^data\s*\(\s*([\w/]+)\s*\)\s*=\s*new\s+([\w/]+)\s*\(/.exec(t);
+      if (m) this.refTypeMap.set(m[1], m[2]);
+    }
+    return this.refTypeMap;
+  }
+
+  /** the classes of the repository with SAP GUI controls a statement calls -
+   *  by name (zcl_x=>m( ), NEW zcl_x( )) or through a variable of theirs: a
+   *  local class that inherits from one, an interface of the repository its
+   *  classes with controls implement (each of them - which one comes is
+   *  not to be told here) */
+  guiReceivers(toks) {
+    const classes = this.guiDepClasses();
+    if (!classes.size) return [];
+    const types = this.refTypes();
+    const out = new Set();
+    const of = (type) => {
+      if (!type) return;
+      if (classes.has(type)) {
+        out.add(type);
+        return;
+      }
+      const sup = this.localSuper(type);
+      if (sup) of(sup);
+      for (const [name, text] of classes) {
+        if (new RegExp(`\\binterfaces\\s+${type.replace(/\//g, "\\/")}\\b`, "i").test(text)) out.add(name);
+      }
+    };
+    for (const t of toks) of(classes.has(t) ? t : types.get(t));
+    return [...out];
+  }
+
+  /** the superclass of a local class of the report */
+  localSuper(name) {
+    for (const u of this.locals.filter((x) => x.kind === "ClassDefinition")) {
+      const m = /^class\s+([\w/]+)\s+definition\b.*?\binheriting\s+from\s+([\w/]+)/.exec(lc(renderTokens(stmtTokens(u.stmts[0]))));
+      if (m && m[1] === name) return m[2];
+    }
+    return undefined;
+  }
+
   /** what a statement uses of a SAP GUI control that its stand-in does not
    *  have - undefined when it has everything */
   guiCheck(s) {
@@ -2277,9 +2348,18 @@ class Converter {
     for (const c of ctors) used.push(guiMember(c, "constructor"));
     // a control handed to a method or class of the report's own - that one
     // takes a SAP GUI control, not its stand-in
-    if (!used.length && /->|=>|\bnew\b|^create\s+object|^call\s+(function|method)/.test(toks.join(" "))) {
+    // cl_abap_browser=>show_html( container = ... ) - its stand-in takes the
+    // container of the stand-ins
+    if (!used.length && !toks.includes("cl_abap_browser") && /->|=>|\bnew\b|^create\s+object|^call\s+(function|method)/.test(toks.join(" "))) {
       for (let i = 1; i < toks.length; i++) {
         if (this.guiVars.has(toks[i]) && ["=", "("].includes(toks[i - 1]) && toks[i + 1] !== "->") {
+          // a class of the repository that uses the SAP GUI itself: it is
+          // converted too, its cl_gui_* the stand-ins, and takes the control
+          const receivers = this.guiReceivers(toks);
+          if (receivers.length) {
+            for (const r of receivers) this.guiDeps.add(r);
+            return undefined;
+          }
           return `${toks[i]}, a SAP GUI control, is handed to a method that is no stand-in - it takes a cl_gui_* object`;
         }
       }
@@ -8487,6 +8567,95 @@ function renderScreenChain(calls) {
 export const REFUSED_MESSAGES = () => [...Object.values(REFUSED), ...Object.entries(REFUSED_FUNCTIONS).map(([fm, m]) => `CALL FUNCTION '${fm}' - ${m}`)];
 
 export function convert(source, opts = {}) {
+  return convertGuiClasses(convertReport(source, opts), opts);
+}
+
+/**
+ * The classes of the report's repository the report hands a SAP GUI control
+ * to (result.guiDeps): each is converted as a local class of a report of its
+ * own would be - its cl_gui_* (and cl_salv_*) the stand-ins, SET HANDLER
+ * set_handler( ) - and written beside the report's class under its own name,
+ * so the report's calls of it stay as they are. A class whose methods would
+ * need the report (WRITE, a FORM, a global of the report) is refused, and so
+ * is what its controls use that the stand-ins do not have - at its line in
+ * its file. The classes it hands a control to in turn are converted too.
+ */
+function convertGuiClasses(result, opts, seen = new Set()) {
+  const todo = (result.guiDeps ?? []).filter((c) => !seen.has(c));
+  for (const cls of todo) seen.add(cls);
+  for (const cls of todo) {
+    const fileName = `${cls.replace(/\//g, "#")}.clas.abap`;
+    const dep = (opts.deps ?? []).find((d) => lc(d.name.split("/").pop()) === fileName);
+    if (!dep) continue;
+    const sub = convertGuiClass(cls, dep.text.replace(/^\uFEFF/, ""), opts, seen);
+    const where = (r) => ({ ...r, row: 0, col: 0, file: fileName, message: `${fileName}${r.row ? `:${r.row}` : ""} - ${r.message}` });
+    result.todos.push(...sub.todos.map(where));
+    result.release.push(...(sub.release ?? []).filter((r) => !result.release.some((x) => x.kind === r.kind && x.name === r.name)));
+    if (sub.refusals.length) {
+      result.refusals.push(...sub.refusals.map(where));
+      result.ok = false;
+      result.files = {};
+      continue;
+    }
+    for (const [name, text] of Object.entries(sub.files)) {
+      if (result.ok) result.files[name] = text;
+      result.draft[name] = text;
+    }
+  }
+  return result;
+}
+
+/** one class of the repository, converted as a local class of a report of
+ *  its own - its definition and implementation, its header as it was */
+function convertGuiClass(cls, source, opts, seen) {
+  const header = /^\s*CLASS\s+[\w/]+\s+DEFINITION\b[^.]*\./im.exec(source);
+  if (!header) return { refusals: [{ row: 1, col: 1, message: "the class has no CLASS ... DEFINITION the converter can read" }], todos: [], files: {} };
+  // the header a local class can have, on the same lines - the rows stay the class's
+  const local = source.replace(header[0], header[0]
+    .replace(/\bPUBLIC\b/i, "      ").replace(/\bCREATE\s+(PUBLIC|PROTECTED|PRIVATE)\b/i, (m) => " ".repeat(m.length))
+    .replace(/\bSHARED\s+MEMORY\s+ENABLED\b/i, (m) => " ".repeat(m.length)));
+  const PRE = "REPORT zr2c_gui_class.\n";
+  const sub = convertReport(`${PRE}${local}\n\nSTART-OF-SELECTION.\n`, {
+    ...opts, file: "zr2c_gui_class.prog.abap", className: "z2ui5_cl_cgui_r2c_gui_class", programName: "zr2c_gui_class",
+    textpool: undefined, deps: (opts.deps ?? []).filter((d) => lc(d.name.split("/").pop()) !== `${cls.replace(/\//g, "#")}.clas.abap`),
+  });
+  const shift = (r) => ({ ...r, row: Math.max(0, (r.row ?? 0) - 1) });
+  const nested = convertGuiClasses(sub, opts, seen);
+  const out = { refusals: nested.refusals.map(shift), todos: nested.todos.map(shift), release: nested.release, files: {} };
+  if (out.refusals.length) return out;
+  const text = [nested.files["z2ui5_cl_cgui_r2c_gui_class.clas.locals_def.abap"], nested.files["z2ui5_cl_cgui_r2c_gui_class.clas.locals_imp.abap"]].filter(Boolean).join("\n");
+  const esc = cls.replace(/\//g, "\\/");
+  // not CLASS x DEFINITION DEFERRED / LOCAL FRIENDS - the class itself
+  const def = new RegExp(`^CLASS ${esc} DEFINITION(?![^.]*\\b(?:DEFERRED|LOAD|LOCAL\\s+FRIENDS)\\b)[^.]*\\.[\\s\\S]*?^ENDCLASS\\.`, "im").exec(text);
+  const imp = new RegExp(`^CLASS ${esc} IMPLEMENTATION\\.[\\s\\S]*?^ENDCLASS\\.`, "im").exec(text);
+  if (!def || !imp) {
+    out.refusals.push({ row: 1, col: 1, message: "the converted class could not be taken out of the conversion - port it by hand" });
+    return out;
+  }
+  // the absolute name of a class of its own (a static handler): no longer
+  // a local class of the report's class pool
+  const body = `${def[0].replace(/^CLASS\s+[\w/]+\s+DEFINITION\b[^.]*\./i, header[0].trim())}\n\n${imp[0]}\n`
+    .replace(/\\CLASS-POOL=Z2UI5_CL_CGUI_R2C_GUI_CLASS\\CLASS=/gi, "\\CLASS=");
+  if (/\blcl_r2c\b|\bz2ui5_cl_cgui_r2c_gui_class\b/i.test(body)) {
+    out.refusals.push({ row: 1, col: 1, message: "its methods use the report - WRITE, a FORM, a global of the report; in a class of its own they have no report to reach: port those methods by hand" });
+    return out;
+  }
+  const helpers = text.replace(def[0], "").replace(imp[0], "")
+    .replace(/^CLASS lcl_r2c DEFINITION[\s\S]*?^ENDCLASS\.\s*/im, "").replace(/^CLASS lcl_r2c IMPLEMENTATION\.[\s\S]*?^ENDCLASS\.\s*/im, "")
+    // what only the report's class pool needs: the class deferred, the
+    // report class's local friends
+    .replace(/^CLASS\s+[\w/]+\s+DEFINITION\s+(?:DEFERRED|LOAD|LOCAL\s+FRIENDS\b[^.]*)\s*\.\s*$/gim, "")
+    .replace(/^"[^\n]*\n/gm, "").trim();
+  if (helpers && /^CLASS\s/im.test(helpers)) {
+    out.refusals.push({ row: 1, col: 1, message: "the conversion needs local types beside the class - port it by hand" });
+    return out;
+  }
+  out.files[`${cls.replace(/\//g, "#")}.clas.abap`] = normalizeAbap(body);
+  out.files[`${cls.replace(/\//g, "#")}.clas.xml`] = classXml(cls, `${cls} - its SAP GUI controls on the stand-ins of abap-cloud-gui (report2cloud)`);
+  return out;
+}
+
+function convertReport(source, opts = {}) {
   // salv: true - the stand-ins of the SALV at once (the tests), false - never
   if (opts.salv === true) {
     salvMode = true;

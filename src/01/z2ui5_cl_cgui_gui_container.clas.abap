@@ -42,6 +42,8 @@ CLASS z2ui5_cl_cgui_gui_container DEFINITION PUBLIC
     DATA top_left_container     TYPE REF TO z2ui5_cl_cgui_gui_container READ-ONLY.
     DATA bottom_right_container TYPE REF TO z2ui5_cl_cgui_gui_container READ-ONLY.
 
+    "! container_name the preferred parameter - NEW cl_gui_custom_container( 'CC' )
+    "! names the area
     METHODS constructor
       IMPORTING
         parent                  TYPE REF TO z2ui5_cl_cgui_gui_container OPTIONAL
@@ -69,6 +71,7 @@ CLASS z2ui5_cl_cgui_gui_container DEFINITION PUBLIC
         height                  TYPE i     OPTIONAL
         top                     TYPE i     OPTIONAL
         left                    TYPE i     OPTIONAL
+      PREFERRED PARAMETER container_name
       EXCEPTIONS
         cntl_error
         cntl_system_error
