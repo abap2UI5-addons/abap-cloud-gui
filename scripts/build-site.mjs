@@ -1,7 +1,9 @@
 #!/usr/bin/env node
 // The site of the repository (site/) - the page that presents the addon and
 // the report2cloud playground, the converter bundled for the browser - into
-// build/site, which the Pages workflow (.github/workflows/pages.yaml) deploys.
+// build/site, which the Pages workflow (.github/workflows/pages.yaml) deploys
+// with the abap2UI5 playground beside it (npm run site:playground,
+// scripts/build-playground.mjs), where a converted report runs.
 //
 //   npm run site           build/site
 //   npm run site -- --serve   and serve it on http://localhost:8080
@@ -51,10 +53,12 @@ for (const f of readdirSync(CORPUS).filter((x) => x.endsWith(".prog.abap")).sort
   if (!/^\s*(?:report|program)\s/im.test(source)) continue;
   const name = f.replace(/\.prog\.abap$/, "");
   const xml = join(CORPUS, `${name}.prog.xml`);
-  const textpool = existsSync(xml) ? parseTextpool(readFileSync(xml, "utf8")) : undefined;
+  const xmlText = existsSync(xml) ? readFileSync(xml, "utf8").replace(/^\uFEFF/, "") : undefined;
+  const textpool = xmlText ? parseTextpool(xmlText) : undefined;
   const title = /^\*&\s+(?!Report\b)(.+?)\s*$/m.exec(source)?.[1] ?? name;
   const result = convert(source, { file: f, programName: name, textpool });
-  examples.push({ name, title: title.replace(/[-,:]\s*$/, "").slice(0, 70), source, textpool, ok: result.ok });
+  // xml: the .prog.xml itself, for the playground of the site (Run)
+  examples.push({ name, title: title.replace(/[-,:]\s*$/, "").slice(0, 70), source, textpool, xml: xmlText, ok: result.ok });
 }
 // the ones that convert first, one that is refused at the end
 examples.sort((a, b) => Number(b.ok) - Number(a.ok) || a.name.localeCompare(b.name));

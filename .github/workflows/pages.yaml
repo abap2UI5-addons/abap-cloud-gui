@@ -2,8 +2,11 @@ name: pages
 
 # The site of the repository on GitHub Pages: the page that presents the
 # addon and the report2cloud playground - the converter bundled for the
-# browser (npm run site, scripts/build-site.mjs). A pull request builds it,
-# a push to main deploys it. The repository's Pages source must be "GitHub
+# browser (npm run site, scripts/build-site.mjs) - and beside it the abap2UI5
+# playground with report2cloud, where a converted report runs with the
+# runtime of src/ (npm run site:playground, site/playground/README.md). A
+# pull request builds it and runs the playground's report tests, a push to
+# main deploys it. The repository's Pages source must be "GitHub
 # Actions" (Settings > Pages).
 
 on:
@@ -11,16 +14,20 @@ on:
     branches: [main]
     paths:
       - 'site/**'
+      - 'src/**'
       - 'tools/report2cloud/lib/**'
       - 'tools/report2cloud/test/corpus/**'
       - 'scripts/build-site.mjs'
+      - 'scripts/build-playground.mjs'
       - 'package-lock.json'
       - '.github/workflows/pages.yaml'
   pull_request:
     paths:
       - 'site/**'
+      - 'src/**'
       - 'tools/report2cloud/lib/**'
       - 'scripts/build-site.mjs'
+      - 'scripts/build-playground.mjs'
       - 'package-lock.json'
       - '.github/workflows/pages.yaml'
   workflow_dispatch:
@@ -35,7 +42,7 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 40
     steps:
     - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
     - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
@@ -44,6 +51,17 @@ jobs:
         cache: 'npm'
     - run: npm ci
     - run: npm run site
+    # the playground's clone keeps its build/, deps/ and node_modules: its own
+    # stamps then skip the downport and the UI5 build when the pin is the same
+    - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: |
+          build/playground/build
+          build/playground/deps
+          build/playground/node_modules
+        key: playground-${{ hashFiles('scripts/build-playground.mjs') }}-${{ github.sha }}
+        restore-keys: playground-${{ hashFiles('scripts/build-playground.mjs') }}-
+    - run: npm run site:playground -- ${{ github.event_name == 'pull_request' && '--test' || '' }}
     - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
       with:
         path: build/site
