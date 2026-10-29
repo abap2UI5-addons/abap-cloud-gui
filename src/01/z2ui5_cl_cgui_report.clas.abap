@@ -87,6 +87,9 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
     "! that hold them, one variant per user, named by the user
     CONSTANTS cv_cgui_spa_report TYPE string VALUE `%SPA`.
     CONSTANTS cv_cgui_spa_key    TYPE string VALUE `PARAMETERS`.
+    " the customizing parameters - a variant of the store's report %SPA,
+    " beside the user's own
+    CONSTANTS cv_cgui_spa_customizing TYPE string VALUE `%CUSTOMIZING`.
 
     "! the browser's local storage of the input history - the last entries
     "! of every field, the key is the name of the report class
@@ -1020,12 +1023,29 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
         id    TYPE clike
         value TYPE any.
 
-    "! GET PARAMETER ID - from the browser's local storage
+    "! GET PARAMETER ID - the user's parameter (SU3), else the customizing
+    "! parameter of the installation (SPRO), else its system parameter
+    "! (set_system_parameters( ))
     METHODS get_parameter_id
       IMPORTING
         id            TYPE clike
       RETURNING
         VALUE(result) TYPE string.
+
+    "! the system parameters of the installation - what GET PARAMETER ID
+    "! answers for an ID that neither the user nor the customizing sets.
+    "! Given in code, the same for every user: set them in initialization( )
+    "! (or in a common superclass of the installation's reports)
+    METHODS set_system_parameters
+      IMPORTING
+        values TYPE z2ui5_if_client=>ty_t_name_value.
+
+    "! may the user maintain the customizing parameters - SPRO in the
+    "! command field. abap_false unless redefined: redefine it with the
+    "! AUTHORITY-CHECK the installation asks for its customizing
+    METHODS authority_check_customizing
+      RETURNING
+        VALUE(result) TYPE abap_bool.
 
     "! REPORT ... LINE-COUNT n - the list breaks into pages of n lines
     METHODS set_line_count
@@ -1096,6 +1116,10 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
     DATA mv_cgui_prefill TYPE abap_bool.
     DATA mo_cgui_job     TYPE REF TO z2ui5_if_cgui_job.
     DATA mo_cgui_catalog TYPE REF TO z2ui5_if_cgui_catalog.
+    " the customizing parameters (spa_load( ), SPRO) and the system ones
+    " (set_system_parameters( )) - ID=value lines and a table
+    DATA mv_cgui_spa_cust   TYPE string.
+    DATA mt_cgui_spa_system TYPE z2ui5_if_client=>ty_t_name_value.
     DATA mo_cgui_app_log TYPE REF TO z2ui5_if_cgui_log.
     DATA mo_cgui_tree_handler TYPE REF TO z2ui5_if_cgui_tree_handler.
     DATA mv_cgui_fresh_off TYPE abap_bool.
@@ -1316,6 +1340,7 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
         file           TYPE string VALUE `FILE`,
         palette        TYPE string VALUE `PALETTE`,
         su3            TYPE string VALUE `SU3`,
+        spro           TYPE string VALUE `SPRO`,
         transport      TYPE string VALUE `TRANSPORT`,
       END OF cs_pending.
 
@@ -1442,6 +1467,18 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
     "! SU3 in the command field: the user's parameters in a popup to change
     METHODS su3_open.
     METHODS su3_result.
+
+    "! SPRO in the command field: the customizing parameters in a popup to
+    "! change - with authority_check_customizing( ) and a server store only
+    METHODS spro_open.
+    METHODS spro_result.
+
+    "! the parameters of a store variant as lines ID=value
+    METHODS spa_lines
+      IMPORTING
+        values        TYPE z2ui5_cl_cgui_variant=>ty_t_value
+      RETURNING
+        VALUE(result) TYPE string.
 
     TYPES:
       BEGIN OF ty_s_cgui_history,
@@ -3726,6 +3763,8 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
 
       WHEN cs_pending-su3.
         su3_result( ).
+      WHEN cs_pending-spro.
+        spro_result( ).
 
       WHEN cs_pending-transport.
         TRY.
@@ -4356,17 +4395,17 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
 
   METHOD spa_load.
 
-    DATA lt_line TYPE string_table.
-
     DATA(lt_variant) = mo_cgui_store->load( cv_cgui_spa_report ).
+    " the customizing of the installation, for every user
+    READ TABLE lt_variant INTO DATA(ls_cust) WITH KEY name = cv_cgui_spa_customizing.
+    IF sy-subrc = 0.
+      mv_cgui_spa_cust = spa_lines( ls_cust-values ).
+    ENDIF.
     READ TABLE lt_variant INTO DATA(ls_variant) WITH KEY name = to_upper( sy-uname ).
     IF sy-subrc <> 0.
       RETURN.
     ENDIF.
-    LOOP AT ls_variant-values INTO DATA(ls_value).
-      INSERT |{ to_upper( ls_value-name ) }={ ls_value-low }| INTO TABLE lt_line.
-    ENDLOOP.
-    mv_cgui_spa = concat_lines_of( table = lt_line sep = cl_abap_char_utilities=>newline ).
+    mv_cgui_spa = spa_lines( ls_variant-values ).
 
   ENDMETHOD.
 
@@ -4433,12 +4472,137 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
 
   METHOD get_parameter_id.
 
+    DATA lt_line TYPE string_table.
+    DATA lv_id   TYPE string.
+    DATA lv_val  TYPE string.
+
     DATA(lv_name) = to_upper( id ).
     DATA(lt_spa) = spa_get( ).
     READ TABLE lt_spa INTO DATA(ls_spa) WITH KEY n = lv_name.
     IF sy-subrc = 0.
       result = ls_spa-v.
+      RETURN.
     ENDIF.
+
+    " the customizing of the installation
+    SPLIT mv_cgui_spa_cust AT cl_abap_char_utilities=>newline INTO TABLE lt_line.
+    LOOP AT lt_line INTO DATA(lv_line) WHERE table_line IS NOT INITIAL.
+      SPLIT lv_line AT `=` INTO lv_id lv_val.
+      IF to_upper( lv_id ) = lv_name.
+        result = lv_val.
+        RETURN.
+      ENDIF.
+    ENDLOOP.
+
+    " the system parameters given in code
+    READ TABLE mt_cgui_spa_system INTO DATA(ls_system) WITH KEY n = lv_name.
+    IF sy-subrc = 0.
+      result = ls_system-v.
+    ENDIF.
+
+  ENDMETHOD.
+
+  METHOD set_system_parameters.
+
+    CLEAR mt_cgui_spa_system.
+    LOOP AT values INTO DATA(ls_value).
+      INSERT VALUE #( n = to_upper( ls_value-n )
+                      v = ls_value-v ) INTO TABLE mt_cgui_spa_system.
+    ENDLOOP.
+
+  ENDMETHOD.
+
+  METHOD authority_check_customizing.
+
+    result = abap_false.
+
+  ENDMETHOD.
+
+  METHOD spa_lines.
+
+    DATA lt_line TYPE string_table.
+
+    LOOP AT values INTO DATA(ls_value).
+      INSERT |{ to_upper( ls_value-name ) }={ ls_value-low }| INTO TABLE lt_line.
+    ENDLOOP.
+    result = concat_lines_of( table = lt_line sep = cl_abap_char_utilities=>newline ).
+
+  ENDMETHOD.
+
+  METHOD spro_open.
+
+    DATA lt_field TYPE z2ui5_cl_cgui_popup=>ty_t_field.
+    DATA lt_line  TYPE string_table.
+    DATA lv_id    TYPE string.
+    DATA lv_val   TYPE string.
+
+    IF authority_check_customizing( ) = abap_false.
+      message( text = 'You are not authorized to maintain the customizing'(063)
+               type = `E` ).
+      RETURN.
+    ENDIF.
+    " customizing is the installation's, not a browser's
+    IF mo_cgui_store IS NOT BOUND.
+      message( text = 'The customizing parameters need the variant table on the server'(064)
+               type = `E` ).
+      RETURN.
+    ENDIF.
+
+    SPLIT mv_cgui_spa_cust AT cl_abap_char_utilities=>newline INTO TABLE lt_line.
+    LOOP AT lt_line INTO DATA(lv_line) WHERE table_line IS NOT INITIAL.
+      SPLIT lv_line AT `=` INTO lv_id lv_val.
+      INSERT VALUE #( name = to_upper( lv_id ) text = to_upper( lv_id ) value = lv_val ) INTO TABLE lt_field.
+    ENDLOOP.
+    INSERT VALUE #( name = `%NEW_ID`    text = 'New parameter ID'(056) ) INTO TABLE lt_field.
+    INSERT VALUE #( name = `%NEW_VALUE` text = 'Value'(057) ) INTO TABLE lt_field.
+
+    mv_cgui_pending_kind = cs_pending-spro.
+    mv_cgui_nav = abap_true.
+    client->nav_app_call( z2ui5_cl_cgui_popup=>get_values(
+        fields = lt_field
+        title  = 'Customizing parameters'(065)
+        text   = 'For every user without a parameter of their own; an empty value deletes it'(066) ) ).
+
+  ENDMETHOD.
+
+  METHOD spro_result.
+
+    DATA lt_value TYPE z2ui5_cl_cgui_variant=>ty_t_value.
+    DATA lo_popup TYPE REF TO z2ui5_cl_cgui_popup.
+
+    TRY.
+        lo_popup ?= client->get_app_prev( ).
+      CATCH cx_root.
+        RETURN.
+    ENDTRY.
+    DATA(ls_result) = lo_popup->result( ).
+    IF ls_result-confirmed = abap_false OR authority_check_customizing( ) = abap_false OR mo_cgui_store IS NOT BOUND.
+      RETURN.
+    ENDIF.
+
+    LOOP AT ls_result-fields INTO DATA(ls_field) WHERE value IS NOT INITIAL AND name(1) <> `%`.
+      INSERT VALUE #( name = to_upper( ls_field-name ) kind = `P` low = ls_field-value ) INTO TABLE lt_value.
+    ENDLOOP.
+    DATA(lv_new) = to_upper( condense( lo_popup->result_value( `%NEW_ID` ) ) ).
+    DATA(lv_value) = lo_popup->result_value( `%NEW_VALUE` ).
+    IF lv_new IS NOT INITIAL AND lv_value IS NOT INITIAL.
+      DELETE lt_value WHERE name = lv_new.
+      INSERT VALUE #( name = lv_new kind = `P` low = lv_value ) INTO TABLE lt_value.
+    ENDIF.
+
+    TRY.
+        mo_cgui_store->save( report  = cv_cgui_spa_report
+                             variant = VALUE #( name   = cv_cgui_spa_customizing
+                                                text   = 'Customizing parameters'(065)
+                                                values = lt_value ) ).
+      CATCH z2ui5_cx_cgui_error INTO DATA(lx_error).
+        message( text = lx_error->get_text( )
+                 type = `E` ).
+        RETURN.
+    ENDTRY.
+    mv_cgui_spa_cust = spa_lines( lt_value ).
+    message( text = 'Customizing parameters saved'(067)
+             type = `S` ).
 
   ENDMETHOD.
 
@@ -4547,6 +4711,10 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
             su3_open( ).
             RETURN.
           ENDIF.
+          IF lv_target = `SPRO`.
+            spro_open( ).
+            RETURN.
+          ENDIF.
           okcode_start( code       = lv_target
                         new_window = abap_false ).
         WHEN `O`.
@@ -4586,6 +4754,8 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
         ENDIF.
       WHEN `SU3`.
         su3_open( ).
+      WHEN `SPRO`.
+        spro_open( ).
       WHEN OTHERS.
         user_command( lv_upper ).
     ENDCASE.

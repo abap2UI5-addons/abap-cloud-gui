@@ -361,6 +361,36 @@
      <ENTRY>Show</ENTRY>
      <LENGTH>10</LENGTH>
     </item>
+    <item>
+     <ID>I</ID>
+     <KEY>063</KEY>
+     <ENTRY>You are not authorized to maintain the customizing</ENTRY>
+     <LENGTH>75</LENGTH>
+    </item>
+    <item>
+     <ID>I</ID>
+     <KEY>064</KEY>
+     <ENTRY>The customizing parameters need the variant table on the server</ENTRY>
+     <LENGTH>94</LENGTH>
+    </item>
+    <item>
+     <ID>I</ID>
+     <KEY>065</KEY>
+     <ENTRY>Customizing parameters</ENTRY>
+     <LENGTH>33</LENGTH>
+    </item>
+    <item>
+     <ID>I</ID>
+     <KEY>066</KEY>
+     <ENTRY>For every user without a parameter of their own; an empty value deletes it</ENTRY>
+     <LENGTH>111</LENGTH>
+    </item>
+    <item>
+     <ID>I</ID>
+     <KEY>067</KEY>
+     <ENTRY>Customizing parameters saved</ENTRY>
+     <LENGTH>42</LENGTH>
+    </item>
    </TPOOL>
   </asx:values>
  </asx:abap>

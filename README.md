@@ -339,6 +339,26 @@ every device. `SU3` in the command field opens them in a popup to change, add
 or delete (an empty value deletes the parameter). Without a server store
 they stay in the browser's local storage.
 
+`GET PARAMETER ID` looks in three places, the first one that has the ID
+answers: the user's own parameter, then the **customizing parameter** of the
+installation, then its **system parameter**. Customizing parameters are kept
+in the same store, one entry for every user (`%CUSTOMIZING`); `SPRO` in the
+command field maintains them - for a user `authority_check_customizing( )`
+lets through, which refuses everyone unless the installation redefines it
+with its AUTHORITY-CHECK. System parameters are given in code, the same for
+everyone and nowhere stored:
+
+```abap
+METHOD initialization.
+  set_system_parameters( VALUE #( ( n = `BUK` v = `1000` ) ( n = `WRK` v = `1010` ) ) ).
+ENDMETHOD.
+
+METHOD authority_check_customizing.
+  AUTHORITY-CHECK OBJECT 'S_TABU_DIS' ID 'ACTVT' FIELD '02' ID 'DICBERCLS' FIELD 'ZCGU'.
+  result = xsdbool( sy-subrc = 0 ).
+ENDMETHOD.
+```
+
 ### ALV layouts
 
 The layout button of every ALV opens the classic "Change Layout": the
@@ -655,7 +675,10 @@ Navigation and transactions
 - [ ] Transaction logic: create a draft
 - [x] `SET` / `GET PARAMETER ID` with user parameters on the server, `SU3` in
       the command field to maintain them
-- [ ] System parameters and customizing parameters beside the user parameters
+- [x] System parameters and customizing parameters beside the user
+      parameters: `GET PARAMETER ID` reads the user's, then the customizing
+      ones (`SPRO` in the command field, `authority_check_customizing( )`),
+      then the system ones (`set_system_parameters( )`)
 
 Stage 3 - clean core at the scale of a code base
 

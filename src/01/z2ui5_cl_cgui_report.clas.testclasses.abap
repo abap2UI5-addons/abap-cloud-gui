@@ -115,6 +115,8 @@ CLASS ltcl_report DEFINITION INHERITING FROM z2ui5_cl_cgui_report FINAL.
     DATA mv_exit     TYPE string.
     DATA mv_exit_err TYPE abap_bool.
     DATA mv_then     TYPE string.
+    " SPRO: may the user maintain the customizing parameters
+    DATA mv_customizing TYPE abap_bool.
 
     "! the callback of a popup with then = `ON_SURE`
     METHODS on_sure
@@ -140,6 +142,7 @@ CLASS ltcl_report DEFINITION INHERITING FROM z2ui5_cl_cgui_report FINAL.
     METHODS dynpro_pbo REDEFINITION.
     METHODS dynpro_pai REDEFINITION.
     METHODS after_call_screen REDEFINITION.
+    METHODS authority_check_customizing REDEFINITION.
 
 ENDCLASS.
 
@@ -247,6 +250,7 @@ CLASS ltcl_test DEFINITION FINAL FOR TESTING
     METHODS execute_in_background FOR TESTING.
     METHODS command_field FOR TESTING.
     METHODS user_parameters FOR TESTING.
+    METHODS parameter_levels FOR TESTING.
     METHODS application_log FOR TESTING.
     METHODS alv_chart FOR TESTING.
     METHODS transport_popup FOR TESTING.
@@ -557,6 +561,12 @@ CLASS ltcl_report IMPLEMENTATION.
   METHOD initialization.
 
     mv_inits = mv_inits + 1.
+
+  ENDMETHOD.
+
+  METHOD authority_check_customizing.
+
+    result = mv_customizing.
 
   ENDMETHOD.
 
@@ -1669,6 +1679,61 @@ CLASS ltcl_test IMPLEMENTATION.
     lo_next->spa_load( ).
     cl_abap_unit_assert=>assert_equals( act = lo_next->get_parameter_id( `ZCGUI_ADD` )
                                         exp = `0017` ).
+
+  ENDMETHOD.
+
+  METHOD parameter_levels.
+
+    " GET PARAMETER ID: the user's parameter, else the customizing one, else
+    " the system parameter given in code
+    init( ).
+    mo_cut->set_system_parameters( VALUE #( ( n = `zcgui_lvl` v = `SYS` )
+                                            ( n = `ZCGUI_SYS` v = `S1` ) ) ).
+    cl_abap_unit_assert=>assert_equals( act = mo_cut->get_parameter_id( `ZCGUI_LVL` )
+                                        exp = `SYS` ).
+
+    " SPRO without the authorization: refused, nothing opens
+    mo_cut->okcode_execute( `/nSPRO` ).
+    cl_abap_unit_assert=>assert_not_bound( mo_client->mo_called ).
+
+    " with it: the customizing parameters in a popup, one added
+    mo_report->mv_customizing = abap_true.
+    mo_cut->okcode_execute( `SPRO` ).
+    DATA(lo_popup) = CAST z2ui5_cl_cgui_popup( mo_client->mo_called ).
+    lo_popup->mt_field[ name = `%NEW_ID` ]-value = `zcgui_lvl`.
+    lo_popup->mt_field[ name = `%NEW_VALUE` ]-value = `CUST`.
+    mo_client->mv_event = `CGUI_POP_OK`.
+    lo_popup->z2ui5_if_app~main( mo_client ).
+    CLEAR: mo_client->mo_called, mo_client->mv_event.
+    mo_client->mo_prev = lo_popup.
+    mo_client->mv_navigated = abap_true.
+    mo_cut->z2ui5_if_app~main( mo_client ).
+    mo_client->mv_navigated = abap_false.
+    cl_abap_unit_assert=>assert_equals( act = mo_cut->get_parameter_id( `ZCGUI_LVL` )
+                                        exp = `CUST` ).
+    " the system parameter where the customizing has none
+    cl_abap_unit_assert=>assert_equals( act = mo_cut->get_parameter_id( `ZCGUI_SYS` )
+                                        exp = `S1` ).
+
+    " the user's own wins
+    mo_cut->set_parameter_id( id    = `ZCGUI_LVL`
+                              value = `USER` ).
+    cl_abap_unit_assert=>assert_equals( act = mo_cut->get_parameter_id( `ZCGUI_LVL` )
+                                        exp = `USER` ).
+
+    " the customizing is on the server - the next report reads it, for a
+    " user without a parameter of their own
+    DATA(lo_next) = NEW ltcl_report( ).
+    DATA(lo_next_client) = NEW ltcl_client( ).
+    lo_next_client->mo_app = lo_next.
+    lo_next_client->mv_init = abap_true.
+    lo_next->set_layout_store( NEW ltcl_layout_store( ) ).
+    lo_next->z2ui5_if_app~main( lo_next_client ).
+    cl_abap_unit_assert=>assert_equals( act = lo_next->get_parameter_id( `ZCGUI_LVL` )
+                                        exp = `USER` ).
+    lo_next->mv_cgui_spa = ``.
+    cl_abap_unit_assert=>assert_equals( act = lo_next->get_parameter_id( `ZCGUI_LVL` )
+                                        exp = `CUST` ).
 
   ENDMETHOD.
 
