@@ -31,6 +31,24 @@ The class uses no database table, DDIC type, function module, class or message c
 | 40 | `LEAVE TO SCREEN 0` | `leave_to_screen( dynnr )` and `RETURN` - the modules after it do not run; screen 0 goes back to where CALL SCREEN stood |
 | 44 | `MODULE check_0110 INPUT` | private method `check_0110( )` - the module, called by dynpro_pai( ) as the flow logic of the screen did |
 
+## Launchpad tile
+
+The class runs as a tile of the Fiori launchpad with this target mapping (the frontend app `z2ui5` of abap2UI5):
+
+| | |
+|---|---|
+| Semantic object | `Z2UI5_CL_CGUI_R2C_51` |
+| Action | `display` |
+| URL | `/sap/bc/ui5_ui5/sap/z2ui5` |
+| ID | `z2ui5` |
+| Parameter | `app_start` = `Z2UI5_CL_CGUI_R2C_51` |
+
+Each field of its selection screen is a startup parameter of the same name (`P_CARRID=LH`, a select-option `S_DATE=20260101,20260131`), and so is `variant`. So that `CALL TRANSACTION` of another report navigates to the tile inside the launchpad, give the transaction its intent in the catalog of the installation (`set_catalog( )`):
+
+```abap
+( code = `ZR2C_51_TABSTRIP` report = `Z2UI5_CL_CGUI_R2C_51` text = `ZR2C_51_TABSTRIP` semantic_object = `Z2UI5_CL_CGUI_R2C_51` action = `display` )
+```
+
 ## Next steps
 
 1. Work through the TODOs above; replace every object of the release table by its released successor.

@@ -177,7 +177,9 @@ ENDCLASS.
 CLASS ltcl_catalog IMPLEMENTATION.
   METHOD z2ui5_if_cgui_catalog~get.
     result = VALUE #( ( code = `ZFLY`  report = `z2ui5_cl_cgui_sample_04` text = `Flights` variant = `MINE` )
-                      ( code = `ZGONE` report = `ZCL_NOT_THERE`           text = `Gone` ) ).
+                      ( code = `ZGONE` report = `ZCL_NOT_THERE`           text = `Gone` )
+                      ( code = `ZAIR`  report = `LTCL_REPORT`             text = `Airline`
+                        semantic_object = `Airline` action = `display` ) ).
   ENDMETHOD.
 ENDCLASS.
 
@@ -267,6 +269,7 @@ CLASS ltcl_test DEFINITION FINAL FOR TESTING
     METHODS popup_then FOR TESTING.
     METHODS popup_decide_list FOR TESTING.
     METHODS call_transaction FOR TESTING.
+    METHODS call_intent FOR TESTING.
     METHODS read_list_clicked FOR TESTING.
     METHODS roundtrip_start FOR TESTING.
     METHODS fresh_start FOR TESTING.
@@ -1579,6 +1582,44 @@ CLASS ltcl_test IMPLEMENTATION.
     mo_cut->call_transaction( `ZGONE` ).
     cl_abap_unit_assert=>assert_not_bound( mo_client->mo_called ).
     cl_abap_unit_assert=>assert_true( mo_cut->mv_cgui_stop ).
+
+  ENDMETHOD.
+
+  METHOD call_intent.
+
+    init( ).
+    mo_cut->set_catalog( NEW ltcl_catalog( ) ).
+    DATA(lt_value) = VALUE z2ui5_cl_cgui_variant=>ty_t_value(
+        ( name = `P_CARRID` kind = z2ui5_cl_cgui_variant=>cs_kind-parameter low = `LH` )
+        ( name = `S_CODE` kind = z2ui5_cl_cgui_variant=>cs_kind-select_option sign = `I` option = `BT` low = `A` high = `B` ) ).
+
+    " outside the launchpad: the transaction of the catalog with the intent
+    mo_cut->call_intent( semantic_object = `airline`
+                         values          = lt_value ).
+    DATA(lo_called) = CAST ltcl_report( mo_client->mo_called ).
+    DATA(lt_submit) = lo_called->mt_cgui_submit.
+    cl_abap_unit_assert=>assert_equals( act = lt_submit[ 1 ]-low
+                                        exp = `LH` ).
+
+    " inside: the cross-app navigation of the shell, the single values as
+    " the startup parameters - CALL TRANSACTION of the tile alike
+    CLEAR: mo_client->mo_called, mo_client->mt_action.
+    mo_client->ms_get-check_launchpad_active = abap_true.
+    mo_cut->call_intent( semantic_object = `Airline`
+                         values          = lt_value ).
+    cl_abap_unit_assert=>assert_not_bound( mo_client->mo_called ).
+    cl_abap_unit_assert=>assert_equals( act = mo_client->mt_action[ 1 ]
+                                        exp = `CROSS_APP_NAV_TO_EXT:{"semanticObject":"Airline","action":"display"}|{"P_CARRID":"LH"}` ).
+    CLEAR mo_client->mt_action.
+    mo_cut->call_transaction( `ZAIR` ).
+    cl_abap_unit_assert=>assert_not_bound( mo_client->mo_called ).
+    cl_abap_unit_assert=>assert_char_cp( act = mo_client->mt_action[ 1 ]
+                                         exp = `CROSS_APP_NAV_TO_EXT:*Airline*` ).
+
+    " the shell shows the title of the report
+    mo_cut->set_title( `Flights` ).
+    mo_cut->view_display( ).
+    cl_abap_unit_assert=>assert_true( xsdbool( line_exists( mo_client->mt_action[ table_line = `SET_TITLE_LAUNCHPAD:Flights` ] ) ) ).
 
   ENDMETHOD.
 

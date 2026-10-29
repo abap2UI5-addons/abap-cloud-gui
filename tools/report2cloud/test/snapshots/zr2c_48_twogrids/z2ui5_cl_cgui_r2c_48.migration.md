@@ -40,6 +40,24 @@ Layout, formatting and behaviour of the classic report that the list, the ALV or
 | 71 | `MODULE user_command_0100 INPUT` | private method `user_command_0100( )` - the module, called by dynpro_pai( ) as the flow logic of the screen did |
 | 74 | `LEAVE TO SCREEN 0` | `leave_to_screen( dynnr )` and `RETURN` - the modules after it do not run; screen 0 goes back to where CALL SCREEN stood |
 
+## Launchpad tile
+
+The class runs as a tile of the Fiori launchpad with this target mapping (the frontend app `z2ui5` of abap2UI5):
+
+| | |
+|---|---|
+| Semantic object | `Z2UI5_CL_CGUI_R2C_48` |
+| Action | `display` |
+| URL | `/sap/bc/ui5_ui5/sap/z2ui5` |
+| ID | `z2ui5` |
+| Parameter | `app_start` = `Z2UI5_CL_CGUI_R2C_48` |
+
+Each field of its selection screen is a startup parameter of the same name (`P_CARRID=LH`, a select-option `S_DATE=20260101,20260131`), and so is `variant`. So that `CALL TRANSACTION` of another report navigates to the tile inside the launchpad, give the transaction its intent in the catalog of the installation (`set_catalog( )`):
+
+```abap
+( code = `ZR2C_48_TWOGRIDS` report = `Z2UI5_CL_CGUI_R2C_48` text = `ZR2C_48_TWOGRIDS` semantic_object = `Z2UI5_CL_CGUI_R2C_48` action = `display` )
+```
+
 ## Next steps
 
 1. Work through the TODOs above; replace every object of the release table by its released successor.

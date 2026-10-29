@@ -237,6 +237,28 @@ The code starts the same way: `call_transaction( code = 'ZFLIGHTS' )` is
 `CALL TRANSACTION`, `skip_first = abap_true` its `AND SKIP FIRST SCREEN` -
 the report class of the catalog with its variant, Back returns here.
 
+### In the Fiori launchpad
+
+A report class is a tile of the launchpad like any abap2UI5 app - the
+migration report of report2cloud lists its target mapping (semantic object
+the class, action `display`, parameter `app_start`). Inside the launchpad
+the shell shows the title of the report, and the startup parameters of the
+tile fill the selection screen as the URL does (`P_CARRID=LH`, `variant`).
+A transaction of the catalog with an intent navigates through the shell -
+its history and Back keep working - instead of starting the class;
+`call_intent( )` goes to any intent, the values as startup parameters:
+
+```abap
+( code = `ZFLIGHTS` report = `ZCL_FLIGHTS` text = `Flights`
+  semantic_object = `Flight` action = `display` )   " a line of the catalog
+
+call_intent( semantic_object = `Airline`
+             values          = VALUE #( ( name = `CARRID` kind = `P` low = p_carrid ) ) ).
+```
+
+Outside the launchpad `call_intent( )` starts the transaction of the catalog
+with that intent.
+
 ### The last entries
 
 Every field remembers what was run with it: the last ten values - of a
@@ -701,7 +723,10 @@ Dialogs and screens
 
 Navigation and transactions
 
-- [ ] Launchpad tiles and intent navigation for a converted class
+- [x] Launchpad tiles and intent navigation for a converted class: the
+      target mapping in the migration report, the startup parameters on the
+      selection screen, the title in the shell, the intent of a transaction
+      of the catalog and `call_intent( )`
 - [x] Command field instead of a plain input: transaction codes, `/n`, `/o`
       (`set_command_field( )`, `set_catalog( )`)
 - [x] Command palette (`Cmd+K` / `Ctrl+K`) to search and start reports

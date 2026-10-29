@@ -1031,11 +1031,24 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
     "! variant, else code is taken as the class; Back returns here.
     "! skip_first runs it straight away with the values - SET PARAMETER ID
     "! fills the fields with a MEMORY ID as before
+    "! Inside the Fiori launchpad a transaction of the catalog with an intent
+    "! (semantic_object, action) navigates there, the values as its startup
+    "! parameters - the shell's history and Back keep working
     METHODS call_transaction
       IMPORTING
         code       TYPE clike
         skip_first TYPE abap_bool DEFAULT abap_false
         values     TYPE z2ui5_cl_cgui_variant=>ty_t_value OPTIONAL.
+
+    "! the intent semantic_object-action of the Fiori launchpad, the values
+    "! as its startup parameters (each parameter, the first single value of
+    "! each select-option); outside the launchpad the transaction of the
+    "! catalog with this intent starts
+    METHODS call_intent
+      IMPORTING
+        semantic_object TYPE clike
+        action          TYPE clike DEFAULT `display`
+        values          TYPE z2ui5_cl_cgui_variant=>ty_t_value OPTIONAL.
 
     "! SET PARAMETER ID - kept in the browser's local storage for every
     "! report (there is no SAP memory on ABAP Cloud)
@@ -1124,6 +1137,8 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
     " apart from the attributes of the report that inherits
     DATA mv_cgui_screen        TYPE string.
     DATA mv_cgui_title         TYPE string.
+    " the title the launchpad shell shows - set again when it changed
+    DATA mv_cgui_title_shell   TYPE string.
     DATA mo_cgui_list          TYPE REF TO z2ui5_cl_cgui_list.
     DATA mo_cgui_alv           TYPE REF TO z2ui5_cl_cgui_alv.
     DATA mo_cgui_tree          TYPE REF TO z2ui5_cl_cgui_tree.
@@ -1421,6 +1436,18 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
         screen TYPE REF TO z2ui5_cl_cgui_selscreen.
 
     "! the name of the user's draft - a variant of the report
+    METHODS intent_navigate
+      IMPORTING
+        semantic_object TYPE clike
+        action          TYPE clike
+        values          TYPE z2ui5_cl_cgui_variant=>ty_t_value.
+
+    METHODS json_escape
+      IMPORTING
+        val           TYPE clike
+      RETURNING
+        VALUE(result) TYPE string.
+
     METHODS draft_name
       RETURNING
         VALUE(result) TYPE string.
@@ -7334,6 +7361,13 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
         IF to_upper( ls_tcode-code ) = lv_code.
           lv_report = to_upper( ls_tcode-report ).
           lv_variant = ls_tcode-variant.
+          " the tile of the launchpad - its intent instead of the class
+          IF ls_tcode-semantic_object IS NOT INITIAL AND client->get( )-check_launchpad_active = abap_true.
+            intent_navigate( semantic_object = ls_tcode-semantic_object
+                             action          = ls_tcode-action
+                             values          = values ).
+            RETURN.
+          ENDIF.
           EXIT.
         ENDIF.
       ENDLOOP.
@@ -7358,6 +7392,70 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
 
     mv_cgui_nav = abap_true.
     client->nav_app_call( lo_app ).
+
+  ENDMETHOD.
+
+  METHOD call_intent.
+
+    IF client->get( )-check_launchpad_active = abap_true.
+      intent_navigate( semantic_object = semantic_object
+                       action          = action
+                       values          = values ).
+      RETURN.
+    ENDIF.
+
+    " outside the launchpad: the transaction of the catalog with the intent
+    IF mo_cgui_catalog IS BOUND.
+      LOOP AT mo_cgui_catalog->get( ) INTO DATA(ls_tcode)
+          WHERE semantic_object IS NOT INITIAL.
+        IF to_upper( ls_tcode-semantic_object ) = to_upper( semantic_object )
+            AND to_upper( COND string( WHEN ls_tcode-action IS INITIAL THEN `display` ELSE ls_tcode-action ) )
+              = to_upper( action ).
+          call_transaction( code   = ls_tcode-code
+                            values = values ).
+          RETURN.
+        ENDIF.
+      ENDLOOP.
+    ENDIF.
+    message( text = replace( val  = 'Intent &1 needs the Fiori launchpad'(072)
+                             sub  = `&1`
+                             with = |{ semantic_object }-{ action }| )
+             type = `E` ).
+
+  ENDMETHOD.
+
+  METHOD intent_navigate.
+
+    DATA lt_name TYPE string_table.
+
+    DATA(lv_params) = ``.
+    LOOP AT values INTO DATA(ls_value).
+      IF line_exists( lt_name[ table_line = ls_value-name ] ).
+        CONTINUE.
+      ENDIF.
+      IF ls_value-kind <> z2ui5_cl_cgui_variant=>cs_kind-parameter
+          AND NOT ( ( ls_value-sign = `I` OR ls_value-sign IS INITIAL )
+                    AND ( ls_value-option = `EQ` OR ls_value-option IS INITIAL ) ).
+        CONTINUE.
+      ENDIF.
+      INSERT ls_value-name INTO TABLE lt_name.
+      lv_params = |{ lv_params }{ COND #( WHEN lv_params IS NOT INITIAL THEN `,` ) }| &&
+                  |"{ json_escape( ls_value-name ) }":"{ json_escape( ls_value-low ) }"|.
+    ENDLOOP.
+
+    mv_cgui_nav = abap_true.
+    client->follow_up_action(
+        val   = client->cs_event-cross_app_nav_to_ext
+        t_arg = VALUE #( ( |\{"semanticObject":"{ json_escape( semantic_object ) }",| &&
+                           |"action":"{ json_escape( COND string( WHEN action IS INITIAL THEN `display` ELSE action ) ) }"\}| )
+                         ( |\{{ lv_params }\}| ) ) ).
+
+  ENDMETHOD.
+
+  METHOD json_escape.
+
+    result = replace( val = val sub = `\` with = `\\` occ = 0 ).
+    result = replace( val = result sub = `"` with = `\"` occ = 0 ).
 
   ENDMETHOD.
 
@@ -8139,6 +8237,13 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
 
     client->view_display( view->stringify( ) ).
     shortcuts_register( ).
+
+    " inside the Fiori launchpad the shell shows the title of the report
+    IF client->get( )-check_launchpad_active = abap_true AND mv_cgui_title <> mv_cgui_title_shell.
+      mv_cgui_title_shell = mv_cgui_title.
+      client->follow_up_action( val   = client->cs_event-set_title_launchpad
+                                t_arg = VALUE #( ( mv_cgui_title ) ) ).
+    ENDIF.
 
     " SET CURSOR FIELD
     IF mv_cgui_screen = cs_screen-selection AND mv_cgui_cursor_field IS NOT INITIAL.

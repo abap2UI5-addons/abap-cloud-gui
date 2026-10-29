@@ -415,6 +415,12 @@
      <ENTRY>Discard Draft</ENTRY>
      <LENGTH>26</LENGTH>
     </item>
+    <item>
+     <ID>I</ID>
+     <KEY>072</KEY>
+     <ENTRY>Intent &amp;1 needs the Fiori launchpad</ENTRY>
+     <LENGTH>70</LENGTH>
+    </item>
    </TPOOL>
   </asx:values>
  </asx:abap>
