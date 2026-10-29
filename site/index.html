@@ -14,6 +14,7 @@
       <nav>
         <a href="#why">Why</a>
         <a href="#how">How</a>
+        <a href="#samples">Samples</a>
         <a href="#playground">Playground</a>
         <a href="https://github.com/abap2UI5-addons/abap-cloud-gui">GitHub</a>
         <a href="https://abap2ui5.github.io/docs/">abap2UI5</a>
@@ -30,7 +31,8 @@
         an app in the browser. The reports you have already convert with <strong>report2cloud</strong> -
         try it below, nothing leaves your browser.</p>
       <p class="actions">
-        <a class="button primary" href="#playground">Try the converter</a>
+        <a class="button primary" href="#samples">See the samples</a>
+        <a class="button" href="#playground">Convert your own report</a>
         <a class="button" href="https://github.com/abap2UI5-addons/abap-cloud-gui#installation">Install with abapGit</a>
       </p>
     </section>
@@ -57,7 +59,7 @@
 
     <section id="how" class="wrap">
       <h2>A report as a class</h2>
-      <pre class="code"><code>CLASS zcl_hello DEFINITION PUBLIC INHERITING FROM z2ui5_cl_cgui_report FINAL CREATE PUBLIC.
+      <pre class="code"><code class="abap">CLASS zcl_hello DEFINITION PUBLIC INHERITING FROM z2ui5_cl_cgui_report FINAL CREATE PUBLIC.
   PUBLIC SECTION.
     DATA p_name  TYPE string.
     DATA p_times TYPE i.
@@ -83,35 +85,81 @@ ENDCLASS.</code></pre>
         <strong>Execute</strong> runs the report and shows the list, <strong>Back</strong> returns.</p>
     </section>
 
-    <section id="playground" class="wide">
-      <h2>report2cloud playground</h2>
-      <p class="muted">Paste a classic report of your own, or pick an example. It is converted as you type, and
-        <strong>Run</strong> starts the class it becomes - all three side by side, here in the page: the converter
-        and the abap2UI5 runtime run in your browser, nothing is sent anywhere. Includes and the repository's DDIC
-        are not there; the flight tables SCARR, SPFLI and SFLIGHT are, with rows to list.</p>
+    <section id="samples" class="wide">
+      <h2>Samples - a classic report, the class it becomes, the app</h2>
+      <p class="muted">Each sample is a classic report of the converter's corpus. report2cloud converts it here
+        in the page, and the class it writes starts as an abap2UI5 app beside it - the converter and the abap2UI5
+        runtime run in your browser, nothing is sent anywhere.</p>
 
       <div class="toolbar">
-        <div class="segmented" role="group" aria-label="Source">
-          <button id="mode-own" class="seg" type="button" aria-pressed="true">Your own report</button>
-          <button id="mode-example" class="seg" type="button" aria-pressed="false">Examples</button>
-        </div>
-        <label id="example-label" hidden>Example
-          <select id="example"></select>
+        <label>Sample
+          <select id="s-example"></select>
         </label>
-        <label>Class name
-          <input id="classname" placeholder="zcl_ + the report name" spellcheck="false">
-        </label>
-        <button id="convert" class="button" type="button">Convert</button>
-        <button id="run" class="button primary" type="button">Run</button>
+        <button id="s-prev" class="button" type="button" aria-label="Previous sample">&larr;</button>
+        <button id="s-next" class="button" type="button" aria-label="Next sample">&rarr;</button>
+        <button id="s-try" class="button" type="button">Edit it below</button>
       </div>
 
       <div class="three">
         <div class="pane">
-          <div class="pane-head"><span><span class="step-no">1</span> The classic report <span class="muted">.prog.abap</span></span>
+          <div class="pane-head"><span><span class="step-no">1</span> The original report <span id="s-name" class="muted"></span></span></div>
+          <pre id="s-source" class="output" tabindex="0"></pre>
+        </div>
+        <div class="pane">
+          <div class="pane-head">
+            <span><span class="step-no">2</span> Converted by report2cloud</span>
+            <span class="head-actions">
+              <button id="s-copy" class="link" type="button">Copy</button>
+              <button id="s-download" class="link" type="button">Download</button>
+            </span>
+          </div>
+          <div id="s-tabs" class="tabs" role="tablist"></div>
+          <pre id="s-output" class="output" tabindex="0"></pre>
+        </div>
+        <div class="pane">
+          <div class="pane-head"><span><span class="step-no">3</span> Preview - abap2UI5 in your browser</span>
+            <button id="s-restart" class="link" type="button">Start again</button>
+          </div>
+          <div class="app">
+            <iframe id="s-app" title="The converted sample, running" src="about:blank"></iframe>
+            <div id="s-cover" class="app-cover">Starting...</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="info">
+        <div class="card info-card wide-card"><h3>What happened</h3><ol id="s-steps" class="steps"></ol></div>
+        <div class="card info-card"><h3>Refused <span id="s-n-refused" class="badge"></span></h3><div id="s-refused" class="muted">Nothing.</div></div>
+        <div class="card info-card"><h3>To do <span id="s-n-todo" class="badge"></span></h3><div id="s-todo" class="muted">Nothing.</div></div>
+        <div class="card info-card"><h3>ABAP Cloud release check <span id="s-n-release" class="badge"></span></h3><div id="s-release" class="muted">Nothing to check.</div></div>
+        <div class="card info-card wide-card"><details><summary><h3>Mapped - classic to abap-cloud-gui <span id="s-n-mapped" class="badge"></span></h3></summary><div id="s-mapped" class="muted">Nothing yet.</div></details></div>
+      </div>
+    </section>
+
+    <section id="playground" class="wide">
+      <h2>Your own report</h2>
+      <p class="muted">Paste a classic report of your own. It is converted as you type, and kept in this browser
+        for your next visit. <strong>Preview</strong> starts the class as an app. Includes and the DDIC of your
+        system are not there; the flight tables SCARR, SPFLI and SFLIGHT are, with rows to list.</p>
+
+      <div class="toolbar">
+        <label>Class name
+          <input id="classname" placeholder="zcl_ + the report name" spellcheck="false">
+        </label>
+        <button id="convert" class="button" type="button">Convert</button>
+        <button id="run" class="button primary" type="button" aria-pressed="false">Preview</button>
+      </div>
+
+      <div id="own-panes" class="two">
+        <div class="pane">
+          <div class="pane-head"><span><span class="step-no">1</span> Your report <span class="muted">.prog.abap</span></span>
             <button id="clear" class="link" type="button">Clear</button>
           </div>
-          <textarea id="source" wrap="off" spellcheck="false" aria-label="ABAP report source"
-            placeholder="Paste a classic report here - REPORT zmy_report. PARAMETERS ... START-OF-SELECTION. WRITE ...&#10;&#10;It is converted as you type (Ctrl+Enter converts at once)."></textarea>
+          <div class="editor">
+            <pre id="source-hl" class="editor-hl" aria-hidden="true"></pre>
+            <textarea id="source" wrap="off" spellcheck="false" aria-label="ABAP report source"
+              placeholder="Paste a classic report here - REPORT zmy_report. PARAMETERS ... START-OF-SELECTION. WRITE ...&#10;&#10;It is converted as you type (Ctrl+Enter converts at once)."></textarea>
+          </div>
           <details id="texts" class="texts">
             <summary>Text pool <span class="muted">.prog.xml, optional - the selection texts, text symbols and screens</span></summary>
             <textarea id="textpool" wrap="off" spellcheck="false" aria-label="abapGit .prog.xml of the report"
@@ -130,18 +178,54 @@ ENDCLASS.</code></pre>
           <div id="tabs" class="tabs" role="tablist"></div>
           <pre id="output" class="output" tabindex="0"><span class="muted">The generated class appears here.</span></pre>
         </div>
-        <div class="pane">
-          <div class="pane-head"><span><span class="step-no">3</span> abap2UI5, running in your browser</span>
+        <div id="preview" class="pane" hidden>
+          <div class="pane-head"><span><span class="step-no">3</span> Preview - abap2UI5 in your browser</span>
             <span id="app-state" class="muted"></span>
           </div>
           <div class="app">
             <iframe id="app" title="The converted report, running" src="about:blank"></iframe>
-            <div id="app-cover" class="app-cover">Press <strong>Run</strong> to start the class.</div>
+            <div id="app-cover" class="app-cover">Starting...</div>
           </div>
         </div>
       </div>
 
       <div id="status" class="status" role="status"></div>
+
+      <div id="ai" class="card ai">
+        <h3>AI assistant <span class="muted"></span></h3>
+        <p class="muted">The converter does not guess. The assistant does the two things it leaves to you, and a
+          check decides on every answer - up to three rounds, then you see the changes and decide.</p>
+        <ul class="muted ai-modes">
+          <li><strong>Rewrite the refused statements</strong> - of your report, so that the converter takes it, with
+            the rewrites the converter suggests and the samples above as its guide. The judge: the converter.</li>
+          <li><strong>Polish the class</strong> - the class the converter wrote, as a person would write it for
+            abap-cloud-gui: names, structure, the TODOs where the report makes them clear. The judge: it has to start
+            in the preview, checked against the report runtime and abap2UI5.</li>
+        </ul>
+        <div class="toolbar">
+          <label>Anthropic API key
+            <input id="ai-key" type="password" autocomplete="off" spellcheck="false" placeholder="sk-ant-...">
+          </label>
+          <label class="check"><input id="ai-remember" type="checkbox"> keep it in this browser</label>
+          <button id="ai-run" class="button primary" type="button" disabled>Rewrite the refused statements</button>
+          <button id="ai-polish" class="button primary" type="button" disabled>Polish the class</button>
+          <button id="ai-stop" class="button" type="button" hidden>Stop</button>
+        </div>
+        <p class="muted small">Your key and your report go from this browser to api.anthropic.com, and nowhere else;
+          the requests are billed to your key.</p>
+        <ol id="ai-steps" class="steps"></ol>
+        <div id="ai-result" hidden>
+          <div id="ai-notes" class="ai-notes"></div>
+          <div class="pane-head"><span>The changes</span>
+            <span class="head-actions">
+              <button id="ai-take" class="button primary" type="button">Take it</button>
+              <button id="ai-drop" class="button" type="button">Discard</button>
+            </span>
+          </div>
+          <pre id="ai-diff" class="output diff" tabindex="0"></pre>
+        </div>
+      </div>
+
       <div class="info">
         <div class="card info-card wide-card">
           <h3>What happened</h3>

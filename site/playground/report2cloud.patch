@@ -118,7 +118,7 @@ index 815a543..daf3d0f 100644
    return files.map(({ name, source }) => ({ name, source }));
  }
 diff --git a/src/editor/registry-core.mjs b/src/editor/registry-core.mjs
-index cbddb55..b21adb4 100644
+index cbddb55..409effc 100644
 --- a/src/editor/registry-core.mjs
 +++ b/src/editor/registry-core.mjs
 @@ -20,6 +20,7 @@
@@ -129,7 +129,16 @@ index cbddb55..b21adb4 100644
  // The language server's own issue-to-diagnostic mapping, reached directly:
  // abaplint exports it only through LanguageServer.diagnostics( ), which runs
  // the rules for the one file it is asked about, and analyse( ) below runs them
-@@ -292,6 +293,22 @@ export function getRegistry() {
+@@ -213,6 +214,8 @@ export async function buildRegistry(corpus, filesReady, onProgress) {
+   );
+ 
+   await parseWithYields(reg, onProgress);
++  // the report runtime, when it came first (addLibrary)
++  if (library) reg.addDependencies(libraryFiles());
+ 
+   held = new Map();
+   versions = new Map();
+@@ -292,6 +295,29 @@ export function getRegistry() {
    return registry;
  }
  
@@ -140,12 +149,19 @@ index cbddb55..b21adb4 100644
 +// The report runtime of abap-cloud-gui (dist/report2cloud/library.json), held
 +// like the corpus - dependencies, which the rules skip and the user's
 +// objects are not - so a converted class checks against the classes it
-+// inherits from. Added once; the parse is incremental.
-+let libraryAdded = false;
++// inherits from. Added once; the parse is incremental. Kept, so a registry
++// built later - the first one, when a class of the runtime is run before the
++// corpus is parsed, or a new one - holds it too (buildRegistry).
++let library;
++const libraryFiles = () => library.map((f) => new abaplint.MemoryFile(`/lib/${f.name}`, f.source));
 +export function addLibrary(files) {
-+  if (libraryAdded) return;
-+  libraryAdded = true;
-+  registry.addDependencies(files.map((f) => new abaplint.MemoryFile(`/lib/${f.name}`, f.source)));
++  if (library) return;
++  library = files;
++  if (!registry) return;
++  registry.addDependencies(libraryFiles());
++  // what was checked before the runtime came answers from its cache - a
++  // superclass not found - so the editor's own objects are checked again
++  for (const o of registry.getObjects()) if (!registry.isDependency(o)) o.setDirty();
 +  registry.parse();
 +}
 +
@@ -153,10 +169,10 @@ index cbddb55..b21adb4 100644
  // this costs a few milliseconds however large the corpus is.
  //
 diff --git a/src/editor/registry-worker.mjs b/src/editor/registry-worker.mjs
-index 7c6aa40..9670d80 100644
+index 7c6aa40..549b486 100644
 --- a/src/editor/registry-worker.mjs
 +++ b/src/editor/registry-worker.mjs
-@@ -52,7 +52,60 @@ const filesReady = new Promise((resolve) => {
+@@ -52,7 +52,68 @@ const filesReady = new Promise((resolve) => {
  
  const progress = (done, total) => post({ type: "progress", done, total });
  
@@ -214,20 +230,29 @@ index 7c6aa40..9670d80 100644
 +      commit: lib.commit,
 +    };
 +  },
++  // A class of the report runtime in the editor - one the converter wrote,
++  // changed since: the runtime's ABAP added to the registry, as for a
++  // report, so the class checks.
++  async useReportRuntime() {
++    const lib = await loadLibrary();
++    core.addLibrary(lib.files);
++    return { commit: lib.commit };
++  },
    async build({ settings }) {
      if (settings) core.useAbaplintSettings(settings);
      const corpus = await corpusReady;
 diff --git a/src/editor/registry.mjs b/src/editor/registry.mjs
-index 2b1549f..85840eb 100644
+index 2b1549f..66c79b4 100644
 --- a/src/editor/registry.mjs
 +++ b/src/editor/registry.mjs
-@@ -277,6 +277,10 @@ export const languageServer = (method, params, files) => call("ls", method, para
+@@ -277,6 +277,11 @@ export const languageServer = (method, params, files) => call("ls", method, para
  // carries `problems` when the transpiler refused something at a line.
  export const compile = (files) => call("compile", files);
  
 +// A classic report to a class of abap-cloud-gui's report runtime, in the
 +// worker (registry-worker.mjs, convertReport) - see src/shell/report2cloud.mjs.
 +export const convertReport = (report) => call("convertReport", report);
++export const useReportRuntime = () => call("useReportRuntime");
 +
  // Every class and interface completion can offer: the corpus's, told once,
  // with the user's own merged in - read off the file names, which is where
@@ -320,6 +345,50 @@ index 324317d..16f9962 100644
  function createStatements(statements) {
    const out = new Map();
    for (const sql of statements) {
+diff --git a/src/examples/zcl_r2c_polished.clas.abap b/src/examples/zcl_r2c_polished.clas.abap
+new file mode 100644
+index 0000000..fa67c03
+--- /dev/null
++++ b/src/examples/zcl_r2c_polished.clas.abap
+@@ -0,0 +1,38 @@
++CLASS zcl_r2c_polished DEFINITION PUBLIC
++  INHERITING FROM z2ui5_cl_cgui_report
++  FINAL
++  CREATE PUBLIC.
++
++  PUBLIC SECTION.
++    DATA p_name  TYPE string.
++    DATA p_times TYPE i.
++
++  PROTECTED SECTION.
++    METHODS initialization REDEFINITION.
++    METHODS selection_screen REDEFINITION.
++    METHODS start_of_selection REDEFINITION.
++
++ENDCLASS.
++
++
++CLASS zcl_r2c_polished IMPLEMENTATION.
++
++  METHOD initialization.
++    set_title( `A class of the report runtime` ).
++    p_name  = `Claude`.
++    p_times = 2.
++  ENDMETHOD.
++
++  METHOD selection_screen.
++    screen->parameter( val = p_name text = `Your name` obligatory = abap_true
++        )->parameter( val = p_times text = `Lines` ).
++  ENDMETHOD.
++
++  METHOD start_of_selection.
++    write( |Hello { p_name }, from a class written by hand| ).
++    DO p_times TIMES.
++      write( |Line { sy-index }| )->new_line( ).
++    ENDDO.
++  ENDMETHOD.
++
++ENDCLASS.
 diff --git a/src/examples/zr2c_broken_report.prog.abap b/src/examples/zr2c_broken_report.prog.abap
 new file mode 100644
 index 0000000..15a8fd1
@@ -475,10 +544,10 @@ index 55760c2..d993efd 100644
            ? "interface"
 diff --git a/src/shell/report2cloud.mjs b/src/shell/report2cloud.mjs
 new file mode 100644
-index 0000000..0bb76a7
+index 0000000..fddeabf
 --- /dev/null
 +++ b/src/shell/report2cloud.mjs
-@@ -0,0 +1,114 @@
+@@ -0,0 +1,138 @@
 +// @ts-check
 +// report2cloud on Run: the first file is a classic report (zreport.prog.abap,
 +// with its text pool zreport.prog.xml beside it when there is one), and the
@@ -503,10 +572,17 @@ index 0000000..0bb76a7
 +// What the converter cannot map is refused at its line: the Run stops there,
 +// and the lines are underlined and listed under Problems the way the
 +// transpiler's refusals are - in the AI Studio they are the model's work list.
-+import { convertReport } from "../editor/registry.mjs";
++import { convertReport, useReportRuntime } from "../editor/registry.mjs";
 +import { isReportFile } from "../editor/files.mjs";
 +
 +export const isReportSet = (files) => files.length > 0 && isReportFile(files[0].name);
++
++// A class of the report runtime as the first file - one the converter wrote,
++// changed since (the site's assistant polishes it): it runs as a converted
++// report does, the runtime's chunks and the demo tables with it, and its
++// checks know the runtime.
++export const usesReportRuntime = (files) =>
++  files.length > 0 && /\.clas\.abap$/.test(files[0].name) && /\binheriting\s+from\s+z2ui5_cl_cgui_report\b/i.test(files[0].source);
 +
 +/** YYYYMMDD of today + `days` */
 +const today = (days) => {
@@ -593,21 +669,45 @@ index 0000000..0bb76a7
 +    report: result.report,
 +  };
 +}
++
++/** a class of the report runtime: the runtime known to the checks first -
++ *  true the first time, when the checks' kept answer is no longer true */
++let runtimeKnown = false;
++export async function prepareRuntimeSet() {
++  if (runtimeKnown) return false;
++  await useReportRuntime();
++  runtimeKnown = true;
++  return true;
++}
++
++/** a class of the report runtime: its set with the demo tables, and the
++ *  runtime's chunks to be defined before its own */
++export async function runtimeSet(files) {
++  const [lib, demo] = await Promise.all([loadRuntime(), loadDemo()]);
++  return { files: [...files, ...demoFiles(demo, files)], library: lib.chunks };
++}
 diff --git a/src/shell/run.mjs b/src/shell/run.mjs
-index ffdefbc..371a7e0 100644
+index ffdefbc..5b5cd9d 100644
 --- a/src/shell/run.mjs
 +++ b/src/shell/run.mjs
-@@ -15,7 +15,8 @@ import {
+@@ -9,13 +9,15 @@
+ import {
+   focusProblem,
+   getFiles,
++  invalidateAnalysis,
+   refresh,
+   refreshNow,
+   reportTranspilerProblems,
  } from "../editor/editor.mjs";
  import { declaredObjectName, entryClass } from "../editor/registry.mjs";
  import { compile } from "../editor/transpile.mjs";
 -import { parseName } from "../editor/files.mjs";
 +import { isReportFile, parseName } from "../editor/files.mjs";
-+import { convertedSet, isReportSet } from "./report2cloud.mjs";
++import { convertedSet, isReportSet, prepareRuntimeSet, runtimeSet, usesReportRuntime } from "./report2cloud.mjs";
  import { setTestResults, showInsight, updateInsight } from "./insight.mjs";
  import { announceAppHeight } from "./embed.mjs";
  import { clearRoundtrips, roundtripList } from "./roundtrips.mjs";
-@@ -153,14 +154,20 @@ export function firstLine(body) {
+@@ -153,14 +155,20 @@ export function firstLine(body) {
  function structuralProblem(files) {
    if (files.length === 0) return "There is nothing to run.";
    const first = parseName(files[0].name);
@@ -631,8 +731,12 @@ index ffdefbc..371a7e0 100644
      const expected = parsed?.object;
      const declared = declaredObjectName(file.source);
      if (declared === undefined) {
-@@ -310,7 +317,11 @@ export async function run({ quiet = false } = {}) {
+@@ -308,9 +316,18 @@ export async function run({ quiet = false } = {}) {
+     // evidence. They are underlined in the editor and listed under Problems.
+     // Waited for, not read back: Run decides on the text as it is now, and
      // the registry answers from a worker.
++    // a class of the report runtime: the runtime known to the checks first
++    if (usesReportRuntime(files) && (await prepareRuntimeSet())) invalidateAnalysis();
      const problems = await refreshNow();
      updateInsight(problems);
 -    const errors = problems.filter((i) => i.severity === 1 && i.source === "abaplint");
@@ -641,10 +745,13 @@ index ffdefbc..371a7e0 100644
 +    // and the class it writes is checked when it compiles. It reads the DDIC
 +    // of the system it came from, which is not here.
 +    const errors = problems.filter((i) => i.severity === 1 && i.source === "abaplint" && !isReportFile(String(i.file)));
++    // for a page that has this one in a frame (the site of abap-cloud-gui):
++    // what stopped the Run, by file and line
++    globalThis.__pgProblems = errors.map((i) => ({ file: String(i.file), line: i.range.start.line + 1, message: i.message }));
      if (errors.length > 0) {
        setStatus(`${errors.length} error${errors.length > 1 ? "s" : ""} in the ABAP - fix them and run again`, true);
        stopped("the code on screen has errors");
-@@ -323,8 +334,20 @@ export async function run({ quiet = false } = {}) {
+@@ -323,8 +340,24 @@ export async function run({ quiet = false } = {}) {
        return;
      }
  
@@ -658,6 +765,10 @@ index ffdefbc..371a7e0 100644
 +      runFiles = converted.files;
 +      library = converted.library;
 +      showOutput("report2cloud", converted.report);
++    } else if (usesReportRuntime(files)) {
++      const set = await runtimeSet(files);
++      runFiles = set.files;
++      library = set.library;
 +    }
 +
      setStatus("compiling…");
@@ -666,7 +777,7 @@ index ffdefbc..371a7e0 100644
      // Waited for: the worker evaluates each chunk with `new Function`, and a
      // chunk V8 refuses, or one that throws while defining itself, is the
      // error to show. Left unawaited it was an "Uncaught (in promise)" in the
-@@ -344,7 +367,7 @@ export async function run({ quiet = false } = {}) {
+@@ -344,7 +377,7 @@ export async function run({ quiet = false } = {}) {
      // (src/shell/linked-code.mjs). For the visit - a script it started
      // outlives the files being replaced.
      if (fromALink(context.startedFrom)) markLinkedCodeRan();
@@ -675,7 +786,7 @@ index ffdefbc..371a7e0 100644
  
      // The unit tests in the test includes, before the app: a run is compile,
      // test, start - the order a developer works in - and a failing test is
-@@ -396,7 +419,7 @@ export async function run({ quiet = false } = {}) {
+@@ -396,7 +429,7 @@ export async function run({ quiet = false } = {}) {
      clearRoundtrips();
  
      const src = new URL("app/index.html", document.baseURI);
@@ -722,10 +833,10 @@ index 0000000..e782e95
 +});
 diff --git a/tests/report2cloud.spec.js b/tests/report2cloud.spec.js
 new file mode 100644
-index 0000000..fc793ab
+index 0000000..3aa3f32
 --- /dev/null
 +++ b/tests/report2cloud.spec.js
-@@ -0,0 +1,48 @@
+@@ -0,0 +1,69 @@
 +import { test, expect } from "@playwright/test";
 +import { markers, openFiles } from "./helpers.mjs";
 +
@@ -773,6 +884,27 @@ index 0000000..fc793ab
 +  // and SFLIGHT comes with the Run, with its rows - no selection screen, so
 +  // the list is the first screen
 +  await expect(frame(page).getByText("A340-600").first()).toBeVisible({ timeout: 60000 });
++});
++
++test("a class of the report runtime as the first file runs on the runtime - one the converter wrote, changed since", async ({ page }) => {
++  await page.goto("/?src=examples/zcl_r2c_polished.clas.abap");
++  await expect(page.locator("#status")).toHaveText(/^running/, { timeout: 120000 });
++  // the runtime is known to the checks, and its chunks are defined before the class
++  await expect(frame(page).getByText("A class of the report runtime").first()).toBeVisible({ timeout: 60000 });
++  await frame(page).getByText("Execute").first().click();
++  await expect(frame(page).getByText("from a class written by hand")).toBeVisible({ timeout: 60000 });
++  expect(await page.evaluate(() => globalThis.__pgProblems)).toEqual([]);
++});
++
++test("what stops the Run of a class is there for the page around the playground, by file and line", async ({ page }) => {
++  await page.goto("/?src=examples/zcl_r2c_polished.clas.abap");
++  await expect(page.locator("#status")).toHaveText(/^running/, { timeout: 120000 });
++  await page.evaluate(() => {
++    const model = globalThis.monaco?.editor.getModels().find((m) => m.uri.path.endsWith("zcl_r2c_polished.clas.abap"));
++    model?.setValue(model.getValue().replace("write( |Line { sy-index }| )", "write( |Line { sy-index }| ) lv_unknown = 1"));
++  });
++  await page.locator("#run").click();
++  await expect.poll(async () => page.evaluate(() => globalThis.__pgProblems?.length ?? 0), { timeout: 60000 }).toBeGreaterThan(0);
 +});
 diff --git a/tools/build-report2cloud.mjs b/tools/build-report2cloud.mjs
 new file mode 100644

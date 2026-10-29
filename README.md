@@ -677,9 +677,19 @@ Stage 4 - in the browser, and with an agent
 - [x] Converted reports run in the browser: the site has its own copy of
       the abap2UI5 playground (`site/playground/`) - a `.prog.abap` (and its
       `.prog.xml`) as the first file is converted on Run and its class runs on
-      the stage; the converter page shows the classic report, the class and
-      the running app side by side, and step by step what happened - nothing
+      the stage; the site shows the samples - the original report, the class
+      and the running app side by side, highlighted - and below them a
+      converter for your own report, with its preview on demand - nothing
       to install
+- [x] An AI assistant on the site for the statements the converter refuses:
+      with the user's own Anthropic API key, from the browser, it rewrites
+      them in the classic report - the refusal catalogue's rewrites and the
+      closest samples as its guide - and the converter checks every answer,
+      up to three rounds; the user sees the diff and takes it or not
+- [x] The AI assistant polishes the converted class: names, structure, the
+      TODOs where the report makes them clear - each answer started in the
+      preview, checked against the report runtime and abap2UI5, and what
+      stops it goes back to the model, up to three rounds
 - [x] `migrate_report` in the MCP server with the class deployed into the
       sandbox and its first screen answered
 - [ ] An evaluation harness for the AI loop: a model works the migration

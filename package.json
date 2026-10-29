@@ -33,6 +33,7 @@
     "@abap2ui5/linter-render": "^0.8.5",
     "@abaplint/cli": "^2.120.75",
     "@abaplint/core": "^2.120.75",
+    "@anthropic-ai/sdk": "^1.3.0",
     "@openui5/sap.f": "1.153.0",
     "@openui5/sap.m": "1.153.0",
     "@openui5/sap.tnt": "1.153.0",
