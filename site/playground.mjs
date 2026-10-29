@@ -22,9 +22,11 @@ import { convert, defaultClassName } from "../tools/report2cloud/lib/convert.mjs
 import { migrationReport } from "../tools/report2cloud/lib/report.mjs";
 import { parseTextpool } from "../tools/report2cloud/lib/textpool.mjs";
 import { highlightAbap, highlightFile } from "./highlight.mjs";
+import { MODEL, errorText, lineDiff, rewriteRefused } from "./assistant.mjs";
 
 const $ = (id) => document.getElementById(id);
 const STORE = "report2cloud.own";
+const KEY_STORE = "report2cloud.ai-key";
 
 const el = (tag, attrs = {}, ...kids) => {
   const e = document.createElement(tag);
@@ -370,6 +372,7 @@ try {
     panels("", result);
     $("migration").textContent = c.report;
     markStale();
+    aiReady();
   };
 
   /** the app in the frame was started with another source - Preview starts this one */
@@ -475,6 +478,112 @@ try {
     $("playground").scrollIntoView({ behavior: "smooth" });
     source.focus({ preventScroll: true });
   });
+
+  // ---- the AI assistant: the refused statements rewritten, the converter the judge
+  const aiKey = $("ai-key");
+  const aiRun = $("ai-run");
+  const aiSteps = $("ai-steps");
+  let aiAnswer;
+  let aiAbort;
+  const aiLog = [];
+  const aiStep = (s) => {
+    if (aiLog.at(-1)?.state === "wait") aiLog.pop();
+    aiLog.push(s);
+    aiSteps.replaceChildren(...aiLog.map((x) => el("li", { class: x.state }, x.text)));
+  };
+  function aiReady() {
+    const refused = last && !last.result.ok;
+    aiRun.disabled = !refused || !aiKey.value.trim() || Boolean(aiAbort);
+    aiRun.title = !refused ? "Nothing is refused - nothing for the assistant to do" : !aiKey.value.trim() ? "Your Anthropic API key first" : "";
+  }
+  try {
+    aiKey.value = localStorage.getItem(KEY_STORE) ?? "";
+    $("ai-remember").checked = Boolean(aiKey.value);
+  } catch {
+    /* no storage in this context */
+  }
+  const keepKey = () => {
+    try {
+      if ($("ai-remember").checked && aiKey.value.trim()) localStorage.setItem(KEY_STORE, aiKey.value.trim());
+      else localStorage.removeItem(KEY_STORE);
+    } catch {
+      /* no storage in this context */
+    }
+  };
+  aiKey.addEventListener("input", () => {
+    keepKey();
+    aiReady();
+  });
+  $("ai-remember").addEventListener("change", keepKey);
+
+  const showDiff = (before, after) => {
+    const rows = lineDiff(before, after);
+    // the changed lines with three lines around them
+    const near = rows.map((r, i) => rows.slice(Math.max(0, i - 3), i + 4).some((x) => x.kind !== " "));
+    const out = [];
+    let gap = false;
+    rows.forEach((r, i) => {
+      if (!near[i]) {
+        if (!gap) out.push(`<span class="gap">...</span>`);
+        gap = true;
+        return;
+      }
+      gap = false;
+      const code = highlightAbap(r.text) || " ";
+      out.push(`<span class="${r.kind === "+" ? "add" : r.kind === "-" ? "del" : "ctx"}">${r.kind === " " ? " " : r.kind} ${code}</span>`);
+    });
+    // a line each - the spans are blocks
+    $("ai-diff").innerHTML = out.join("");
+  };
+
+  aiRun.onclick = async () => {
+    if (!last || last.result.ok) return;
+    aiLog.length = 0;
+    $("ai-result").hidden = true;
+    aiAbort = new AbortController();
+    aiReady();
+    $("ai-stop").hidden = false;
+    const report = last.text;
+    const { textpool } = textpoolOf();
+    try {
+      aiAnswer = await rewriteRefused({
+        apiKey: aiKey.value.trim(),
+        report,
+        result: last.result,
+        samples: examples.filter((e) => convertReport(e.source, { textpool: e.textpool }).result.ok),
+        convert: (text) => convertReport(text, { textpool, className: classname.value.trim() || undefined }).result,
+        onStep: aiStep,
+        signal: aiAbort.signal,
+      });
+      aiAnswer.before = report;
+      $("ai-notes").textContent = aiAnswer.notes;
+      showDiff(report, aiAnswer.source);
+      $("ai-result").hidden = false;
+      $("ai-take").textContent = aiAnswer.result.ok ? "Take it" : "Take it anyway";
+      if (!aiAnswer.result.ok) aiStep({ state: "bad", text: `After ${aiAnswer.rounds} rounds, ${aiAnswer.result.refusals.length} statement(s) are still refused - take what it did and rewrite those by hand, or discard it.` });
+    } catch (e) {
+      aiStep({ state: "bad", text: `The assistant stopped: ${errorText(e)}.` });
+    } finally {
+      aiAbort = undefined;
+      $("ai-stop").hidden = true;
+      aiReady();
+    }
+  };
+  $("ai-stop").onclick = () => aiAbort?.abort();
+  $("ai-take").onclick = () => {
+    if (!aiAnswer) return;
+    source.value = aiAnswer.source;
+    save();
+    run();
+    $("ai-result").hidden = true;
+    aiStep({ state: "ok", text: "Taken into your report - converted again above." });
+    aiAnswer = undefined;
+  };
+  $("ai-drop").onclick = () => {
+    $("ai-result").hidden = true;
+    aiAnswer = undefined;
+  };
+  $("ai").querySelector("h3 .muted").textContent = `- for the statements the converter refuses (${MODEL})`;
 
   const kept = load();
   source.value = kept?.source ?? "";

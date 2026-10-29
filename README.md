@@ -681,6 +681,13 @@ Stage 4 - in the browser, and with an agent
       and the running app side by side, highlighted - and below them a
       converter for your own report, with its preview on demand - nothing
       to install
+- [x] An AI assistant on the site for the statements the converter refuses:
+      with the user's own Anthropic API key, from the browser, it rewrites
+      them in the classic report - the refusal catalogue's rewrites and the
+      closest samples as its guide - and the converter checks every answer,
+      up to three rounds; the user sees the diff and takes it or not
+- [ ] The AI assistant for the converted class: idiomatic abap-cloud-gui
+      beyond what the converter writes, checked by abaplint and a start
 - [x] `migrate_report` in the MCP server with the class deployed into the
       sandbox and its first screen answered
 - [ ] An evaluation harness for the AI loop: a model works the migration

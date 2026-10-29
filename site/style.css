@@ -188,3 +188,19 @@ textarea::placeholder { color: var(--muted); white-space: pre-wrap; }
 .findings .warn { color: var(--warn); }
 
 .foot { border-top: 1px solid var(--line); padding: 24px 16px 40px; color: var(--muted); font-size: 14px; }
+
+/* the AI assistant */
+.ai { margin-top: 16px; }
+.ai h3 { font-size: 16px; margin: 0 0 6px; }
+.ai p { margin: 0 0 8px; }
+.ai .small { font-size: 13px; }
+.ai .toolbar { margin: 10px 0 6px; }
+.ai #ai-key { width: 360px; }
+.check { flex-direction: row !important; align-items: center; gap: 6px !important; font-size: 14px !important; padding-bottom: 8px; }
+.check input { min-width: 0; }
+.ai-notes { font-size: 14px; white-space: pre-wrap; margin: 8px 0; }
+.diff { height: auto; max-height: 520px; }
+.diff .add { background: color-mix(in srgb, var(--ok) 16%, transparent); display: block; }
+.diff .del { background: color-mix(in srgb, var(--bad) 14%, transparent); display: block; text-decoration: line-through; text-decoration-color: color-mix(in srgb, var(--bad) 50%, transparent); }
+.diff .gap { color: var(--muted); display: block; }
+.diff .ctx { display: block; }

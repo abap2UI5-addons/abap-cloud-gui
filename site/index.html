@@ -190,6 +190,36 @@ ENDCLASS.</code></pre>
       </div>
 
       <div id="status" class="status" role="status"></div>
+
+      <div id="ai" class="card ai">
+        <h3>AI assistant <span class="muted">- for the statements the converter refuses</span></h3>
+        <p class="muted">The converter does not guess - what it has no counterpart for, it refuses. The assistant
+          rewrites those statements of your report so that the converter takes it, with the rewrites the converter
+          suggests and the samples above as its guide. Every answer is converted again; what is still refused goes
+          back to it, up to three times. You see the changes to your report and decide.</p>
+        <div class="toolbar">
+          <label>Anthropic API key
+            <input id="ai-key" type="password" autocomplete="off" spellcheck="false" placeholder="sk-ant-...">
+          </label>
+          <label class="check"><input id="ai-remember" type="checkbox"> keep it in this browser</label>
+          <button id="ai-run" class="button primary" type="button" disabled>Rewrite the refused statements</button>
+          <button id="ai-stop" class="button" type="button" hidden>Stop</button>
+        </div>
+        <p class="muted small">Your key and your report go from this browser to api.anthropic.com, and nowhere else;
+          the requests are billed to your key.</p>
+        <ol id="ai-steps" class="steps"></ol>
+        <div id="ai-result" hidden>
+          <div id="ai-notes" class="ai-notes"></div>
+          <div class="pane-head"><span>The changes to your report</span>
+            <span class="head-actions">
+              <button id="ai-take" class="button primary" type="button">Take it</button>
+              <button id="ai-drop" class="button" type="button">Discard</button>
+            </span>
+          </div>
+          <pre id="ai-diff" class="output diff" tabindex="0"></pre>
+        </div>
+      </div>
+
       <div class="info">
         <div class="card info-card wide-card">
           <h3>What happened</h3>
