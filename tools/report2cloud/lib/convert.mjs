@@ -1425,10 +1425,19 @@ class Converter {
       const parents = tokenParents(x);
       return stmtTokens(x).some((t) => lc(t.getStr()) === name && parents.get(key(t)) === "Field");
     };
+    // an inline or DATA declaration, or a parameter of a method
     const declares = (list, name) => list.some((x) => findAll(x, "InlineData").some((d) => lc(d.getTokens()[2]?.getStr() ?? "") === name) ||
-      (kind(x) === "Data" && lc(findAll(x, "DefinitionName")[0]?.getFirstToken().getStr() ?? "") === name));
+      (kind(x) === "Data" && lc(findAll(x, "DefinitionName")[0]?.getFirstToken().getStr() ?? "") === name) ||
+      findAll(x, "MethodParamName").some((p) => lc(p.getFirstToken().getStr()) === name));
+    // a local class is its definition and its implementation together: an
+    // attribute or a parameter of the definition is what the implementation reads
+    const classes = new Map();
+    for (const u of this.locals) {
+      const cls = lc(nodeText(child(u.stmts[0], "ClassName") ?? u.stmts[0].getChildren()[1]));
+      classes.set(cls, [...(classes.get(cls) ?? []), ...u.stmts]);
+    }
     const elsewhere = (e, name) => {
-      const own = [...this.forms.map((f) => f.body), ...this.locals.map((u) => u.stmts)].filter((list) => !declares(list, name));
+      const own = [...this.forms.map((f) => f.body), ...classes.values()].filter((list) => !declares(list, name));
       const units = [...this.events.filter((x) => x !== e).map((x) => x.stmts), ...own];
       return units.some((list) => list.some((x) => reads(x, name)));
     };
@@ -1457,6 +1466,10 @@ class Converter {
     if (m) return `TYPE ${lc(m[2])}`;
     m = new RegExp(`^DATA\\(\\s*${esc}\\s*\\)\\s*=\\s*CAST\\s+([\\w/]+)\\s*\\(`, "i").exec(text);
     if (m) return `TYPE REF TO ${lc(m[1])}`;
+    // a static attribute or a constant of a class: LIKE it - the stand-in's
+    // where the class has one
+    m = new RegExp(`^DATA\\(\\s*${esc}\\s*\\)\\s*=\\s*([\\w/]+)=>([\\w/]+)\\s*\\.?$`, "i").exec(text);
+    if (m) return `LIKE ${GUI.classes[lc(m[1])] ?? lc(m[1])}=>${lc(m[2])}`;
     // abaplint leaves the target of a SELECT untyped (SELECT_todo)
     if (/^SELECT\b/i.test(text)) return selectTargetType(text, lc(name));
     const t = this.programTypes().get(lc(name));
@@ -1477,7 +1490,8 @@ class Converter {
       return undefined;
     }
     if (!abap || /todo|check_syntax|\bSELECT_/i.test(abap)) return undefined;
-    if (cls === "ObjectReferenceType" || cls === "DataReference") return `TYPE ${abap}`;
+    // a reference to a class or an interface: its name as the report writes names
+    if (/^REF TO [\w/]+$/i.test(abap)) return `TYPE REF TO ${lc(abap.slice(7))}`;
     return `TYPE ${abap}`;
   }
 

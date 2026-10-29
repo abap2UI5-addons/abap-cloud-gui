@@ -28,9 +28,11 @@ const USAGE = `usage: node tools/report2cloud/cli.mjs <report.prog.abap> [option
   --texts <file>   the report's .prog.xml with its text pool (default: beside the source)
   --includes <dir> where the report's INCLUDEs are, as abapGit writes them: <include>.prog.abap
                    (default: beside the source; the includes are inlined before the conversion)
-  --deps <dir>     the classes, interfaces and DDIC objects of the report's repository, as abapGit
-                   writes them - they type what the report reads of them (default: the abapGit
-                   repository the report is in, the folder above it with an .abapgit.xml)
+  --deps <dir>     the classes, interfaces and DDIC objects of a repository the report reads, as
+                   abapGit writes them - they type what the report reads of them; once per
+                   repository, e.g. a library the report's repository is installed beside
+                   (always: the abapGit repository the report is in: STARTING_FOLDER of its
+                   .abapgit.xml, or its git repository)
   --report <file>  where to write the migration report (default: <out>/<class>.migration.md)
   --check          lint the class with abaplint - v750 and ABAP Cloud, in a scratch
                    copy of this repository (needs git and network for the dependencies)
@@ -55,7 +57,10 @@ function args(argv) {
     else if (a === "--partial") opts.partial = true;
     else if (a === "--wrappers") opts.wrappers = true;
     else if (a === "--successors") opts.successors = true;
-    else if (["--class", "--out", "--texts", "--includes", "--report", "--ddic", "--deps", "--atc"].includes(a)) {
+    else if (a === "--deps") {
+      if (argv[i + 1] === undefined) throw new Error(`${a} needs a value`);
+      opts.deps = [...(opts.deps ?? []), argv[++i]];
+    } else if (["--class", "--out", "--texts", "--includes", "--report", "--ddic", "--atc"].includes(a)) {
       if (argv[i + 1] === undefined) throw new Error(`${a} needs a value`);
       opts[a.slice(2)] = argv[++i];
     } else if (a.startsWith("--")) throw new Error(`unknown option ${a}`);
@@ -108,9 +113,9 @@ async function main() {
   const texts = opts.texts ?? (sibling !== file && existsSync(sibling) ? sibling : undefined);
   const textpool = texts ? parseTextpool(readFileSync(texts, "utf8")) : undefined;
   const m = /^(.+)\.prog\.abap$/i.exec(basename(file));
-  const depsDir = opts.deps ? resolve(opts.deps) : repositoryOf(file);
+  const depsDirs = [...new Set([repositoryOf(file), ...(opts.deps ?? []).map((d) => resolve(d))].filter(Boolean))];
   const result = convert(source, {
-    deps: depsDir ? dependenciesOf(source, dependencyIndex([depsDir])) : undefined,
+    deps: depsDirs.length ? dependenciesOf(source, dependencyIndex(depsDirs)) : undefined,
     file,
     className: opts.class,
     programName: m ? m[1].replace(/#/g, "/") : undefined,
