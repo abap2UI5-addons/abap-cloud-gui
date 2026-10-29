@@ -1805,6 +1805,10 @@ CLASS ltcl_test IMPLEMENTATION.
     cl_abap_unit_assert=>assert_equals( act = mo_cut->get_parameter_id( `ZCGUI_LVL` )
                                         exp = `USER` ).
 
+    " stored shared - the store gives other users only shared variants
+    DATA(lt_spa_store) = mo_cut->mo_cgui_store->load( `%SPA` ).
+    cl_abap_unit_assert=>assert_true( lt_spa_store[ name = `%CUSTOMIZING` ]-shared ).
+
     " the customizing is on the server - the next report reads it, for a
     " user without a parameter of their own
     DATA(lo_next) = NEW ltcl_report( ).

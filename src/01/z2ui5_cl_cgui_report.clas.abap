@@ -4646,10 +4646,12 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
     ENDIF.
 
     TRY.
+        " shared: every user reads them, not only the one who saved them
         mo_cgui_store->save( report  = cv_cgui_spa_report
                              variant = VALUE #( name   = cv_cgui_spa_customizing
                                                 text   = 'Customizing parameters'(065)
-                                                values = lt_value ) ).
+                                                values = lt_value
+                                                shared = abap_true ) ).
       CATCH z2ui5_cx_cgui_error INTO DATA(lx_error).
         message( text = lx_error->get_text( )
                  type = `E` ).
