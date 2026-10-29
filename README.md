@@ -781,8 +781,11 @@ Stage 4 - in the browser, and with an agent
       stops it goes back to the model, up to three rounds
 - [x] `migrate_report` in the MCP server with the class deployed into the
       sandbox and its first screen answered
-- [ ] An evaluation harness for the AI loop: a model works the migration
-      reports of the corpus, and the share that ends clean is measured
+- [x] An evaluation harness for the AI loop: a model works the refused
+      reports of the web corpus, and the share that ends clean is measured
+      (`report2cloud:eval`) - accepted by the converter, clean when the
+      rest of the report is unchanged, per kind of refusal, with the rounds
+      and the tokens; `--dry` without a key
 
 Stage 5 - research
 

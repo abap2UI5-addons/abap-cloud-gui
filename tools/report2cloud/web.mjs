@@ -108,6 +108,26 @@ async function fetchAll(names, cache, parallel = 8) {
   return failed;
 }
 
+/** the repositories of the cache that are there, each with its reports
+ *  (files), what reads their includes - from the repository itself only -
+ *  and the dependency index they are converted with. The repositories of the
+ *  same owner count as installed beside it: a library and the demos of it are
+ *  often two repositories */
+export function* repositoriesIn(cache, names) {
+  for (const name of names) {
+    const dir = join(cache, folderOf(name));
+    if (!existsSync(dir)) continue;
+    const files = programs(dir);
+    const read = includesFrom([...new Set(files.map(dirname))]);
+    const owner = name.split("/")[0];
+    const siblings = names.filter((x) => x !== name && x.split("/")[0] === owner).map((x) => join(cache, folderOf(x))).filter(existsSync);
+    yield { name, files, read, deps: dependencyIndex([dir, ...siblings]) };
+  }
+}
+
+/** the repositories a cache holds already - what --offline works on */
+export const cachedRepositories = (cache) => readdirSync(cache).filter((d) => d.includes("__")).map((d) => d.replace("__", "/"));
+
 /** what a lint finding is about, without the names of one report */
 const kindOf = (f) => `${f.key}: ${String(f.message).replace(/"[^"]*"/g, "\"…\"").replace(/\b[A-Z0-9_]{3,}\b/g, "…").slice(0, 100)}`;
 
@@ -166,24 +186,14 @@ async function main() {
   }
   const cache = resolve(opts.cache);
   mkdirSync(cache, { recursive: true });
-  let names = opts.offline ? readdirSync(cache).filter((d) => d.includes("__")).map((d) => d.replace("__", "/")) : await repositories(opts.list);
+  let names = opts.offline ? cachedRepositories(cache) : await repositories(opts.list);
   if (opts.limit) names = names.slice(0, Number(opts.limit));
   const failed = opts.offline ? [] : await fetchAll(names, cache);
   if (failed.length) console.log(`${failed.length} repositor${failed.length === 1 ? "y" : "ies"} not cloned: ${failed.slice(0, 10).join(", ")}${failed.length > 10 ? ", …" : ""}`);
 
-  // a report's includes from its own repository only
   let n = 0;
   const rows = [];
-  for (const name of names) {
-    const dir = join(cache, folderOf(name));
-    if (!existsSync(dir)) continue;
-    const files = programs(dir);
-    const read = includesFrom([...new Set(files.map(dirname))]);
-    // the repositories of the same owner count as installed beside it - a
-    // library and the demos of it are often two repositories
-    const owner = name.split("/")[0];
-    const siblings = names.filter((x) => x !== name && x.split("/")[0] === owner).map((x) => join(cache, folderOf(x))).filter(existsSync);
-    const deps = dependencyIndex([dir, ...siblings]);
+  for (const { files, read, deps } of repositoriesIn(cache, names)) {
     for (const row of coverage(files, { read, deps, keep: opts.lint || opts.start, className: () => `z2ui5_cl_cgui_w${String(++n).padStart(4, "0")}` })) {
       rows.push({ ...row, file: relative(cache, row.file) });
     }
