@@ -687,8 +687,12 @@ Dialogs and screens
       `_popup( )->transport( )`, `z2ui5_cl_cgui_transport`, beside
       `POPUP_TO_DECIDE` and `POPUP_GET_VALUES`; no popup of another addon is
       needed any more
-- [ ] `CALL SCREEN` of a screen in another class - `CALL SCREEN` of the
-      report's own screens and back is there
+- [x] `CALL SCREEN` of a screen in another class - the dynpro of a
+      function group or another program: `call_screen( dynnr = '0100' owner
+      = lo_screens )` shows the dynpro of the report class `lo_screens` with
+      its PBO and PAI as an app of its own; when its last dynpro is left
+      (`SET SCREEN 0`) the caller goes on in `after_call_screen( )` and
+      reads the attributes of `lo_screens` as the dynpro left them
 - [x] The selection screen of another report, as a popup or by screen
       number: `submit( using_selection_screen = '1100' )` (SUBMIT ... USING
       SELECTION-SCREEN, converted by report2cloud) and `submit( as_window =

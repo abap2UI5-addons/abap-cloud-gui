@@ -94,6 +94,8 @@ CLASS ltcl_report DEFINITION INHERITING FROM z2ui5_cl_cgui_report FINAL.
     DATA mv_window   TYPE abap_bool.
     DATA mv_leave    TYPE abap_bool.
     DATA mv_dynpro   TYPE abap_bool.
+    " call_screen( owner = ): the class whose dynpro 100 is called
+    DATA mo_owner    TYPE REF TO ltcl_report.
     " a tabstrip on dynpro 0100: two tabs on one subscreen area
     DATA mv_tabs     TYPE abap_bool.
     DATA tabstr      TYPE z2ui5_cl_cgui_report=>ty_s_tabstrip.
@@ -230,6 +232,7 @@ CLASS ltcl_test DEFINITION FINAL FOR TESTING
     METHODS file_upload_and_download FOR TESTING.
     METHODS current_screen_afresh FOR TESTING.
     METHODS dynpro_call_and_leave FOR TESTING.
+    METHODS dynpro_of_another_class FOR TESTING.
     METHODS dynpro_text_editor FOR TESTING.
     METHODS dynpro_tabstrip FOR TESTING.
     METHODS dynpro_table_control FOR TESTING.
@@ -481,6 +484,10 @@ CLASS ltcl_report IMPLEMENTATION.
   METHOD after_call_screen.
 
     mv_after = dynnr.
+    " the dynpro of another class: its fields as it left them
+    IF mo_owner IS BOUND.
+      mv_seats = mo_owner->mv_seats.
+    ENDIF.
     list( )->new_line(
         )->write( |Seats { mv_seats }| ).
 
@@ -491,6 +498,12 @@ CLASS ltcl_report IMPLEMENTATION.
     mv_total = mv_total + 1.
 
     " CALL SCREEN - the rest comes in after_call_screen( )
+    IF mo_owner IS BOUND.
+      mo_owner->p_carrid = p_carrid.
+      call_screen( dynnr = `100`
+                   owner = mo_owner ).
+      RETURN.
+    ENDIF.
     IF mv_dynpro = abap_true.
       call_screen( `100` ).
       RETURN.
@@ -1086,6 +1099,52 @@ CLASS ltcl_test IMPLEMENTATION.
     cl_abap_unit_assert=>assert_equals( act = mo_cut->mv_cgui_screen
                                         exp = `SELECTION` ).
     cl_abap_unit_assert=>assert_initial( mo_cut->mt_cgui_dynpro_stack ).
+
+  ENDMETHOD.
+
+  METHOD dynpro_of_another_class.
+
+    " CALL SCREEN of a dynpro of another class: it runs as its own app
+    init( ).
+    mo_report->p_carrid = `LH`.
+    DATA(lo_owner) = NEW ltcl_report( ).
+    mo_report->mo_owner = lo_owner.
+    event( z2ui5_cl_cgui_report=>cs_ucomm-execute ).
+    cl_abap_unit_assert=>assert_true( act = xsdbool( mo_client->mo_called = lo_owner )
+                                      msg = `not called` ).
+
+    " started, it shows dynpro 100 with its PBO - no selection screen
+    DATA(lo_client) = NEW ltcl_client( ).
+    lo_client->mo_app = lo_owner.
+    lo_client->mv_init = abap_true.
+    lo_owner->z2ui5_if_app~main( lo_client ).
+    cl_abap_unit_assert=>assert_equals( act = lo_owner->mv_cgui_screen
+                                        exp = `DYNPRO` ).
+    cl_abap_unit_assert=>assert_equals( act = lo_owner->mv_pai
+                                        exp = `PBO0100;` ).
+    cl_abap_unit_assert=>assert_true( act = xsdbool( lo_client->mv_view CS `Seats` )
+                                      msg = `the dynpro is not on the page` ).
+
+    " its PAI leaves (SET SCREEN 0): back to the caller
+    lo_client->mv_init = abap_false.
+    lo_owner->mv_seats = 3.
+    lo_client->mv_event = `SAVE`.
+    lo_owner->z2ui5_if_app~main( lo_client ).
+    cl_abap_unit_assert=>assert_true( act = lo_client->mv_left
+                                      msg = `not left` ).
+
+    " the caller goes on after CALL SCREEN, with the fields of the dynpro
+    CLEAR: mo_client->mv_event, mo_client->mo_called.
+    mo_client->mo_prev = lo_owner.
+    mo_client->mv_navigated = abap_true.
+    mo_cut->z2ui5_if_app~main( mo_client ).
+    mo_client->mv_navigated = abap_false.
+    cl_abap_unit_assert=>assert_equals( act = mo_report->mv_after
+                                        exp = `0100` ).
+    cl_abap_unit_assert=>assert_equals( act = mo_cut->mv_cgui_screen
+                                        exp = `OUTPUT` ).
+    cl_abap_unit_assert=>assert_true( act = xsdbool( mo_client->mv_view CS `Seats 3` )
+                                      msg = `no seats 3` ).
 
   ENDMETHOD.
 

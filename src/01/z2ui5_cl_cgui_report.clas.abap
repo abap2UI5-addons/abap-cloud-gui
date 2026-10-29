@@ -949,9 +949,15 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
     "! CALL SCREEN dynnr - the dynpro of dynpro_screen( ) shows, its PBO
     "! before, its PAI for every function; the statements after CALL SCREEN
     "! belong into after_call_screen( ), which runs when it is left
+    "! owner is another report class whose dynpro it is - the screen of a
+    "! function group or another program: it shows with the PBO and PAI of
+    "! owner, and when its last dynpro is left (SET SCREEN 0) the caller
+    "! goes on in after_call_screen( ), the attributes of owner as the
+    "! dynpro left them
     METHODS call_screen
       IMPORTING
-        dynnr TYPE clike.
+        dynnr TYPE clike
+        owner TYPE REF TO z2ui5_cl_cgui_report OPTIONAL.
 
     "! SET SCREEN dynnr - the next screen after the PAI; `0` returns to the
     "! screen of CALL SCREEN
@@ -1269,6 +1275,9 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
     " HTMLFrame of the frontend: initial not yet asked, X there, - not there
     DATA mv_cgui_html_frame    TYPE c LENGTH 1.
     DATA mt_cgui_dynpro_stack  TYPE ty_t_cgui_call.
+    " call_screen( owner = ) of another class: the dynpro the caller called -
+    " when it is left, the owner returns to the caller
+    DATA mv_cgui_owner_dynnr   TYPE string.
     DATA mv_cgui_dynpro_next   TYPE string.
     DATA mv_cgui_dynpro_left   TYPE abap_bool.
     DATA mt_cgui_file_pick     TYPE string_table.
@@ -1366,6 +1375,7 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
         su3            TYPE string VALUE `SU3`,
         spro           TYPE string VALUE `SPRO`,
         transport      TYPE string VALUE `TRANSPORT`,
+        screen         TYPE string VALUE `SCREEN`,
       END OF cs_pending.
 
     TYPES:
@@ -2697,6 +2707,14 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
       RETURN.
     ENDIF.
 
+    " a dynpro another class called: no selection screen, its PBO now
+    IF mv_cgui_owner_dynnr IS NOT INITIAL.
+      mv_cgui_dynpro = mv_cgui_owner_dynnr.
+      mv_cgui_screen = cs_screen-dynpro.
+      view_display( ).
+      RETURN.
+    ENDIF.
+
     initialization( ).
     fresh_keep( ).
 
@@ -2891,6 +2909,16 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
 
   METHOD call_screen.
 
+    " the dynpro of another class runs as an app of its own
+    IF owner IS BOUND AND owner <> me.
+      owner->mv_cgui_owner_dynnr = dynnr_norm( dynnr ).
+      mv_cgui_pending_kind = cs_pending-screen.
+      mv_cgui_pending_field = dynnr_norm( dynnr ).
+      mv_cgui_nav = abap_true.
+      client->nav_app_call( owner ).
+      RETURN.
+    ENDIF.
+
     INSERT VALUE #( screen = mv_cgui_screen
                     dynnr  = mv_cgui_dynpro
                     called = dynnr_norm( dynnr ) ) INTO TABLE mt_cgui_dynpro_stack.
@@ -2970,6 +2998,12 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
 
     DATA(lv_called) = dynnr.
     DATA(lv_top) = lines( mt_cgui_dynpro_stack ).
+    " the dynpro another class called - back to the caller
+    IF lv_top = 0 AND mv_cgui_owner_dynnr IS NOT INITIAL.
+      mv_cgui_nav = abap_true.
+      client->nav_app_leave( client->get_app_prev( ) ).
+      RETURN.
+    ENDIF.
     IF lv_top = 0.
       mv_cgui_screen = cs_screen-selection.
       CLEAR mv_cgui_dynpro.
@@ -3864,6 +3898,13 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
         su3_result( ).
       WHEN cs_pending-spro.
         spro_result( ).
+
+      WHEN cs_pending-screen.
+        " what followed CALL SCREEN in the caller
+        after_call_screen( lv_field ).
+        IF mv_cgui_screen = cs_screen-selection AND ( mo_cgui_list IS BOUND OR mo_cgui_alv IS BOUND ).
+          mv_cgui_screen = cs_screen-output.
+        ENDIF.
 
       WHEN cs_pending-transport.
         TRY.
