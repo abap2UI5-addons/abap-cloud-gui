@@ -3152,9 +3152,33 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
     ASSIGN lr_val->* TO <field_val>.
     DATA(lo_descr) = z2ui5_cl_cgui_context=>rtti_get_value_descr( <field_val> ).
 
-    " MATCHCODE OBJECT - the search help named at the field comes first
     DATA(lv_field_name) = to_upper( field ).
     READ TABLE mt_cgui_field REFERENCE INTO DATA(lr_mc) WITH KEY name = lv_field_name.
+
+    " a CDS entity named as the value help comes first - its rows, the
+    " element named the value (else its first column)
+    IF sy-subrc = 0 AND lr_mc->entity IS NOT INITIAL.
+      DATA(lr_entity) = z2ui5_cl_cgui_context=>entity_select( lr_mc->entity ).
+      IF lr_entity IS BOUND.
+        ASSIGN lr_entity->* TO <tab>.
+        IF <tab> IS NOT INITIAL.
+          DATA(lv_elem) = lr_mc->entity_elem.
+          IF lv_elem IS INITIAL.
+            DATA(lo_row) = CAST cl_abap_structdescr( CAST cl_abap_tabledescr(
+                cl_abap_typedescr=>describe_by_data( <tab> ) )->get_table_line_type( ) ).
+            READ TABLE lo_row->components INTO DATA(ls_first) INDEX 1.
+            lv_elem = ls_first-name.
+          ENDIF.
+          value_help_popup( tab   = <tab>
+                            col   = lv_elem
+                            title = value_help_title( field ) ).
+          RETURN.
+        ENDIF.
+      ENDIF.
+    ENDIF.
+
+    " MATCHCODE OBJECT - the search help named at the field
+    READ TABLE mt_cgui_field REFERENCE INTO lr_mc WITH KEY name = lv_field_name.
     IF sy-subrc = 0 AND lr_mc->matchcode IS NOT INITIAL.
       DATA(ls_mc) = VALUE z2ui5_cl_cgui_context=>ty_s_search_help( name  = lr_mc->matchcode
                                                                   field = matchcode_field( lr_mc->matchcode ) ).

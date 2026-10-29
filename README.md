@@ -297,6 +297,22 @@ METHOD at_value_request.
 ENDMETHOD.
 ```
 
+The standard F4 asks, in this order: a **CDS value help** named at the
+field, the search help of `MATCHCODE OBJECT`, the fixed values of the domain,
+the elementary **search help** of the data element (on premise, its hit list
+without a dialog), and the **value table** with the texts of its **text
+table** (on premise). The CDS value help is what
+`@Consumption.valueHelpDefinition` names - a CDS view entity, or any table or
+view of the DDIC, read on ABAP Cloud as on premise, the element given the
+value (else its first one):
+
+```abap
+screen->parameter( val                = p_land
+                   text               = `Country`
+                   value_help_entity  = `I_Country`
+                   value_help_element = `Country` ).
+```
+
 On a select-option F4 picks any number of values, which become lines
 `I EQ` — the ones already selected come up checked. A button beside the
 field opens the range popup, the classic multiple selection, for every
@@ -613,8 +629,10 @@ Selection screen
 
 - [x] F4 inside the range popup of a select-option - `at_value_request( )`
       of the select-option, the values picked become lines of the popup
-- [ ] Value helps: CDS value helps (`@Consumption.valueHelpDefinition`),
-      text tables beside value tables, search helps
+- [x] Value helps: CDS value helps (`value_help_entity` - what
+      `@Consumption.valueHelpDefinition` names, on ABAP Cloud too), text
+      tables beside value tables, search helps (`MATCHCODE OBJECT` and the
+      data element's)
 - [x] `AT SELECTION-SCREEN ON BLOCK`, `ON RADIOBUTTON GROUP`, `AS LISTBOX`
 - [x] `MEMORY ID`
 - [x] A phone layout of the selection screen: labels above the fields, a

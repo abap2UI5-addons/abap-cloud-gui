@@ -84,6 +84,8 @@ CLASS z2ui5_cl_cgui_selscreen DEFINITION PUBLIC FINAL CREATE PRIVATE.
         block        TYPE string,
         group        TYPE string,
         matchcode    TYPE string,
+        entity       TYPE string,
+        entity_elem  TYPE string,
       END OF ty_s_field.
 
     TYPES:
@@ -200,6 +202,8 @@ CLASS z2ui5_cl_cgui_selscreen DEFINITION PUBLIC FINAL CREATE PRIVATE.
         help           TYPE abap_bool DEFAULT abap_true
         help_request   TYPE abap_bool DEFAULT abap_false
         matchcode      TYPE clike     OPTIONAL
+        value_help_entity  TYPE clike     OPTIONAL
+        value_help_element TYPE clike     OPTIONAL
         read_only      TYPE abap_bool DEFAULT abap_false
       RETURNING
         VALUE(result)  TYPE REF TO z2ui5_cl_cgui_selscreen.
@@ -249,6 +253,8 @@ CLASS z2ui5_cl_cgui_selscreen DEFINITION PUBLIC FINAL CREATE PRIVATE.
         memory_id      TYPE clike    OPTIONAL
         visible_length TYPE i        DEFAULT 0
         matchcode      TYPE clike    OPTIONAL
+        value_help_entity  TYPE clike     OPTIONAL
+        value_help_element TYPE clike     OPTIONAL
       RETURNING
         VALUE(result) TYPE REF TO z2ui5_cl_cgui_selscreen.
 
@@ -512,6 +518,8 @@ CLASS z2ui5_cl_cgui_selscreen DEFINITION PUBLIC FINAL CREATE PRIVATE.
         lines        TYPE i,
         memory_id    TYPE string,
         matchcode    TYPE string,
+        entity       TYPE string,
+        entity_elem  TYPE string,
         intensified  TYPE abap_bool,
         recommended  TYPE abap_bool,
         for_field    TYPE string,
@@ -757,9 +765,13 @@ CLASS z2ui5_cl_cgui_selscreen IMPLEMENTATION.
     ls_item-user_command = user_command.
     ls_item-memory_id    = to_upper( memory_id ).
     ls_item-value_check  = value_check.
-    " MATCHCODE OBJECT - the search help named
+    " MATCHCODE OBJECT - the search help named; a CDS entity (or a table)
+    " as the value help, its element the value - what
+    " @Consumption.valueHelpDefinition names
     ls_item-matchcode    = to_upper( matchcode ).
-    IF ls_item-matchcode IS NOT INITIAL
+    ls_item-entity       = to_upper( value_help_entity ).
+    ls_item-entity_elem  = to_upper( value_help_element ).
+    IF ( ls_item-matchcode IS NOT INITIAL OR ls_item-entity IS NOT INITIAL )
         AND ( ls_item-control = cs_control-input OR ls_item-control = cs_control-number ).
       ls_item-value_help = abap_true.
     ENDIF.
@@ -984,9 +996,12 @@ CLASS z2ui5_cl_cgui_selscreen IMPLEMENTATION.
     ls_item-memory_id    = to_upper( memory_id ).
     ls_item-visible_len  = visible_length.
     ls_item-matchcode    = to_upper( matchcode ).
+    ls_item-entity       = to_upper( value_help_entity ).
+    ls_item-entity_elem  = to_upper( value_help_element ).
     ls_item-lines        = lines( val ).
     ls_item-value        = z2ui5_cl_cgui_context=>range_to_text( val ).
-    ls_item-value_help   = xsdbool( value_help = abap_true OR ls_item-matchcode IS NOT INITIAL ).
+    ls_item-value_help   = xsdbool( value_help = abap_true OR ls_item-matchcode IS NOT INITIAL
+                                    OR ls_item-entity IS NOT INITIAL ).
     IF ls_item-value_help = abap_false.
       ls_item-value_help = value_help_check( val ).
     ENDIF.
@@ -1170,7 +1185,9 @@ CLASS z2ui5_cl_cgui_selscreen IMPLEMENTATION.
                       dtel         = lr_item->dtel
                       block        = lv_block
                       group        = COND #( WHEN lr_item->kind = cs_kind-radiobutton THEN lr_item->group )
-                      matchcode    = lr_item->matchcode ) INTO TABLE result.
+                      matchcode    = lr_item->matchcode
+                      entity       = lr_item->entity
+                      entity_elem  = lr_item->entity_elem ) INTO TABLE result.
     ENDLOOP.
 
   ENDMETHOD.

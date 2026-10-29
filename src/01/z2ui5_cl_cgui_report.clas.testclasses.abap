@@ -117,6 +117,9 @@ CLASS ltcl_report DEFINITION INHERITING FROM z2ui5_cl_cgui_report FINAL.
     DATA mv_then     TYPE string.
     " SPRO: may the user maintain the customizing parameters
     DATA mv_customizing TYPE abap_bool.
+    " a field whose value help is an entity - the variant table stands in
+    " for a CDS view entity
+    DATA p_var TYPE c LENGTH 40.
 
     "! the callback of a popup with then = `ON_SURE`
     METHODS on_sure
@@ -251,6 +254,7 @@ CLASS ltcl_test DEFINITION FINAL FOR TESTING
     METHODS command_field FOR TESTING.
     METHODS user_parameters FOR TESTING.
     METHODS parameter_levels FOR TESTING.
+    METHODS value_help_entity FOR TESTING.
     METHODS application_log FOR TESTING.
     METHODS alv_chart FOR TESTING.
     METHODS transport_popup FOR TESTING.
@@ -337,7 +341,11 @@ CLASS ltcl_report IMPLEMENTATION.
         )->select_option( val  = s_date
                           text = `Date`
         )->select_option( val  = s_code
-                          text = `Code` ).
+                          text = `Code`
+        )->parameter( val                = p_var
+                      text               = `Report of a variant`
+                      value_help_entity  = `Z2UI5_CGUI_VAR`
+                      value_help_element = `REPORT` ).
 
   ENDMETHOD.
 
@@ -1679,6 +1687,30 @@ CLASS ltcl_test IMPLEMENTATION.
     lo_next->spa_load( ).
     cl_abap_unit_assert=>assert_equals( act = lo_next->get_parameter_id( `ZCGUI_ADD` )
                                         exp = `0017` ).
+
+  ENDMETHOD.
+
+  METHOD value_help_entity.
+
+    FIELD-SYMBOLS <rows> TYPE STANDARD TABLE.
+
+    " a row in the entity: the user parameters of the server store
+    init( ).
+    mo_cut->set_parameter_id( id    = `ZCGUI_ENT`
+                              value = `X` ).
+
+    " F4 on the field: the rows of the entity, the element named the value
+    event( name = z2ui5_cl_cgui_selscreen=>cs_event-value_request
+           args = VALUE #( ( `P_VAR` ) ) ).
+    DATA(lo_select) = CAST z2ui5_cl_cgui_select( mo_client->mo_called ).
+    ASSIGN lo_select->mr_source->* TO <rows>.
+    cl_abap_unit_assert=>assert_true( xsdbool( lines( <rows> ) > 0 ) ).
+
+    " an entity that does not exist: no popup, the message of no help
+    CLEAR mo_client->mo_called.
+    mo_cut->mt_cgui_field[ name = `P_VAR` ]-entity = `ZZZ_NO_SUCH_ENTITY`.
+    mo_cut->value_help_ddic( `P_VAR` ).
+    cl_abap_unit_assert=>assert_not_bound( mo_client->mo_called ).
 
   ENDMETHOD.
 
