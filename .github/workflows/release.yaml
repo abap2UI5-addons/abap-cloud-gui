@@ -1,0 +1,73 @@
+name: release
+
+# A tag vX.Y.Z on main is a release (RELEASING.md): the tag, package.json and
+# the CHANGELOG section have to agree, the gates run once more on the tagged
+# commit, and the GitHub release gets the CHANGELOG section as its text and
+# two abapGit zips - the package as it is, and downported to 7.02.
+
+on:
+  push:
+    tags: ['v*.*.*']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    if: github.repository == 'abap2UI5-addons/abap-cloud-gui'
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+    - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+      with:
+        node-version: '22'
+        cache: 'npm'
+    - run: npm ci
+
+    - name: tag, package.json and CHANGELOG agree
+      env:
+        TAG: ${{ github.ref_name }}
+      run: |
+        version="${TAG#v}"
+        pkg="$(node -p 'require("./package.json").version')"
+        if [ "$pkg" != "$version" ]; then
+          echo "::error::the tag is $TAG, package.json says $pkg"
+          exit 1
+        fi
+        # the section of the version, up to the next one
+        awk -v v="$version" '
+          $0 ~ "^## " v "( |$)" { on = 1; next }
+          on && /^## / { exit }
+          on { print }
+        ' CHANGELOG.md > build-notes.md
+        if [ ! -s build-notes.md ]; then
+          echo "::error::CHANGELOG.md has no section ## $version"
+          exit 1
+        fi
+
+    - run: npm run check
+
+    - name: the abapGit zips
+      env:
+        TAG: ${{ github.ref_name }}
+      run: |
+        version="${TAG#v}"
+        mkdir -p dist
+        zip -qr "dist/abap-cloud-gui-$version.zip" .abapgit.xml src
+        # check:702 leaves the downported copy in build/702
+        cp .abapgit.xml build/702/
+        (cd build/702 && zip -qr "../../dist/abap-cloud-gui-$version-702.zip" .abapgit.xml src)
+        ls -l dist
+
+    - name: the GitHub release
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        TAG: ${{ github.ref_name }}
+      run: gh release create "$TAG" dist/*.zip --title "$TAG" --notes-file build-notes.md --verify-tag

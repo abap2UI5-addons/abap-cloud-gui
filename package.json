@@ -1,7 +1,7 @@
 {
   "name": "abap-cloud-gui",
   "private": true,
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "Write abap2UI5 apps like classic ABAP reports - selection screens, WRITE lists, ALV grids and report events, on ABAP Cloud and NW 7.02.",
   "scripts": {
     "lint": "abaplint abaplint.jsonc",

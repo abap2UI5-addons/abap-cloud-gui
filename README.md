@@ -61,8 +61,13 @@ What it is not:
 **Steps** - with [abapGit](https://abapgit.org), in this order:
 
 1. [abap2UI5](https://github.com/abap2UI5/abap2UI5)
-2. this repository (branch `main`) - classes, two interfaces and the two
-   tables `Z2UI5_CGUI_VAR` / `Z2UI5_CGUI_LAY`; nothing else to set up
+2. this repository - classes, two interfaces and the two tables
+   `Z2UI5_CGUI_VAR` / `Z2UI5_CGUI_LAY`; nothing else to set up. A release
+   (a tag `vX.Y.Z`, [CHANGELOG.md](CHANGELOG.md)) is what to pin: pull the
+   tag, or import the zip of its
+   [GitHub release](https://github.com/abap2UI5-addons/abap-cloud-gui/releases)
+   - `abap-cloud-gui-X.Y.Z-702.zip` is the copy downported to 7.02.
+   Branch `main` is the newest state the CI proved
 
 **Start** - run a sample like any abap2UI5 app, e.g.
 `?app_start=z2ui5_cl_cgui_sample_05` for a complete report.
