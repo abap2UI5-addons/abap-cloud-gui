@@ -52,7 +52,7 @@ export const isReport = (source) => /^\s*(REPORT|PROGRAM)\b/im.test(source);
 
 // A refusal's reason without what is particular to one report - the name
 // in quotes, a number - so the same reason counts as one line.
-const reasonOf = (message) => message.split(" - ")[0].replace(/'[^']*'/g, "'…'").replace(/`[^`]*`/g, "`…`").replace(/\b\d+\b/g, "n").trim();
+export const reasonOf = (message) => message.split(" - ")[0].replace(/'[^']*'/g, "'…'").replace(/`[^`]*`/g, "`…`").replace(/\b\d+\b/g, "n").trim();
 const todoOf = (message) => message.replace(/'[^']*'/g, "'…'").replace(/`[^`]*`/g, "`…`").replace(/\b[A-Z][A-Z0-9_/]{2,}\b/g, "…").replace(/(?:…, )+…/g, "…").replace(/\b\d+\b/g, "n").trim();
 
 /** the coverage of the reports in `files`; read(name) answers an include,
@@ -63,30 +63,12 @@ const todoOf = (message) => message.replace(/'[^']*'/g, "'…'").replace(/`[^`]*
 export function coverage(files, { read, className, keep = false, deps, wrappers = false, successors = false } = {}) {
   const rows = [];
   for (const file of files) {
-    const raw = readFileSync(file, "utf8");
-    if (!isReport(raw)) continue;
-    const dir = dirname(file);
-    const includes = inlineIncludes(raw, { file, read: read ?? includesFrom([dir]) });
-    const xml = file.replace(/\.abap$/i, ".xml");
-    let textpool;
-    try {
-      textpool = parseTextpool(readFileSync(xml, "utf8"));
-    } catch {
-      textpool = undefined;
-    }
-    const m = /^(.+)\.prog\.abap$/i.exec(basename(file));
+    const report = reportOf(file, { read, className, deps, wrappers, successors });
+    if (!report) continue;
+    const { includes, needs } = report;
     let result;
-    const needs = deps ? dependenciesOf(includes.source, deps) : undefined;
     try {
-      const reader = read ?? includesFrom([dir]);
-      result = convert(includes.source, {
-        file, programName: m ? m[1].replace(/#/g, "/") : undefined, textpool, origin: includes.origin,
-        className: className?.(file),
-        deps: needs,
-        wrappers,
-        successors,
-        classFor: (program) => (reader(program) !== undefined ? defaultClassName(program) : undefined),
-      });
+      result = report.convert(includes.source);
     } catch (e) {
       rows.push({ file, crashed: String(e?.message ?? e) });
       continue;
@@ -109,6 +91,45 @@ export function coverage(files, { read, className, keep = false, deps, wrappers 
     });
   }
   return rows;
+}
+
+/** a report of the folder as the converter takes it: its source with the
+ *  includes inlined, its text pool, the dependencies it reads, and
+ *  convert(text) - the conversion of that text, or of another one in its
+ *  place (the AI loop's answer), with the same options. undefined for an
+ *  include, which is no report of its own */
+export function reportOf(file, { read, className, deps, wrappers = false, successors = false } = {}) {
+  const raw = readFileSync(file, "utf8");
+  if (!isReport(raw)) return undefined;
+  const dir = dirname(file);
+  const reader = read ?? includesFrom([dir]);
+  const includes = inlineIncludes(raw, { file, read: reader });
+  const xml = file.replace(/\.abap$/i, ".xml");
+  let textpool;
+  try {
+    textpool = parseTextpool(readFileSync(xml, "utf8"));
+  } catch {
+    textpool = undefined;
+  }
+  const m = /^(.+)\.prog\.abap$/i.exec(basename(file));
+  const needs = deps ? dependenciesOf(includes.source, deps) : undefined;
+  const name = className?.(file);
+  return {
+    file,
+    includes,
+    textpool,
+    needs,
+    convert: (text) => convert(text, {
+      file, programName: m ? m[1].replace(/#/g, "/") : undefined, textpool,
+      // the rows of the includes are those of the inlined source only
+      origin: text.trimEnd() === includes.source.trimEnd() ? includes.origin : undefined,
+      className: name,
+      deps: needs,
+      wrappers,
+      successors,
+      classFor: (program) => (reader(program) !== undefined ? defaultClassName(program) : undefined),
+    }),
+  };
 }
 
 /** the counts of `key` over the rows: how many reports carry it at least once */

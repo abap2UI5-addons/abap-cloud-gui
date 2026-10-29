@@ -210,6 +210,29 @@ kept, `--offline` uses the cache alone. The workflow
 `.github/workflows/report2cloud-web.yaml` runs it weekly and writes the
 summary into the job summary; it fails when a report crashes the converter.
 
+### The AI loop, measured
+
+```
+npm run report2cloud:eval -- [--cache dir | --corpus test] [--limit n] [--model id] [--parallel n] [--json file] [--summary file] [--dry]
+```
+
+runs the AI assistant of the site (`site/assistant.mjs`, the same prompt,
+the same samples, the converter as the judge, at most three rounds) over the
+reports of the web corpus the converter refuses - the cache of
+`report2cloud:web`, or its own test corpus with `--corpus test` - and
+measures how far it gets: the share **accepted** (the converter takes the
+last answer) and the share **clean** (accepted, and at least 90 % of the
+lines that were not refused are unchanged - a loop that deletes what it
+cannot convert, or writes another report, is accepted but not clean), the
+rounds it took, for each kind of refusal in how many reports the loop
+removed it, the errors, and the tokens. `--limit n` takes n of the refused
+reports spread evenly over the corpus, the same n for the same corpus, so
+two runs - two models, two prompts - compare. The key is
+`ANTHROPIC_API_KEY`; `--dry` runs everything with a model that answers the
+report unchanged - no key, nothing accepted, the floor. The workflow
+`.github/workflows/report2cloud-eval.yaml` runs it by hand, with the
+repository secret `ANTHROPIC_API_KEY`.
+
 ## An example
 
 ```abap
@@ -546,6 +569,7 @@ of the samples: one call per line, the parameters aligned.
 | `package.mjs` | a whole package in one run: the classes and `estate.md` |
 | `lib/estate.mjs` | the calls between the reports of a package, the order to migrate them in |
 | `web.mjs` | the measurement over the open-source reports of the web (`report2cloud:web`) |
+| `eval.mjs` | the AI loop of the site measured on the refused reports of a corpus (`report2cloud:eval`) |
 | `lib/convert.mjs` | the converter |
 | `lib/includes.mjs` | the INCLUDEs of a report, inlined from the files beside it, with where every line came from |
 | `lib/abap.mjs` | helpers over the syntax tree, the token renderer |

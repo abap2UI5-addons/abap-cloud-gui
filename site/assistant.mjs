@@ -79,17 +79,28 @@ function answerOf(text) {
   return { source: last[1].replace(/\s+$/, "\n"), notes: text.slice(0, last.index).trim() };
 }
 
+/** the tokens of the answers so far, summed - what the evaluation
+ *  (tools/report2cloud/eval.mjs) prices */
+function addUsage(sum, usage = {}) {
+  for (const k of ["input_tokens", "output_tokens", "cache_creation_input_tokens", "cache_read_input_tokens"]) sum[k] = (sum[k] ?? 0) + (usage[k] ?? 0);
+  return sum;
+}
+
 const textOf = (message) => message.content.filter((b) => b.type === "text").map((b) => b.text).join("\n");
 
 /**
  * Rewrites the refused statements of a report.
  *   convert(source) - the converter: { ok, refusals }
  *   onStep({ state, text }) - the progress
- * Answers { source, notes, result, rounds } - result the conversion of the
- * last answer (result.ok: the converter took it).
+ *   client, model - another client than the one of apiKey, another model
+ *   (the evaluation's)
+ * Answers { source, notes, result, rounds, usage } - result the conversion of
+ * the last answer (result.ok: the converter took it), usage the tokens of
+ * all rounds.
  */
-export async function rewriteRefused({ apiKey, report, result, samples, convert, onStep, signal }) {
-  const client = new Anthropic({ apiKey, dangerouslyAllowBrowser: true, maxRetries: 1 });
+export async function rewriteRefused({ apiKey, client: given, model = MODEL, report, result, samples, convert, onStep = () => {}, signal }) {
+  const client = given ?? new Anthropic({ apiKey, dangerouslyAllowBrowser: true, maxRetries: 1 });
+  const usage = {};
   const examples = closest(report, samples)
     .map((s) => `### ${s.name} - ${s.title}\n\n\`\`\`abap\n${s.source.trim()}\n\`\`\``).join("\n\n");
   const messages = [{
@@ -105,10 +116,10 @@ export async function rewriteRefused({ apiKey, report, result, samples, convert,
   let converted = result;
   for (let round = 1; round <= ROUNDS; round++) {
     onStep({ state: "wait", text: round === 1
-      ? `Asked ${MODEL} to rewrite ${result.refusals.length} refused statement(s)...`
+      ? `Asked ${model} to rewrite ${result.refusals.length} refused statement(s)...`
       : `Round ${round}: asked it again, with the ${converted.refusals.length} statement(s) still refused...` });
     const stream = client.beta.messages.stream({
-      model: MODEL,
+      model,
       max_tokens: 64000,
       // a decline for policy reasons is retried on the model the API picks
       betas: ["server-side-fallback-2026-07-01"],
@@ -119,6 +130,7 @@ export async function rewriteRefused({ apiKey, report, result, samples, convert,
       messages,
     }, { signal });
     const message = await stream.finalMessage();
+    addUsage(usage, message.usage);
     if (message.stop_reason === "refusal") throw new Error("the model declined the request");
     if (message.stop_reason === "max_tokens") throw new Error("the answer was cut off - the report is too long for one answer");
     const text = textOf(message);
@@ -128,13 +140,13 @@ export async function rewriteRefused({ apiKey, report, result, samples, convert,
     converted = convert(answer.source);
     if (converted.ok) {
       onStep({ state: "ok", text: `Round ${round}: the converter takes the rewritten report.` });
-      return { ...answer, result: converted, rounds: round };
+      return { ...answer, result: converted, rounds: round, usage };
     }
     onStep({ state: "bad", text: `Round ${round}: the converter still refuses ${converted.refusals.length} statement(s).` });
     messages.push({ role: "assistant", content: message.content });
     messages.push({ role: "user", content: `The converter still refuses these statements of your report:\n\n${refusalsText(answer.source, converted.refusals)}\n\nRewrite them the same way, and answer with the list and the whole report again.` });
   }
-  return { ...answer, result: converted, rounds: ROUNDS };
+  return { ...answer, result: converted, rounds: ROUNDS, usage };
 }
 
 const POLISH = `You polish ABAP classes that a deterministic converter, report2cloud, wrote from classic reports. The class inherits from z2ui5_cl_cgui_report of abap-cloud-gui, which runs it as an abap2UI5 app: the event blocks of the report are methods of the same name, PARAMETERS and SELECT-OPTIONS are attributes, write( ) writes the list, alv( ) shows a grid.

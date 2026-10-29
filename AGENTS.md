@@ -203,7 +203,11 @@ report2cloud:web` (`web.mjs`) is that corpus: the reports of the
 open-source ABAP repositories of the dotabap list, cloned sparse into
 `build/web-corpus` (read, never run, never committed - a test case taken
 from it is rewritten by hand), measured weekly by
-`.github/workflows/report2cloud-web.yaml`.
+`.github/workflows/report2cloud-web.yaml`. `npm run report2cloud:eval`
+(`eval.mjs`) measures the AI loop of the site (`site/assistant.mjs`) on
+the reports of that corpus the converter refuses - accepted, clean, per
+kind of refusal; with `--dry` it needs no key. A change to the prompt or
+the model is compared on the same `--limit` before and after.
 
 - **It writes against the API of `src/01` as it is.** A change to a
   signature of `z2ui5_cl_cgui_report`, `_selscreen`, `_list` or `_alv`
@@ -261,7 +265,8 @@ from it is rewritten by hand), measured weekly by
   keeps its body position as `vrow` / `vcol`, which `renderTokens( )` reads
   the spacing from.
 - CI: `.github/workflows/report2cloud.yaml`; the weekly web corpus
-  `.github/workflows/report2cloud-web.yaml`.
+  `.github/workflows/report2cloud-web.yaml`; the AI loop, by hand,
+  `.github/workflows/report2cloud-eval.yaml`.
 
 ## Verifying at runtime
 

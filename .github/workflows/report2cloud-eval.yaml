@@ -1,0 +1,59 @@
+name: report2cloud AI loop
+
+# The AI assistant of the site measured on the web corpus, by hand: the
+# repositories of the community list cloned shallow and sparse as in
+# report2cloud-web.yaml, then the refused reports through the loop of
+# site/assistant.mjs (tools/report2cloud/eval.mjs) - the share the converter
+# accepts, the share that ends clean, per kind of refusal. A model costs
+# money, so it runs on demand only, with the repository secret
+# ANTHROPIC_API_KEY; without it the run is dry - the harness without a model.
+
+on:
+  workflow_dispatch:
+    inputs:
+      limit:
+        description: 'refused reports to take, spread over the corpus'
+        default: '50'
+      model:
+        description: 'model id (empty: the one of the site)'
+        default: ''
+
+permissions:
+  contents: read
+
+concurrency:
+  group: report2cloud-eval
+  cancel-in-progress: false
+
+jobs:
+  eval:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+    - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+      with:
+        node-version: '22'
+        cache: 'npm'
+    - run: npm ci
+    # the clones; its summary is not this job's
+    - run: npm run report2cloud:web > /dev/null
+    - name: eval
+      env:
+        ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        LIMIT: ${{ inputs.limit }}
+        MODEL: ${{ inputs.model }}
+      run: |
+        args=(--limit "$LIMIT" --summary "$GITHUB_STEP_SUMMARY" --json build/eval.jsonl)
+        if [ -n "$MODEL" ]; then args+=(--model "$MODEL"); fi
+        if [ -z "$ANTHROPIC_API_KEY" ]; then
+          echo "::notice::no ANTHROPIC_API_KEY secret - a dry run"
+          args+=(--dry)
+        fi
+        npm run report2cloud:eval -- "${args[@]}"
+    - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+      if: always()
+      with:
+        name: eval
+        path: build/eval.jsonl
+        if-no-files-found: ignore

@@ -15,6 +15,7 @@
     "report2cloud:coverage": "node tools/report2cloud/coverage.mjs",
     "report2cloud:package": "node tools/report2cloud/package.mjs",
     "report2cloud:web": "node tools/report2cloud/web.mjs",
+    "report2cloud:eval": "node tools/report2cloud/eval.mjs",
     "test:report2cloud": "node --test \"tools/report2cloud/test/*.test.mjs\"",
     "report2cloud:docs": "node tools/report2cloud/docs.mjs",
     "test:report2cloud:runtime": "node --test --test-concurrency=1 \"tools/report2cloud/test/runtime/*.test.mjs\"",
