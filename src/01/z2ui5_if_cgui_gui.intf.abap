@@ -82,6 +82,12 @@ INTERFACE z2ui5_if_cgui_gui PUBLIC.
       "! a dialog box container: shown with its caption and a Close button
       dialog    TYPE abap_bool,
       buttons   TYPE ty_t_button,
+      "! the keys of a text editor that raise its event - F1, F4
+      keys      TYPE string,
+      "! the selection of a text editor when its key was pressed, as
+      "! offsets into text - from the focus the browser sent
+      sel_from  TYPE i,
+      sel_to    TYPE i,
     END OF ty_s_control,
     ty_t_control TYPE STANDARD TABLE OF ty_s_control WITH EMPTY KEY,
     "! SET HANDLER: the method of handler (or of the class, a static one)

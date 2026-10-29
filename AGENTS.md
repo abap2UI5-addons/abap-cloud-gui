@@ -73,6 +73,16 @@ No regular expressions (`npm run check:regex`). UI5 1.71 is the floor -
 `npm run check:abap2ui5` (the abap2UI5-linter). `npm run check` runs the
 static gates.
 
+## Releases
+
+A release is an annotated tag `vX.Y.Z` on `main` - RELEASING.md has the
+steps, CHANGELOG.md a section per release (`## Unreleased` collects what a
+pull request adds). `.github/workflows/release.yaml` refuses a tag that
+package.json or the CHANGELOG disagree with, runs `npm run check` on it and
+publishes the GitHub release with the abapGit zip and the 7.02 zip. From
+1.0.0 on the public API of `src/01` follows semantic versioning - a change
+that removes or retypes something public is a major release.
+
 ## Rules learned the hard way
 
 - **No PRIVATE instance attributes on an app class or on an object an app

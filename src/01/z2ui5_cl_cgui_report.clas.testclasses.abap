@@ -113,6 +113,8 @@ CLASS ltcl_report DEFINITION INHERITING FROM z2ui5_cl_cgui_report FINAL.
     DATA mv_gui      TYPE abap_bool.
     DATA mo_edit     TYPE REF TO z2ui5_cl_cgui_gui_textedit.
     DATA mv_note     TYPE string.
+    " F1 in it: the line and position of the cursor
+    DATA mv_f1       TYPE string.
     DATA mv_replace TYPE abap_bool.
     DATA mv_exit     TYPE string.
     DATA mv_exit_err TYPE abap_bool.
@@ -127,6 +129,10 @@ CLASS ltcl_report DEFINITION INHERITING FROM z2ui5_cl_cgui_report FINAL.
     METHODS on_sure
       IMPORTING
         answer TYPE string.
+
+    METHODS on_f1 FOR EVENT f1 OF z2ui5_cl_cgui_gui_textedit
+      IMPORTING
+        sender.
 
   PROTECTED SECTION.
     METHODS selection_screen REDEFINITION.
@@ -411,6 +417,10 @@ CLASS ltcl_report IMPLEMENTATION.
     IF mv_gui = abap_true AND mo_edit IS NOT BOUND.
       mo_edit = NEW #( parent = NEW z2ui5_cl_cgui_gui_container( container_name = 'CC' ) ).
       mo_edit->set_textstream( `first note` ).
+      mo_edit->set_registered_events( VALUE z2ui5_cl_cgui_gui=>ty_t_simple_events( ( eventid = z2ui5_cl_cgui_gui_textedit=>event_f1 ) ) ).
+      mo_edit->set_handler( event   = `F1`
+                            method  = `ON_F1`
+                            handler = me ).
     ENDIF.
     set_pf_status( VALUE #( ( name = `SAVE` text = `Save` ) ) ).
     LOOP AT current_screen( )->loop_at_screen( ) INTO DATA(ls_screen) WHERE group1 = `SEA`.
@@ -438,6 +448,17 @@ CLASS ltcl_report IMPLEMENTATION.
       call_subscreen( area  = 'SUB'
                       dynnr = mv_sub ).
     ENDIF.
+
+  ENDMETHOD.
+
+  METHOD on_f1.
+
+    DATA lv_line TYPE i.
+    DATA lv_pos TYPE i.
+
+    sender->get_selection_pos( IMPORTING from_line = lv_line
+                                         from_pos  = lv_pos ).
+    mv_f1 = |{ lv_line }:{ lv_pos }|.
 
   ENDMETHOD.
 
@@ -1232,6 +1253,20 @@ CLASS ltcl_test IMPLEMENTATION.
                                         exp = `typed note` ).
     cl_abap_unit_assert=>assert_equals( act = lines( mo_cut->mt_cgui_gui )
                                         exp = 2 ).
+
+    " F1 registered: the key on the page, the text area with its id
+    DATA(lv_f1_key) = |KEYBOARD_SHORTCUT:F1\|CGUI_GUI_F1\|{ mo_client->z2ui5_if_client~cs_view-main }|.
+    cl_abap_unit_assert=>assert_true( xsdbool( line_exists( mo_client->mt_action[ table_line = lv_f1_key ] ) ) ).
+    cl_abap_unit_assert=>assert_true( xsdbool( mo_client->mv_view CS `cgui_textedit_2` ) ).
+
+    " F1 with the cursor in the second line: the handler, where it stood
+    mo_cut->mt_cgui_gui[ 2 ]-text = |first\nsecond|.
+    mo_client->ms_get-s_focus = VALUE #( id              = `cgui_textedit_2`
+                                         selection_start = 8
+                                         selection_end   = 8 ).
+    event( z2ui5_cl_cgui_report=>cs_ucomm-gui_f1 ).
+    cl_abap_unit_assert=>assert_equals( act = mo_report->mv_f1
+                                        exp = `2:3` ).
 
   ENDMETHOD.
 

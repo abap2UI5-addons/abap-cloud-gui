@@ -74,6 +74,9 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
         palette           TYPE string VALUE `CGUI_PALETTE`,
         enter             TYPE string VALUE `CGUI_ENTER`,
         gui               TYPE string VALUE `CGUI_GUI`,
+        " F1 and F4 in a text editor that registered them
+        gui_f1            TYPE string VALUE `CGUI_GUI_F1`,
+        gui_f4            TYPE string VALUE `CGUI_GUI_F4`,
         draft_discard     TYPE string VALUE `CGUI_DRAFT_DISCARD`,
       END OF cs_ucomm.
 
@@ -105,6 +108,8 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
 
     "! the URL parameter that runs the report without its selection screen
     CONSTANTS cv_cgui_url_skip TYPE string VALUE `SKIP_SCREEN`.
+    "! the id of the text area of text editor n - prefix and n
+    CONSTANTS cv_cgui_textedit_id TYPE string VALUE `cgui_textedit_`.
 
     TYPES:
       "! the inputs from and to of the select-options - the buffer the screen
@@ -1305,6 +1310,11 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
         id   TYPE i
         node TYPE REF TO z2ui5_cl_ui5_view_builder.
 
+    "! F1 or F4 in a text editor - its event, the selection from the focus
+    METHODS gui_key
+      IMPORTING
+        key TYPE string.
+
     "! an event of the browser for the control id
     METHODS gui_event
       IMPORTING
@@ -2447,6 +2457,37 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
 
   ENDMETHOD.
 
+  METHOD gui_key.
+
+    " the editor with the focus, else the first that registered the key
+    DATA(ls_focus) = client->get( )-s_focus.
+    DATA(lv_id) = 0.
+    IF ls_focus-id CP |{ cv_cgui_textedit_id }*|.
+      lv_id = CONV i( substring( val = ls_focus-id
+                                 off = strlen( cv_cgui_textedit_id ) ) ).
+    ENDIF.
+    LOOP AT mt_cgui_gui ASSIGNING FIELD-SYMBOL(<control>)
+         WHERE kind = z2ui5_if_cgui_gui=>cs_kind-textedit AND freed = abap_false.
+      DATA(lv_index) = sy-tabix.
+      IF NOT ( lv_id = 0 OR lv_index = lv_id ).
+        CONTINUE.
+      ENDIF.
+      SPLIT <control>-keys AT `,` INTO TABLE DATA(lt_key).
+      IF NOT line_exists( lt_key[ table_line = key ] ).
+        CONTINUE.
+      ENDIF.
+      IF lv_index = lv_id.
+        <control>-sel_from = ls_focus-selection_start.
+        <control>-sel_to = ls_focus-selection_end.
+      ENDIF.
+      gui_event( id    = lv_index
+                 event = key
+                 value = `` ).
+      RETURN.
+    ENDLOOP.
+
+  ENDMETHOD.
+
   METHOD gui_html_frame.
 
     IF mv_cgui_html_frame IS INITIAL.
@@ -2526,6 +2567,7 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
 
       WHEN z2ui5_if_cgui_gui=>cs_kind-textedit.
         node->tag( `TextArea`
+            )->a( n = `id`       t = |{ cv_cgui_textedit_id }{ id }|
             )->a( n = `value`    v = client->_bind( val       = <control>-text
                                                     tab       = mt_cgui_gui
                                                     tab_index = id )
@@ -3636,6 +3678,9 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
                              column = ls_hotspot-column
                              link   = abap_true ).
         ENDIF.
+
+      WHEN cs_ucomm-gui_f1 OR cs_ucomm-gui_f4.
+        gui_key( COND #( WHEN lv_event = cs_ucomm-gui_f1 THEN `F1` ELSE `F4` ) ).
 
       WHEN cs_ucomm-gui.
         " an event of a SAP GUI control: id, event, value - or the switch to
@@ -7467,12 +7512,31 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
 
   METHOD shortcuts_register.
 
+    DATA lt_gui_key TYPE string_table.
+
     " F8 Execute and F3 Back, as in the SAP GUI - registered with every
     " view, the frontend binds them to the controller of the view
     client->follow_up_action( val   = client->cs_event-keyboard_shortcut
                               t_arg = VALUE #( ( `F8` ) ( cs_ucomm-execute ) ( client->cs_view-main ) ) ).
     client->follow_up_action( val   = client->cs_event-keyboard_shortcut
                               t_arg = VALUE #( ( `F3` ) ( cs_ucomm-back ) ( client->cs_view-main ) ) ).
+    " F1 and F4 of a text editor that registered them
+    LOOP AT mt_cgui_gui INTO DATA(ls_editor)
+         WHERE kind = z2ui5_if_cgui_gui=>cs_kind-textedit AND freed = abap_false AND keys IS NOT INITIAL.
+      SPLIT ls_editor-keys AT `,` INTO TABLE DATA(lt_editor_key).
+      LOOP AT lt_editor_key INTO DATA(lv_editor_key).
+        INSERT lv_editor_key INTO TABLE lt_gui_key.
+      ENDLOOP.
+    ENDLOOP.
+    SORT lt_gui_key.
+    DELETE ADJACENT DUPLICATES FROM lt_gui_key.
+    LOOP AT lt_gui_key INTO DATA(lv_gui_key).
+      client->follow_up_action( val   = client->cs_event-keyboard_shortcut
+                                t_arg = VALUE #( ( lv_gui_key )
+                                                 ( COND #( WHEN lv_gui_key = `F1` THEN cs_ucomm-gui_f1 ELSE cs_ucomm-gui_f4 ) )
+                                                 ( client->cs_view-main ) ) ).
+    ENDLOOP.
+
     " the command palette - with a command field or a catalog to search
     IF mv_cgui_cmd_on = abap_true OR mo_cgui_catalog IS BOUND.
       client->follow_up_action( val   = client->cs_event-keyboard_shortcut
