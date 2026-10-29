@@ -2304,6 +2304,16 @@ class Converter {
     return [...out];
   }
 
+  /** whether a statement calls a local class of the report - converted as
+   *  it is, its controls the stand-ins: it takes the control */
+  callsLocalClass(toks) {
+    const locals = new Set(this.locals.filter((x) => x.kind === "ClassDefinition")
+      .map((u) => lc(nodeText(child(u.stmts[0], "ClassName") ?? u.stmts[0].getChildren()[1]))));
+    const types = this.refTypes();
+    return toks.some((t, i) => (locals.has(t) && ["=>", "("].includes(toks[i + 1])) || (locals.has(types.get(t)) && toks[i + 1] === "->")
+      || (t === "new" && locals.has(toks[i + 1])));
+  }
+
   /** the superclass of a local class of the report */
   localSuper(name) {
     for (const u of this.locals.filter((x) => x.kind === "ClassDefinition")) {
@@ -2351,8 +2361,14 @@ class Converter {
     // cl_abap_browser=>show_html( container = ... ) - its stand-in takes the
     // container of the stand-ins
     if (!used.length && !toks.includes("cl_abap_browser") && /->|=>|\bnew\b|^create\s+object|^call\s+(function|method)/.test(toks.join(" "))) {
+      // an argument of a call: inside its parentheses - not the source of an
+      // assignment (me->x = io_x) or a comparison (IF me->x = io_x)
+      // (or after the EXPORTING of CREATE OBJECT / CALL METHOD without them)
+      let depth = 0;
       for (let i = 1; i < toks.length; i++) {
-        if (this.guiVars.has(toks[i]) && ["=", "("].includes(toks[i - 1]) && toks[i + 1] !== "->") {
+        if (toks[i - 1] === "(" || (toks[i - 1] === "exporting" && depth === 0)) depth++;
+        if (toks[i - 1] === ")") depth--;
+        if (depth > 0 && this.guiVars.has(toks[i]) && ["=", "("].includes(toks[i - 1]) && toks[i + 1] !== "->") {
           // a class of the repository that uses the SAP GUI itself: it is
           // converted too, its cl_gui_* the stand-ins, and takes the control
           const receivers = this.guiReceivers(toks);
@@ -2360,6 +2376,7 @@ class Converter {
             for (const r of receivers) this.guiDeps.add(r);
             return undefined;
           }
+          if (this.callsLocalClass(toks)) return undefined;
           return `${toks[i]}, a SAP GUI control, is handed to a method that is no stand-in - it takes a cl_gui_* object`;
         }
       }
