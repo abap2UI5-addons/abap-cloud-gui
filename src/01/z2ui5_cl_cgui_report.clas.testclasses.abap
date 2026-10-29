@@ -146,6 +146,7 @@ CLASS ltcl_report DEFINITION INHERITING FROM z2ui5_cl_cgui_report FINAL.
     METHODS dynpro_pai REDEFINITION.
     METHODS after_call_screen REDEFINITION.
     METHODS authority_check_customizing REDEFINITION.
+    METHODS selection_screen_dynnr REDEFINITION.
 
 ENDCLASS.
 
@@ -255,6 +256,7 @@ CLASS ltcl_test DEFINITION FINAL FOR TESTING
     METHODS user_parameters FOR TESTING.
     METHODS parameter_levels FOR TESTING.
     METHODS value_help_entity FOR TESTING.
+    METHODS submit_using_screen FOR TESTING.
     METHODS application_log FOR TESTING.
     METHODS alv_chart FOR TESTING.
     METHODS transport_popup FOR TESTING.
@@ -575,6 +577,16 @@ CLASS ltcl_report IMPLEMENTATION.
   METHOD authority_check_customizing.
 
     result = mv_customizing.
+
+  ENDMETHOD.
+
+  METHOD selection_screen_dynnr.
+
+    " SELECTION-SCREEN BEGIN OF SCREEN 1100 - one field of its own
+    IF dynnr = `1100`.
+      screen->parameter( val  = p_text
+                         text = `Note on 1100` ).
+    ENDIF.
 
   ENDMETHOD.
 
@@ -1687,6 +1699,46 @@ CLASS ltcl_test IMPLEMENTATION.
     lo_next->spa_load( ).
     cl_abap_unit_assert=>assert_equals( act = lo_next->get_parameter_id( `ZCGUI_ADD` )
                                         exp = `0017` ).
+
+  ENDMETHOD.
+
+  METHOD submit_using_screen.
+
+    " SUBMIT ... USING SELECTION-SCREEN 1100 VIA SELECTION-SCREEN: the
+    " report shows screen 1100, not its selection screen
+    init( ).
+    mo_cut->submit( report                 = `LTCL_REPORT`
+                    via_selection_screen   = abap_true
+                    using_selection_screen = `1100` ).
+    DATA(lo_called) = CAST ltcl_report( mo_client->mo_called ).
+    DATA(lo_client) = NEW ltcl_client( ).
+    lo_client->mo_app = lo_called.
+    lo_client->mv_init = abap_true.
+    lo_called->z2ui5_if_app~main( lo_client ).
+    cl_abap_unit_assert=>assert_char_cp( act = lo_client->mv_view
+                                         exp = `*Note on 1100*` ).
+    cl_abap_unit_assert=>assert_false( xsdbool( lo_client->mv_view CS `Report of a variant` ) ).
+
+    " as a window: the selection screen as a dialog box over the caller -
+    " no view of its own
+    CLEAR mo_client->mo_called.
+    mo_cut->submit( report    = `LTCL_REPORT`
+                    as_window = abap_true ).
+    lo_called = CAST ltcl_report( mo_client->mo_called ).
+    lo_client = NEW ltcl_client( ).
+    lo_client->mo_app = lo_called.
+    lo_client->mv_init = abap_true.
+    lo_called->z2ui5_if_app~main( lo_client ).
+    cl_abap_unit_assert=>assert_initial( lo_client->mv_view ).
+    cl_abap_unit_assert=>assert_char_cp( act = lo_client->mv_popup
+                                         exp = `*<Dialog*Report of a variant*Execute*` ).
+
+    " Cancel closes it and returns to the caller
+    lo_client->mv_init = abap_false.
+    lo_client->mv_event = z2ui5_cl_cgui_report=>cs_ucomm-back.
+    lo_called->z2ui5_if_app~main( lo_client ).
+    cl_abap_unit_assert=>assert_initial( lo_client->mv_popup ).
+    cl_abap_unit_assert=>assert_true( lo_client->mv_left ).
 
   ENDMETHOD.
 

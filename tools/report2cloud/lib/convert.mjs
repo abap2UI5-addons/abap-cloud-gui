@@ -4930,7 +4930,7 @@ class Converter {
 
   /**
    * SUBMIT report [WITH ...] [VIA SELECTION-SCREEN] [USING SELECTION-SET v]
-   * [AND RETURN] -> submit( report = the class values = ... ): the runtime
+   * [USING SELECTION-SCREEN dynnr] [AND RETURN] -> submit( report = the class values = ... ): the runtime
    * starts the class with the values and Back returns here. A WITH p = v
    * is a parameter value, every other comparison a range line - the runtime
    * takes the kind from the attribute of the called class, so the caller
@@ -4959,8 +4959,8 @@ class Converter {
       this.refuse(s, "SUBMIT ... WITH-FREE SELECTIONS - logical database selections have no counterpart");
       return;
     }
-    if (hasSeq(w, "USING", "SELECTION", "-", "SCREEN") || hasSeq(w, "USING", "SELECTION", "-", "SETS")) {
-      this.refuse(s, "SUBMIT ... USING SELECTION-SCREEN / SELECTION-SETS OF PROGRAM - the class has its standard selection screen and its own variants only");
+    if (hasSeq(w, "USING", "SELECTION", "-", "SETS")) {
+      this.refuse(s, "SUBMIT ... USING SELECTION-SETS OF PROGRAM - the class has its own variants only");
       return;
     }
 
@@ -5047,6 +5047,10 @@ class Converter {
       params.push({ name: "values", value: tab });
     } else if (values.length) params.push({ name: "values", value: values.length === 1 ? `VALUE #( ${values[0]} )` : "VALUE #(" });
     if (hasSeq(w, "VIA", "SELECTION", "-", "SCREEN")) params.push({ name: "via_selection_screen", value: "abap_true" });
+    // USING SELECTION-SCREEN dynnr: the screen of the called class, its
+    // selection_screen_dynnr( ) - the token after SCREEN
+    const screenAt = ch.findIndex((c, i) => isToken(c) && uc(c.get().getStr()) === "SCREEN" && wordAt(i - 1) === "-" && wordAt(i - 2) === "SELECTION" && wordAt(i - 3) === "USING");
+    if (screenAt >= 0 && ch[screenAt + 1]) params.push({ name: "using_selection_screen", value: text(ch[screenAt + 1]) });
     const setAt = ch.findIndex((c, i) => isToken(c) && uc(c.get().getStr()) === "SET" && wordAt(i - 1) === "-" && wordAt(i - 2) === "SELECTION");
     if (setAt >= 0 && ch[setAt + 1]) params.push({ name: "using_variant", value: text(ch[setAt + 1]) });
     if (hasSeq(w, "LINE", "-", "SIZE") || hasSeq(w, "LINE", "-", "COUNT")) this.note("SUBMIT ... LINE-SIZE / LINE-COUNT - dropped, the called class formats its own list");

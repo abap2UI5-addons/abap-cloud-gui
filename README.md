@@ -676,7 +676,11 @@ Dialogs and screens
       needed any more
 - [ ] `CALL SCREEN` of a screen in another class - `CALL SCREEN` of the
       report's own screens and back is there
-- [ ] `CALL SELECTION-SCREEN` of another report, as a popup or by screen number
+- [x] The selection screen of another report, as a popup or by screen
+      number: `submit( using_selection_screen = '1100' )` (SUBMIT ... USING
+      SELECTION-SCREEN, converted by report2cloud) and `submit( as_window =
+      abap_true )` - the called report's screen as a dialog box over the
+      caller, Execute shows its output, Cancel returns
 
 Navigation and transactions
 

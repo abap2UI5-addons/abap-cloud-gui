@@ -998,12 +998,18 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
     "! SUBMIT report WITH ... AND RETURN - starts the report class report
     "! with values; Back returns here. Without via_selection_screen it runs
     "! straight away, as SUBMIT does without VIA SELECTION-SCREEN
+    "! USING SELECTION-SCREEN dynnr - the report shows its screen dynnr
+    "! (selection_screen_dynnr( )) instead of its selection screen; as_window
+    "! - its screen as a dialog box over this one, VIA SELECTION-SCREEN
+    "! STARTING AT: Execute shows its output, Back returns here
     METHODS submit
       IMPORTING
-        report               TYPE clike
-        values               TYPE z2ui5_cl_cgui_variant=>ty_t_value OPTIONAL
-        via_selection_screen TYPE abap_bool DEFAULT abap_false
-        using_variant        TYPE clike     OPTIONAL.
+        report                 TYPE clike
+        values                 TYPE z2ui5_cl_cgui_variant=>ty_t_value OPTIONAL
+        via_selection_screen   TYPE abap_bool DEFAULT abap_false
+        using_variant          TYPE clike     OPTIONAL
+        using_selection_screen TYPE clike     OPTIONAL
+        as_window              TYPE abap_bool DEFAULT abap_false.
 
     "! CALL TRANSACTION code [AND SKIP FIRST SCREEN] - the transaction of
     "! the catalog (set_catalog( )) starts its report class with its
@@ -1185,6 +1191,11 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
     DATA mt_cgui_url           TYPE z2ui5_cl_cgui_variant=>ty_t_value.
     DATA mt_cgui_submit        TYPE z2ui5_cl_cgui_variant=>ty_t_value.
     DATA mv_cgui_called        TYPE abap_bool.
+    " SUBMIT ... USING SELECTION-SCREEN dynnr, and the dialog box of
+    " submit( as_window ) - shown or not
+    DATA mv_cgui_using_dynnr   TYPE string.
+    DATA mv_cgui_as_window     TYPE abap_bool.
+    DATA mv_cgui_as_window_on  TYPE abap_bool.
     DATA mv_cgui_skip          TYPE abap_bool.
     DATA mv_cgui_skipped       TYPE abap_bool.
     DATA mv_cgui_auto_exec     TYPE abap_bool.
@@ -1379,6 +1390,22 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
     METHODS level_push.
 
     METHODS level_pop.
+
+    "! the layout of the selection screen the report shows: its own, or the
+    "! screen of SUBMIT ... USING SELECTION-SCREEN
+    METHODS selection_screen_layout
+      IMPORTING
+        screen TYPE REF TO z2ui5_cl_cgui_selscreen.
+
+    "! the selection screen prepared for rendering - its values, listboxes,
+    "! AT SELECTION-SCREEN OUTPUT, the history
+    METHODS selection_screen_prepare
+      RETURNING
+        VALUE(result) TYPE REF TO z2ui5_cl_cgui_selscreen.
+
+    "! submit( as_window ): the selection screen as a dialog box over the
+    "! report that called this one
+    METHODS view_display_submit_window.
 
     METHODS screen_fields
       RETURNING
@@ -3673,6 +3700,10 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
     " from the output when it ran without one
     IF mv_cgui_called = abap_true
         AND ( mv_cgui_screen = cs_screen-selection OR mv_cgui_skipped = abap_true ).
+      IF mv_cgui_as_window_on = abap_true.
+        client->popup_destroy( ).
+        mv_cgui_as_window_on = abap_false.
+      ENDIF.
       mv_cgui_nav = abap_true.
       client->nav_app_leave( client->get_app_prev( ) ).
       RETURN.
@@ -3870,7 +3901,7 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
     " the layout without rendering - which fields the report has
     DATA(screen) = z2ui5_cl_cgui_selscreen=>factory( client = client
                                                      app    = me ).
-    selection_screen( screen ).
+    selection_screen_layout( screen ).
     result = screen->get_fields( ).
 
   ENDMETHOD.
@@ -3879,7 +3910,7 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
 
     DATA(screen) = z2ui5_cl_cgui_selscreen=>factory( client = client
                                                      app    = me ).
-    selection_screen( screen ).
+    selection_screen_layout( screen ).
     result = xsdbool( screen->loop_at_screen( ) IS INITIAL ).
 
   ENDMETHOD.
@@ -7045,7 +7076,7 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
       RETURN.
     ENDIF.
     result = z2ui5_cl_cgui_selscreen=>factory( client ).
-    selection_screen( result ).
+    selection_screen_layout( result ).
 
   ENDMETHOD.
 
@@ -7100,7 +7131,10 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
 
     lo_app->mt_cgui_submit = values.
     lo_app->mv_cgui_called = abap_true.
-    lo_app->mv_cgui_skip = xsdbool( via_selection_screen = abap_false ).
+    " a dialog box is the selection screen - it is shown
+    lo_app->mv_cgui_skip = xsdbool( via_selection_screen = abap_false AND as_window = abap_false ).
+    lo_app->mv_cgui_using_dynnr = using_selection_screen.
+    lo_app->mv_cgui_as_window = as_window.
     IF using_variant IS NOT INITIAL.
       lo_app->mv_cgui_variant_start = using_variant.
     ENDIF.
@@ -7733,6 +7767,16 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
     DATA lv_button_icon  TYPE string.
     DATA lv_button_ucomm TYPE string.
 
+    " submit( as_window ): the selection screen over the caller's view
+    IF mv_cgui_as_window = abap_true AND mv_cgui_screen = cs_screen-selection AND mv_cgui_denied = abap_false.
+      view_display_submit_window( ).
+      RETURN.
+    ENDIF.
+    IF mv_cgui_as_window_on = abap_true.
+      client->popup_destroy( ).
+      mv_cgui_as_window_on = abap_false.
+    ENDIF.
+
     DATA(view) = z2ui5_cl_ui5_view_builder=>factory(
         )->ele( n = `View` ns = `mvc`
             )->a( n = `xmlns`        v = `sap.m`
@@ -7816,26 +7860,7 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
       lv_button_icon = `sap-icon://nav-back`.
       lv_button_ucomm = cs_ucomm-back.
     ELSE.
-      DATA(screen) = z2ui5_cl_cgui_selscreen=>factory( client          = client
-                                                       value_help_auto = abap_true ).
-      selection_screen( screen ).
-      LOOP AT mt_cgui_vrm REFERENCE INTO DATA(lr_vrm).
-        screen->set_listbox_values( name   = lr_vrm->name
-                                    values = lr_vrm->values ).
-      ENDLOOP.
-      mo_cgui_screen = screen.
-      at_selection_screen_output( screen ).
-      CLEAR mo_cgui_screen.
-      variant_attributes_apply( screen ).
-      value_state_set( screen ).
-      mt_cgui_field = screen->get_fields( ).
-      mt_cgui_fkey = screen->get_function_keys( ).
-      so_buffer_prepare( screen ).
-      tab_binding_prepare( screen ).
-      LOOP AT history_get( ) INTO DATA(ls_history).
-        screen->set_history( name   = ls_history-name
-                             values = ls_history-values ).
-      ENDLOOP.
+      DATA(screen) = selection_screen_prepare( ).
       screen->render( page ).
       gui_docked( dynnr = `1000`
                   node  = page ).
@@ -7949,6 +7974,80 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
     IF mv_cgui_dynnr IS NOT INITIAL.
       view_display_dynnr( ).
     ENDIF.
+
+  ENDMETHOD.
+
+  METHOD selection_screen_layout.
+
+    IF mv_cgui_using_dynnr IS NOT INITIAL.
+      selection_screen_dynnr( dynnr  = mv_cgui_using_dynnr
+                              screen = screen ).
+      RETURN.
+    ENDIF.
+    selection_screen( screen ).
+
+  ENDMETHOD.
+
+  METHOD selection_screen_prepare.
+
+    result = z2ui5_cl_cgui_selscreen=>factory( client          = client
+                                               value_help_auto = abap_true ).
+    selection_screen_layout( result ).
+    LOOP AT mt_cgui_vrm REFERENCE INTO DATA(lr_vrm).
+      result->set_listbox_values( name   = lr_vrm->name
+                                  values = lr_vrm->values ).
+    ENDLOOP.
+    mo_cgui_screen = result.
+    at_selection_screen_output( result ).
+    CLEAR mo_cgui_screen.
+    variant_attributes_apply( result ).
+    value_state_set( result ).
+    mt_cgui_field = result->get_fields( ).
+    mt_cgui_fkey = result->get_function_keys( ).
+    so_buffer_prepare( result ).
+    tab_binding_prepare( result ).
+    LOOP AT history_get( ) INTO DATA(ls_history).
+      result->set_history( name   = ls_history-name
+                           values = ls_history-values ).
+    ENDLOOP.
+
+  ENDMETHOD.
+
+  METHOD view_display_submit_window.
+
+    DATA(screen) = selection_screen_prepare( ).
+
+    DATA(lo_dialog) = z2ui5_cl_ui5_view_builder=>factory(
+        )->ele( n = `FragmentDefinition` ns = `core`
+        )->a( n = `xmlns`      v = `sap.m`
+        )->a( n = `xmlns:core` v = `sap.ui.core`
+        )->ele( `Dialog`
+        )->a( n = `title`        t = mv_cgui_title
+        )->a( n = `contentWidth` v = `40rem`
+        )->a( n = `resizable`    b = abap_true
+        )->a( n = `draggable`    b = abap_true ).
+
+    screen->render( lo_dialog->ele( `content` ) ).
+    " the messages of the checks - a bar of their own only when there are any
+    IF mt_cgui_log IS NOT INITIAL.
+      messages_render( page    = lo_dialog
+                       toolbar = lo_dialog->ele( `subHeader` )->ele( `OverflowToolbar` ) ).
+    ENDIF.
+
+    lo_dialog->ele( `buttons`
+        )->tag( `Button`
+        )->a( n = `text`    t = CONV #( 'Execute'(026) )
+        )->a( n = `icon`    v = `sap-icon://begin`
+        )->a( n = `type`    v = `Emphasized`
+        )->a( n = `tooltip` v = `F8`
+        )->a( n = `press`   v = client->_event( cs_ucomm-execute )
+        )->tag( `Button`
+        )->a( n = `text`    t = CONV #( 'Cancel'(068) )
+        )->a( n = `icon`    v = `sap-icon://decline`
+        )->a( n = `press`   v = client->_event( cs_ucomm-back ) ).
+
+    client->popup_display( lo_dialog->stringify( ) ).
+    mv_cgui_as_window_on = abap_true.
 
   ENDMETHOD.
 
