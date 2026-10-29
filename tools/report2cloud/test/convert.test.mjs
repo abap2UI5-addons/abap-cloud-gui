@@ -1163,6 +1163,42 @@ test("SAP GUI controls: a member, a parameter or an event the stand-ins do not h
   assert.deepEqual(refusalOf(`${head}DATA go_p TYPE REF TO cl_gui_calendar.\n`).map((x) => x.replace(/^\d+:\d+ /, "")), ["SAP GUI controls: cl_gui_calendar has no counterpart - the containers, cl_gui_textedit, cl_gui_html_viewer, cl_gui_toolbar, cl_gui_picture, cl_gui_simple_tree, cl_gui_column_tree, cl_gui_list_tree and cl_gui_alv_grid have (z2ui5_cl_cgui_gui*)"]);
 });
 
+test("SAP GUI controls: F1 of the text editor - the registered event, SET HANDLER and the cursor of get_selection_pos( )", () => {
+  const src = `REPORT zt.
+CLASS lcl DEFINITION.
+  PUBLIC SECTION.
+    DATA mo_e TYPE REF TO cl_gui_textedit.
+    METHODS run.
+    METHODS on_f1 FOR EVENT f1 OF cl_gui_textedit IMPORTING sender.
+ENDCLASS.
+CLASS lcl IMPLEMENTATION.
+  METHOD run.
+    DATA lt_event TYPE cntl_simple_events.
+    DATA ls_event TYPE cntl_simple_event.
+    CREATE OBJECT mo_e EXPORTING parent = cl_gui_container=>default_screen.
+    ls_event-eventid = cl_gui_textedit=>event_f1.
+    APPEND ls_event TO lt_event.
+    mo_e->set_registered_events( events = lt_event ).
+    SET HANDLER me->on_f1 FOR mo_e.
+  ENDMETHOD.
+  METHOD on_f1.
+    DATA lv_line TYPE i.
+    sender->get_selection_pos( IMPORTING from_line = lv_line ).
+    MESSAGE |line { lv_line }| TYPE 'S'.
+  ENDMETHOD.
+ENDCLASS.
+START-OF-SELECTION.
+  NEW lcl( )->run( ).
+`;
+  const r = convert(src, { file: "zt.prog.abap", className: "zcl_t" });
+  assert.deepEqual(r.refusals.map((x) => x.message), []);
+  const text = Object.values(r.files).join("\n");
+  assert.match(text, /FOR EVENT f1 OF z2ui5_cl_cgui_gui_textedit/i);
+  assert.match(text, /z2ui5_cl_cgui_gui_textedit=>event_f1/i);
+  assert.match(text, /event {3}= `F1` \)\./);
+  assert.doesNotMatch(text, /cl_gui_textedit\b/);
+});
+
 test("SAP GUI controls: SET HANDLER of a local class's method is set_handler( ) of the stand-in; what it cannot call is refused", () => {
   const cls = (decl, body) => `REPORT zt.\nCLASS lcl DEFINITION.\n  PUBLIC SECTION.\n    DATA mo_t TYPE REF TO cl_gui_toolbar.\n    DATA mo_c TYPE REF TO cl_gui_custom_container.\n    METHODS run.\n${decl}ENDCLASS.\nCLASS lcl IMPLEMENTATION.\n  METHOD run.\n    CREATE OBJECT mo_c EXPORTING container_name = 'CC'.\n    CREATE OBJECT mo_t EXPORTING parent = mo_c.\n${body}  ENDMETHOD.\n  METHOD on_f.\n  ENDMETHOD.\nENDCLASS.\nSTART-OF-SELECTION.\n  NEW lcl( )->run( ).\n`;
   const handler = "    METHODS on_f FOR EVENT function_selected OF cl_gui_toolbar IMPORTING fcode.\n";

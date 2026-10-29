@@ -833,7 +833,10 @@ Stage 5 - research
       report, their `cl_gui_*` the stand-ins, under their own names
 - [x] Table controls on a dynpro: `LOOP WITH CONTROL` a line at a time in
       PBO and PAI, the columns ready for input inputs of a table
-- [ ] F1 of the editor
+- [x] F1 of the editor: F1 and F4 in the text editor raise its events `f1`
+      and `f4` once `set_registered_events( )` names them, the cursor of
+      the text area as `get_selection_pos( )` - the help of an SQL or code
+      editor on the word under the cursor
 
 Quality, through every stage
 
