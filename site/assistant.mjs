@@ -14,6 +14,13 @@
 // closest to the report, as reports it accepts. No training: the samples and
 // the catalogue are the context.
 //
+// The second stage polishes the class the converter wrote: names, structure,
+// the TODOs the converter left where the report's intent is clear - what a
+// person writing abap-cloud-gui by hand would do. Here the judge is the
+// start: each answer runs in the preview, the syntax check of the playground
+// against the report runtime and abap2UI5 first, and what stops it goes back
+// to the model, for at most ROUNDS rounds.
+//
 // The key is the user's own: it stays in this browser (kept only when they
 // ask) and goes to api.anthropic.com with the request, nowhere else.
 import Anthropic from "@anthropic-ai/sdk";
@@ -128,6 +135,89 @@ export async function rewriteRefused({ apiKey, report, result, samples, convert,
     messages.push({ role: "user", content: `The converter still refuses these statements of your report:\n\n${refusalsText(answer.source, converted.refusals)}\n\nRewrite them the same way, and answer with the list and the whole report again.` });
   }
   return { ...answer, result: converted, rounds: ROUNDS };
+}
+
+const POLISH = `You polish ABAP classes that a deterministic converter, report2cloud, wrote from classic reports. The class inherits from z2ui5_cl_cgui_report of abap-cloud-gui, which runs it as an abap2UI5 app: the event blocks of the report are methods of the same name, PARAMETERS and SELECT-OPTIONS are attributes, write( ) writes the list, alv( ) shows a grid.
+
+The converter is exact but mechanical. Make the class read like one a person wrote by hand for abap-cloud-gui:
+- clear names for methods and variables where the converted ones are cryptic;
+- the structure the logic asks for - a long method split, a repeated block once;
+- the TODOs the converter left, where the report makes clear what was meant; the others stay, as they are;
+- comments only where they say something the code does not.
+
+Keep, exactly:
+- what the class does - the selection screen, the list, the grid, the messages, in the same order;
+- the class name, INHERITING FROM z2ui5_cl_cgui_report, the redefined event methods and their names;
+- the public attributes of the selection screen and their names - a variant stored for the report reads them;
+- the names of the files.
+Use only what the class already uses of the runtime and of abap2UI5 - the reference classes show more of it. ABAP 7.50: no constructs of a later release.
+
+Answer with a short list of what you changed, then each file you changed: a line "### <file name>", then the whole file in one \`\`\`abap code block. Leave out the files you did not change.`;
+
+/** the files of an answer: "### name" then a code block */
+function filesOf(text, names) {
+  const out = {};
+  for (const m of text.matchAll(/^###\s+`?([\w#/.-]+?)`?\s*\n+```abap\s*\n([\s\S]*?)```/gm)) {
+    if (names.includes(m[1])) out[m[1]] = m[2].replace(/\s+$/, "\n");
+  }
+  const first = text.search(/^###\s/m);
+  return { files: out, notes: (first < 0 ? text : text.slice(0, first)).trim() };
+}
+
+const problemsText = (outcome) => (outcome.problems.length
+  ? outcome.problems.map((p) => `- ${p.file}:${p.line} - ${p.message}`).join("\n")
+  : `- ${outcome.said}`);
+
+/**
+ * Polishes the class the converter wrote.
+ *   files - the converted ABAP files, { name: source }, the class first
+ *   check(files) - starts them: { ok, said, problems }
+ * Answers { files, notes, ok, rounds } - files all of them, the changed ones
+ * the model's; ok when the last answer started.
+ */
+export async function polishClass({ apiKey, report, files, todos, references, check, onStep, signal }) {
+  const client = new Anthropic({ apiKey, dangerouslyAllowBrowser: true, maxRetries: 1 });
+  const names = Object.keys(files);
+  const block = (name, source) => `### ${name}\n\n\`\`\`abap\n${source.trim()}\n\`\`\``;
+  const messages = [{
+    role: "user",
+    content: [
+      { type: "text", text: `## Reference classes - written by the converter from other reports\n\n${references.map((r) => block(r.name, r.source)).join("\n\n")}` },
+      { type: "text", text: `## The classic report\n\n\`\`\`abap\n${report.trim()}\n\`\`\`\n\n## The class the converter wrote of it\n\n${names.map((n) => block(n, files[n])).join("\n\n")}\n\n## The TODOs the converter left\n\n${todos.length ? todos.map((t) => `- line ${t.row} of the report: ${t.message}`).join("\n") : "None."}` },
+    ],
+  }];
+  let current = { ...files };
+  let notes = "";
+  for (let round = 1; round <= ROUNDS; round++) {
+    onStep({ state: "wait", text: round === 1 ? `Asked ${MODEL} to polish the class...` : `Round ${round}: asked it again, with what stopped the start...` });
+    const stream = client.beta.messages.stream({
+      model: MODEL,
+      max_tokens: 64000,
+      betas: ["server-side-fallback-2026-07-01"],
+      fallbacks: "default",
+      output_config: { effort: "high" },
+      cache_control: { type: "ephemeral" },
+      system: POLISH,
+      messages,
+    }, { signal });
+    const message = await stream.finalMessage();
+    if (message.stop_reason === "refusal") throw new Error("the model declined the request");
+    if (message.stop_reason === "max_tokens") throw new Error("the answer was cut off - the class is too long for one answer");
+    const answer = filesOf(textOf(message), names);
+    if (!Object.keys(answer.files).length) throw new Error("the answer has no file of the class in it");
+    current = { ...current, ...answer.files };
+    notes = answer.notes;
+    onStep({ state: "wait", text: `Round ${round}: starting the polished class in the preview...` });
+    const outcome = await check(current);
+    if (outcome.ok) {
+      onStep({ state: "ok", text: `Round ${round}: the polished class starts.` });
+      return { files: current, notes, ok: true, rounds: round };
+    }
+    onStep({ state: "bad", text: `Round ${round}: it does not start - ${outcome.problems.length ? `${outcome.problems.length} error(s) in the ABAP` : outcome.said}.` });
+    messages.push({ role: "assistant", content: message.content });
+    messages.push({ role: "user", content: `The polished class does not start:\n\n${problemsText(outcome)}\n\nFix that, and answer with the list and the files you changed again - whole files.` });
+  }
+  return { files: current, notes, ok: false, rounds: ROUNDS };
 }
 
 /** a message for an error of the API - what the user can do about it */

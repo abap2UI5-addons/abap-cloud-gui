@@ -686,8 +686,10 @@ Stage 4 - in the browser, and with an agent
       them in the classic report - the refusal catalogue's rewrites and the
       closest samples as its guide - and the converter checks every answer,
       up to three rounds; the user sees the diff and takes it or not
-- [ ] The AI assistant for the converted class: idiomatic abap-cloud-gui
-      beyond what the converter writes, checked by abaplint and a start
+- [x] The AI assistant polishes the converted class: names, structure, the
+      TODOs where the report makes them clear - each answer started in the
+      preview, checked against the report runtime and abap2UI5, and what
+      stops it goes back to the model, up to three rounds
 - [x] `migrate_report` in the MCP server with the class deployed into the
       sandbox and its first screen answered
 - [ ] An evaluation harness for the AI loop: a model works the migration

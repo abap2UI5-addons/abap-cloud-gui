@@ -204,3 +204,5 @@ textarea::placeholder { color: var(--muted); white-space: pre-wrap; }
 .diff .del { background: color-mix(in srgb, var(--bad) 14%, transparent); display: block; text-decoration: line-through; text-decoration-color: color-mix(in srgb, var(--bad) 50%, transparent); }
 .diff .gap { color: var(--muted); display: block; }
 .diff .ctx { display: block; }
+.ai-modes { margin: 0 0 8px; padding-left: 20px; font-size: 14px; }
+.ai-modes li { margin: 3px 0; }

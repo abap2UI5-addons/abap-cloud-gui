@@ -192,17 +192,23 @@ ENDCLASS.</code></pre>
       <div id="status" class="status" role="status"></div>
 
       <div id="ai" class="card ai">
-        <h3>AI assistant <span class="muted">- for the statements the converter refuses</span></h3>
-        <p class="muted">The converter does not guess - what it has no counterpart for, it refuses. The assistant
-          rewrites those statements of your report so that the converter takes it, with the rewrites the converter
-          suggests and the samples above as its guide. Every answer is converted again; what is still refused goes
-          back to it, up to three times. You see the changes to your report and decide.</p>
+        <h3>AI assistant <span class="muted"></span></h3>
+        <p class="muted">The converter does not guess. The assistant does the two things it leaves to you, and a
+          check decides on every answer - up to three rounds, then you see the changes and decide.</p>
+        <ul class="muted ai-modes">
+          <li><strong>Rewrite the refused statements</strong> - of your report, so that the converter takes it, with
+            the rewrites the converter suggests and the samples above as its guide. The judge: the converter.</li>
+          <li><strong>Polish the class</strong> - the class the converter wrote, as a person would write it for
+            abap-cloud-gui: names, structure, the TODOs where the report makes them clear. The judge: it has to start
+            in the preview, checked against the report runtime and abap2UI5.</li>
+        </ul>
         <div class="toolbar">
           <label>Anthropic API key
             <input id="ai-key" type="password" autocomplete="off" spellcheck="false" placeholder="sk-ant-...">
           </label>
           <label class="check"><input id="ai-remember" type="checkbox"> keep it in this browser</label>
           <button id="ai-run" class="button primary" type="button" disabled>Rewrite the refused statements</button>
+          <button id="ai-polish" class="button primary" type="button" disabled>Polish the class</button>
           <button id="ai-stop" class="button" type="button" hidden>Stop</button>
         </div>
         <p class="muted small">Your key and your report go from this browser to api.anthropic.com, and nowhere else;
@@ -210,7 +216,7 @@ ENDCLASS.</code></pre>
         <ol id="ai-steps" class="steps"></ol>
         <div id="ai-result" hidden>
           <div id="ai-notes" class="ai-notes"></div>
-          <div class="pane-head"><span>The changes to your report</span>
+          <div class="pane-head"><span>The changes</span>
             <span class="head-actions">
               <button id="ai-take" class="button primary" type="button">Take it</button>
               <button id="ai-drop" class="button" type="button">Discard</button>

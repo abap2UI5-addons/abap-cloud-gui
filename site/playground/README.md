@@ -20,9 +20,10 @@ onto the playground at its pin (`PIN` there):
 | `src/editor/transpile-core.mjs` | `transpileObjects()`, which the build step and a Run share. Its ordering and prologue skip the nameless `requires` that a class's local classes bring. |
 | `src/editor/registry-*.mjs`, `src/editor/registry.mjs` | `convertReport`: the converter in the registry worker, the runtime's ABAP added to the corpus once. |
 | `src/shell/report2cloud.mjs`, `src/shell/run.mjs` | A report as the first file is converted on Run. The class files are compiled in its place; the runtime's chunks are defined before them. Refusals are underlined in the report. The report's own abaplint findings don't block Run: they come from the DDIC of the system it was written for, which isn't here. |
+| `src/shell/report2cloud.mjs`, `src/shell/run.mjs`, `src/editor/registry-*.mjs` | A class of the report runtime as the first file - one the converter wrote, changed since (the site's assistant polishes it) - runs on the runtime too: its checks know the runtime (added to the registry, the editor's objects checked again), its chunks and the demo tables come with it. What stops a Run is `globalThis.__pgProblems` (file, line, message) for the site's page around the frame. |
 | the demo tables | SCARR, SPFLI and SFLIGHT come with every converted Run, with the rows the addon's runtime tests seed (`tools/report2cloud/test/runtime/seed.mjs`). The flight dates count from today. The test DDIC (`tools/report2cloud/test/ddic`) is in the checks. A table of the same name in the editor replaces the demo one. |
 | `src/editor/files.mjs`, `src/shell/deep-link.mjs`, `src/shell/ai-agent.mjs`, `src/shell/export.mjs` | `.prog.abap` / `.prog.xml` as file names, in `?src=` links and in the AI Studio. `.clas.locals_def.abap` / `.clas.locals_imp.abap` are includes of their class. |
-| `src/examples/zr2c_*`, `tests/report2cloud.spec.js`, `tests/node/report-files.test.mjs` | Examples and tests (`npm run site:playground -- --test`). |
+| `src/examples/zr2c_*`, `src/examples/zcl_r2c_polished.clas.abap`, `tests/report2cloud.spec.js`, `tests/node/report-files.test.mjs` | Examples and tests (`npm run site:playground -- --test`). |
 
 Nothing of the addon is fetched before the first report is converted.
 
