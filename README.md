@@ -375,6 +375,19 @@ METHOD authority_check_customizing.
 ENDMETHOD.
 ```
 
+A selection screen that is filled in and then left - the browser closed, the
+session timed out - keeps the entries as a **draft** with `set_draft( )` in
+`initialization( )`: every roundtrip saves them in the variant store under
+the user's own name, the next start brings them back with a message and a
+**Discard Draft** button, and a successful Execute deletes the draft. A
+start variant wins over the draft; the draft is not in the list of variants.
+
+```abap
+METHOD initialization.
+  set_draft( ).
+ENDMETHOD.
+```
+
 ### ALV layouts
 
 The layout button of every ALV opens the classic "Change Layout": the
@@ -694,7 +707,9 @@ Navigation and transactions
       keys of a GUI status (`set_pf_status( shortcuts = )`)
 - [x] Transaction logic: start with a variant, prefill the last entries
       (`set_prefill_last( )`)
-- [ ] Transaction logic: create a draft
+- [x] Transaction logic: create a draft - the entries of a selection screen
+      that was left without executing come back at the next start
+      (`set_draft( )`)
 - [x] `SET` / `GET PARAMETER ID` with user parameters on the server, `SU3` in
       the command field to maintain them
 - [x] System parameters and customizing parameters beside the user

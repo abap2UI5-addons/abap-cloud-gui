@@ -397,6 +397,24 @@
      <ENTRY>Cancel</ENTRY>
      <LENGTH>10</LENGTH>
     </item>
+    <item>
+     <ID>I</ID>
+     <KEY>069</KEY>
+     <ENTRY>Draft</ENTRY>
+     <LENGTH>10</LENGTH>
+    </item>
+    <item>
+     <ID>I</ID>
+     <KEY>070</KEY>
+     <ENTRY>Your entries that were not executed are back as a draft</ENTRY>
+     <LENGTH>84</LENGTH>
+    </item>
+    <item>
+     <ID>I</ID>
+     <KEY>071</KEY>
+     <ENTRY>Discard Draft</ENTRY>
+     <LENGTH>26</LENGTH>
+    </item>
    </TPOOL>
   </asx:values>
  </asx:abap>

@@ -74,6 +74,7 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
         palette           TYPE string VALUE `CGUI_PALETTE`,
         enter             TYPE string VALUE `CGUI_ENTER`,
         gui               TYPE string VALUE `CGUI_GUI`,
+        draft_discard     TYPE string VALUE `CGUI_DRAFT_DISCARD`,
       END OF cs_ucomm.
 
     "! the prefix of the browser's local storage the variants are kept
@@ -784,6 +785,14 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
         log   TYPE REF TO z2ui5_if_cgui_log
         title TYPE clike OPTIONAL.
 
+    "! keep a draft: what the user enters on the selection screen and does
+    "! not execute is kept - with every roundtrip of the screen, as a variant
+    "! of the user's own (in the store of the variants) - and comes back at
+    "! the next start, with Discard Draft beside it. Execute uses it up
+    METHODS set_draft
+      IMPORTING
+        val TYPE abap_bool DEFAULT abap_true.
+
     METHODS set_prefill_last
       IMPORTING
         val TYPE abap_bool DEFAULT abap_true.
@@ -1120,6 +1129,10 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
     DATA mt_cgui_field         TYPE z2ui5_cl_cgui_selscreen=>ty_t_field.
     DATA mt_cgui_msg           TYPE ty_t_cgui_msg.
     DATA mv_cgui_prefill TYPE abap_bool.
+    " set_draft( ): on, what was kept last, and a draft restored at the start
+    DATA mv_cgui_draft          TYPE abap_bool.
+    DATA mv_cgui_draft_last     TYPE string.
+    DATA mv_cgui_draft_restored TYPE abap_bool.
     DATA mo_cgui_job     TYPE REF TO z2ui5_if_cgui_job.
     DATA mo_cgui_catalog TYPE REF TO z2ui5_if_cgui_catalog.
     " the customizing parameters (spa_load( ), SPRO) and the system ones
@@ -1396,6 +1409,24 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
     METHODS selection_screen_layout
       IMPORTING
         screen TYPE REF TO z2ui5_cl_cgui_selscreen.
+
+    "! the name of the user's draft - a variant of the report
+    METHODS draft_name
+      RETURNING
+        VALUE(result) TYPE string.
+
+    "! the values of the selection screen kept as the draft, when they
+    "! changed since it was kept last
+    METHODS draft_keep.
+
+    "! the draft restored at the start - before the start variant
+    METHODS draft_restore.
+
+    "! the draft gone - used up by Execute, or discarded
+    METHODS draft_drop.
+
+    "! Discard Draft: the draft gone, the fields as initialization( ) sets them
+    METHODS draft_discard.
 
     "! the selection screen prepared for rendering - its values, listboxes,
     "! AT SELECTION-SCREEN OUTPUT, the history
@@ -1958,6 +1989,12 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
       IF mv_cgui_nav = abap_false.
         view_display( ).
       ENDIF.
+    ENDIF.
+
+    " set_draft( ): what is on the selection screen now is the draft
+    IF mv_cgui_draft = abap_true AND mv_cgui_screen = cs_screen-selection
+        AND client->check_on_event( ) AND mt_cgui_field IS NOT INITIAL.
+      draft_keep( ).
     ENDIF.
 
     messages_display( ).
@@ -2687,6 +2724,10 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
       mv_cgui_variant_start = lv_variant.
       mv_cgui_variant_url = abap_true.
     ENDIF.
+    " the draft of a server store - a start variant wins over it
+    IF mo_cgui_store IS BOUND AND mv_cgui_draft = abap_true AND mv_cgui_variant_start IS INITIAL.
+      draft_restore( ).
+    ENDIF.
     IF mv_cgui_variant_start IS NOT INITIAL AND mo_cgui_store IS BOUND.
       DATA(lv_start) = mv_cgui_variant_start.
       CLEAR mv_cgui_variant_start.
@@ -3400,6 +3441,9 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
 
       WHEN cs_ucomm-back.
         on_back( ).
+
+      WHEN cs_ucomm-draft_discard.
+        draft_discard( ).
 
       WHEN cs_ucomm-cancel.
         CLEAR: mv_cgui_pending_field, mv_cgui_pending_kind.
@@ -5131,6 +5175,86 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
 
   ENDMETHOD.
 
+  METHOD set_draft.
+
+    mv_cgui_draft = val.
+
+  ENDMETHOD.
+
+  METHOD draft_name.
+
+    result = |%DRAFT_{ to_upper( sy-uname ) }|.
+
+  ENDMETHOD.
+
+  METHOD draft_keep.
+
+    DATA lt_name TYPE string_table.
+
+    LOOP AT mt_cgui_field REFERENCE INTO DATA(lr_field).
+      INSERT lr_field->name INTO TABLE lt_name.
+    ENDLOOP.
+    DATA(lt_value) = z2ui5_cl_cgui_variant=>values_get( app   = me
+                                                        names = lt_name ).
+    " every part of every value - a change anywhere is a new draft
+    DATA(lv_text) = ``.
+    LOOP AT lt_value INTO DATA(ls_value).
+      lv_text = |{ lv_text }{ ls_value-name }\|{ ls_value-sign }\|{ ls_value-option }\|{ ls_value-low }\|{ ls_value-high };|.
+    ENDLOOP.
+    IF lv_text = mv_cgui_draft_last.
+      RETURN.
+    ENDIF.
+    mv_cgui_draft_last = lv_text.
+    variant_put( VALUE #( name   = draft_name( )
+                          text   = 'Draft'(069)
+                          values = lt_value ) ).
+
+  ENDMETHOD.
+
+  METHOD draft_restore.
+
+    DATA(lt_variant) = variant_catalog( ).
+    IF NOT line_exists( lt_variant[ name = draft_name( ) ] ).
+      RETURN.
+    ENDIF.
+    IF variant_apply( draft_name( ) ) = abap_true.
+      " a draft is no variant the user picked
+      CLEAR mv_cgui_variant.
+      mv_cgui_draft_restored = abap_true.
+      message( 'Your entries that were not executed are back as a draft'(070) ).
+    ENDIF.
+
+  ENDMETHOD.
+
+  METHOD draft_drop.
+
+    CLEAR: mv_cgui_draft_last, mv_cgui_draft_restored.
+    DATA(lt_variant) = variant_catalog( ).
+    IF line_exists( lt_variant[ name = draft_name( ) ] ).
+      variant_remove( draft_name( ) ).
+    ENDIF.
+
+  ENDMETHOD.
+
+  METHOD draft_discard.
+
+    FIELD-SYMBOLS <field_val> TYPE any.
+
+    draft_drop( ).
+    LOOP AT mt_cgui_field REFERENCE INTO DATA(lr_field).
+      DATA(lr_val) = attri_assign( lr_field->name ).
+      IF lr_val IS BOUND.
+        ASSIGN lr_val->* TO <field_val>.
+        CLEAR <field_val>.
+      ENDIF.
+    ENDLOOP.
+    initialization( ).
+    " what initialization( ) set is no draft
+    draft_keep( ).
+    draft_drop( ).
+
+  ENDMETHOD.
+
   METHOD set_prefill_last.
 
     mv_cgui_prefill = val.
@@ -5275,6 +5399,11 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
     IF mv_cgui_prefill = abap_true.
       history_apply( ).
     ENDIF.
+    " a draft wins over the last entries, the start variant over the draft
+    " (a server store has it from on_init( ))
+    IF mv_cgui_draft = abap_true AND mo_cgui_store IS NOT BOUND AND mv_cgui_variant_start IS INITIAL.
+      draft_restore( ).
+    ENDIF.
 
     IF mv_cgui_variant_start IS NOT INITIAL.
       DATA(lv_start) = mv_cgui_variant_start.
@@ -5317,6 +5446,8 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
     FIELD-SYMBOLS <field_val> TYPE any.
 
     DATA(lt_variant) = variant_catalog( ).
+    " a draft is no variant to pick or save over
+    DELETE lt_variant WHERE name CP `%DRAFT_*`.
 
     IF kind = cs_pending-variant_save.
       " the name, the sharing of a server store, and a dynamic date for
@@ -5668,6 +5799,9 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
 
     IF run( ) = abap_true.
       mv_cgui_screen = cs_screen-output.
+      IF mv_cgui_draft = abap_true.
+        draft_drop( ).
+      ENDIF.
     ELSEIF mv_cgui_skipped = abap_true.
       " a run without selection screen that stopped shows the screen
       mv_cgui_skipped = abap_false.
@@ -7907,6 +8041,12 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
             )->a( n = `text`  t = CONV #( 'Delete Variant'(007) )
             )->a( n = `icon`  v = `sap-icon://delete`
             )->a( n = `press` v = client->_event( cs_ucomm-variant_delete ) ).
+      ENDIF.
+      IF mv_cgui_draft_restored = abap_true.
+        toolbar->tag( `Button`
+            )->a( n = `text`  t = CONV #( 'Discard Draft'(071) )
+            )->a( n = `icon`  v = `sap-icon://delete`
+            )->a( n = `press` v = client->_event( cs_ucomm-draft_discard ) ).
       ENDIF.
       IF NOT line_exists( mt_cgui_excl_sel[ table_line = cs_ucomm-link_copy ] ).
         toolbar->tag( `Button`

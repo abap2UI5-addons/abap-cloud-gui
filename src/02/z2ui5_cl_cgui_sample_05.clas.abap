@@ -60,6 +60,8 @@ CLASS z2ui5_cl_cgui_sample_05 IMPLEMENTATION.
     mock_data( ).
     " save a variant named DEFAULT and the report starts with it
     set_variant( `DEFAULT` ).
+    " entries not executed come back at the next start
+    set_draft( ).
 
   ENDMETHOD.
 

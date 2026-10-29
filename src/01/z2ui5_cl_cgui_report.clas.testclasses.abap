@@ -257,6 +257,7 @@ CLASS ltcl_test DEFINITION FINAL FOR TESTING
     METHODS parameter_levels FOR TESTING.
     METHODS value_help_entity FOR TESTING.
     METHODS submit_using_screen FOR TESTING.
+    METHODS draft FOR TESTING.
     METHODS application_log FOR TESTING.
     METHODS alv_chart FOR TESTING.
     METHODS transport_popup FOR TESTING.
@@ -1699,6 +1700,41 @@ CLASS ltcl_test IMPLEMENTATION.
     lo_next->spa_load( ).
     cl_abap_unit_assert=>assert_equals( act = lo_next->get_parameter_id( `ZCGUI_ADD` )
                                         exp = `0017` ).
+
+  ENDMETHOD.
+
+  METHOD draft.
+
+    " set_draft( ): what is entered and not executed is kept with the
+    " roundtrip
+    mo_cut->set_draft( ).
+    init( ).
+    mo_report->p_carrid = `LH`.
+    event( z2ui5_cl_cgui_report=>cs_ucomm-enter ).
+    DATA(lt_variant) = mo_cut->mo_cgui_store->load( mo_cut->variant_key( ) ).
+    cl_abap_unit_assert=>assert_true( xsdbool( line_exists( lt_variant[ name = mo_cut->draft_name( ) ] ) ) ).
+
+    " the next start brings it back, with Discard Draft
+    DATA(lo_next) = NEW ltcl_report( ).
+    DATA(lo_next_client) = NEW ltcl_client( ).
+    lo_next_client->mo_app = lo_next.
+    lo_next_client->mv_init = abap_true.
+    lo_next->set_layout_store( NEW ltcl_layout_store( ) ).
+    lo_next->set_draft( ).
+    lo_next->z2ui5_if_app~main( lo_next_client ).
+    cl_abap_unit_assert=>assert_equals( act = lo_next->p_carrid
+                                        exp = `LH` ).
+    cl_abap_unit_assert=>assert_char_cp( act = lo_next_client->mv_view
+                                         exp = `*Discard Draft*` ).
+    " not in the variants to pick
+    cl_abap_unit_assert=>assert_initial( lo_next->mv_cgui_variant ).
+
+    " Execute uses it up
+    lo_next_client->mv_init = abap_false.
+    lo_next_client->mv_event = z2ui5_cl_cgui_report=>cs_ucomm-execute.
+    lo_next->z2ui5_if_app~main( lo_next_client ).
+    lt_variant = mo_cut->mo_cgui_store->load( mo_cut->variant_key( ) ).
+    cl_abap_unit_assert=>assert_false( xsdbool( line_exists( lt_variant[ name = mo_cut->draft_name( ) ] ) ) ).
 
   ENDMETHOD.
 
