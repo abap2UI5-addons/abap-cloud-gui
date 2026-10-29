@@ -1387,6 +1387,50 @@ test("the dependencies of a report type what it reads of them - an inline declar
   }
 });
 
+test("a library installed beside the report's repository types what the report reads of it; the report's own objects come first", () => {
+  const src = "REPORT zt.\nINITIALIZATION.\n  DATA(lo_log) = zcl_lib_factory=>logger( ).\nSTART-OF-SELECTION.\n  lo_log->add( `x` ).\n";
+  const factory = (ret) => `CLASS zcl_lib_factory DEFINITION PUBLIC CREATE PUBLIC.\n  PUBLIC SECTION.\n    CLASS-METHODS logger RETURNING VALUE(result) TYPE REF TO ${ret}.\nENDCLASS.\nCLASS zcl_lib_factory IMPLEMENTATION.\n  METHOD logger.\n  ENDMETHOD.\nENDCLASS.\n`;
+  const intf = (name) => `INTERFACE ${name} PUBLIC.\n  METHODS add IMPORTING t TYPE string.\nENDINTERFACE.\n`;
+  const dir = join(tmpdir(), `r2c-libs-${process.pid}`);
+  mkdirSync(join(dir, "app", "src"), { recursive: true });
+  mkdirSync(join(dir, "lib", "src"), { recursive: true });
+  try {
+    writeFileSync(join(dir, "lib", "src", "zcl_lib_factory.clas.abap"), factory("ZIF_LIB_LOG"));
+    writeFileSync(join(dir, "lib", "src", "zif_lib_log.intf.abap"), intf("zif_lib_log"));
+    const r = convert(src, { file: "zt.prog.abap", className: "zcl_t", deps: dependenciesOf(src, dependencyIndex([join(dir, "app"), join(dir, "lib")])) });
+    assert.deepEqual(r.refusals, []);
+    // the name as the report writes names
+    assert.match(r.files["zcl_t.clas.abap"], /DATA lo_log TYPE REF TO zif_lib_log\./);
+
+    // the report's repository has a class of the same name: that one, not the library's
+    writeFileSync(join(dir, "app", "src", "zcl_lib_factory.clas.abap"), factory("zif_app_log"));
+    writeFileSync(join(dir, "app", "src", "zif_app_log.intf.abap"), intf("zif_app_log"));
+    const deps = dependenciesOf(src, dependencyIndex([join(dir, "app"), join(dir, "lib")]));
+    assert.equal(deps.filter((d) => d.name === "zcl_lib_factory.clas.abap").length, 1);
+    assert.match(convert(src, { file: "zt.prog.abap", className: "zcl_t", deps }).files["zcl_t.clas.abap"], /DATA lo_log TYPE REF TO zif_app_log\./);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("an inline declaration of an event block: an attribute or a parameter of a local class of that name is no read of it", () => {
+  // the definition declares params and side, the implementation reads them -
+  // the inline declarations stay where they are
+  const src = "REPORT zt.\nCLASS lcl DEFINITION.\n  PUBLIC SECTION.\n    METHODS run IMPORTING side TYPE i.\n    METHODS get RETURNING VALUE(r) TYPE i.\n    DATA params TYPE i.\nENDCLASS.\nCLASS lcl IMPLEMENTATION.\n  METHOD run.\n    params = side.\n  ENDMETHOD.\n  METHOD get.\n    r = params.\n  ENDMETHOD.\nENDCLASS.\nINITIALIZATION.\n  DATA(params) = zcl_unknown=>get( ).\n  DATA(side) = zcl_unknown=>side( ).\n  WRITE: params, side.\n";
+  const r = convert(src, { file: "zt.prog.abap", className: "zcl_t" });
+  assert.deepEqual(r.refusals.map((x) => x.message), []);
+  assert.match(r.files["zcl_t.clas.abap"], /DATA\(params\) = zcl_unknown=>get\( \)\./);
+});
+
+test("an inline declaration of an event block that takes a constant of a class: LIKE the constant - the stand-in's for a SAP GUI class", () => {
+  const src = "REPORT zt.\nPARAMETERS p_left AS CHECKBOX.\nAT SELECTION-SCREEN.\n  IF p_left = abap_true.\n    DATA(side) = cl_gui_docking_container=>dock_at_left.\n  ENDIF.\nSTART-OF-SELECTION.\n  DATA go_dock TYPE REF TO cl_gui_docking_container.\n  CREATE OBJECT go_dock EXPORTING side = side.\n";
+  const r = convert(src, { file: "zt.prog.abap", className: "zcl_t" });
+  assert.deepEqual(r.refusals.map((x) => x.message), []);
+  assert.match(r.files["zcl_t.clas.abap"], /DATA side +LIKE z2ui5_cl_cgui_gui_container=>dock_at_left\./);
+  const own = convert(src.replace("cl_gui_docking_container=>dock_at_left", "zcl_sides=>left").replace(/  DATA go_dock[^]*$/, "  WRITE side.\n"), { file: "zt.prog.abap", className: "zcl_t" });
+  assert.match(own.files["zcl_t.clas.abap"], /DATA side LIKE zcl_sides=>left\./);
+});
+
 test("a name every JavaScript object has - constructor, toString - is no SAP GUI class, icon or ALV type", () => {
   const src = "REPORT zt.\nDATA go_c TYPE REF TO cl_gui_custom_container.\nCLASS lcl DEFINITION.\n  PUBLIC SECTION.\n    METHODS constructor.\n    METHODS tostring RETURNING VALUE(r) TYPE string.\nENDCLASS.\nCLASS lcl IMPLEMENTATION.\n  METHOD constructor.\n  ENDMETHOD.\n  METHOD tostring.\n    r = `x`.\n  ENDMETHOD.\nENDCLASS.\nSTART-OF-SELECTION.\n  go_c = NEW #( container_name = 'CC' ).\n  WRITE NEW lcl( )->tostring( ).\n";
   const r = convert(src, { file: "zt.prog.abap", className: "zcl_t" });

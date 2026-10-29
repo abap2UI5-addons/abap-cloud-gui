@@ -16,9 +16,12 @@ import { basename, join } from "node:path";
 // the abapGit files that type something: classes and interfaces, the DDIC
 const KINDS = /^(.+?)\.(clas|intf|tabl|dtel|doma|ttyp|view|ddls|enho)(\..+)?\.(abap|xml|asddls)$/;
 
-/** an index of a repository: object name -> its files { name, text } */
+/** an index of repositories: object name -> its files { name, text } - the
+ *  report's repository first, then the ones it is installed beside; an object
+ *  of an earlier one hides the same name of a later one */
 export function dependencyIndex(dirs) {
   const index = new Map();
+  let own;                 // the names of the folder walked now
   const walk = (dir) => {
     let entries;
     try {
@@ -41,12 +44,17 @@ export function dependencyIndex(dirs) {
         // a test class is no dependency
         if (!m || /testclasses/.test(m[3] ?? "")) continue;
         const name = m[1].replace(/#/g, "/");
+        if (index.has(name) && !own.has(name)) continue;
+        own.add(name);
         if (!index.has(name)) index.set(name, []);
         index.get(name).push({ path: p, name: basename(p) });
       }
     }
   };
-  for (const d of dirs) walk(d);
+  for (const d of dirs) {
+    own = new Set();
+    walk(d);
+  }
   return index;
 }
 

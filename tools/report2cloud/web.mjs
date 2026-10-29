@@ -179,7 +179,11 @@ async function main() {
     if (!existsSync(dir)) continue;
     const files = programs(dir);
     const read = includesFrom([...new Set(files.map(dirname))]);
-    const deps = dependencyIndex([dir]);
+    // the repositories of the same owner count as installed beside it - a
+    // library and the demos of it are often two repositories
+    const owner = name.split("/")[0];
+    const siblings = names.filter((x) => x !== name && x.split("/")[0] === owner).map((x) => join(cache, folderOf(x))).filter(existsSync);
+    const deps = dependencyIndex([dir, ...siblings]);
     for (const row of coverage(files, { read, deps, keep: opts.lint || opts.start, className: () => `z2ui5_cl_cgui_w${String(++n).padStart(4, "0")}` })) {
       rows.push({ ...row, file: relative(cache, row.file) });
     }

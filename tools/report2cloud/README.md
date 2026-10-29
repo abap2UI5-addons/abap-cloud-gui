@@ -46,10 +46,11 @@ node tools/report2cloud/cli.mjs <report.prog.abap> [options]
   --texts <file>   the report's .prog.xml with its text pool (default: beside the source)
   --includes <dir> where the report's INCLUDEs are, as abapGit writes them: <include>.prog.abap
                    (default: beside the source; the includes are inlined before the conversion)
-  --deps <dir>     the classes, interfaces and DDIC objects of the report's repository, as abapGit
-                   writes them - they type what the report reads of them (default: the abapGit
-                   repository the report is in: STARTING_FOLDER of its .abapgit.xml, or its git
-                   repository)
+  --deps <dir>     the classes, interfaces and DDIC objects of a repository the report reads, as
+                   abapGit writes them - they type what the report reads of them; once per
+                   repository, e.g. a library the report's repository is installed beside
+                   (always: the abapGit repository the report is in: STARTING_FOLDER of its
+                   .abapgit.xml, or its git repository)
   --report <file>  where to write the migration report (default: <out>/<class>.migration.md)
   --check          lint the class with abaplint - v750 and ABAP Cloud, in a scratch
                    copy of this repository (needs git and network for the dependencies)
@@ -137,8 +138,14 @@ objects of the report's repository (`--deps`) are parsed beside it, never
 converted: they tell the types of what the report reads of them - a
 `DATA(lo_log) = zcl_app_factory=>create_logger( )` in INITIALIZATION, read in
 START-OF-SELECTION, is an attribute `TYPE REF TO zcl_app_log` of the class,
-where without them its type cannot be told and the statement is refused. Only
-the objects the report names go in, and what they name in turn. Macros (`DEFINE`) are
+where without them its type cannot be told and the statement is refused. A
+library the repository is installed beside is one more `--deps`; an object of
+the report's own repository hides one of the same name in a library. Only
+the objects the report names go in, and what they name in turn. A constant or
+a static attribute of a class, `DATA(side) = cl_gui_docking_container=>dock_at_left`,
+needs no dependency: the attribute is `LIKE` it - of the stand-in, for a
+SAP GUI class. A name that a local class declares itself, as an attribute or
+a parameter of a method, is no read of the inline declaration. Macros (`DEFINE`) are
 expanded at every call, wherever they are defined.
 
 ### Measuring a code base
@@ -188,7 +195,9 @@ of the community list of ABAP projects (`--list`, default the `list.json` of
 dotabap-list), cloned shallow and sparse into `build/web-corpus` - only
 the programs and the classes, interfaces and DDIC objects that type them,
 read and never run, and none of it part of this repository. Every report is
-converted with the includes and the dependencies of its own repository; `--lint` lints the converted classes together (v750), where the
+converted with the includes of its own repository and the dependencies of
+it and of the other repositories of the same owner in the list - a library
+and its demos are often two repositories, installed side by side; `--lint` lints the converted classes together (v750), where the
 parser errors and redefinitions are the converter's and most other findings
 name a dependency the sparse clone does not have. `--start` takes the
 converted classes into the transpiled runtime, the way the runtime test runs
