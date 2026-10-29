@@ -5,10 +5,10 @@ The site of this repository has its own copy of the
 `playground/` beside the converter page. There, a classic report runs: put
 `zreport.prog.abap` first, optionally with its text pool `zreport.prog.xml`,
 and press Run. Run converts the report with report2cloud and starts the class
-on the addon's report runtime. The converter page runs it in its
-third column, in the playground's app-only view (`?view=full`): the classic
-report, the class and the running app side by side, and below them what
-happened. The full playground with its editor is at `playground/` too.
+on the addon's report runtime. The site's page runs it in the
+playground's app-only view (`?view=full`), twice: under Samples, a report of
+the converter's corpus beside its class, started when it is picked; under
+Your own report, the report you paste, started when you press Preview. The full playground with its editor is at `playground/` too.
 
 The abap2UI5 playground itself knows nothing about reports. Everything that
 does is in `report2cloud.patch`, applied by `scripts/build-playground.mjs`

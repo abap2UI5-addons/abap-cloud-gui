@@ -76,7 +76,7 @@ section { margin: 40px auto; }
 
 .toolbar { display: flex; gap: 12px; align-items: end; flex-wrap: wrap; margin: 16px 0; }
 .toolbar label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--muted); min-width: 0; max-width: 100%; }
-#example { width: 420px; }
+#s-example { width: 460px; }
 select, input {
   font: inherit; font-size: 15px; padding: 7px 10px; border-radius: 8px; border: 1px solid var(--line);
   background: var(--surface); color: var(--text); min-width: 220px; max-width: 100%;
@@ -85,6 +85,36 @@ select, input {
 .muted { color: var(--muted); }
 .three { display: grid; grid-template-columns: minmax(0, 0.85fr) minmax(0, 0.95fr) minmax(0, 1.3fr); gap: 16px; }
 @media (max-width: 1180px) { .three { grid-template-columns: minmax(0, 1fr); } }
+/* your own report: report and class, the preview a third column when it is on */
+.two { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.two.with-preview { grid-template-columns: minmax(0, 0.85fr) minmax(0, 0.95fr) minmax(0, 1.3fr); }
+@media (max-width: 1180px) { .two, .two.with-preview { grid-template-columns: minmax(0, 1fr); } }
+#run[aria-pressed="true"] { box-shadow: inset 0 0 0 2px var(--accent-text); }
+
+/* the editor: a text area with transparent text over its highlighted copy */
+.editor { position: relative; height: 560px; }
+.editor textarea, .editor-hl {
+  position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; padding: 14px;
+  border: 1px solid var(--line); border-radius: 10px; font: 13px/1.5 var(--mono); tab-size: 2;
+  white-space: pre; overflow: auto; overflow-wrap: normal; letter-spacing: 0;
+}
+.editor-hl { background: var(--code-bg); color: var(--text); pointer-events: none; }
+.editor textarea { background: transparent; color: transparent; caret-color: var(--text); resize: none; }
+.editor textarea::selection { background: color-mix(in srgb, var(--accent) 30%, transparent); color: transparent; }
+.editor textarea::placeholder { color: var(--muted); }
+
+/* ABAP highlighting (site/highlight.mjs) */
+.hl-kw { color: #0b5cad; font-weight: 600; }
+.hl-str { color: #a3410b; }
+.hl-com { color: #5f7a4d; font-style: italic; }
+.hl-num { color: #7a3eb1; }
+.hl-op { color: var(--muted); }
+@media (prefers-color-scheme: dark) {
+  .hl-kw { color: #7cb8f2; }
+  .hl-str { color: #f0a46c; }
+  .hl-com { color: #8fb07a; }
+  .hl-num { color: #c49af0; }
+}
 .step-no {
   display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; margin-right: 6px;
   background: var(--accent); color: var(--accent-text); font-size: 12px; font-weight: 700;
@@ -96,7 +126,7 @@ select, input {
   background: var(--surface); color: var(--muted);
 }
 .app-cover[hidden] { display: none; }
-.info { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin-top: 8px; }
+.info { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin-top: 16px; }
 @media (max-width: 1180px) { .info { grid-template-columns: minmax(0, 1fr); } }
 .info-card { padding: 16px 18px; min-width: 0; }
 .info-card h3 { font-size: 15px; margin: 0 0 8px; display: inline; }
