@@ -94,6 +94,8 @@ CLASS ltcl_report DEFINITION INHERITING FROM z2ui5_cl_cgui_report FINAL.
     DATA mv_window   TYPE abap_bool.
     DATA mv_leave    TYPE abap_bool.
     DATA mv_dynpro   TYPE abap_bool.
+    " call_screen( owner = ): the class whose dynpro 100 is called
+    DATA mo_owner    TYPE REF TO ltcl_report.
     " a tabstrip on dynpro 0100: two tabs on one subscreen area
     DATA mv_tabs     TYPE abap_bool.
     DATA tabstr      TYPE z2ui5_cl_cgui_report=>ty_s_tabstrip.
@@ -115,6 +117,11 @@ CLASS ltcl_report DEFINITION INHERITING FROM z2ui5_cl_cgui_report FINAL.
     DATA mv_exit     TYPE string.
     DATA mv_exit_err TYPE abap_bool.
     DATA mv_then     TYPE string.
+    " SPRO: may the user maintain the customizing parameters
+    DATA mv_customizing TYPE abap_bool.
+    " a field whose value help is an entity - the variant table stands in
+    " for a CDS view entity
+    DATA p_var TYPE c LENGTH 40.
 
     "! the callback of a popup with then = `ON_SURE`
     METHODS on_sure
@@ -140,6 +147,8 @@ CLASS ltcl_report DEFINITION INHERITING FROM z2ui5_cl_cgui_report FINAL.
     METHODS dynpro_pbo REDEFINITION.
     METHODS dynpro_pai REDEFINITION.
     METHODS after_call_screen REDEFINITION.
+    METHODS authority_check_customizing REDEFINITION.
+    METHODS selection_screen_dynnr REDEFINITION.
 
 ENDCLASS.
 
@@ -168,7 +177,9 @@ ENDCLASS.
 CLASS ltcl_catalog IMPLEMENTATION.
   METHOD z2ui5_if_cgui_catalog~get.
     result = VALUE #( ( code = `ZFLY`  report = `z2ui5_cl_cgui_sample_04` text = `Flights` variant = `MINE` )
-                      ( code = `ZGONE` report = `ZCL_NOT_THERE`           text = `Gone` ) ).
+                      ( code = `ZGONE` report = `ZCL_NOT_THERE`           text = `Gone` )
+                      ( code = `ZAIR`  report = `LTCL_REPORT`             text = `Airline`
+                        semantic_object = `Airline` action = `display` ) ).
   ENDMETHOD.
 ENDCLASS.
 
@@ -223,6 +234,7 @@ CLASS ltcl_test DEFINITION FINAL FOR TESTING
     METHODS file_upload_and_download FOR TESTING.
     METHODS current_screen_afresh FOR TESTING.
     METHODS dynpro_call_and_leave FOR TESTING.
+    METHODS dynpro_of_another_class FOR TESTING.
     METHODS dynpro_text_editor FOR TESTING.
     METHODS dynpro_tabstrip FOR TESTING.
     METHODS dynpro_table_control FOR TESTING.
@@ -247,12 +259,17 @@ CLASS ltcl_test DEFINITION FINAL FOR TESTING
     METHODS execute_in_background FOR TESTING.
     METHODS command_field FOR TESTING.
     METHODS user_parameters FOR TESTING.
+    METHODS parameter_levels FOR TESTING.
+    METHODS value_help_entity FOR TESTING.
+    METHODS submit_using_screen FOR TESTING.
+    METHODS draft FOR TESTING.
     METHODS application_log FOR TESTING.
     METHODS alv_chart FOR TESTING.
     METHODS transport_popup FOR TESTING.
     METHODS popup_then FOR TESTING.
     METHODS popup_decide_list FOR TESTING.
     METHODS call_transaction FOR TESTING.
+    METHODS call_intent FOR TESTING.
     METHODS read_list_clicked FOR TESTING.
     METHODS roundtrip_start FOR TESTING.
     METHODS fresh_start FOR TESTING.
@@ -333,7 +350,11 @@ CLASS ltcl_report IMPLEMENTATION.
         )->select_option( val  = s_date
                           text = `Date`
         )->select_option( val  = s_code
-                          text = `Code` ).
+                          text = `Code`
+        )->parameter( val                = p_var
+                      text               = `Report of a variant`
+                      value_help_entity  = `Z2UI5_CGUI_VAR`
+                      value_help_element = `REPORT` ).
 
   ENDMETHOD.
 
@@ -466,6 +487,10 @@ CLASS ltcl_report IMPLEMENTATION.
   METHOD after_call_screen.
 
     mv_after = dynnr.
+    " the dynpro of another class: its fields as it left them
+    IF mo_owner IS BOUND.
+      mv_seats = mo_owner->mv_seats.
+    ENDIF.
     list( )->new_line(
         )->write( |Seats { mv_seats }| ).
 
@@ -476,6 +501,12 @@ CLASS ltcl_report IMPLEMENTATION.
     mv_total = mv_total + 1.
 
     " CALL SCREEN - the rest comes in after_call_screen( )
+    IF mo_owner IS BOUND.
+      mo_owner->p_carrid = p_carrid.
+      call_screen( dynnr = `100`
+                   owner = mo_owner ).
+      RETURN.
+    ENDIF.
     IF mv_dynpro = abap_true.
       call_screen( `100` ).
       RETURN.
@@ -557,6 +588,22 @@ CLASS ltcl_report IMPLEMENTATION.
   METHOD initialization.
 
     mv_inits = mv_inits + 1.
+
+  ENDMETHOD.
+
+  METHOD authority_check_customizing.
+
+    result = mv_customizing.
+
+  ENDMETHOD.
+
+  METHOD selection_screen_dynnr.
+
+    " SELECTION-SCREEN BEGIN OF SCREEN 1100 - one field of its own
+    IF dynnr = `1100`.
+      screen->parameter( val  = p_text
+                         text = `Note on 1100` ).
+    ENDIF.
 
   ENDMETHOD.
 
@@ -1058,6 +1105,52 @@ CLASS ltcl_test IMPLEMENTATION.
 
   ENDMETHOD.
 
+  METHOD dynpro_of_another_class.
+
+    " CALL SCREEN of a dynpro of another class: it runs as its own app
+    init( ).
+    mo_report->p_carrid = `LH`.
+    DATA(lo_owner) = NEW ltcl_report( ).
+    mo_report->mo_owner = lo_owner.
+    event( z2ui5_cl_cgui_report=>cs_ucomm-execute ).
+    cl_abap_unit_assert=>assert_true( act = xsdbool( mo_client->mo_called = lo_owner )
+                                      msg = `not called` ).
+
+    " started, it shows dynpro 100 with its PBO - no selection screen
+    DATA(lo_client) = NEW ltcl_client( ).
+    lo_client->mo_app = lo_owner.
+    lo_client->mv_init = abap_true.
+    lo_owner->z2ui5_if_app~main( lo_client ).
+    cl_abap_unit_assert=>assert_equals( act = lo_owner->mv_cgui_screen
+                                        exp = `DYNPRO` ).
+    cl_abap_unit_assert=>assert_equals( act = lo_owner->mv_pai
+                                        exp = `PBO0100;` ).
+    cl_abap_unit_assert=>assert_true( act = xsdbool( lo_client->mv_view CS `Seats` )
+                                      msg = `the dynpro is not on the page` ).
+
+    " its PAI leaves (SET SCREEN 0): back to the caller
+    lo_client->mv_init = abap_false.
+    lo_owner->mv_seats = 3.
+    lo_client->mv_event = `SAVE`.
+    lo_owner->z2ui5_if_app~main( lo_client ).
+    cl_abap_unit_assert=>assert_true( act = lo_client->mv_left
+                                      msg = `not left` ).
+
+    " the caller goes on after CALL SCREEN, with the fields of the dynpro
+    CLEAR: mo_client->mv_event, mo_client->mo_called.
+    mo_client->mo_prev = lo_owner.
+    mo_client->mv_navigated = abap_true.
+    mo_cut->z2ui5_if_app~main( mo_client ).
+    mo_client->mv_navigated = abap_false.
+    cl_abap_unit_assert=>assert_equals( act = mo_report->mv_after
+                                        exp = `0100` ).
+    cl_abap_unit_assert=>assert_equals( act = mo_cut->mv_cgui_screen
+                                        exp = `OUTPUT` ).
+    cl_abap_unit_assert=>assert_true( act = xsdbool( mo_client->mv_view CS `Seats 3` )
+                                      msg = `no seats 3` ).
+
+  ENDMETHOD.
+
   METHOD dynpro_table_control.
 
     init( ).
@@ -1492,6 +1585,44 @@ CLASS ltcl_test IMPLEMENTATION.
 
   ENDMETHOD.
 
+  METHOD call_intent.
+
+    init( ).
+    mo_cut->set_catalog( NEW ltcl_catalog( ) ).
+    DATA(lt_value) = VALUE z2ui5_cl_cgui_variant=>ty_t_value(
+        ( name = `P_CARRID` kind = z2ui5_cl_cgui_variant=>cs_kind-parameter low = `LH` )
+        ( name = `S_CODE` kind = z2ui5_cl_cgui_variant=>cs_kind-select_option sign = `I` option = `BT` low = `A` high = `B` ) ).
+
+    " outside the launchpad: the transaction of the catalog with the intent
+    mo_cut->call_intent( semantic_object = `airline`
+                         values          = lt_value ).
+    DATA(lo_called) = CAST ltcl_report( mo_client->mo_called ).
+    DATA(lt_submit) = lo_called->mt_cgui_submit.
+    cl_abap_unit_assert=>assert_equals( act = lt_submit[ 1 ]-low
+                                        exp = `LH` ).
+
+    " inside: the cross-app navigation of the shell, the single values as
+    " the startup parameters - CALL TRANSACTION of the tile alike
+    CLEAR: mo_client->mo_called, mo_client->mt_action.
+    mo_client->ms_get-check_launchpad_active = abap_true.
+    mo_cut->call_intent( semantic_object = `Airline`
+                         values          = lt_value ).
+    cl_abap_unit_assert=>assert_not_bound( mo_client->mo_called ).
+    cl_abap_unit_assert=>assert_equals( act = mo_client->mt_action[ 1 ]
+                                        exp = `CROSS_APP_NAV_TO_EXT:{"semanticObject":"Airline","action":"display"}|{"P_CARRID":"LH"}` ).
+    CLEAR mo_client->mt_action.
+    mo_cut->call_transaction( `ZAIR` ).
+    cl_abap_unit_assert=>assert_not_bound( mo_client->mo_called ).
+    cl_abap_unit_assert=>assert_char_cp( act = mo_client->mt_action[ 1 ]
+                                         exp = `CROSS_APP_NAV_TO_EXT:*Airline*` ).
+
+    " the shell shows the title of the report
+    mo_cut->set_title( `Flights` ).
+    mo_cut->view_display( ).
+    cl_abap_unit_assert=>assert_true( xsdbool( line_exists( mo_client->mt_action[ table_line = `SET_TITLE_LAUNCHPAD:Flights` ] ) ) ).
+
+  ENDMETHOD.
+
   METHOD popup_decide_list.
 
     DATA lt_list TYPE STANDARD TABLE OF z2ui5_cl_cgui_popup=>ty_s_spopli WITH DEFAULT KEY.
@@ -1669,6 +1800,164 @@ CLASS ltcl_test IMPLEMENTATION.
     lo_next->spa_load( ).
     cl_abap_unit_assert=>assert_equals( act = lo_next->get_parameter_id( `ZCGUI_ADD` )
                                         exp = `0017` ).
+
+  ENDMETHOD.
+
+  METHOD draft.
+
+    " set_draft( ): what is entered and not executed is kept with the
+    " roundtrip
+    mo_cut->set_draft( ).
+    init( ).
+    mo_report->p_carrid = `LH`.
+    event( z2ui5_cl_cgui_report=>cs_ucomm-enter ).
+    DATA(lt_variant) = mo_cut->mo_cgui_store->load( mo_cut->variant_key( ) ).
+    cl_abap_unit_assert=>assert_true( xsdbool( line_exists( lt_variant[ name = mo_cut->draft_name( ) ] ) ) ).
+
+    " the next start brings it back, with Discard Draft
+    DATA(lo_next) = NEW ltcl_report( ).
+    DATA(lo_next_client) = NEW ltcl_client( ).
+    lo_next_client->mo_app = lo_next.
+    lo_next_client->mv_init = abap_true.
+    lo_next->set_layout_store( NEW ltcl_layout_store( ) ).
+    lo_next->set_draft( ).
+    lo_next->z2ui5_if_app~main( lo_next_client ).
+    cl_abap_unit_assert=>assert_equals( act = lo_next->p_carrid
+                                        exp = `LH` ).
+    cl_abap_unit_assert=>assert_char_cp( act = lo_next_client->mv_view
+                                         exp = `*Discard Draft*` ).
+    " not in the variants to pick
+    cl_abap_unit_assert=>assert_initial( lo_next->mv_cgui_variant ).
+
+    " Execute uses it up
+    lo_next_client->mv_init = abap_false.
+    lo_next_client->mv_event = z2ui5_cl_cgui_report=>cs_ucomm-execute.
+    lo_next->z2ui5_if_app~main( lo_next_client ).
+    lt_variant = mo_cut->mo_cgui_store->load( mo_cut->variant_key( ) ).
+    cl_abap_unit_assert=>assert_false( xsdbool( line_exists( lt_variant[ name = mo_cut->draft_name( ) ] ) ) ).
+
+  ENDMETHOD.
+
+  METHOD submit_using_screen.
+
+    " SUBMIT ... USING SELECTION-SCREEN 1100 VIA SELECTION-SCREEN: the
+    " report shows screen 1100, not its selection screen
+    init( ).
+    mo_cut->submit( report                 = `LTCL_REPORT`
+                    via_selection_screen   = abap_true
+                    using_selection_screen = `1100` ).
+    DATA(lo_called) = CAST ltcl_report( mo_client->mo_called ).
+    DATA(lo_client) = NEW ltcl_client( ).
+    lo_client->mo_app = lo_called.
+    lo_client->mv_init = abap_true.
+    lo_called->z2ui5_if_app~main( lo_client ).
+    cl_abap_unit_assert=>assert_char_cp( act = lo_client->mv_view
+                                         exp = `*Note on 1100*` ).
+    cl_abap_unit_assert=>assert_false( xsdbool( lo_client->mv_view CS `Report of a variant` ) ).
+
+    " as a window: the selection screen as a dialog box over the caller -
+    " no view of its own
+    CLEAR mo_client->mo_called.
+    mo_cut->submit( report    = `LTCL_REPORT`
+                    as_window = abap_true ).
+    lo_called = CAST ltcl_report( mo_client->mo_called ).
+    lo_client = NEW ltcl_client( ).
+    lo_client->mo_app = lo_called.
+    lo_client->mv_init = abap_true.
+    lo_called->z2ui5_if_app~main( lo_client ).
+    cl_abap_unit_assert=>assert_initial( lo_client->mv_view ).
+    cl_abap_unit_assert=>assert_char_cp( act = lo_client->mv_popup
+                                         exp = `*<Dialog*Report of a variant*Execute*` ).
+
+    " Cancel closes it and returns to the caller
+    lo_client->mv_init = abap_false.
+    lo_client->mv_event = z2ui5_cl_cgui_report=>cs_ucomm-back.
+    lo_called->z2ui5_if_app~main( lo_client ).
+    cl_abap_unit_assert=>assert_initial( lo_client->mv_popup ).
+    cl_abap_unit_assert=>assert_true( lo_client->mv_left ).
+
+  ENDMETHOD.
+
+  METHOD value_help_entity.
+
+    FIELD-SYMBOLS <rows> TYPE STANDARD TABLE.
+
+    " a row in the entity: the user parameters of the server store
+    init( ).
+    mo_cut->set_parameter_id( id    = `ZCGUI_ENT`
+                              value = `X` ).
+
+    " F4 on the field: the rows of the entity, the element named the value
+    event( name = z2ui5_cl_cgui_selscreen=>cs_event-value_request
+           args = VALUE #( ( `P_VAR` ) ) ).
+    DATA(lo_select) = CAST z2ui5_cl_cgui_select( mo_client->mo_called ).
+    ASSIGN lo_select->mr_source->* TO <rows>.
+    cl_abap_unit_assert=>assert_true( xsdbool( lines( <rows> ) > 0 ) ).
+
+    " an entity that does not exist: no popup, the message of no help
+    CLEAR mo_client->mo_called.
+    mo_cut->mt_cgui_field[ name = `P_VAR` ]-entity = `ZZZ_NO_SUCH_ENTITY`.
+    mo_cut->value_help_ddic( `P_VAR` ).
+    cl_abap_unit_assert=>assert_not_bound( mo_client->mo_called ).
+
+  ENDMETHOD.
+
+  METHOD parameter_levels.
+
+    " GET PARAMETER ID: the user's parameter, else the customizing one, else
+    " the system parameter given in code
+    init( ).
+    mo_cut->set_system_parameters( VALUE #( ( n = `zcgui_lvl` v = `SYS` )
+                                            ( n = `ZCGUI_SYS` v = `S1` ) ) ).
+    cl_abap_unit_assert=>assert_equals( act = mo_cut->get_parameter_id( `ZCGUI_LVL` )
+                                        exp = `SYS` ).
+
+    " SPRO without the authorization: refused, nothing opens
+    mo_cut->okcode_execute( `/nSPRO` ).
+    cl_abap_unit_assert=>assert_not_bound( mo_client->mo_called ).
+
+    " with it: the customizing parameters in a popup, one added
+    mo_report->mv_customizing = abap_true.
+    mo_cut->okcode_execute( `SPRO` ).
+    DATA(lo_popup) = CAST z2ui5_cl_cgui_popup( mo_client->mo_called ).
+    lo_popup->mt_field[ name = `%NEW_ID` ]-value = `zcgui_lvl`.
+    lo_popup->mt_field[ name = `%NEW_VALUE` ]-value = `CUST`.
+    mo_client->mv_event = `CGUI_POP_OK`.
+    lo_popup->z2ui5_if_app~main( mo_client ).
+    CLEAR: mo_client->mo_called, mo_client->mv_event.
+    mo_client->mo_prev = lo_popup.
+    mo_client->mv_navigated = abap_true.
+    mo_cut->z2ui5_if_app~main( mo_client ).
+    mo_client->mv_navigated = abap_false.
+    cl_abap_unit_assert=>assert_equals( act = mo_cut->get_parameter_id( `ZCGUI_LVL` )
+                                        exp = `CUST` ).
+    " the system parameter where the customizing has none
+    cl_abap_unit_assert=>assert_equals( act = mo_cut->get_parameter_id( `ZCGUI_SYS` )
+                                        exp = `S1` ).
+
+    " the user's own wins
+    mo_cut->set_parameter_id( id    = `ZCGUI_LVL`
+                              value = `USER` ).
+    cl_abap_unit_assert=>assert_equals( act = mo_cut->get_parameter_id( `ZCGUI_LVL` )
+                                        exp = `USER` ).
+
+    " stored shared - the store gives other users only shared variants
+    DATA(lt_spa_store) = mo_cut->mo_cgui_store->load( `%SPA` ).
+    cl_abap_unit_assert=>assert_true( lt_spa_store[ name = `%CUSTOMIZING` ]-shared ).
+
+    " the customizing is on the server - the next report reads it, for a
+    " user without a parameter of their own
+    DATA(lo_next) = NEW ltcl_report( ).
+    DATA(lo_next_client) = NEW ltcl_client( ).
+    lo_next_client->mo_app = lo_next.
+    lo_next_client->mv_init = abap_true.
+    lo_next->set_layout_store( NEW ltcl_layout_store( ) ).
+    lo_next->z2ui5_if_app~main( lo_next_client ).
+    cl_abap_unit_assert=>assert_equals( act = lo_next->get_parameter_id( `ZCGUI_LVL` )
+                                        exp = `USER` ).
+    lo_next->mv_cgui_spa = ``.
+    cl_abap_unit_assert=>assert_equals( act = lo_next->get_parameter_id( `ZCGUI_LVL` )
+                                        exp = `CUST` ).
 
   ENDMETHOD.
 

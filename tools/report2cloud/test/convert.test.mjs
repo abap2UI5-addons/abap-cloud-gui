@@ -420,6 +420,14 @@ test("CALL METHOD cl_gui_frontend_services=>('CLIPBOARD_EXPORT') - a dynamic cal
   assert.equal(convert("REPORT zt.\nSTART-OF-SELECTION.\n  CALL METHOD cl_gui_frontend_services=>('REGISTRY_GET_VALUE').", { file: "zt.prog.abap", className: "zcl_t" }).ok, false);
 });
 
+test("SUBMIT ... USING SELECTION-SCREEN dynnr starts the called class on that screen; USING SELECTION-SETS OF PROGRAM stays refused", () => {
+  const r = convert("REPORT zt.\nSTART-OF-SELECTION.\n  SUBMIT zother USING SELECTION-SCREEN '1100' VIA SELECTION-SCREEN AND RETURN.", { file: "zt.prog.abap", className: "zcl_t" });
+  assert.equal(r.ok, true, r.refusals.map((x) => x.message).join("\n"));
+  assert.match(r.files["zcl_t.clas.abap"], /submit\( report\s+= `ZCL_OTHER`\n\s+via_selection_screen\s+= abap_true\n\s+using_selection_screen = '1100' \)\./);
+  const sets = convert("REPORT zt.\nSTART-OF-SELECTION.\n  SUBMIT zother USING SELECTION-SETS OF PROGRAM 'ZX' AND RETURN.", { file: "zt.prog.abap", className: "zcl_t" });
+  assert.match(sets.refusals[0].message, /^SUBMIT \.\.\. USING SELECTION-SETS OF PROGRAM/);
+});
+
 test("SUBMIT ... AND RETURN starts the class of the called report with the values, CALL SELECTION-SCREEN goes on in after_call_selection_screen( )", () => {
   const cls = classOf("zr2c_15_submit");
   assert.match(cls, /DATA lt_r2c_submit_1 TYPE z2ui5_cl_cgui_variant=>ty_t_value\.\n\s+DATA lt_r2c_lines_1 TYPE z2ui5_cl_cgui_variant=>ty_t_value\.\n\s+CLEAR lt_r2c_submit_1\.\n\s+INSERT VALUE #\( name = `P_CARRID` kind = z2ui5_cl_cgui_variant=>cs_kind-parameter low = p_carrid \) INTO TABLE lt_r2c_submit_1\.\n\s+lt_r2c_lines_1 = z2ui5_cl_cgui_variant=>range_lines_get\( name = `S_FLDATE` range = s_fldate \)\.\n\s+APPEND LINES OF lt_r2c_lines_1 TO lt_r2c_submit_1\.\n\s+INSERT VALUE #\( name = `P_MAX` kind = z2ui5_cl_cgui_variant=>cs_kind-select_option sign = 'E' option = `NE` low = p_max \) INTO TABLE lt_r2c_submit_1\.\n\s+submit\( report = `Z2UI5_CL_CGUI_R2C_02`\n\s+values = lt_r2c_submit_1 \)\./);

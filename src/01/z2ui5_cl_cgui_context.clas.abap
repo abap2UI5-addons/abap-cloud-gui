@@ -91,6 +91,17 @@ CLASS z2ui5_cl_cgui_context DEFINITION PUBLIC FINAL CREATE PUBLIC.
       RETURNING
         VALUE(result) TYPE REF TO data.
 
+    "! the rows of entity - a CDS view entity, or a table or view of the
+    "! DDIC - as the value help of a field: what
+    "! @Consumption.valueHelpDefinition names. On ABAP Cloud as on premise;
+    "! unbound when it cannot be read
+    CLASS-METHODS entity_select
+      IMPORTING
+        entity        TYPE clike
+        max           TYPE i DEFAULT 500
+      RETURNING
+        VALUE(result) TYPE REF TO data.
+
     "! the rows of value table table with the text of its text table in
     "! the logon language as last column - unbound when it cannot be read
     CLASS-METHODS value_table_select
@@ -1203,6 +1214,36 @@ CLASS z2ui5_cl_cgui_context IMPLEMENTATION.
         ENDIF.
 
       CATCH cx_root.
+        CLEAR result.
+    ENDTRY.
+
+  ENDMETHOD.
+
+  METHOD entity_select.
+
+    DATA lv_entity TYPE c LENGTH 30.
+    FIELD-SYMBOLS <tab> TYPE STANDARD TABLE.
+
+    IF entity IS INITIAL.
+      RETURN.
+    ENDIF.
+    lv_entity = to_upper( entity ).
+    " an unknown name is a classic exception, no class-based one
+    cl_abap_typedescr=>describe_by_name( EXPORTING  p_name         = lv_entity
+                                         RECEIVING  p_descr_ref    = DATA(lo_type)
+                                         EXCEPTIONS type_not_found = 1
+                                                    OTHERS         = 2 ).
+    IF sy-subrc <> 0 OR lo_type->kind <> cl_abap_typedescr=>kind_struct.
+      RETURN.
+    ENDIF.
+    TRY.
+        DATA(lo_struct) = CAST cl_abap_structdescr( lo_type ).
+        DATA(lo_table) = cl_abap_tabledescr=>create( lo_struct ).
+        CREATE DATA result TYPE HANDLE lo_table.
+        ASSIGN result->* TO <tab>.
+        SELECT * FROM (lv_entity) INTO TABLE @<tab> UP TO @max ROWS.
+      CATCH cx_root.
+        " no such entity, no structure, or no read access
         CLEAR result.
     ENDTRY.
 

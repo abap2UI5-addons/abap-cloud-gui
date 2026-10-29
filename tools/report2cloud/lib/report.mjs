@@ -110,6 +110,24 @@ export function migrationReport(result, { source, texts, lint, atc, includes } =
   }
   push("");
 
+  if (result.ok) {
+    // the tile of the Fiori launchpad: abap2UI5 starts the class with the
+    // app_start parameter, the class is the semantic object of its intent
+    const prog = result.programName.toUpperCase();
+    const so = cls.toUpperCase();
+    push("## Launchpad tile", "");
+    push("The class runs as a tile of the Fiori launchpad with this target mapping (the frontend app `z2ui5` of abap2UI5):", "");
+    push("| | |", "|---|---|");
+    push(`| Semantic object | \`${so}\` |`);
+    push("| Action | `display` |");
+    push("| URL | `/sap/bc/ui5_ui5/sap/z2ui5` |");
+    push("| ID | `z2ui5` |");
+    push(`| Parameter | \`app_start\` = \`${so}\` |`);
+    push("");
+    push("Each field of its selection screen is a startup parameter of the same name (`P_CARRID=LH`, a select-option `S_DATE=20260101,20260131`), and so is `variant`. So that `CALL TRANSACTION` of another report navigates to the tile inside the launchpad, give the transaction its intent in the catalog of the installation (`set_catalog( )`):", "");
+    push("```abap", `( code = \`${prog}\` report = \`${so}\` text = \`${prog}\` semantic_object = \`${so}\` action = \`display\` )`, "```", "");
+  }
+
   push("## Next steps", "");
   push("1. Work through the TODOs above; replace every object of the release table by its released successor.");
   push("2. Lint the class against ABAP Cloud: `node tools/report2cloud/cli.mjs <report> --check` (or `npm run check:cloud` with the class in `src/`) until it is clean.");

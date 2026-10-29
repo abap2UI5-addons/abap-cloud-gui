@@ -60,6 +60,8 @@ CLASS z2ui5_cl_cgui_sample_05 IMPLEMENTATION.
     mock_data( ).
     " save a variant named DEFAULT and the report starts with it
     set_variant( `DEFAULT` ).
+    " entries not executed come back at the next start
+    set_draft( ).
 
   ENDMETHOD.
 
@@ -85,7 +87,10 @@ CLASS z2ui5_cl_cgui_sample_05 IMPLEMENTATION.
         )->block_end(
         )->button( text  = `Reset`
                    event = `RESET_ASK`
-                   icon  = `sap-icon://reset` ).
+                   icon  = `sap-icon://reset`
+        )->button( text  = `Airline`
+                   event = `AIRLINE`
+                   icon  = `sap-icon://flight` ).
 
   ENDMETHOD.
 
@@ -207,6 +212,13 @@ CLASS z2ui5_cl_cgui_sample_05 IMPLEMENTATION.
         p_alv = abap_true.
         p_list = abap_false.
         message( `Selection screen reset` ).
+      WHEN `AIRLINE`.
+        " the app of the airline in the Fiori launchpad, the airline as its
+        " startup parameter
+        call_intent( semantic_object = `Airline`
+                     values          = VALUE #( ( name = `CARRID`
+                                                  kind = z2ui5_cl_cgui_variant=>cs_kind-parameter
+                                                  low  = p_carrid ) ) ).
     ENDCASE.
 
   ENDMETHOD.

@@ -237,6 +237,28 @@ The code starts the same way: `call_transaction( code = 'ZFLIGHTS' )` is
 `CALL TRANSACTION`, `skip_first = abap_true` its `AND SKIP FIRST SCREEN` -
 the report class of the catalog with its variant, Back returns here.
 
+### In the Fiori launchpad
+
+A report class is a tile of the launchpad like any abap2UI5 app - the
+migration report of report2cloud lists its target mapping (semantic object
+the class, action `display`, parameter `app_start`). Inside the launchpad
+the shell shows the title of the report, and the startup parameters of the
+tile fill the selection screen as the URL does (`P_CARRID=LH`, `variant`).
+A transaction of the catalog with an intent navigates through the shell -
+its history and Back keep working - instead of starting the class;
+`call_intent( )` goes to any intent, the values as startup parameters:
+
+```abap
+( code = `ZFLIGHTS` report = `ZCL_FLIGHTS` text = `Flights`
+  semantic_object = `Flight` action = `display` )   " a line of the catalog
+
+call_intent( semantic_object = `Airline`
+             values          = VALUE #( ( name = `CARRID` kind = `P` low = p_carrid ) ) ).
+```
+
+Outside the launchpad `call_intent( )` starts the transaction of the catalog
+with that intent.
+
 ### The last entries
 
 Every field remembers what was run with it: the last ten values - of a
@@ -297,6 +319,22 @@ METHOD at_value_request.
 ENDMETHOD.
 ```
 
+The standard F4 asks, in this order: a **CDS value help** named at the
+field, the search help of `MATCHCODE OBJECT`, the fixed values of the domain,
+the elementary **search help** of the data element (on premise, its hit list
+without a dialog), and the **value table** with the texts of its **text
+table** (on premise). The CDS value help is what
+`@Consumption.valueHelpDefinition` names - a CDS view entity, or any table or
+view of the DDIC, read on ABAP Cloud as on premise, the element given the
+value (else its first one):
+
+```abap
+screen->parameter( val                = p_land
+                   text               = `Country`
+                   value_help_entity  = `I_Country`
+                   value_help_element = `Country` ).
+```
+
 On a select-option F4 picks any number of values, which become lines
 `I EQ` — the ones already selected come up checked. A button beside the
 field opens the range popup, the classic multiple selection, for every
@@ -338,6 +376,39 @@ same store: one entry per user, so every report of the user sees them, on
 every device. `SU3` in the command field opens them in a popup to change, add
 or delete (an empty value deletes the parameter). Without a server store
 they stay in the browser's local storage.
+
+`GET PARAMETER ID` looks in three places, the first one that has the ID
+answers: the user's own parameter, then the **customizing parameter** of the
+installation, then its **system parameter**. Customizing parameters are kept
+in the same store, one entry for every user (`%CUSTOMIZING`); `SPRO` in the
+command field maintains them - for a user `authority_check_customizing( )`
+lets through, which refuses everyone unless the installation redefines it
+with its AUTHORITY-CHECK. System parameters are given in code, the same for
+everyone and nowhere stored:
+
+```abap
+METHOD initialization.
+  set_system_parameters( VALUE #( ( n = `BUK` v = `1000` ) ( n = `WRK` v = `1010` ) ) ).
+ENDMETHOD.
+
+METHOD authority_check_customizing.
+  AUTHORITY-CHECK OBJECT 'S_TABU_DIS' ID 'ACTVT' FIELD '02' ID 'DICBERCLS' FIELD 'ZCGU'.
+  result = xsdbool( sy-subrc = 0 ).
+ENDMETHOD.
+```
+
+A selection screen that is filled in and then left - the browser closed, the
+session timed out - keeps the entries as a **draft** with `set_draft( )` in
+`initialization( )`: every roundtrip saves them in the variant store under
+the user's own name, the next start brings them back with a message and a
+**Discard Draft** button, and a successful Execute deletes the draft. A
+start variant wins over the draft; the draft is not in the list of variants.
+
+```abap
+METHOD initialization.
+  set_draft( ).
+ENDMETHOD.
+```
 
 ### ALV layouts
 
@@ -593,8 +664,10 @@ Selection screen
 
 - [x] F4 inside the range popup of a select-option - `at_value_request( )`
       of the select-option, the values picked become lines of the popup
-- [ ] Value helps: CDS value helps (`@Consumption.valueHelpDefinition`),
-      text tables beside value tables, search helps
+- [x] Value helps: CDS value helps (`value_help_entity` - what
+      `@Consumption.valueHelpDefinition` names, on ABAP Cloud too), text
+      tables beside value tables, search helps (`MATCHCODE OBJECT` and the
+      data element's)
 - [x] `AT SELECTION-SCREEN ON BLOCK`, `ON RADIOBUTTON GROUP`, `AS LISTBOX`
 - [x] `MEMORY ID`
 - [x] A phone layout of the selection screen: labels above the fields, a
@@ -636,13 +709,24 @@ Dialogs and screens
       `_popup( )->transport( )`, `z2ui5_cl_cgui_transport`, beside
       `POPUP_TO_DECIDE` and `POPUP_GET_VALUES`; no popup of another addon is
       needed any more
-- [ ] `CALL SCREEN` of a screen in another class - `CALL SCREEN` of the
-      report's own screens and back is there
-- [ ] `CALL SELECTION-SCREEN` of another report, as a popup or by screen number
+- [x] `CALL SCREEN` of a screen in another class - the dynpro of a
+      function group or another program: `call_screen( dynnr = '0100' owner
+      = lo_screens )` shows the dynpro of the report class `lo_screens` with
+      its PBO and PAI as an app of its own; when its last dynpro is left
+      (`SET SCREEN 0`) the caller goes on in `after_call_screen( )` and
+      reads the attributes of `lo_screens` as the dynpro left them
+- [x] The selection screen of another report, as a popup or by screen
+      number: `submit( using_selection_screen = '1100' )` (SUBMIT ... USING
+      SELECTION-SCREEN, converted by report2cloud) and `submit( as_window =
+      abap_true )` - the called report's screen as a dialog box over the
+      caller, Execute shows its output, Cancel returns
 
 Navigation and transactions
 
-- [ ] Launchpad tiles and intent navigation for a converted class
+- [x] Launchpad tiles and intent navigation for a converted class: the
+      target mapping in the migration report, the startup parameters on the
+      selection screen, the title in the shell, the intent of a transaction
+      of the catalog and `call_intent( )`
 - [x] Command field instead of a plain input: transaction codes, `/n`, `/o`
       (`set_command_field( )`, `set_catalog( )`)
 - [x] Command palette (`Cmd+K` / `Ctrl+K`) to search and start reports
@@ -652,10 +736,15 @@ Navigation and transactions
       keys of a GUI status (`set_pf_status( shortcuts = )`)
 - [x] Transaction logic: start with a variant, prefill the last entries
       (`set_prefill_last( )`)
-- [ ] Transaction logic: create a draft
+- [x] Transaction logic: create a draft - the entries of a selection screen
+      that was left without executing come back at the next start
+      (`set_draft( )`)
 - [x] `SET` / `GET PARAMETER ID` with user parameters on the server, `SU3` in
       the command field to maintain them
-- [ ] System parameters and customizing parameters beside the user parameters
+- [x] System parameters and customizing parameters beside the user
+      parameters: `GET PARAMETER ID` reads the user's, then the customizing
+      ones (`SPRO` in the command field, `authority_check_customizing( )`),
+      then the system ones (`set_system_parameters( )`)
 
 Stage 3 - clean core at the scale of a code base
 
