@@ -6,7 +6,7 @@ release.
 
 ## Unreleased
 
-## 1.0.0 - unreleased
+## 1.0.0 - 2026-10-30
 
 The first release: the report runtime, report2cloud and the tools around
 them. Install it with abapGit - the repository at the tag, or the zip of the
