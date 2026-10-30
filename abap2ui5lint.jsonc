@@ -27,6 +27,14 @@
       "exclude": [
         "z2ui5_cl_cgui_list\\."
       ]
+    },
+    // The report binds its GUI controls (mt_cgui_gui) and the rows of a
+    // table control (mt_cgui_tc_row) through z2ui5_cl_cgui_gui_view, which
+    // renders them on the report's behalf - the _bind( ) calls are there.
+    "unbound-public-attribute": {
+      "exclude": [
+        "z2ui5_cl_cgui_report\\."
+      ]
     }
   },
 
