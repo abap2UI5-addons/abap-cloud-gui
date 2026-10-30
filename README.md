@@ -909,7 +909,12 @@ Simpler to read, simpler to change - the API stays
 
 - [ ] `z2ui5_cl_cgui_report` split behind its API into collaborators -
       selection screen, output, variants and parameters, dynpro and GUI
-      stand-ins, navigation; no method over 80 lines, no class over 2,000
+      stand-ins, navigation; no method over 80 lines, no class over 2,000.
+      So far: `z2ui5_cl_cgui_memory` (variants, parameters, draft, history),
+      `z2ui5_cl_cgui_command` (URL, command field, shortcuts), the grid's
+      table work in `z2ui5_cl_cgui_alv` - 8,730 to 7,718 lines, the PUBLIC
+      and PROTECTED sections byte-identical; next the GUI rendering and the
+      three 200-line methods
 - [x] `convert.mjs` split by statement family - `convert-screen`, `-decl`,
       `-list`, `-alv`, `-calls`, `-functions`, `-dynpro`, `-gui`, `-locals`,
       `-rewrites` as methods mixed into the one Converter, the tables and
