@@ -849,7 +849,11 @@ Quality, through every stage
 - [x] Tests for the report runtime and the ALV with a client test double
       (`ltcl_client` of the report, the ALV's own), beside the selection
       screen's
-- [ ] Samples in the abap2UI5 playground, a documentation page
+- [x] Samples in a playground, a documentation page: the samples run in
+      the site's own copy of the abap2UI5 playground (the framework's
+      playground stays without the addon), and the documentation has
+      [Apps Written Like Reports](https://abap2ui5.github.io/docs/advanced/report_style)
+      beside [Migrating Classic Reports](https://abap2ui5.github.io/docs/advanced/report_migration)
 - [x] Semantic tests: the classic report and its class run against the
       same seeded rows in the transpiled runtime, their lists compared line
       by line (`test/runtime/semantic.test.mjs`) - six list reports of the
