@@ -209,6 +209,14 @@ CLASS ltcl_client DEFINITION FINAL FOR TESTING.
     DATA mv_box       TYPE string.
     DATA mv_box_type  TYPE string.
 
+    " the name of the public attribute val is - or, as the framework's model
+    " dissolves a reference, the attribute whose REF TO data points at val
+    METHODS attri_name
+      IMPORTING
+        val           TYPE any
+      RETURNING
+        VALUE(result) TYPE string.
+
 ENDCLASS.
 
 
@@ -761,15 +769,73 @@ CLASS ltcl_client IMPLEMENTATION.
 
   ENDMETHOD.
 
-  METHOD z2ui5_if_client~_bind.
+  METHOD attri_name.
 
-    IF tab IS SUPPLIED.
-      result = |\{/{ z2ui5_cl_cgui_context=>attri_name_by_ref( app = mo_app
-                                                               val = tab ) }/{ tab_index - 1 }\}|.
+    DATA lr_val   TYPE REF TO data.
+    DATA lr_attri TYPE REF TO data.
+    FIELD-SYMBOLS <ref>   TYPE REF TO data.
+    FIELD-SYMBOLS <attri> TYPE any.
+
+    result = z2ui5_cl_cgui_context=>attri_name_by_ref( app = mo_app
+                                                       val = val ).
+    IF result IS NOT INITIAL.
       RETURN.
     ENDIF.
-    result = |\{/{ z2ui5_cl_cgui_context=>attri_name_by_ref( app = mo_app
-                                                             val = val ) }\}|.
+
+    GET REFERENCE OF val INTO lr_val.
+    DATA(lo_class) = CAST cl_abap_classdescr( cl_abap_typedescr=>describe_by_object_ref( mo_app ) ).
+    LOOP AT lo_class->attributes REFERENCE INTO DATA(lr_descr)
+         WHERE visibility = cl_abap_classdescr=>public
+           AND is_constant = abap_false
+           AND type_kind = cl_abap_typedescr=>typekind_dref.
+      ASSIGN mo_app->(lr_descr->name) TO <ref>.
+      IF <ref> IS NOT ASSIGNED OR <ref> IS NOT BOUND.
+        CONTINUE.
+      ENDIF.
+      ASSIGN <ref>->* TO <attri>.
+      GET REFERENCE OF <attri> INTO lr_attri.
+      IF lr_attri = lr_val.
+        result = lr_descr->name.
+        RETURN.
+      ENDIF.
+    ENDLOOP.
+
+  ENDMETHOD.
+
+  METHOD z2ui5_if_client~_bind.
+
+    " the framework finds a binding by the reference of the value: a public
+    " attribute of the app, or a component of the row tab_index of such a
+    " table. A copy of the row binds nothing - BINDING_ERROR_TAB_CELL_LEVEL
+    " on the real client, so the double fails the same way, in the unit test
+    " instead of the runtime job
+    IF tab IS SUPPLIED.
+      DATA(lv_tab) = attri_name( tab ).
+      cl_abap_unit_assert=>assert_not_initial( act = lv_tab
+                                               msg = `BINDING_ERROR - the bound table is no public attribute` ).
+      cl_abap_unit_assert=>assert_true( act = xsdbool( tab_index >= 1 AND tab_index <= lines( tab ) )
+                                        msg = |BINDING_ERROR_TAB_CELL_LEVEL - row { tab_index } of { lv_tab } out of range| ).
+      FIELD-SYMBOLS <tab> TYPE STANDARD TABLE.
+      ASSIGN tab TO <tab>.
+      ASSIGN <tab>[ tab_index ] TO FIELD-SYMBOL(<row>).
+      DATA lr_val  TYPE REF TO data.
+      DATA lr_cell TYPE REF TO data.
+      GET REFERENCE OF val INTO lr_val.
+      DATA(lo_struct) = CAST cl_abap_structdescr( cl_abap_typedescr=>describe_by_data( <row> ) ).
+      LOOP AT lo_struct->components REFERENCE INTO DATA(lr_comp).
+        ASSIGN COMPONENT lr_comp->name OF STRUCTURE <row> TO FIELD-SYMBOL(<cell>).
+        GET REFERENCE OF <cell> INTO lr_cell.
+        IF lr_cell = lr_val.
+          result = |\{/{ lv_tab }/{ tab_index - 1 }/{ lr_comp->name }\}|.
+          RETURN.
+        ENDIF.
+      ENDLOOP.
+      cl_abap_unit_assert=>fail( |BINDING_ERROR_TAB_CELL_LEVEL - the value is no cell of row { tab_index } of { lv_tab } - a copy of the row?| ).
+    ENDIF.
+    DATA(lv_attri) = attri_name( val ).
+    cl_abap_unit_assert=>assert_not_initial( act = lv_attri
+                                             msg = `BINDING_ERROR - the bound value is no public attribute of the app` ).
+    result = |\{/{ lv_attri }\}|.
 
   ENDMETHOD.
 
