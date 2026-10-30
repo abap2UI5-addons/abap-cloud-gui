@@ -1405,15 +1405,6 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
 
     TYPES:
       " character types - the popup heads its columns with their names
-      BEGIN OF ty_s_cgui_filter_col,
-        column TYPE c LENGTH 30,
-        text   TYPE c LENGTH 60,
-        filter TYPE c LENGTH 60,
-      END OF ty_s_cgui_filter_col.
-    TYPES ty_t_cgui_filter_col TYPE STANDARD TABLE OF ty_s_cgui_filter_col WITH EMPTY KEY.
-
-    TYPES:
-      " character types - the popup heads its columns with their names
       BEGIN OF ty_s_variant_row,
         variant TYPE c LENGTH 40,
         values  TYPE c LENGTH 255,
@@ -1865,6 +1856,20 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
     METHODS on_alv_event
       RETURNING
         VALUE(result) TYPE abap_bool.
+
+    "! F4 of a cell of the grid - the value help of the report for it
+    METHODS alv_event_f4.
+
+    "! the details of the selected row of the grid in a popup
+    METHODS alv_event_details
+      IMPORTING
+        full TYPE REF TO data.
+
+    "! an event of the grid the ALV handles itself - the export takes the
+    "! table of the report, the selection the table the grid shows
+    METHODS alv_event_forward
+      IMPORTING
+        event TYPE string.
 
     METHODS view_display.
 
@@ -3622,21 +3627,7 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
     FIELD-SYMBOLS <tab> TYPE STANDARD TABLE.
 
     DATA(lv_event) = client->get_event( ).
-    IF mo_cgui_alv IS NOT BOUND
-        OR ( lv_event <> z2ui5_cl_cgui_alv=>cs_event-select_all
-         AND lv_event <> z2ui5_cl_cgui_alv=>cs_event-deselect_all
-         AND lv_event <> z2ui5_cl_cgui_alv=>cs_event-export
-         AND lv_event <> z2ui5_cl_cgui_alv=>cs_event-export_xlsx
-         AND lv_event <> z2ui5_cl_cgui_alv=>cs_event-layout
-         AND lv_event <> z2ui5_cl_cgui_alv=>cs_event-page
-         AND lv_event <> z2ui5_cl_cgui_alv=>cs_event-filter
-         AND lv_event <> z2ui5_cl_cgui_alv=>cs_event-filter_clear
-         AND lv_event <> z2ui5_cl_cgui_alv=>cs_event-details
-         AND lv_event <> z2ui5_cl_cgui_alv=>cs_event-details_close
-         AND lv_event <> z2ui5_cl_cgui_alv=>cs_event-chart
-         AND lv_event <> z2ui5_cl_cgui_alv=>cs_event-chart_close
-         AND lv_event <> z2ui5_cl_cgui_alv=>cs_event-search
-         AND lv_event <> z2ui5_cl_cgui_alv=>cs_event-f4 ).
+    IF mo_cgui_alv IS NOT BOUND OR z2ui5_cl_cgui_alv=>is_grid_event( lv_event ) = abap_false.
       RETURN.
     ENDIF.
 
@@ -3649,72 +3640,76 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
           mo_cgui_alv->page_turn( direction = client->get_event_arg( )
                                   lines     = lines( mo_cgui_alv->filter_index( <tab> ) ) ).
         ENDIF.
-        RETURN.
       WHEN z2ui5_cl_cgui_alv=>cs_event-filter.
         alv_filter_popup( ).
-        RETURN.
       WHEN z2ui5_cl_cgui_alv=>cs_event-filter_clear.
         mo_cgui_alv->clear_filter( ).
         mo_cgui_alv->set_search( `` ).
-        RETURN.
       WHEN z2ui5_cl_cgui_alv=>cs_event-search.
         mo_cgui_alv->set_search( client->get_event_arg( ) ).
-        RETURN.
       WHEN z2ui5_cl_cgui_alv=>cs_event-f4.
-        DATA(ls_f4) = z2ui5_cl_cgui_alv=>get_hotspot_by_event( client ).
-        mv_cgui_alv_f4_row = alv_row( ls_f4-row ).
-        mv_cgui_alv_f4_col = to_upper( ls_f4-column ).
-        mv_cgui_value_field = mv_cgui_alv_f4_col.
-        at_alv_value_request( row    = mv_cgui_alv_f4_row
-                              column = mv_cgui_alv_f4_col ).
-        CLEAR mv_cgui_value_field.
-        IF mv_cgui_nav = abap_false.
-          CLEAR: mv_cgui_alv_f4_row, mv_cgui_alv_f4_col.
-        ENDIF.
-        RETURN.
+        alv_event_f4( ).
       WHEN z2ui5_cl_cgui_alv=>cs_event-details.
-        IF lr_full IS BOUND.
-          ASSIGN lr_full->* TO <tab>.
-          DATA(lt_selected) = mo_cgui_alv->get_selected_rows( <tab> ).
-          IF lt_selected IS INITIAL.
-            message( text = 'Select a row'(044)
-                     type = `W` ).
-          ELSE.
-            mo_cgui_alv->details_popup( client = client
-                                        tab    = <tab>
-                                        row    = lt_selected[ 1 ] ).
-          ENDIF.
-        ENDIF.
-        RETURN.
+        alv_event_details( lr_full ).
+      WHEN z2ui5_cl_cgui_alv=>cs_event-layout.
+        layout_popup( ).
       WHEN z2ui5_cl_cgui_alv=>cs_event-select_all OR z2ui5_cl_cgui_alv=>cs_event-deselect_all.
         " filtered: the rows that pass, as the classic ALV does
         IF lr_full IS BOUND AND mo_cgui_alv->is_filtered( ) = abap_true.
           ASSIGN lr_full->* TO <tab>.
-          DATA(lt_index) = mo_cgui_alv->filter_index( <tab> ).
-          DATA(lv_box) = mo_cgui_alv->get_box_field( ).
-          FIELD-SYMBOLS <box> TYPE any.
-          LOOP AT lt_index INTO DATA(lv_row).
-            READ TABLE <tab> ASSIGNING FIELD-SYMBOL(<line>) INDEX lv_row.
-            IF sy-subrc <> 0.
-              CONTINUE.
-            ENDIF.
-            ASSIGN COMPONENT lv_box OF STRUCTURE <line> TO <box>.
-            IF sy-subrc = 0.
-              <box> = xsdbool( lv_event = z2ui5_cl_cgui_alv=>cs_event-select_all ).
-            ENDIF.
-          ENDLOOP.
-          RETURN.
+          mo_cgui_alv->select_filtered( EXPORTING selected = xsdbool( lv_event = z2ui5_cl_cgui_alv=>cs_event-select_all )
+                                        CHANGING  tab      = <tab> ).
+        ELSE.
+          alv_event_forward( lv_event ).
         ENDIF.
+      WHEN OTHERS.
+        alv_event_forward( lv_event ).
     ENDCASE.
-    IF lv_event = z2ui5_cl_cgui_alv=>cs_event-layout.
-      layout_popup( ).
+
+  ENDMETHOD.
+
+  METHOD alv_event_f4.
+
+    DATA(ls_f4) = z2ui5_cl_cgui_alv=>get_hotspot_by_event( client ).
+    mv_cgui_alv_f4_row = alv_row( ls_f4-row ).
+    mv_cgui_alv_f4_col = to_upper( ls_f4-column ).
+    mv_cgui_value_field = mv_cgui_alv_f4_col.
+    at_alv_value_request( row    = mv_cgui_alv_f4_row
+                          column = mv_cgui_alv_f4_col ).
+    CLEAR mv_cgui_value_field.
+    IF mv_cgui_nav = abap_false.
+      CLEAR: mv_cgui_alv_f4_row, mv_cgui_alv_f4_col.
+    ENDIF.
+
+  ENDMETHOD.
+
+  METHOD alv_event_details.
+
+    FIELD-SYMBOLS <tab> TYPE STANDARD TABLE.
+
+    IF full IS NOT BOUND.
       RETURN.
     ENDIF.
-    " the export takes the table of the report, the selection the table the
-    " grid shows
+    ASSIGN full->* TO <tab>.
+    DATA(lt_selected) = mo_cgui_alv->get_selected_rows( <tab> ).
+    IF lt_selected IS INITIAL.
+      message( text = 'Select a row'(044)
+               type = `W` ).
+    ELSE.
+      mo_cgui_alv->details_popup( client = client
+                                  tab    = <tab>
+                                  row    = lt_selected[ 1 ] ).
+    ENDIF.
+
+  ENDMETHOD.
+
+  METHOD alv_event_forward.
+
+    FIELD-SYMBOLS <tab> TYPE STANDARD TABLE.
     DATA lr_tab TYPE REF TO data.
-    IF lv_event = z2ui5_cl_cgui_alv=>cs_event-export OR lv_event = z2ui5_cl_cgui_alv=>cs_event-export_xlsx
-        OR lv_event = z2ui5_cl_cgui_alv=>cs_event-chart.
+
+    IF event = z2ui5_cl_cgui_alv=>cs_event-export OR event = z2ui5_cl_cgui_alv=>cs_event-export_xlsx
+        OR event = z2ui5_cl_cgui_alv=>cs_event-chart.
       lr_tab = alv_visible_source( ).
     ELSE.
       lr_tab = alv_shown( ).
@@ -6022,44 +6017,8 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
 
     " a copy of the table with the box field - the selection is kept as
     " long as the table keeps its number of rows
-    DATA lt_comp TYPE cl_abap_structdescr=>component_table.
-    DATA lv_flag TYPE abap_bool.
-    DATA lr_row  TYPE REF TO data.
-    DATA lt_selected TYPE z2ui5_cl_cgui_alv=>ty_t_row.
-    FIELD-SYMBOLS <src> TYPE STANDARD TABLE.
-    FIELD-SYMBOLS <old> TYPE STANDARD TABLE.
-    FIELD-SYMBOLS <tab> TYPE STANDARD TABLE.
-    FIELD-SYMBOLS <row> TYPE any.
-    FIELD-SYMBOLS <box> TYPE any.
-
-    ASSIGN source->* TO <src>.
-    IF mr_cgui_alv_box IS BOUND.
-      ASSIGN mr_cgui_alv_box->* TO <old>.
-      IF lines( <old> ) = lines( <src> ).
-        lt_selected = mo_cgui_alv->get_selected_rows( <old> ).
-      ENDIF.
-    ENDIF.
-
-    DATA(lo_line) = CAST cl_abap_structdescr( CAST cl_abap_tabledescr(
-        cl_abap_typedescr=>describe_by_data( <src> ) )->get_table_line_type( ) ).
-    lt_comp = lo_line->get_components( ).
-    INSERT VALUE #( name = z2ui5_cl_cgui_alv=>cv_box_field
-                    type = CAST #( cl_abap_typedescr=>describe_by_data( lv_flag ) ) ) INTO TABLE lt_comp.
-    DATA(lo_tab) = cl_abap_tabledescr=>create( cl_abap_structdescr=>create( lt_comp ) ).
-    CREATE DATA mr_cgui_alv_box TYPE HANDLE lo_tab.
-    ASSIGN mr_cgui_alv_box->* TO <tab>.
-
-    LOOP AT <src> ASSIGNING FIELD-SYMBOL(<line>).
-      DATA(lv_index) = sy-tabix.
-      CREATE DATA lr_row LIKE LINE OF <tab>.
-      ASSIGN lr_row->* TO <row>.
-      MOVE-CORRESPONDING <line> TO <row>.
-      IF line_exists( lt_selected[ table_line = lv_index ] ).
-        ASSIGN COMPONENT z2ui5_cl_cgui_alv=>cv_box_field OF STRUCTURE <row> TO <box>.
-        <box> = abap_true.
-      ENDIF.
-      INSERT <row> INTO TABLE <tab>.
-    ENDLOOP.
+    mr_cgui_alv_box = mo_cgui_alv->box_copy( source = source
+                                             old    = mr_cgui_alv_box ).
 
   ENDMETHOD.
 
@@ -6909,62 +6868,26 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
 
   METHOD alv_visible_source.
 
-    FIELD-SYMBOLS <src>   TYPE STANDARD TABLE.
-    FIELD-SYMBOLS <shown> TYPE STANDARD TABLE.
-    FIELD-SYMBOLS <copy>  TYPE STANDARD TABLE.
-
     result = alv_source( ).
     IF result IS NOT BOUND OR mo_cgui_alv IS NOT BOUND OR mo_cgui_alv->is_filtered( ) = abap_false.
       RETURN.
     ENDIF.
     " the copy with the box field has the rows of the table, one to one
-    DATA(lr_shown) = alv_shown( ).
-    ASSIGN result->* TO <src>.
-    ASSIGN lr_shown->* TO <shown>.
-    DATA(lt_index) = mo_cgui_alv->filter_index( <shown> ).
-    DATA lr_copy TYPE REF TO data.
-    CREATE DATA lr_copy LIKE <src>.
-    ASSIGN lr_copy->* TO <copy>.
-    " empty - the transpiled runtime copies the rows along with LIKE
-    CLEAR <copy>.
-    LOOP AT lt_index INTO DATA(lv_row).
-      READ TABLE <src> ASSIGNING FIELD-SYMBOL(<line>) INDEX lv_row.
-      IF sy-subrc = 0.
-        INSERT <line> INTO TABLE <copy>.
-      ENDIF.
-    ENDLOOP.
-    result = lr_copy.
+    result = mo_cgui_alv->filtered_copy( source = result
+                                         shown  = alv_shown( ) ).
 
   ENDMETHOD.
 
   METHOD alv_filter_popup.
 
     FIELD-SYMBOLS <tab> TYPE STANDARD TABLE.
-    DATA lt_col TYPE ty_t_cgui_filter_col.
-    DATA lt_low TYPE string_table.
 
     DATA(lr_tab) = alv_shown( ).
     IF lr_tab IS NOT BOUND.
       RETURN.
     ENDIF.
     ASSIGN lr_tab->* TO <tab>.
-    DATA(lt_filter) = mo_cgui_alv->get_filter( ).
-    DATA(lt_layout) = mo_cgui_alv->get_layout( <tab> ).
-    SORT lt_layout BY position.
-    LOOP AT lt_layout INTO DATA(ls_layout).
-      CLEAR lt_low.
-      READ TABLE lt_filter INTO DATA(ls_filter) WITH KEY name = ls_layout-name.
-      IF sy-subrc = 0.
-        LOOP AT ls_filter-rows INTO DATA(ls_row).
-          INSERT COND string( WHEN ls_row-sign = `E` THEN |≠{ ls_row-low }|
-                              WHEN ls_row-high IS NOT INITIAL THEN |{ ls_row-low }…{ ls_row-high }|
-                              ELSE ls_row-low ) INTO TABLE lt_low.
-        ENDLOOP.
-      ENDIF.
-      INSERT VALUE #( column = ls_layout-name
-                      text   = ls_layout-text
-                      filter = concat_lines_of( table = lt_low sep = `, ` ) ) INTO TABLE lt_col.
-    ENDLOOP.
+    DATA(lt_col) = mo_cgui_alv->filter_columns( <tab> ).
 
     mv_cgui_pending_kind = cs_pending-filter_col.
     mv_cgui_nav = abap_true.
@@ -6975,7 +6898,7 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
 
   METHOD alv_filter_column_result.
 
-    FIELD-SYMBOLS <col> TYPE ty_s_cgui_filter_col.
+    FIELD-SYMBOLS <col> TYPE z2ui5_cl_cgui_alv=>ty_s_filter_col.
     DATA lo_popup TYPE REF TO z2ui5_cl_cgui_select.
 
     TRY.
@@ -7004,18 +6927,8 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
       RETURN.
     ENDIF.
     ASSIGN lr_tab->* TO <tab>.
-    DATA(ls_setting) = VALUE z2ui5_cl_cgui_range=>ty_s_setting( control = z2ui5_cl_cgui_range=>cs_control-input ).
-    DATA(lt_layout) = mo_cgui_alv->get_layout( <tab> ).
-    READ TABLE lt_layout INTO DATA(ls_layout) WITH KEY name = mv_cgui_filter_col.
-    ls_setting-title = COND #( WHEN ls_layout-text IS NOT INITIAL THEN ls_layout-text ELSE mv_cgui_filter_col ).
-    DATA(lt_comp) = z2ui5_cl_cgui_context=>rtti_get_t_comp( <tab> ).
-    READ TABLE lt_comp INTO DATA(ls_comp) WITH KEY name = mv_cgui_filter_col.
-    CASE ls_comp-type_kind.
-      WHEN cl_abap_typedescr=>typekind_date.
-        ls_setting-control = z2ui5_cl_cgui_range=>cs_control-date.
-      WHEN cl_abap_typedescr=>typekind_time.
-        ls_setting-control = z2ui5_cl_cgui_range=>cs_control-time.
-    ENDCASE.
+    DATA(ls_setting) = mo_cgui_alv->filter_setting( tab  = <tab>
+                                                    name = mv_cgui_filter_col ).
 
     mv_cgui_pending_kind = cs_pending-filter.
     mv_cgui_nav = abap_true.
@@ -7145,9 +7058,6 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
 
   METHOD alv_page_sync.
 
-    FIELD-SYMBOLS <full> TYPE STANDARD TABLE.
-    FIELD-SYMBOLS <page> TYPE STANDARD TABLE.
-
     " selection and input of the rows shown go back to the rows they are
     " cut from
     IF mo_cgui_alv IS NOT BOUND OR mr_cgui_alv_page IS NOT BOUND.
@@ -7157,28 +7067,13 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
     IF lr_full IS NOT BOUND.
       RETURN.
     ENDIF.
-    ASSIGN lr_full->* TO <full>.
-    ASSIGN mr_cgui_alv_page->* TO <page>.
-    LOOP AT <page> ASSIGNING FIELD-SYMBOL(<row>).
-      DATA(lv_shown) = sy-tabix.
-      READ TABLE mt_cgui_alv_index INTO DATA(lv_row) INDEX lv_shown.
-      IF sy-subrc <> 0.
-        CONTINUE.
-      ENDIF.
-      READ TABLE <full> ASSIGNING FIELD-SYMBOL(<line>) INDEX lv_row.
-      IF sy-subrc = 0.
-        <line> = <row>.
-      ENDIF.
-    ENDLOOP.
+    mo_cgui_alv->page_write_back( full  = lr_full
+                                  page  = mr_cgui_alv_page
+                                  index = mt_cgui_alv_index ).
 
   ENDMETHOD.
 
   METHOD alv_edit_sync.
-
-    FIELD-SYMBOLS <src>  TYPE STANDARD TABLE.
-    FIELD-SYMBOLS <box>  TYPE STANDARD TABLE.
-    FIELD-SYMBOLS <row>  TYPE any.
-    FIELD-SYMBOLS <line> TYPE any.
 
     IF mo_cgui_alv IS NOT BOUND OR mr_cgui_alv_box IS NOT BOUND OR mo_cgui_alv->is_editable( ) = abap_false.
       RETURN.
@@ -7187,18 +7082,8 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
     IF lr_src IS NOT BOUND.
       RETURN.
     ENDIF.
-    ASSIGN lr_src->* TO <src>.
-    ASSIGN mr_cgui_alv_box->* TO <box>.
-    IF lines( <src> ) <> lines( <box> ).
-      RETURN.
-    ENDIF.
-
-    LOOP AT <box> ASSIGNING <row>.
-      READ TABLE <src> ASSIGNING <line> INDEX sy-tabix.
-      IF sy-subrc = 0.
-        MOVE-CORRESPONDING <row> TO <line>.
-      ENDIF.
-    ENDLOOP.
+    mo_cgui_alv->box_write_back( source = lr_src
+                                 box    = mr_cgui_alv_box ).
 
   ENDMETHOD.
 
