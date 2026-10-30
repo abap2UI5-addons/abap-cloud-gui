@@ -610,8 +610,9 @@ is next. Every stage is a release of its own.
 
 Stage 0 - release, and the number to move
 
-- [ ] A release of this addon with report2cloud and the MCP server's
-      `migrate_report`; the documentation's preview note goes
+- [x] A release of this addon with report2cloud and the MCP server's
+      `migrate_report`: [v1.0.0](https://github.com/abap2UI5-addons/abap-cloud-gui/releases/tag/v1.0.0),
+      with the abapGit zip and the 7.02 zip
 - [x] A corpus of real reports: the open-source ABAP of the web, converted
       weekly (`report2cloud:web`), the share that converts without a refusal
       and the refusals ranked in the job summary - the number every stage
