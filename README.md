@@ -554,8 +554,6 @@ of an abapGit export.
 
 Known limitations:
 
-- ALV cells show dates and times as the model carries them (`2026-01-05`),
-  not in the user's format yet.
 - In the transpiled JavaScript runtime, `IN` only knows `I EQ`, `E EQ` and
   `I CP` — use `z2ui5_cl_cgui_context=>range_check( )` for internal tables if
   the report must also run there. On an SAP system `IN` and
@@ -843,6 +841,52 @@ Stage 5 - research
       and `f4` once `set_registered_events( )` names them, the cursor of
       the text area as `get_selection_pos( )` - the help of an SQL or code
       editor on the word under the cursor
+
+Stage 6 - the review of 1.0.0: does it run, and is it fun
+
+A review on 2026-10-30, measured: 634 of 780 open-source reports convert
+(81 %), the converted classes read like hand-written ones, the test-corpus
+reports carry at most five TODOs. What the numbers do not say: how many of
+the converted reports run on a real system, whether the AI assistant helps
+or harms, and the two cores grew into monoliths - the report class has
+8,700 lines, 244 methods and 124 state attributes, the converter 8,700
+lines in one file. The stage takes that on, in this order.
+
+The last meter for the user
+
+- [ ] One click into the system: the converted class as an abapGit zip
+      from the site (offline import), samples and own report alike - not
+      one download per file
+- [ ] A whole package in the browser: an abapGit zip of a package dropped
+      on the site, every report converted with its includes, the order to
+      migrate in, one zip back
+- [ ] The AI assistant measured: `report2cloud:eval` run with a key on the
+      refused reports of the web corpus, the share that ends clean in this
+      README - and the loop made the second path of the site if it earns it
+- [ ] Three real reports of real users run on a real system - the
+      measurement the transpiled runtime cannot replace
+
+Simpler to read, simpler to change - the API stays
+
+- [ ] `z2ui5_cl_cgui_report` split behind its API into collaborators -
+      selection screen, output, variants and parameters, dynpro and GUI
+      stand-ins, navigation; no method over 80 lines, no class over 2,000
+- [ ] `convert.mjs` split by statement family - selection screen, list,
+      ALV, dynpro, GUI, popups, SUBMIT - the snapshots unchanged
+- [ ] The API in two tiers in this README: the dozen methods a new report
+      needs first, the rest as what a converted report may use
+- [ ] The rarely used stand-ins (picture, the trees) frozen: kept and
+      tested, not extended
+
+What abap2UI5 could take over
+
+- [ ] A table bound by reference, not only a public attribute - `alv( )`
+      copies and rebuilds every other table with RTTI on each roundtrip
+- [ ] Large tables kept on the server, the page alone to the browser - the
+      roundtrip payload of a 10,000-row ALV measured first, then the
+      proposal
+- [ ] Dates, times and amounts in the user's locale as a binding type of
+      the framework - the ALV does it itself today
 
 Quality, through every stage
 

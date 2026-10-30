@@ -23,6 +23,7 @@ import { migrationReport } from "../tools/report2cloud/lib/report.mjs";
 import { parseTextpool } from "../tools/report2cloud/lib/textpool.mjs";
 import { highlightAbap, highlightFile } from "./highlight.mjs";
 import { MODEL, errorText, lineDiff, polishClass, rewriteRefused } from "./assistant.mjs";
+import { abapgitZip } from "./zip.mjs";
 
 const $ = (id) => document.getElementById(id);
 const STORE = "report2cloud.own";
@@ -219,9 +220,9 @@ const copyTo = (button, text) => async () => {
   }
 };
 
-// the files as abapGit wants them beside each other - one download each
-const download = (name, text) => {
-  const a = el("a", { href: URL.createObjectURL(new Blob([text], { type: "text/plain" })), download: name });
+// one file of the class, as it is
+const download = (name, text, type = "text/plain") => {
+  const a = el("a", { href: URL.createObjectURL(new Blob([text], { type })), download: name });
   document.body.append(a);
   a.click();
   setTimeout(() => {
@@ -229,6 +230,11 @@ const download = (name, text) => {
     a.remove();
   }, 0);
 };
+
+// all the files as the zip abapGit imports offline (Repository - New Offline,
+// then Import zip): .abapgit.xml and the objects under src/ - the way into
+// the system in one click
+const downloadZip = (files, className) => download(`${className}.zip`, abapgitZip(files, className), "application/zip");
 
 // for the code on the page that is no sample: the example class of "How"
 for (const code of document.querySelectorAll("code.abap")) code.innerHTML = highlightAbap(code.textContent);
@@ -288,6 +294,7 @@ try {
   $("s-restart").onclick = () => pick();
   $("s-copy").onclick = copyTo($("s-copy"), () => files[shown()]);
   $("s-download").onclick = () => shown() && download(shown(), files[shown()]);
+  $("s-zip").onclick = () => sample && Object.keys(files).length && downloadZip(files, convertReport(sample.source, { textpool: sample.textpool }).result.className);
   // the sample as your own report, to change it
   $("s-try").onclick = () => sample && window.dispatchEvent(new CustomEvent("r2c-own", { detail: sample }));
   if (examples.length) {
@@ -484,7 +491,7 @@ try {
   });
   $("copy").onclick = copyTo($("copy"), () => files[shown()]);
   $("download").onclick = () => shown() && download(shown(), files[shown()]);
-  $("download-all").onclick = () => Object.keys(files).forEach((f, i) => setTimeout(() => download(f, files[f]), i * 250));
+  $("download-all").onclick = () => last?.result.ok && downloadZip(files, last.result.className);
 
   // a sample to edit: it becomes your own report
   window.addEventListener("r2c-own", (e) => {

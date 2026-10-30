@@ -83,6 +83,9 @@ CLASS zcl_hello IMPLEMENTATION.
 ENDCLASS.</code></pre>
       <p>Start it like any abap2UI5 app (<code>?app_start=zcl_hello</code>): the selection screen comes up,
         <strong>Execute</strong> runs the report and shows the list, <strong>Back</strong> returns.</p>
+      <p>From here into your system: <strong>abapGit zip</strong> under a converted class gives you the files as a
+        zip - in abapGit, <em>New Offline</em> repository, <em>Import zip</em>, pull. The add-on itself is installed the
+        same way, from its <a href="https://github.com/abap2UI5-addons/abap-cloud-gui/releases">release</a>.</p>
     </section>
 
     <section id="samples" class="wide">
@@ -111,6 +114,7 @@ ENDCLASS.</code></pre>
             <span class="head-actions">
               <button id="s-copy" class="link" type="button">Copy</button>
               <button id="s-download" class="link" type="button">Download</button>
+              <button id="s-zip" class="link" type="button" title="The files as the zip abapGit imports offline">abapGit zip</button>
             </span>
           </div>
           <div id="s-tabs" class="tabs" role="tablist"></div>
@@ -172,7 +176,7 @@ ENDCLASS.</code></pre>
             <span class="head-actions">
               <button id="copy" class="link" type="button">Copy</button>
               <button id="download" class="link" type="button">Download</button>
-              <button id="download-all" class="link" type="button">All files</button>
+              <button id="download-all" class="link" type="button" title="The files as the zip abapGit imports offline">abapGit zip</button>
             </span>
           </div>
           <div id="tabs" class="tabs" role="tablist"></div>
