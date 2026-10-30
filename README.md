@@ -806,10 +806,9 @@ Stage 3 - clean core at the scale of a code base
 
 Stage 4 - in the browser, and with an agent
 
-- [x] Converted reports run in the browser: the site has its own copy of
-      the abap2UI5 playground (`site/playground/`) - a `.prog.abap` (and its
-      `.prog.xml`) as the first file is converted on Run and its class runs on
-      the stage; the site shows the samples - the original report, the class
+- [x] Converted reports run in the browser: the site converts the report
+      and runs its class in the abap2UI5 playground, handed the class, the
+      report runtime and the demo tables in the playground's URL; the site shows the samples - the original report, the class
       and the running app side by side, highlighted - and below them a
       converter for your own report, with its preview on demand - nothing
       to install
@@ -951,8 +950,8 @@ Quality, through every stage
       (`ltcl_client` of the report, the ALV's own), beside the selection
       screen's
 - [x] Samples in a playground, a documentation page: the samples run in
-      the site's own copy of the abap2UI5 playground (the framework's
-      playground stays without the addon), and the documentation has
+      the abap2UI5 playground, which carries nothing of the addon - the
+      site hands it the runtime with the class, and the documentation has
       [Apps Written Like Reports](https://abap2ui5.github.io/docs/advanced/report_style)
       beside [Migrating Classic Reports](https://abap2ui5.github.io/docs/advanced/report_migration)
 - [x] Semantic tests: the classic report and its class run against the
@@ -980,7 +979,6 @@ npm run check:regex     # no regular expressions in src/
 npm run unit            # ABAP Unit in the transpiled backend (needs ../mcp-server)
 npm run test:report2cloud  # the report converter: snapshots and abaplint over its output
 npm run site            # the GitHub Pages site with the converter playground into build/site (-- --serve: on :8080)
-npm run site:playground # and the abap2UI5 playground beside it, where a converted report runs (build/site/playground)
 ```
 
 The ABAP Unit tests run in CI in the transpiled abap2UI5 backend
