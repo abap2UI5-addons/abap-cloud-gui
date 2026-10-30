@@ -599,7 +599,12 @@ Known limitations:
   read, and the standard F4 is the domain's fixed values.
 - `alv( )` binds a PUBLIC attribute directly; any other table is copied into
   a data reference, which the draft has to rebuild with RTTI on every
-  roundtrip.
+  roundtrip ([abap2UI5#2963](https://github.com/abap2UI5/abap2UI5/issues/2963)).
+- A large table costs every roundtrip: 10,000 rows in an ALV are 1.1 MB to
+  the browser each time, and two seconds of serializing the app in the
+  transpiled runtime. `set_paging( 500 )` on the ALV brings the payload down
+  to a page; the serialization stays
+  ([abap2UI5#2962](https://github.com/abap2UI5/abap2UI5/issues/2962)).
 
 ## Roadmap
 
@@ -918,13 +923,19 @@ Simpler to read, simpler to change - the API stays
 
 What abap2UI5 could take over
 
-- [ ] A table bound by reference, not only a public attribute - `alv( )`
-      copies and rebuilds every other table with RTTI on each roundtrip
-- [ ] Large tables kept on the server, the page alone to the browser - the
-      roundtrip payload of a 10,000-row ALV measured first, then the
-      proposal
-- [ ] Dates, times and amounts in the user's locale as a binding type of
-      the framework - the ALV does it itself today
+- [x] A table bound by reference, not only a public attribute - `alv( )`
+      copies and rebuilds every other table with RTTI on each roundtrip:
+      proposed as [abap2UI5#2963](https://github.com/abap2UI5/abap2UI5/issues/2963)
+- [x] Large tables kept on the server, the page alone to the browser -
+      measured on a 10,000-row ALV in the transpiled runtime: bound as it
+      is, every roundtrip carries 1,137 KB (2.2 s); with `set_paging( 500 )`
+      60 KB on Execute and 4 KB after, but still 2 s - the app with its
+      rows is serialized into the draft and back on every request. The
+      payload the addon solves, the serialization it cannot: proposed as
+      [abap2UI5#2962](https://github.com/abap2UI5/abap2UI5/issues/2962)
+- [x] Dates, times and amounts in the user's locale as a binding type of
+      the framework - the ALV does it itself today: proposed as
+      [abap2UI5#2964](https://github.com/abap2UI5/abap2UI5/issues/2964)
 
 Quality, through every stage
 
