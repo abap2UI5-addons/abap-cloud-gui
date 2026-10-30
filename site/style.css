@@ -44,7 +44,10 @@ code { font-family: var(--mono); font-size: .92em; }
 .top { border-bottom: 1px solid var(--line); background: var(--surface); position: sticky; top: 0; z-index: 2; }
 .top-row { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; min-height: 56px; gap: 4px 16px; padding-top: 8px; padding-bottom: 8px; }
 section[id] { scroll-margin-top: 72px; }
-.brand { font-weight: 700; color: var(--text); text-decoration: none; }
+.brand { display: inline-flex; align-items: center; gap: 8px; font-weight: 700; }
+.brand a { color: var(--text); text-decoration: none; }
+.brand-home { display: inline-flex; align-items: center; gap: 8px; }
+.brand-sep { color: var(--muted); font-weight: 400; }
 nav { display: flex; gap: 18px; flex-wrap: wrap; }
 nav a { color: var(--muted); text-decoration: none; font-size: 15px; }
 nav a:hover { color: var(--text); }
@@ -63,7 +66,8 @@ h2 { font-size: 22px; margin: 0 0 10px; }
 .button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-text); font-weight: 600; }
 .link { background: none; border: 0; color: var(--accent); cursor: pointer; font: inherit; padding: 0; }
 
-section { margin: 40px auto; }
+section, section.wrap { margin: 40px auto; }
+section.hero { margin: 0 auto; }
 .grid3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
 .card { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 20px; }
 .card h2 { font-size: 18px; }
