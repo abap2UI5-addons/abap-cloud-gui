@@ -1,6 +1,6 @@
 // The files the abap2UI5 playground needs beside a converted class to run it:
-// the report runtime of src/01 and the demo tables SCARR, SPFLI and SFLIGHT
-// (tools/report2cloud/test/ddic; their rows come from the page, see
+// the report runtime of src/01, the demo tables SCARR, SPFLI and SFLIGHT and
+// the structure SNODETEXT (tools/report2cloud/test/ddic; their rows come from the page, see
 // site/playground.mjs). scripts/build-site.mjs writes them to runtime.json.
 //
 // The playground takes classes, interfaces and database tables - not data
@@ -13,7 +13,8 @@ import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 
 const read = (file) => readFileSync(file, "utf8").replace(/^﻿/, "");
-const DEMO_TABLES = ["scarr", "spfli", "sflight"];
+// SNODETEXT is a structure: the node of a tree list (zr2c_46_treelist)
+const DEMO_TABLES = ["scarr", "spfli", "sflight", "snodetext"];
 
 /** a data element as built-in DDIC fields, from its abapGit XML */
 function builtIn(xml, name) {

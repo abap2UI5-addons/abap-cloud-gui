@@ -22,7 +22,7 @@ test("every class and interface of src/01 goes, its unit tests do not", () => {
 test("only files the playground takes: classes, interfaces, tables", () => {
   for (const n of names) assert.match(n, /^[a-z0-9_]+\.(clas\.abap|intf\.abap|tabl\.xml)$/, n);
   assert.equal(new Set(names).size, names.length, "a file twice");
-  for (const t of ["scarr", "spfli", "sflight"]) assert.ok(names.includes(`${t}.tabl.xml`), t);
+  for (const t of ["scarr", "spfli", "sflight", "snodetext"]) assert.ok(names.includes(`${t}.tabl.xml`), t);
 });
 
 test("no data element of the runtime is left - the playground has none", () => {
