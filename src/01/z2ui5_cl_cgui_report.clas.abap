@@ -1310,11 +1310,6 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
         id   TYPE i
         node TYPE REF TO z2ui5_cl_ui5_view_builder.
 
-    "! F1 or F4 in a text editor - its event, the selection from the focus
-    METHODS gui_key
-      IMPORTING
-        key TYPE string.
-
     "! an event of the browser for the control id
     METHODS gui_event
       IMPORTING
@@ -1322,15 +1317,6 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
         event TYPE string
         value TYPE string
         post  TYPE string OPTIONAL.
-
-    "! whether the frontend has the custom control z2ui5.cc.HTMLFrame - its
-    "! mirror class is part of the same abap2UI5 release
-    METHODS gui_html_frame
-      RETURNING
-        VALUE(result) TYPE abap_bool.
-
-    "! the event of the button that shows a grid that does not show
-    CONSTANTS cs_gui_show TYPE string VALUE `CGUI_SHOW`.
 
     "! the grid id shows in place of the one that shows
     METHODS grid_show
@@ -1363,16 +1349,10 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
         dynnr TYPE string
         node  TYPE REF TO z2ui5_cl_ui5_view_builder.
 
-    "! a control on the list of the run (cl_gui_container=>default_screen,
-    "! a docking container created during the run) - the list shows it
-    METHODS gui_on_list
+    "! what the view of the controls reads of the report, by reference
+    METHODS gui_ctx
       RETURNING
-        VALUE(result) TYPE abap_bool.
-
-    "! the screen a docking container without dynnr sits on - the one shown
-    METHODS gui_screen
-      RETURNING
-        VALUE(result) TYPE string.
+        VALUE(result) TYPE z2ui5_cl_cgui_gui_view=>ty_s_ctx.
 
 
     CONSTANTS:
@@ -1413,9 +1393,66 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
 
     METHODS on_init.
 
+    "! the memory of the report at the start: the store of the variants,
+    "! the parameter IDs, the variant of the URL or of initialization( ),
+    "! the draft
+    METHODS on_init_memory.
+
     METHODS on_event.
 
+    "! before an event: the input and the selection of the grid, the ticks
+    "! of the tree and the inputs of the list back into their tables
+    METHODS on_event_sync.
+
+    "! an event of the tree - handled when it was one
+    METHODS on_event_tree
+      IMPORTING
+        event         TYPE string
+      RETURNING
+        VALUE(result) TYPE abap_bool.
+
+    "! the events of the selection screen and the popup screen: Execute,
+    "! Back, the storage, a select-option, F4, F1, the background job
+    METHODS on_event_selection
+      IMPORTING
+        event         TYPE string
+      RETURNING
+        VALUE(result) TYPE abap_bool.
+
+    "! the events that open a popup or come back from one: the messages,
+    "! the variants
+    METHODS on_event_popup
+      IMPORTING
+        event         TYPE string
+      RETURNING
+        VALUE(result) TYPE abap_bool.
+
+    "! the events of the output: Print, the command field, the palette, a
+    "! line of the list, a row or cell of the ALV
+    METHODS on_event_output
+      IMPORTING
+        event         TYPE string
+      RETURNING
+        VALUE(result) TYPE abap_bool.
+
+    "! the events of the SAP GUI controls and of a dynpro
+    METHODS on_event_gui
+      IMPORTING
+        event         TYPE string
+      RETURNING
+        VALUE(result) TYPE abap_bool.
+
     METHODS on_navigated.
+
+    "! back from a popup of the variants: the one picked is loaded, saved
+    "! or deleted after a confirmation
+    METHODS on_navigated_variant
+      IMPORTING
+        kind TYPE string.
+
+    "! back from a popup to decide or a popup of values: its answer and
+    "! its fields
+    METHODS popup_answer_take.
 
     METHODS on_back.
 
@@ -1522,6 +1559,21 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
       IMPORTING
         kind TYPE string.
 
+    "! Save as Variant: the name, the sharing, the protected and hidden
+    "! fields, the dynamic dates - current is the variant of that name
+    METHODS variant_popup_save
+      IMPORTING
+        current TYPE z2ui5_cl_cgui_variant=>ty_s_variant.
+
+    "! a dynamic date for every date of the screen - the fields of the
+    "! popup and the values of their listboxes
+    METHODS variant_popup_dynamic
+      IMPORTING
+        current TYPE z2ui5_cl_cgui_variant=>ty_s_variant
+      CHANGING
+        fields  TYPE z2ui5_cl_cgui_popup=>ty_t_field
+        listbox TYPE z2ui5_cl_cgui_popup=>ty_t_listbox.
+
     METHODS variant_selected
       RETURNING
         VALUE(result) TYPE string.
@@ -1606,9 +1658,64 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
         field TYPE string
         col   TYPE string.
 
+    "! the value picked in the value help: column col of its row, else the
+    "! first column - unbound when there is none
+    METHODS f4_row_value
+      IMPORTING
+        row           TYPE REF TO data
+        col           TYPE string
+      RETURNING
+        VALUE(result) TYPE REF TO data.
+
+    "! a parameter: the value picked into the field
+    METHODS f4_result_value
+      IMPORTING
+        field TYPE REF TO data
+        row   TYPE REF TO data
+        col   TYPE string.
+
+    "! the upper limit of a select-option: the first line becomes an
+    "! interval up to the value picked
+    METHODS f4_result_high
+      IMPORTING
+        range TYPE REF TO data
+        row   TYPE REF TO data
+        col   TYPE string.
+
+    "! a select-option: every row picked becomes a line I EQ
+    METHODS f4_result_rows
+      IMPORTING
+        range TYPE REF TO data
+        rows  TYPE REF TO data
+        col   TYPE string.
+
     METHODS value_help_ddic
       IMPORTING
         field TYPE string.
+
+    "! the value help of a CDS entity named at the field - shown when it
+    "! has rows
+    METHODS value_help_entity
+      IMPORTING
+        field         TYPE string
+      RETURNING
+        VALUE(result) TYPE abap_bool.
+
+    "! MATCHCODE OBJECT - the search help named at the field
+    METHODS value_help_matchcode
+      IMPORTING
+        field         TYPE string
+      RETURNING
+        VALUE(result) TYPE abap_bool.
+
+    "! what the type of the field knows: its fixed values, the search help
+    "! of its data element, its value table with the texts
+    METHODS value_help_descr
+      IMPORTING
+        field         TYPE string
+        descr         TYPE REF TO cl_abap_typedescr
+      RETURNING
+        VALUE(result) TYPE abap_bool.
 
     "! tab with a column ZZSELKZ, set for every row whose col is a line
     "! I EQ of range - the selection the popup starts with
@@ -1873,6 +1980,49 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
 
     METHODS view_display.
 
+    TYPES:
+      "! the main button of the footer - Execute, Back or Continue
+      BEGIN OF ty_s_cgui_button,
+        text  TYPE string,
+        icon  TYPE string,
+        ucomm TYPE string,
+      END OF ty_s_cgui_button.
+
+    "! the command field and the storage controls of the page
+    METHODS view_display_header
+      IMPORTING
+        page TYPE REF TO z2ui5_cl_ui5_view_builder.
+
+    "! the screen shown into the page - the dynpro, the output or the
+    "! selection screen - and the main button that goes with it
+    METHODS view_display_body
+      IMPORTING
+        page          TYPE REF TO z2ui5_cl_ui5_view_builder
+        dynpro        TYPE REF TO z2ui5_cl_cgui_selscreen
+        window        TYPE abap_bool
+      RETURNING
+        VALUE(result) TYPE ty_s_cgui_button.
+
+    "! the buttons of the footer: the standard functions of the selection
+    "! screen, then the function keys and the main button
+    METHODS view_display_toolbar
+      IMPORTING
+        toolbar TYPE REF TO z2ui5_cl_ui5_view_builder
+        button  TYPE ty_s_cgui_button.
+
+    "! SELECTION-SCREEN FUNCTION KEY, SET PF-STATUS on the output, Print,
+    "! and the main button
+    METHODS view_display_toolbar_keys
+      IMPORTING
+        toolbar TYPE REF TO z2ui5_cl_ui5_view_builder
+        button  TYPE ty_s_cgui_button.
+
+    "! after the view: the title of the launchpad shell, SET CURSOR, the
+    "! dialog box of WINDOW and the popup screen
+    METHODS view_display_after
+      IMPORTING
+        window TYPE abap_bool.
+
     METHODS view_display_output
       IMPORTING
         page TYPE REF TO z2ui5_cl_ui5_view_builder.
@@ -1987,7 +2137,7 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
     " a docking container sits on the screen it is created for, and so
     " does a control on the screen itself (cl_gui_container=>default_screen)
     IF ls_control-parent IS INITIAL AND ls_control-name IS INITIAL AND ls_control-dynnr IS INITIAL.
-      ls_control-dynnr = gui_screen( ).
+      ls_control-dynnr = z2ui5_cl_cgui_gui_view=>screen( gui_ctx( ) ).
     ELSEIF ls_control-dynnr IS NOT INITIAL AND ls_control-dynnr CO `0123456789`.
       ls_control-dynnr = dynnr_norm( ls_control-dynnr ).
     ENDIF.
@@ -2265,47 +2415,11 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
 
   METHOD z2ui5_if_cgui_gui~tablecontrol_render.
 
-    IF to_upper( name ) <> mv_cgui_tc.
-      RETURN.
-    ENDIF.
-    " the lines of the PBO, the cells of a column ready for input inputs
-    DATA(lo_table) = node->ele( `Table`
-        )->a( n = `items`      v = client->_bind( mt_cgui_tc_row )
-        )->a( n = `growing`    b = abap_true
-        )->a( n = `growingThreshold` v = `50`
-        )->a( n = `class`      v = `sapUiSmallMarginBottom` ).
-    IF title IS NOT INITIAL.
-      lo_table->ele( `headerToolbar`
-          )->ele( `Toolbar`
-          )->tag( `Title`
-          )->a( n = `text` t = title ).
-    ENDIF.
-    DATA(lo_columns) = lo_table->ele( `columns` ).
-    LOOP AT columns INTO DATA(ls_column).
-      IF sy-tabix > cv_cgui_tc_columns.
-        EXIT.
-      ENDIF.
-      lo_columns->ele( `Column`
-          )->a( n = `width` v = COND #( WHEN ls_column-width > 0 THEN |{ ls_column-width * 2 / 3 + 2 }rem| )
-          )->tag( `Text`
-          )->a( n = `text` t = ls_column-text ).
-    ENDLOOP.
-    DATA(lo_cells) = lo_table->ele( `items`
-        )->ele( `ColumnListItem`
-        )->ele( `cells` ).
-    LOOP AT columns INTO ls_column.
-      IF sy-tabix > cv_cgui_tc_columns.
-        EXIT.
-      ENDIF.
-      DATA(lv_cell) = |\{C{ sy-tabix WIDTH = 2 ALIGN = RIGHT PAD = '0' }\}|.
-      IF ls_column-input = abap_true.
-        lo_cells->tag( `Input`
-            )->a( n = `value` v = lv_cell ).
-      ELSE.
-        lo_cells->tag( `Text`
-            )->a( n = `text` v = lv_cell ).
-      ENDIF.
-    ENDLOOP.
+    z2ui5_cl_cgui_gui_view=>tablecontrol( ctx     = gui_ctx( )
+                                          name    = name
+                                          title   = title
+                                          columns = columns
+                                          node    = node ).
 
   ENDMETHOD.
 
@@ -2364,49 +2478,6 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
 
   ENDMETHOD.
 
-  METHOD gui_key.
-
-    " the editor with the focus, else the first that registered the key
-    DATA(ls_focus) = client->get( )-s_focus.
-    DATA(lv_id) = 0.
-    IF ls_focus-id CP |{ cv_cgui_textedit_id }*|.
-      lv_id = CONV i( substring( val = ls_focus-id
-                                 off = strlen( cv_cgui_textedit_id ) ) ).
-    ENDIF.
-    LOOP AT mt_cgui_gui ASSIGNING FIELD-SYMBOL(<control>)
-         WHERE kind = z2ui5_if_cgui_gui=>cs_kind-textedit AND freed = abap_false.
-      DATA(lv_index) = sy-tabix.
-      IF NOT ( lv_id = 0 OR lv_index = lv_id ).
-        CONTINUE.
-      ENDIF.
-      SPLIT <control>-keys AT `,` INTO TABLE DATA(lt_key).
-      IF NOT line_exists( lt_key[ table_line = key ] ).
-        CONTINUE.
-      ENDIF.
-      IF lv_index = lv_id.
-        <control>-sel_from = ls_focus-selection_start.
-        <control>-sel_to = ls_focus-selection_end.
-      ENDIF.
-      gui_event( id    = lv_index
-                 event = key
-                 value = `` ).
-      RETURN.
-    ENDLOOP.
-
-  ENDMETHOD.
-
-  METHOD gui_html_frame.
-
-    IF mv_cgui_html_frame IS INITIAL.
-      cl_abap_typedescr=>describe_by_name( EXPORTING  p_name         = `Z2UI5_CL_UI5F_HTMLFRM_JS`
-                                           EXCEPTIONS type_not_found = 1
-                                                      OTHERS         = 2 ).
-      mv_cgui_html_frame = COND #( WHEN sy-subrc = 0 THEN abap_true ELSE `-` ).
-    ENDIF.
-    result = xsdbool( mv_cgui_html_frame = abap_true ).
-
-  ENDMETHOD.
-
   METHOD gui_docked.
 
     LOOP AT mt_cgui_gui INTO DATA(ls_control)
@@ -2417,256 +2488,52 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
 
   ENDMETHOD.
 
-  METHOD gui_on_list.
-
-    LOOP AT mt_cgui_gui TRANSPORTING NO FIELDS WHERE parent = 0 AND dynnr = `LIST` AND freed = abap_false.
-      result = abap_true.
-      RETURN.
-    ENDLOOP.
-
-  ENDMETHOD.
-
-  METHOD gui_screen.
-
-    " during the run the controls are created for the list it writes
-    result = COND #( WHEN mv_cgui_screen = cs_screen-dynpro THEN mv_cgui_dynpro
-                     WHEN mv_cgui_screen = cs_screen-selection AND mv_cgui_in_run = abap_false THEN `1000`
-                     ELSE `LIST` ).
-
-  ENDMETHOD.
-
   METHOD gui_render.
 
-    READ TABLE mt_cgui_gui ASSIGNING FIELD-SYMBOL(<control>) INDEX id.
-    IF sy-subrc <> 0 OR <control>-freed = abap_true OR <control>-hidden = abap_true.
+    READ TABLE mt_cgui_gui INTO DATA(ls_control) INDEX id.
+    IF sy-subrc <> 0 OR ls_control-freed = abap_true OR ls_control-hidden = abap_true.
       RETURN.
     ENDIF.
 
-    CASE <control>-kind.
+    CASE ls_control-kind.
       WHEN z2ui5_if_cgui_gui=>cs_kind-container.
-        DATA(lo_box) = node->ele( `VBox`
-            )->a( n = `width` v = `100%` ).
-        IF <control>-dialog = abap_true.
-          " a dialog box container: its caption and Close (the event close)
-          lo_box->ele( `Toolbar`
-              )->tag( `Title`
-                  )->a( n = `text` t = <control>-caption
-              )->tag( `ToolbarSpacer`
-              )->tag( `Button`
-                  )->a( n = `icon`    v = `sap-icon://decline`
-                  )->a( n = `tooltip` t = CONV string( 'Close'(047) )
-                  )->a( n = `press`   v = client->_event( val   = cs_ucomm-gui
-                                                          t_arg = VALUE #( ( |{ id }| ) ( `CLOSE` ) ) ) ).
-        ELSEIF <control>-caption IS NOT INITIAL.
-          lo_box->tag( `Title`
-              )->a( n = `text` t = <control>-caption ).
-        ENDIF.
-        " the cells of a splitter row by row, the controls in their order
-        DATA(lt_child) = VALUE z2ui5_if_cgui_gui=>ty_t_control( ).
-        LOOP AT mt_cgui_gui INTO DATA(ls_child) WHERE parent = id.
-          INSERT ls_child INTO TABLE lt_child.
-        ENDLOOP.
-        SORT lt_child BY row column id.
-        LOOP AT lt_child INTO ls_child.
+        DATA(lo_box) = z2ui5_cl_cgui_gui_view=>container( ctx  = gui_ctx( )
+                                                          id   = id
+                                                          node = node ).
+        DATA(lt_child) = z2ui5_cl_cgui_gui_view=>children( ctx = gui_ctx( )
+                                                           id  = id ).
+        LOOP AT lt_child INTO DATA(ls_child).
           gui_render( id   = ls_child-id
                       node = lo_box ).
         ENDLOOP.
-
-      WHEN z2ui5_if_cgui_gui=>cs_kind-textedit.
-        node->tag( `TextArea`
-            )->a( n = `id`       t = |{ cv_cgui_textedit_id }{ id }|
-            )->a( n = `value`    v = client->_bind( val       = <control>-text
-                                                    tab       = mt_cgui_gui
-                                                    tab_index = id )
-            )->a( n = `editable` b = xsdbool( <control>-readonly = abap_false )
-            )->a( n = `width`    v = `100%`
-            )->a( n = `rows`     v = `12`
-            )->a( n = `growing`  b = abap_true
-            )->a( n = `class`    v = `sapUiTinyMarginTopBottom` ).
-
-      WHEN z2ui5_if_cgui_gui=>cs_kind-html.
-        IF <control>-html IS NOT INITIAL AND gui_html_frame( ) = abap_true.
-          " the document as it is, in a frame under the page's policy: its
-          " styles apply, no script of it runs; a SAPEVENT link or a form
-          " posted to a SAPEVENT action is the event, its action, query and
-          " fields the arguments. content is bound - the braces of its CSS
-          " would be read as a binding in the view
-          node->tag( n = `HTMLFrame` ns = `z2ui5`
-              )->a( n = `xmlns:z2ui5` v = `z2ui5.cc`
-              )->a( n = `content`     v = client->_bind( val       = <control>-html
-                                                         tab       = mt_cgui_gui
-                                                         tab_index = id )
-              )->a( n = `width`       v = `100%`
-              )->a( n = `height`      v = `40rem`
-              )->a( n = `sapevent`    v = client->_event( val   = cs_ucomm-gui
-                                                          t_arg = VALUE #( ( |{ id }| ) ( `SAPEVENT` )
-                                                                           ( `${$parameters>/action}` )
-                                                                           ( `${$parameters>/getdata}` )
-                                                                           ( `${$parameters>/postdata}` ) ) ) ).
-        ELSEIF <control>-html IS NOT INITIAL.
-          " sanitized: no script, no event handler of the document
-          node->tag( n = `HTML` ns = `core`
-              )->a( n = `xmlns:core`      v = `sap.ui.core`
-              )->a( n = `content`         v = client->_bind( val       = <control>-html
-                                                             tab       = mt_cgui_gui
-                                                             tab_index = id )
-              )->a( n = `sanitizeContent` b = abap_true
-              )->a( n = `preferDOM`       b = abap_false ).
-          " the SAPEVENT links of the document - the sanitized HTML has none
-          DATA(lo_links) = node->ele( `HBox`
-              )->a( n = `wrap`  v = `Wrap`
-              )->a( n = `class` v = `sapUiTinyMarginTop` ).
-          LOOP AT z2ui5_cl_cgui_gui_html_viewer=>sapevent_links( CONV #( <control>-html ) ) INTO DATA(ls_link).
-            lo_links->tag( `Link`
-                )->a( n = `text`  t = COND #( WHEN ls_link-text IS NOT INITIAL THEN ls_link-text ELSE ls_link-action )
-                )->a( n = `class` v = `sapUiSmallMarginEnd`
-                )->a( n = `press` v = client->_event( val   = cs_ucomm-gui
-                                                      t_arg = VALUE #( ( |{ id }| ) ( `SAPEVENT` ) ( ls_link-action ) ) ) ).
-          ENDLOOP.
-        ELSEIF <control>-url IS NOT INITIAL.
-          node->tag( `Link`
-              )->a( n = `text`   t = <control>-url
-              )->a( n = `href`   t = <control>-url
-              )->a( n = `target` v = `_blank` ).
-        ENDIF.
-
-      WHEN z2ui5_if_cgui_gui=>cs_kind-picture.
-        IF <control>-url CP `sap-icon://*`.
-          node->tag( n = `Icon` ns = `core`
-              )->a( n = `xmlns:core` v = `sap.ui.core`
-              )->a( n = `src`        t = <control>-url
-              )->a( n = `size`       v = `3rem`
-              )->a( n = `press`      v = client->_event( val   = cs_ucomm-gui
-                                                         t_arg = VALUE #( ( |{ id }| ) ( `PICTURE_CLICK` ) ) ) ).
-        ELSEIF <control>-url IS NOT INITIAL.
-          " stretch and fit fill the width of the container
-          node->tag( `Image`
-              )->a( n = `src`   v = client->_bind( val       = <control>-url
-                                                   tab       = mt_cgui_gui
-                                                   tab_index = id )
-              )->a( n = `width` v = COND #( WHEN <control>-mode = 1 OR <control>-mode = 2 OR <control>-mode = 4 THEN `100%` )
-              )->a( n = `press` v = client->_event( val   = cs_ucomm-gui
-                                                    t_arg = VALUE #( ( |{ id }| ) ( `PICTURE_CLICK` ) ) ) ).
-        ENDIF.
-
-      WHEN z2ui5_if_cgui_gui=>cs_kind-simple_tree.
-        " the rows of the expanded branches: expander, icon, the text a link
-        DATA(lo_stree) = CAST z2ui5_cl_cgui_gui_simple_tree( mt_cgui_gui_obj[ id ] ).
-        DATA(lo_nodes) = node->ele( `VBox`
-            )->a( n = `class` v = `sapUiTinyMarginTopBottom` ).
-        " a column tree: the headers, the tree in the first column of its
-        " width, the cells of a node after it
-        DATA(lt_tcol) = lo_stree->columns( ).
-        IF lt_tcol IS NOT INITIAL.
-          DATA(lo_head) = lo_nodes->ele( `HBox`
-              )->a( n = `class` v = `sapUiTinyMarginBottom` ).
-          LOOP AT lt_tcol INTO DATA(ls_tcol).
-            lo_head->tag( `Label`
-                )->a( n = `text`   t = ls_tcol-text
-                )->a( n = `design` v = `Bold`
-                )->a( n = `width`  v = COND #( WHEN ls_tcol-width > 0 THEN |{ ls_tcol-width * 2 / 3 }rem| ELSE `12rem` ) ).
-          ENDLOOP.
-        ENDIF.
-        LOOP AT lo_stree->view( ) INTO DATA(ls_row).
-          DATA(lo_line) = lo_nodes->ele( `HBox`
-              )->a( n = `alignItems` v = `Center` ).
-          DATA(lo_row) = lo_line.
-          IF lt_tcol IS NOT INITIAL.
-            ls_tcol = lt_tcol[ 1 ].
-            lo_row = lo_line->ele( `HBox`
-                )->a( n = `alignItems` v = `Center`
-                )->a( n = `width`      v = COND #( WHEN ls_tcol-width > 0 THEN |{ ls_tcol-width * 2 / 3 }rem| ELSE `12rem` ) ).
-          ENDIF.
-          lo_row->tag( `Text`
-              )->a( n = `text`  v = ``
-              )->a( n = `width` v = ls_row-indent ).
-          IF ls_row-expander IS NOT INITIAL.
-            lo_row->tag( `Button`
-                )->a( n = `icon`  v = ls_row-expander
-                )->a( n = `type`  v = `Transparent`
-                )->a( n = `press` v = client->_event( val   = cs_ucomm-gui
-                                                      t_arg = VALUE #( ( |{ id }| ) ( `EXPAND` ) ( |{ ls_row-key }| ) ) ) ).
-          ENDIF.
-          IF ls_row-icon IS NOT INITIAL.
-            lo_row->tag( n = `Icon` ns = `core`
-                )->a( n = `xmlns:core` v = `sap.ui.core`
-                )->a( n = `src`        v = ls_row-icon
-                )->a( n = `class`      v = `sapUiTinyMarginEnd` ).
-          ENDIF.
-          lo_row->tag( `Link`
-              )->a( n = `text`       t = ls_row-text
-              )->a( n = `emphasized` b = xsdbool( ls_row-key = lo_stree->selected( ) )
-              )->a( n = `press`      v = client->_event( val   = cs_ucomm-gui
-                                                         t_arg = VALUE #( ( |{ id }| ) ( `CLICK` ) ( |{ ls_row-key }| ) ) ) ).
-          LOOP AT lo_stree->cells( ls_row-key ) INTO DATA(ls_cell).
-            ls_tcol = VALUE #( lt_tcol[ name = ls_cell-name ] OPTIONAL ).
-            IF ls_tcol-width = 0.
-              ls_tcol-width = ls_cell-width.
-            ENDIF.
-            DATA(lv_cell_width) = COND string( WHEN ls_tcol-width > 0 THEN |{ ls_tcol-width * 2 / 3 }rem| ELSE `12rem` ).
-            DATA(lv_cell_arg) = |{ ls_row-key } { ls_cell-name }|.
-            CASE ls_cell-kind.
-              WHEN `LINK`.
-                lo_line->tag( `Link`
-                    )->a( n = `text`  t = ls_cell-text
-                    )->a( n = `width` v = lv_cell_width
-                    )->a( n = `press` v = client->_event( val   = cs_ucomm-gui
-                                                          t_arg = VALUE #( ( |{ id }| ) ( `LINK` ) ( lv_cell_arg ) ) ) ).
-              WHEN `CHECKBOX`.
-                lo_line->tag( `CheckBox`
-                    )->a( n = `text`     t = ls_cell-text
-                    )->a( n = `selected` b = ls_cell-checked
-                    )->a( n = `width`    v = lv_cell_width
-                    )->a( n = `select`   v = client->_event( val   = cs_ucomm-gui
-                                                             t_arg = VALUE #( ( |{ id }| ) ( `CHECKBOX` ) ( lv_cell_arg ) ) ) ).
-              WHEN OTHERS.
-                lo_line->tag( `Text`
-                    )->a( n = `text`  t = ls_cell-text
-                    )->a( n = `width` v = lv_cell_width ).
-            ENDCASE.
-          ENDLOOP.
-        ENDLOOP.
-
       WHEN z2ui5_if_cgui_gui=>cs_kind-grid.
         " the grid the ALV shows - another one offers to show it
         IF mv_cgui_grid = id AND mo_cgui_alv IS BOUND.
           alv_render( node ).
         ELSE.
-          DATA(lv_caption) = CAST z2ui5_cl_cgui_gui_alv_grid( mt_cgui_gui_obj[ id ] )->caption( ).
-          IF lv_caption IS NOT INITIAL.
-            node->ele( `Toolbar`
-                )->tag( `Title`
-                )->a( n = `text` t = lv_caption
-                )->tag( `ToolbarSpacer`
-                )->tag( `Button`
-                )->a( n = `text`  t = CONV #( 'Show'(062) )
-                )->a( n = `icon`  v = `sap-icon://table-view`
-                )->a( n = `press` v = client->_event( val   = cs_ucomm-gui
-                                                      t_arg = VALUE #( ( |{ id }| ) ( cs_gui_show ) ) ) ).
-          ENDIF.
+          z2ui5_cl_cgui_gui_view=>render( ctx  = gui_ctx( )
+                                          id   = id
+                                          node = node ).
         ENDIF.
-
-      WHEN z2ui5_if_cgui_gui=>cs_kind-toolbar.
-        DATA(lo_bar) = node->ele( `OverflowToolbar` ).
-        LOOP AT <control>-buttons INTO DATA(ls_button).
-          IF ls_button-type = 3.
-            lo_bar->tag( `ToolbarSeparator` ).
-            CONTINUE.
-          ENDIF.
-          " a dropdown and a menu button raise dropdown_clicked, the others function_selected
-          lo_bar->tag( `Button`
-              )->a( n = `text`    t = ls_button-text
-              )->a( n = `icon`    v = COND #( WHEN ls_button-icon CP `sap-icon://*` THEN ls_button-icon )
-              )->a( n = `tooltip` t = ls_button-quickinfo
-              )->a( n = `enabled` b = xsdbool( ls_button-disabled = abap_false )
-              )->a( n = `type`    v = COND #( WHEN ls_button-checked = abap_true THEN `Emphasized` ELSE `Default` )
-              )->a( n = `press`   v = client->_event( val   = cs_ucomm-gui
-                                                      t_arg = VALUE #( ( |{ id }| )
-                                                                       ( COND #( WHEN ls_button-type = 1 OR ls_button-type = 2
-                                                                                 THEN `DROPDOWN_CLICKED` ELSE `FUNCTION_SELECTED` ) )
-                                                                       ( ls_button-fcode ) ) ) ).
-        ENDLOOP.
+      WHEN OTHERS.
+        z2ui5_cl_cgui_gui_view=>render( ctx  = gui_ctx( )
+                                        id   = id
+                                        node = node ).
     ENDCASE.
+
+  ENDMETHOD.
+
+  METHOD gui_ctx.
+
+    result = VALUE #( client     = client
+                      gui        = REF #( mt_cgui_gui )
+                      objects    = mt_cgui_gui_obj
+                      html_frame = REF #( mv_cgui_html_frame )
+                      tc         = mv_cgui_tc
+                      tc_row     = REF #( mt_cgui_tc_row )
+                      screen     = mv_cgui_screen
+                      dynpro     = mv_cgui_dynpro
+                      in_run     = mv_cgui_in_run ).
 
   ENDMETHOD.
 
@@ -2699,6 +2566,34 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
       z2ui5_cl_cgui_variant=>values_set( app    = me
                                          values = mt_cgui_submit ).
     ENDIF.
+
+    on_init_memory( ).
+
+    " the fields of the screen - what the URL and MEMORY ID may fill
+    mt_cgui_field = screen_fields( ).
+    z2ui5_cl_cgui_memory=>memory_id_apply( memory_ctx( ) ).
+    z2ui5_cl_cgui_command=>url_values_get( command_ctx( ) ).
+    z2ui5_cl_cgui_command=>url_values_apply( command_ctx( ) ).
+
+    IF mv_cgui_skip = abap_true OR to_upper( z2ui5_cl_cgui_command=>url_param( client = client
+                                                                                            name   = cv_cgui_url_skip ) ) = abap_true OR screen_empty( ) = abap_true.
+      IF mv_cgui_variant_start IS NOT INITIAL.
+        " the variant arrives with the browser's storage - the run waits for
+        " it, and a timer runs it when nothing is stored
+        mv_cgui_auto_exec = abap_true.
+        client->follow_up_action( val   = client->cs_event-start_timer
+                                  t_arg = VALUE #( ( cs_ucomm-auto_execute ) ( `700` ) ) ).
+      ELSE.
+        mv_cgui_skipped = abap_true.
+        on_execute( ).
+      ENDIF.
+    ENDIF.
+
+    view_display( ).
+
+  ENDMETHOD.
+
+  METHOD on_init_memory.
 
     " the default store is the table, unless initialization( ) chose another
     " one or the browser's local storage
@@ -2734,28 +2629,6 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
                  type = `W` ).
       ENDIF.
     ENDIF.
-
-    " the fields of the screen - what the URL and MEMORY ID may fill
-    mt_cgui_field = screen_fields( ).
-    z2ui5_cl_cgui_memory=>memory_id_apply( memory_ctx( ) ).
-    z2ui5_cl_cgui_command=>url_values_get( command_ctx( ) ).
-    z2ui5_cl_cgui_command=>url_values_apply( command_ctx( ) ).
-
-    IF mv_cgui_skip = abap_true OR to_upper( z2ui5_cl_cgui_command=>url_param( client = client
-                                                                                            name   = cv_cgui_url_skip ) ) = abap_true OR screen_empty( ) = abap_true.
-      IF mv_cgui_variant_start IS NOT INITIAL.
-        " the variant arrives with the browser's storage - the run waits for
-        " it, and a timer runs it when nothing is stored
-        mv_cgui_auto_exec = abap_true.
-        client->follow_up_action( val   = client->cs_event-start_timer
-                                  t_arg = VALUE #( ( cs_ucomm-auto_execute ) ( `700` ) ) ).
-      ELSE.
-        mv_cgui_skipped = abap_true.
-        on_execute( ).
-      ENDIF.
-    ENDIF.
-
-    view_display( ).
 
   ENDMETHOD.
 
@@ -3222,9 +3095,7 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
 
   METHOD value_help_ddic.
 
-    DATA lt_value TYPE ty_t_cgui_value.
     FIELD-SYMBOLS <field_val> TYPE any.
-    FIELD-SYMBOLS <tab> TYPE STANDARD TABLE.
 
     DATA(lr_val) = value_help_target( field ).
     IF lr_val IS NOT BOUND.
@@ -3233,33 +3104,62 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
     ASSIGN lr_val->* TO <field_val>.
     DATA(lo_descr) = z2ui5_cl_cgui_context=>rtti_get_value_descr( <field_val> ).
 
-    DATA(lv_field_name) = to_upper( field ).
-    READ TABLE mt_cgui_field REFERENCE INTO DATA(lr_mc) WITH KEY name = lv_field_name.
-
-    " a CDS entity named as the value help comes first - its rows, the
-    " element named the value (else its first column)
-    IF sy-subrc = 0 AND lr_mc->entity IS NOT INITIAL.
-      DATA(lr_entity) = z2ui5_cl_cgui_context=>entity_select( lr_mc->entity ).
-      IF lr_entity IS BOUND.
-        ASSIGN lr_entity->* TO <tab>.
-        IF <tab> IS NOT INITIAL.
-          DATA(lv_elem) = lr_mc->entity_elem.
-          IF lv_elem IS INITIAL.
-            DATA(lo_row) = CAST cl_abap_structdescr( CAST cl_abap_tabledescr(
-                cl_abap_typedescr=>describe_by_data( <tab> ) )->get_table_line_type( ) ).
-            READ TABLE lo_row->components INTO DATA(ls_first) INDEX 1.
-            lv_elem = ls_first-name.
-          ENDIF.
-          value_help_popup( tab   = <tab>
-                            col   = lv_elem
-                            title = value_help_title( field ) ).
-          RETURN.
-        ENDIF.
-      ENDIF.
+    " a CDS entity named as the value help comes first, then MATCHCODE
+    " OBJECT, then what the type of the field knows
+    IF value_help_entity( field ) = abap_true.
+      RETURN.
+    ENDIF.
+    IF value_help_matchcode( field ) = abap_true.
+      RETURN.
+    ENDIF.
+    IF value_help_descr( field = field
+                         descr = lo_descr ) = abap_true.
+      RETURN.
     ENDIF.
 
+    message( 'No input help is available'(003) ).
+
+  ENDMETHOD.
+
+  METHOD value_help_entity.
+
+    FIELD-SYMBOLS <tab> TYPE STANDARD TABLE.
+
+    READ TABLE mt_cgui_field REFERENCE INTO DATA(lr_mc) WITH KEY name = to_upper( field ).
+    " a CDS entity named as the value help comes first - its rows, the
+    " element named the value (else its first column)
+    IF sy-subrc <> 0 OR lr_mc->entity IS INITIAL.
+      RETURN.
+    ENDIF.
+    DATA(lr_entity) = z2ui5_cl_cgui_context=>entity_select( lr_mc->entity ).
+    IF lr_entity IS NOT BOUND.
+      RETURN.
+    ENDIF.
+    ASSIGN lr_entity->* TO <tab>.
+    IF <tab> IS INITIAL.
+      RETURN.
+    ENDIF.
+    DATA(lv_elem) = lr_mc->entity_elem.
+    IF lv_elem IS INITIAL.
+      DATA(lo_row) = CAST cl_abap_structdescr( CAST cl_abap_tabledescr(
+          cl_abap_typedescr=>describe_by_data( <tab> ) )->get_table_line_type( ) ).
+      READ TABLE lo_row->components INTO DATA(ls_first) INDEX 1.
+      lv_elem = ls_first-name.
+    ENDIF.
+    value_help_popup( tab   = <tab>
+                      col   = lv_elem
+                      title = value_help_title( field ) ).
+    result = abap_true.
+
+
+  ENDMETHOD.
+
+  METHOD value_help_matchcode.
+
+    FIELD-SYMBOLS <tab> TYPE STANDARD TABLE.
+
     " MATCHCODE OBJECT - the search help named at the field
-    READ TABLE mt_cgui_field REFERENCE INTO lr_mc WITH KEY name = lv_field_name.
+    READ TABLE mt_cgui_field REFERENCE INTO DATA(lr_mc) WITH KEY name = to_upper( field ).
     IF sy-subrc = 0 AND lr_mc->matchcode IS NOT INITIAL.
       DATA(ls_mc) = VALUE z2ui5_cl_cgui_context=>ty_s_search_help( name  = lr_mc->matchcode
                                                                   field = matchcode_field( lr_mc->matchcode ) ).
@@ -3271,13 +3171,22 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
             value_help_popup( tab   = <tab>
                               col   = ls_mc-field
                               title = value_help_title( field ) ).
+            result = abap_true.
             RETURN.
           ENDIF.
         ENDIF.
       ENDIF.
     ENDIF.
 
-    DATA(lt_fix) = z2ui5_cl_cgui_context=>rtti_get_fixed_values( lo_descr ).
+
+  ENDMETHOD.
+
+  METHOD value_help_descr.
+
+    DATA lt_value TYPE ty_t_cgui_value.
+    FIELD-SYMBOLS <tab> TYPE STANDARD TABLE.
+
+    DATA(lt_fix) = z2ui5_cl_cgui_context=>rtti_get_fixed_values( descr ).
     IF lt_fix IS NOT INITIAL.
       LOOP AT lt_fix REFERENCE INTO DATA(lr_fix).
         INSERT VALUE #( value = lr_fix->low
@@ -3286,11 +3195,12 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
       value_help_popup( tab   = lt_value
                         col   = `VALUE`
                         title = value_help_title( field ) ).
+      result = abap_true.
       RETURN.
     ENDIF.
 
     " the search help of the data element - its hit list without a dialog
-    DATA(ls_help) = z2ui5_cl_cgui_context=>rtti_get_search_help( lo_descr ).
+    DATA(ls_help) = z2ui5_cl_cgui_context=>rtti_get_search_help( descr ).
     IF ls_help-name IS NOT INITIAL.
       DATA(lr_hits) = z2ui5_cl_cgui_context=>search_help_select( ls_help ).
       IF lr_hits IS BOUND.
@@ -3299,13 +3209,14 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
           value_help_popup( tab   = <tab>
                             col   = ls_help-field
                             title = value_help_title( field ) ).
+          result = abap_true.
           RETURN.
         ENDIF.
       ENDIF.
     ENDIF.
 
     " the value table with the texts of its text table
-    DATA(ls_table) = z2ui5_cl_cgui_context=>rtti_get_value_table( lo_descr ).
+    DATA(ls_table) = z2ui5_cl_cgui_context=>rtti_get_value_table( descr ).
     IF ls_table-table IS NOT INITIAL.
       DATA(lr_rows) = z2ui5_cl_cgui_context=>value_table_select( ls_table ).
       IF lr_rows IS BOUND.
@@ -3314,12 +3225,12 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
           value_help_popup( tab   = <tab>
                             col   = ls_table-field
                             title = value_help_title( field ) ).
+          result = abap_true.
           RETURN.
         ENDIF.
       ENDIF.
     ENDIF.
 
-    message( 'No input help is available'(003) ).
 
   ENDMETHOD.
 
@@ -3407,6 +3318,31 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
       lv_event = to_upper( client->get_event_arg( ) ).
     ENDIF.
 
+    on_event_sync( ).
+    IF on_alv_event( ) = abap_true.
+      RETURN.
+    ENDIF.
+    IF on_event_tree( lv_event ) = abap_true.
+      RETURN.
+    ENDIF.
+    IF on_event_selection( lv_event ) = abap_true.
+      RETURN.
+    ENDIF.
+    IF on_event_popup( lv_event ) = abap_true.
+      RETURN.
+    ENDIF.
+    IF on_event_output( lv_event ) = abap_true.
+      RETURN.
+    ENDIF.
+    IF on_event_gui( lv_event ) = abap_true.
+      RETURN.
+    ENDIF.
+    user_command( lv_event ).
+
+  ENDMETHOD.
+
+  METHOD on_event_sync.
+
     alv_page_sync( ).
     alv_single_sync( ).
     alv_edit_sync( ).
@@ -3417,20 +3353,23 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
     IF mo_cgui_list IS BOUND AND mt_cgui_list_input IS NOT INITIAL.
       mo_cgui_list->set_inputs( mt_cgui_list_input ).
     ENDIF.
-    IF on_alv_event( ) = abap_true.
-      RETURN.
-    ENDIF.
+  ENDMETHOD.
+
+  METHOD on_event_tree.
+
     IF mo_cgui_tree IS BOUND.
-      IF lv_event = z2ui5_cl_cgui_tree=>cs_event-node.
+      IF event = z2ui5_cl_cgui_tree=>cs_event-node.
         on_tree_node( z2ui5_cl_cgui_tree=>get_node_by_event( client ) ).
+        result = abap_true.
         RETURN.
       ELSEIF mo_cgui_tree->handle_event( client ) = abap_true.
         DATA(lv_lazy) = mo_cgui_tree->take_expand_request( ).
         IF lv_lazy IS NOT INITIAL.
           at_tree_expand_no_children( lv_lazy ).
         ENDIF.
+        result = abap_true.
         RETURN.
-      ELSEIF lv_event = z2ui5_cl_cgui_tree=>cs_event-checkbox.
+      ELSEIF event = z2ui5_cl_cgui_tree=>cs_event-checkbox.
         DATA(lv_tick) = z2ui5_cl_cgui_tree=>get_node_by_event( client ).
         at_tree_checkbox( key     = lv_tick
                           checked = mo_cgui_tree->get_node( lv_tick )-checked ).
@@ -3439,11 +3378,17 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
           mo_cgui_tree_handler->on_checkbox( key     = lv_tick
                                              checked = mo_cgui_tree->get_node( lv_tick )-checked ).
         ENDIF.
+        result = abap_true.
         RETURN.
       ENDIF.
     ENDIF.
 
-    CASE lv_event.
+  ENDMETHOD.
+
+  METHOD on_event_selection.
+
+    result = abap_true.
+    CASE event.
 
       WHEN cs_ucomm-execute.
         " F8 is registered for the whole app - on the output it does nothing
@@ -3466,33 +3411,6 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
 
       WHEN cs_ucomm-auto_execute.
         auto_execute( ).
-
-      WHEN cs_ucomm-messages_open.
-        " the screen stays as it is - the popover opens on it
-        mv_cgui_nav = abap_true.
-        client->follow_up_action( val   = client->cs_event-control_by_id
-                                  t_arg = VALUE #( ( cv_cgui_popover_id ) ( `openBy` ) ( cv_cgui_messages_id ) ) ).
-
-      WHEN cs_ucomm-message_focus.
-        mv_cgui_nav = abap_true.
-        message_focus( client->get_event_arg( ) ).
-
-      WHEN cs_ucomm-variant_get.
-        variant_popup( cs_pending-variant_get ).
-
-      WHEN cs_ucomm-variant_save.
-        variant_popup( cs_pending-variant_save ).
-
-      WHEN cs_ucomm-variant_delete.
-        variant_popup( cs_pending-variant_delete ).
-
-      WHEN cs_ucomm-variant_delete_ok.
-        variant_delete( mv_cgui_pending_field ).
-        CLEAR mv_cgui_pending_field.
-
-      WHEN cs_ucomm-variant_saved.
-        " handled in on_navigated( ), which read the popup
-        CLEAR mv_cgui_pending_ucomm.
 
       WHEN cs_ucomm-link_copy.
         client->follow_up_action( val   = client->cs_event-clipboard_copy
@@ -3526,15 +3444,6 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
       WHEN z2ui5_cl_cgui_selscreen=>cs_event-help_request.
         at_selection_screen_on_help( client->get_event_arg( ) ).
 
-      WHEN cs_ucomm-print.
-        on_print( ).
-
-      WHEN cs_ucomm-okcode.
-        okcode_execute( mv_cgui_okcode ).
-
-      WHEN cs_ucomm-palette.
-        palette_open( ).
-
       WHEN cs_ucomm-background.
         IF mv_cgui_screen = cs_screen-selection AND mo_cgui_job IS BOUND.
           on_background( ).
@@ -3547,6 +3456,66 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
           at_value_request( mv_cgui_value_field ).
           CLEAR: mv_cgui_value_field, mv_cgui_value_part.
         ENDIF.
+
+      WHEN OTHERS.
+        result = abap_false.
+
+    ENDCASE.
+
+  ENDMETHOD.
+
+  METHOD on_event_popup.
+
+    result = abap_true.
+    CASE event.
+
+      WHEN cs_ucomm-messages_open.
+        " the screen stays as it is - the popover opens on it
+        mv_cgui_nav = abap_true.
+        client->follow_up_action( val   = client->cs_event-control_by_id
+                                  t_arg = VALUE #( ( cv_cgui_popover_id ) ( `openBy` ) ( cv_cgui_messages_id ) ) ).
+
+      WHEN cs_ucomm-message_focus.
+        mv_cgui_nav = abap_true.
+        message_focus( client->get_event_arg( ) ).
+
+      WHEN cs_ucomm-variant_get.
+        variant_popup( cs_pending-variant_get ).
+
+      WHEN cs_ucomm-variant_save.
+        variant_popup( cs_pending-variant_save ).
+
+      WHEN cs_ucomm-variant_delete.
+        variant_popup( cs_pending-variant_delete ).
+
+      WHEN cs_ucomm-variant_delete_ok.
+        variant_delete( mv_cgui_pending_field ).
+        CLEAR mv_cgui_pending_field.
+
+      WHEN cs_ucomm-variant_saved.
+        " handled in on_navigated( ), which read the popup
+        CLEAR mv_cgui_pending_ucomm.
+
+      WHEN OTHERS.
+        result = abap_false.
+
+    ENDCASE.
+
+  ENDMETHOD.
+
+  METHOD on_event_output.
+
+    result = abap_true.
+    CASE event.
+
+      WHEN cs_ucomm-print.
+        on_print( ).
+
+      WHEN cs_ucomm-okcode.
+        okcode_execute( mv_cgui_okcode ).
+
+      WHEN cs_ucomm-palette.
+        palette_open( ).
 
       WHEN z2ui5_cl_cgui_list=>cs_event-line_selection.
         cursor_from_list( line = CONV i( client->get_event_arg( ) )
@@ -3589,13 +3558,32 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
                              link   = abap_true ).
         ENDIF.
 
+      WHEN OTHERS.
+        result = abap_false.
+
+    ENDCASE.
+
+  ENDMETHOD.
+
+  METHOD on_event_gui.
+
+    result = abap_true.
+    CASE event.
+
       WHEN cs_ucomm-gui_f1 OR cs_ucomm-gui_f4.
-        gui_key( COND #( WHEN lv_event = cs_ucomm-gui_f1 THEN `F1` ELSE `F4` ) ).
+        DATA(lv_key) = COND string( WHEN event = cs_ucomm-gui_f1 THEN `F1` ELSE `F4` ).
+        DATA(lv_editor) = z2ui5_cl_cgui_gui_view=>key_target( ctx = gui_ctx( )
+                                                              key = lv_key ).
+        IF lv_editor > 0.
+          gui_event( id    = lv_editor
+                     event = lv_key
+                     value = `` ).
+        ENDIF.
 
       WHEN cs_ucomm-gui.
         " an event of a SAP GUI control: id, event, value - or the switch to
         " a grid that does not show
-        IF client->get_event_arg( 2 ) = cs_gui_show.
+        IF client->get_event_arg( 2 ) = z2ui5_cl_cgui_gui_view=>cv_show.
           grid_show( CONV #( client->get_event_arg( 1 ) ) ).
         ELSE.
           " the SAPEVENT of an HTMLFrame: action, query and posted fields
@@ -3616,7 +3604,7 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
         ENDIF.
 
       WHEN OTHERS.
-        user_command( lv_event ).
+        result = abap_false.
 
     ENDCASE.
 
@@ -3895,6 +3883,34 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
         on_f4_result( field = lv_field
                       col   = lv_col ).
 
+      WHEN cs_pending-variant_get OR cs_pending-variant_save OR cs_pending-variant_delete.
+        on_navigated_variant( lv_kind ).
+
+      WHEN cs_pending-layout.
+        layout_result( ).
+
+      WHEN cs_pending-filter_col.
+        alv_filter_column_result( ).
+
+      WHEN cs_pending-filter.
+        alv_filter_result( ).
+
+      WHEN cs_pending-alv_f4.
+        alv_f4_result( lv_col ).
+
+      WHEN cs_pending-file.
+        file_result( lv_field ).
+
+      WHEN cs_pending-decide OR cs_pending-values.
+        popup_answer_take( ).
+
+    ENDCASE.
+
+  ENDMETHOD.
+
+  METHOD on_navigated_variant.
+
+    CASE kind.
       WHEN cs_pending-variant_get.
         DATA(lv_name) = variant_selected( ).
         IF lv_name IS NOT INITIAL AND z2ui5_cl_cgui_memory=>variant_apply( ctx    = memory_ctx( )
@@ -3927,31 +3943,20 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
                             title    = 'Delete Variant'(007) ).
         ENDIF.
 
-      WHEN cs_pending-layout.
-        layout_result( ).
-
-      WHEN cs_pending-filter_col.
-        alv_filter_column_result( ).
-
-      WHEN cs_pending-filter.
-        alv_filter_result( ).
-
-      WHEN cs_pending-alv_f4.
-        alv_f4_result( lv_col ).
-
-      WHEN cs_pending-file.
-        file_result( lv_field ).
-
-      WHEN cs_pending-decide OR cs_pending-values.
-        TRY.
-            lo_popup = CAST z2ui5_cl_cgui_popup( client->get_app_prev( ) ).
-          CATCH cx_root.
-            RETURN.
-        ENDTRY.
-        mv_cgui_answer = lo_popup->result( )-answer.
-        mt_cgui_popup_values = lo_popup->result( )-fields.
-
     ENDCASE.
+
+  ENDMETHOD.
+
+  METHOD popup_answer_take.
+
+    TRY.
+        DATA(lo_popup) = CAST z2ui5_cl_cgui_popup( client->get_app_prev( ) ).
+      CATCH cx_root.
+        RETURN.
+    ENDTRY.
+    mv_cgui_answer = lo_popup->result( )-answer.
+    mt_cgui_popup_values = lo_popup->result( )-fields.
+
 
   ENDMETHOD.
 
@@ -4340,7 +4345,7 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
   METHOD run_answer_output.
 
     IF mv_cgui_nav = abap_false
-        AND ( mo_cgui_alv IS BOUND OR mo_cgui_tree IS BOUND OR gui_on_list( ) = abap_true
+        AND ( mo_cgui_alv IS BOUND OR mo_cgui_tree IS BOUND OR z2ui5_cl_cgui_gui_view=>on_list( gui_ctx( ) ) = abap_true
            OR ( mo_cgui_list IS BOUND AND mo_cgui_list->has_content( ) = abap_true ) ).
       mv_cgui_screen = cs_screen-output.
     ENDIF.
@@ -4794,93 +4799,13 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
   METHOD variant_popup.
 
     DATA lt_row TYPE ty_t_variant_row.
-    DATA lt_field TYPE z2ui5_cl_cgui_popup=>ty_t_field.
-    DATA lt_listbox TYPE z2ui5_cl_cgui_popup=>ty_t_listbox.
-    FIELD-SYMBOLS <field_val> TYPE any.
 
     DATA(lt_variant) = z2ui5_cl_cgui_memory=>variant_catalog( memory_ctx( ) ).
     " a draft is no variant to pick or save over
     DELETE lt_variant WHERE name CP `%DRAFT_*`.
 
     IF kind = cs_pending-variant_save.
-      " the name, the sharing of a server store, and a dynamic date for
-      " every date of the screen
-      DATA ls_current TYPE z2ui5_cl_cgui_variant=>ty_s_variant.
-      DATA ls_old     TYPE z2ui5_cl_cgui_variant=>ty_s_value.
-      ls_current = VALUE #( lt_variant[ name = mv_cgui_variant ] OPTIONAL ).
-      INSERT VALUE #( name     = `NAME`
-                      text     = CONV #( 'Variant name'(009) )
-                      value    = mv_cgui_variant
-                      required = abap_true ) INTO TABLE lt_field.
-      IF mo_cgui_store IS BOUND AND mo_cgui_store->check_sharing( ) = abap_true.
-        INSERT VALUE #( name = `SHARED`
-                        text = CONV #( 'Shared with all users'(010) )
-                        kind = z2ui5_cl_cgui_popup=>cs_kind-checkbox
-                        flag = ls_current-shared ) INTO TABLE lt_field.
-        INSERT VALUE #( name = `PROTECTED`
-                        text = CONV #( 'Protected - only I change it'(011) )
-                        kind = z2ui5_cl_cgui_popup=>cs_kind-checkbox
-                        flag = ls_current-protected ) INTO TABLE lt_field.
-      ENDIF.
-      " the variant attributes: fields protected or hidden
-      INSERT VALUE #( name = `PROTECT`
-                      text = CONV #( 'Protected fields'(038) )
-                      kind = z2ui5_cl_cgui_popup=>cs_kind-multi
-                      keys = ls_current-protect ) INTO TABLE lt_field.
-      INSERT VALUE #( name = `HIDE`
-                      text = CONV #( 'Hidden fields'(039) )
-                      kind = z2ui5_cl_cgui_popup=>cs_kind-multi
-                      keys = ls_current-hide ) INTO TABLE lt_field.
-      LOOP AT mt_cgui_field REFERENCE INTO DATA(lr_attr) WHERE no_display = abap_false AND name IS NOT INITIAL.
-        INSERT VALUE #( name = `PROTECT`
-                        key  = lr_attr->name
-                        text = COND #( WHEN lr_attr->text IS NOT INITIAL THEN lr_attr->text ELSE lr_attr->name ) ) INTO TABLE lt_listbox.
-        INSERT VALUE #( name = `HIDE`
-                        key  = lr_attr->name
-                        text = COND #( WHEN lr_attr->text IS NOT INITIAL THEN lr_attr->text ELSE lr_attr->name ) ) INTO TABLE lt_listbox.
-      ENDLOOP.
-      DATA(lt_dynamic) = z2ui5_cl_cgui_variant=>dynamic_values( ).
-      LOOP AT mt_cgui_field REFERENCE INTO DATA(lr_field) WHERE no_display = abap_false.
-        DATA(lr_val) = attri_assign( lr_field->name ).
-        IF lr_val IS NOT BOUND.
-          CONTINUE.
-        ENDIF.
-        ASSIGN lr_val->* TO <field_val>.
-        DATA(lo_descr) = z2ui5_cl_cgui_context=>rtti_get_value_descr( <field_val> ).
-        IF lo_descr IS NOT BOUND OR lo_descr->type_kind <> cl_abap_typedescr=>typekind_date.
-          CONTINUE.
-        ENDIF.
-        ls_old = VALUE #( ls_current-values[ name = lr_field->name ] OPTIONAL ).
-        INSERT VALUE #( name  = |DYN_{ lr_field->name }|
-                        text  = replace( val  = 'Dynamic date &1'(012)
-                                         sub  = `&1`
-                                         with = lr_field->text )
-                        kind  = z2ui5_cl_cgui_popup=>cs_kind-listbox
-                        value = ls_old-dynamic ) INTO TABLE lt_field.
-        IF lr_field->kind = z2ui5_cl_cgui_selscreen=>cs_field_kind-select_option.
-          INSERT VALUE #( name  = |DYNH_{ lr_field->name }|
-                          text  = replace( val  = 'Dynamic date &1 (to)'(013)
-                                           sub  = `&1`
-                                           with = lr_field->text )
-                          kind  = z2ui5_cl_cgui_popup=>cs_kind-listbox
-                          value = ls_old-dynamic_high ) INTO TABLE lt_field.
-        ENDIF.
-        LOOP AT lt_dynamic INTO DATA(ls_dynamic).
-          INSERT VALUE #( name = |DYN_{ lr_field->name }|
-                          key  = ls_dynamic-key
-                          text = ls_dynamic-text ) INTO TABLE lt_listbox.
-          INSERT VALUE #( name = |DYNH_{ lr_field->name }|
-                          key  = ls_dynamic-key
-                          text = ls_dynamic-text ) INTO TABLE lt_listbox.
-        ENDLOOP.
-      ENDLOOP.
-
-      mv_cgui_pending_kind = kind.
-      mv_cgui_nav = abap_true.
-      client->nav_app_call( z2ui5_cl_cgui_popup=>get_values( fields  = lt_field
-                                                             listbox = lt_listbox
-                                                             title   = CONV string( 'Save as Variant'(014) )
-                                                             event   = cs_ucomm-variant_saved ) ).
+      variant_popup_save( VALUE #( lt_variant[ name = mv_cgui_variant ] OPTIONAL ) ).
       RETURN.
     ENDIF.
 
@@ -4904,6 +4829,101 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
     client->nav_app_call( z2ui5_cl_cgui_select=>factory(
         tab   = lt_row
         title = COND string( WHEN kind = cs_pending-variant_delete THEN 'Delete Variant'(007) ELSE 'Get Variant'(016) ) ) ).
+
+  ENDMETHOD.
+
+  METHOD variant_popup_save.
+
+    DATA lt_field TYPE z2ui5_cl_cgui_popup=>ty_t_field.
+    DATA lt_listbox TYPE z2ui5_cl_cgui_popup=>ty_t_listbox.
+
+    " the name, the sharing of a server store, and a dynamic date for
+    " every date of the screen
+    INSERT VALUE #( name     = `NAME`
+                    text     = CONV #( 'Variant name'(009) )
+                    value    = mv_cgui_variant
+                    required = abap_true ) INTO TABLE lt_field.
+    IF mo_cgui_store IS BOUND AND mo_cgui_store->check_sharing( ) = abap_true.
+      INSERT VALUE #( name = `SHARED`
+                      text = CONV #( 'Shared with all users'(010) )
+                      kind = z2ui5_cl_cgui_popup=>cs_kind-checkbox
+                      flag = current-shared ) INTO TABLE lt_field.
+      INSERT VALUE #( name = `PROTECTED`
+                      text = CONV #( 'Protected - only I change it'(011) )
+                      kind = z2ui5_cl_cgui_popup=>cs_kind-checkbox
+                      flag = current-protected ) INTO TABLE lt_field.
+    ENDIF.
+    " the variant attributes: fields protected or hidden
+    INSERT VALUE #( name = `PROTECT`
+                    text = CONV #( 'Protected fields'(038) )
+                    kind = z2ui5_cl_cgui_popup=>cs_kind-multi
+                    keys = current-protect ) INTO TABLE lt_field.
+    INSERT VALUE #( name = `HIDE`
+                    text = CONV #( 'Hidden fields'(039) )
+                    kind = z2ui5_cl_cgui_popup=>cs_kind-multi
+                    keys = current-hide ) INTO TABLE lt_field.
+    LOOP AT mt_cgui_field REFERENCE INTO DATA(lr_attr) WHERE no_display = abap_false AND name IS NOT INITIAL.
+      INSERT VALUE #( name = `PROTECT`
+                      key  = lr_attr->name
+                      text = COND #( WHEN lr_attr->text IS NOT INITIAL THEN lr_attr->text ELSE lr_attr->name ) ) INTO TABLE lt_listbox.
+      INSERT VALUE #( name = `HIDE`
+                      key  = lr_attr->name
+                      text = COND #( WHEN lr_attr->text IS NOT INITIAL THEN lr_attr->text ELSE lr_attr->name ) ) INTO TABLE lt_listbox.
+    ENDLOOP.
+    variant_popup_dynamic( EXPORTING current = current
+                           CHANGING  fields  = lt_field
+                                     listbox = lt_listbox ).
+
+    mv_cgui_pending_kind = cs_pending-variant_save.
+    mv_cgui_nav = abap_true.
+    client->nav_app_call( z2ui5_cl_cgui_popup=>get_values( fields  = lt_field
+                                                           listbox = lt_listbox
+                                                           title   = CONV string( 'Save as Variant'(014) )
+                                                           event   = cs_ucomm-variant_saved ) ).
+
+  ENDMETHOD.
+
+  METHOD variant_popup_dynamic.
+
+    DATA ls_old TYPE z2ui5_cl_cgui_variant=>ty_s_value.
+    FIELD-SYMBOLS <field_val> TYPE any.
+
+    DATA(lt_dynamic) = z2ui5_cl_cgui_variant=>dynamic_values( ).
+    LOOP AT mt_cgui_field REFERENCE INTO DATA(lr_field) WHERE no_display = abap_false.
+      DATA(lr_val) = attri_assign( lr_field->name ).
+      IF lr_val IS NOT BOUND.
+        CONTINUE.
+      ENDIF.
+      ASSIGN lr_val->* TO <field_val>.
+      DATA(lo_descr) = z2ui5_cl_cgui_context=>rtti_get_value_descr( <field_val> ).
+      IF lo_descr IS NOT BOUND OR lo_descr->type_kind <> cl_abap_typedescr=>typekind_date.
+        CONTINUE.
+      ENDIF.
+      ls_old = VALUE #( current-values[ name = lr_field->name ] OPTIONAL ).
+      INSERT VALUE #( name  = |DYN_{ lr_field->name }|
+                      text  = replace( val  = 'Dynamic date &1'(012)
+                                       sub  = `&1`
+                                       with = lr_field->text )
+                      kind  = z2ui5_cl_cgui_popup=>cs_kind-listbox
+                      value = ls_old-dynamic ) INTO TABLE fields.
+      IF lr_field->kind = z2ui5_cl_cgui_selscreen=>cs_field_kind-select_option.
+        INSERT VALUE #( name  = |DYNH_{ lr_field->name }|
+                        text  = replace( val  = 'Dynamic date &1 (to)'(013)
+                                         sub  = `&1`
+                                         with = lr_field->text )
+                        kind  = z2ui5_cl_cgui_popup=>cs_kind-listbox
+                        value = ls_old-dynamic_high ) INTO TABLE fields.
+      ENDIF.
+      LOOP AT lt_dynamic INTO DATA(ls_dynamic).
+        INSERT VALUE #( name = |DYN_{ lr_field->name }|
+                        key  = ls_dynamic-key
+                        text = ls_dynamic-text ) INTO TABLE listbox.
+        INSERT VALUE #( name = |DYNH_{ lr_field->name }|
+                        key  = ls_dynamic-key
+                        text = ls_dynamic-text ) INTO TABLE listbox.
+      ENDLOOP.
+    ENDLOOP.
+
 
   ENDMETHOD.
 
@@ -5171,7 +5191,7 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
       mo_cgui_list->footer_end( ).
     ENDIF.
 
-    IF mo_cgui_alv IS NOT BOUND AND mo_cgui_tree IS NOT BOUND AND gui_on_list( ) = abap_false
+    IF mo_cgui_alv IS NOT BOUND AND mo_cgui_tree IS NOT BOUND AND z2ui5_cl_cgui_gui_view=>on_list( gui_ctx( ) ) = abap_false
         AND ( mo_cgui_list IS NOT BOUND OR mo_cgui_list->has_content( ) = abap_false ).
       message( 'List contains no data'(020) ).
       RETURN.
@@ -5560,19 +5580,7 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
 
   METHOD on_f4_result.
 
-    FIELD-SYMBOLS <row>   TYPE any.
-    FIELD-SYMBOLS <rows>  TYPE STANDARD TABLE.
-    FIELD-SYMBOLS <value> TYPE any.
-    FIELD-SYMBOLS <field> TYPE any.
-    FIELD-SYMBOLS <range> TYPE STANDARD TABLE.
-    FIELD-SYMBOLS <line>  TYPE any.
-    FIELD-SYMBOLS <comp>  TYPE any.
-    FIELD-SYMBOLS <keep>  TYPE STANDARD TABLE.
-    FIELD-SYMBOLS <sign>  TYPE any.
-    FIELD-SYMBOLS <opt>   TYPE any.
     DATA lo_popup TYPE REF TO z2ui5_cl_cgui_select.
-    DATA lr_line  TYPE REF TO data.
-    DATA lr_keep  TYPE REF TO data.
 
     TRY.
         lo_popup ?= client->get_app_prev( ).
@@ -5605,62 +5613,112 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
     ENDIF.
 
     IF cl_abap_typedescr=>describe_by_data_ref( lr_field )->kind <> cl_abap_typedescr=>kind_table.
-      IF ls_result-row IS NOT BOUND.
-        RETURN.
-      ENDIF.
-      ASSIGN ls_result-row->* TO <row>.
-      IF col IS INITIAL.
-        ASSIGN COMPONENT 1 OF STRUCTURE <row> TO <value>.
-      ELSE.
-        ASSIGN COMPONENT col OF STRUCTURE <row> TO <value>.
-      ENDIF.
-      IF <value> IS NOT ASSIGNED.
-        RETURN.
-      ENDIF.
-      ASSIGN lr_field->* TO <field>.
-      <field> = <value>.
-      RETURN.
+      f4_result_value( field = lr_field
+                       row   = ls_result-row
+                       col   = col ).
+    ELSEIF mv_cgui_pending_part = z2ui5_cl_cgui_selscreen=>cs_part-high.
+      " the upper limit: the first line becomes an interval up to the value
+      CLEAR mv_cgui_pending_part.
+      f4_result_high( range = lr_field
+                      row   = ls_result-row
+                      col   = col ).
+    ELSE.
+      f4_result_rows( range = lr_field
+                      rows  = ls_result-table
+                      col   = col ).
     ENDIF.
 
-    " the upper limit: the first line becomes an interval up to the value
-    IF mv_cgui_pending_part = z2ui5_cl_cgui_selscreen=>cs_part-high.
-      CLEAR mv_cgui_pending_part.
-      IF ls_result-row IS NOT BOUND.
-        RETURN.
-      ENDIF.
-      ASSIGN ls_result-row->* TO <row>.
-      IF col IS INITIAL.
-        ASSIGN COMPONENT 1 OF STRUCTURE <row> TO <value>.
-      ELSE.
-        ASSIGN COMPONENT col OF STRUCTURE <row> TO <value>.
-      ENDIF.
-      IF <value> IS NOT ASSIGNED.
-        RETURN.
-      ENDIF.
-      ASSIGN lr_field->* TO <range>.
-      READ TABLE <range> ASSIGNING <line> INDEX 1.
-      IF sy-subrc <> 0.
-        CREATE DATA lr_line LIKE LINE OF <range>.
-        ASSIGN lr_line->* TO <line>.
-        ASSIGN COMPONENT `SIGN` OF STRUCTURE <line> TO <comp>.
-        <comp> = `I`.
-        INSERT <line> INTO TABLE <range> ASSIGNING <line>.
-      ENDIF.
-      ASSIGN COMPONENT `OPTION` OF STRUCTURE <line> TO <comp>.
-      <comp> = `BT`.
-      ASSIGN COMPONENT `HIGH` OF STRUCTURE <line> TO <comp>.
-      <comp> = <value>.
+  ENDMETHOD.
+
+  METHOD f4_row_value.
+
+    FIELD-SYMBOLS <row>   TYPE any.
+    FIELD-SYMBOLS <value> TYPE any.
+
+    IF row IS NOT BOUND.
       RETURN.
     ENDIF.
+    ASSIGN row->* TO <row>.
+    IF col IS INITIAL.
+      ASSIGN COMPONENT 1 OF STRUCTURE <row> TO <value>.
+    ELSE.
+      ASSIGN COMPONENT col OF STRUCTURE <row> TO <value>.
+    ENDIF.
+    IF <value> IS ASSIGNED.
+      GET REFERENCE OF <value> INTO result.
+    ENDIF.
+
+  ENDMETHOD.
+
+  METHOD f4_result_value.
+
+    FIELD-SYMBOLS <value> TYPE any.
+    FIELD-SYMBOLS <field> TYPE any.
+
+    DATA(lr_value) = f4_row_value( row = row
+                                   col = col ).
+    IF lr_value IS NOT BOUND.
+      RETURN.
+    ENDIF.
+    ASSIGN lr_value->* TO <value>.
+    ASSIGN field->* TO <field>.
+    <field> = <value>.
+
+  ENDMETHOD.
+
+  METHOD f4_result_high.
+
+    FIELD-SYMBOLS <value> TYPE any.
+    FIELD-SYMBOLS <range> TYPE STANDARD TABLE.
+    FIELD-SYMBOLS <line>  TYPE any.
+    FIELD-SYMBOLS <comp>  TYPE any.
+    DATA lr_line TYPE REF TO data.
+
+    DATA(lr_value) = f4_row_value( row = row
+                                   col = col ).
+    IF lr_value IS NOT BOUND.
+      RETURN.
+    ENDIF.
+    ASSIGN lr_value->* TO <value>.
+    ASSIGN range->* TO <range>.
+    READ TABLE <range> ASSIGNING <line> INDEX 1.
+    IF sy-subrc <> 0.
+      CREATE DATA lr_line LIKE LINE OF <range>.
+      ASSIGN lr_line->* TO <line>.
+      ASSIGN COMPONENT `SIGN` OF STRUCTURE <line> TO <comp>.
+      <comp> = `I`.
+      INSERT <line> INTO TABLE <range> ASSIGNING <line>.
+    ENDIF.
+    ASSIGN COMPONENT `OPTION` OF STRUCTURE <line> TO <comp>.
+    <comp> = `BT`.
+    ASSIGN COMPONENT `HIGH` OF STRUCTURE <line> TO <comp>.
+    <comp> = <value>.
+
+  ENDMETHOD.
+
+  METHOD f4_result_rows.
+
+    FIELD-SYMBOLS <row>   TYPE any.
+    FIELD-SYMBOLS <rows>  TYPE STANDARD TABLE.
+    FIELD-SYMBOLS <value> TYPE any.
+    FIELD-SYMBOLS <range> TYPE STANDARD TABLE.
+    FIELD-SYMBOLS <line>  TYPE any.
+    FIELD-SYMBOLS <comp>  TYPE any.
+    FIELD-SYMBOLS <keep>  TYPE STANDARD TABLE.
+    FIELD-SYMBOLS <sign>  TYPE any.
+    FIELD-SYMBOLS <opt>   TYPE any.
+    DATA lr_line TYPE REF TO data.
+    DATA lr_keep TYPE REF TO data.
+    DATA lr_row  TYPE REF TO data.
 
     " a select-option - every row picked becomes a line I EQ. The value
     " help showed the lines I EQ as picked, so only they are replaced:
     " intervals, patterns and excluding lines stay
-    IF ls_result-table IS NOT BOUND.
+    IF rows IS NOT BOUND.
       RETURN.
     ENDIF.
-    ASSIGN ls_result-table->* TO <rows>.
-    ASSIGN lr_field->* TO <range>.
+    ASSIGN rows->* TO <rows>.
+    ASSIGN range->* TO <range>.
     CREATE DATA lr_keep LIKE <range>.
     ASSIGN lr_keep->* TO <keep>.
     " empty - the transpiled runtime copies the rows along with LIKE
@@ -5676,15 +5734,13 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
     <range> = <keep>.
 
     LOOP AT <rows> ASSIGNING <row>.
-      UNASSIGN <value>.
-      IF col IS INITIAL.
-        ASSIGN COMPONENT 1 OF STRUCTURE <row> TO <value>.
-      ELSE.
-        ASSIGN COMPONENT col OF STRUCTURE <row> TO <value>.
-      ENDIF.
-      IF <value> IS NOT ASSIGNED.
+      GET REFERENCE OF <row> INTO lr_row.
+      DATA(lr_value) = f4_row_value( row = lr_row
+                                     col = col ).
+      IF lr_value IS NOT BOUND.
         CONTINUE.
       ENDIF.
+      ASSIGN lr_value->* TO <value>.
 
       CREATE DATA lr_line LIKE LINE OF <range>.
       ASSIGN lr_line->* TO <line>.
@@ -7089,10 +7145,6 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
 
   METHOD view_display.
 
-    DATA lv_button_text  TYPE string.
-    DATA lv_button_icon  TYPE string.
-    DATA lv_button_ucomm TYPE string.
-
     " submit( as_window ): the selection screen over the caller's view
     IF mv_cgui_as_window = abap_true AND mv_cgui_screen = cs_screen-selection AND mv_cgui_denied = abap_false.
       view_display_submit_window( ).
@@ -7119,6 +7171,40 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
         )->a( n = `title`          t = mv_cgui_title
         )->a( n = `showNavButton`  b = xsdbool( mv_cgui_screen = cs_screen-output OR mv_cgui_screen = cs_screen-dynpro OR mv_cgui_called = abap_true )
         )->a( n = `navButtonPress` v = client->_event( cs_ucomm-back ) ).
+    view_display_header( page ).
+
+    DATA(lv_window) = xsdbool( mv_cgui_screen = cs_screen-output
+                               AND mv_cgui_window = abap_true
+                               AND mt_cgui_level IS NOT INITIAL ).
+    " no authorization: nothing but the messages
+    IF mv_cgui_denied = abap_true.
+      CLEAR lv_window.
+    ENDIF.
+    DATA(ls_button) = view_display_body( page   = page
+                                         dynpro = lo_dynpro
+                                         window = lv_window ).
+
+    DATA(toolbar) = page->ele( `footer`
+        )->ele( `OverflowToolbar` ).
+
+    messages_render( page    = page
+                     toolbar = toolbar ).
+
+    IF mv_cgui_denied = abap_true.
+      client->view_display( view->stringify( ) ).
+      RETURN.
+    ENDIF.
+
+    view_display_toolbar( toolbar = toolbar
+                          button  = ls_button ).
+
+    client->view_display( view->stringify( ) ).
+    shortcuts_register( ).
+    view_display_after( lv_window ).
+
+  ENDMETHOD.
+
+  METHOD view_display_header.
 
     IF mv_cgui_cmd_on = abap_true AND mv_cgui_denied = abap_false.
       page->ele( `headerContent`
@@ -7163,48 +7249,44 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
                                                    s_ctrl = VALUE #( check_queue_last = abap_true ) ) ).
     ENDIF.
 
-    DATA(lv_window) = xsdbool( mv_cgui_screen = cs_screen-output
-                               AND mv_cgui_window = abap_true
-                               AND mt_cgui_level IS NOT INITIAL ).
+  ENDMETHOD.
+
+  METHOD view_display_body.
+
     " no authorization: nothing but the messages
     IF mv_cgui_denied = abap_true.
-      CLEAR lv_window.
-    ELSEIF lo_dynpro IS BOUND.
-      lo_dynpro->render( page ).
+      RETURN.
+    ENDIF.
+    IF dynpro IS BOUND.
+      dynpro->render( page ).
       gui_docked( dynnr = mv_cgui_dynpro
                   node  = page ).
-      lv_button_text = 'Continue'(046).
-      lv_button_icon = `sap-icon://accept`.
-      lv_button_ucomm = cs_ucomm-enter.
+      result = VALUE #( text  = 'Continue'(046)
+                        icon  = `sap-icon://accept`
+                        ucomm = cs_ucomm-enter ).
     ELSEIF mv_cgui_screen = cs_screen-output.
-      IF lv_window = abap_true.
+      IF window = abap_true.
         view_display_window_base( page ).
       ELSE.
         view_display_output( page ).
       ENDIF.
-      lv_button_text = 'Back'(025).
-      lv_button_icon = `sap-icon://nav-back`.
-      lv_button_ucomm = cs_ucomm-back.
+      result = VALUE #( text  = 'Back'(025)
+                        icon  = `sap-icon://nav-back`
+                        ucomm = cs_ucomm-back ).
     ELSE.
       DATA(screen) = selection_screen_prepare( ).
       screen->render( page ).
       gui_docked( dynnr = `1000`
                   node  = page ).
-      lv_button_text = 'Execute'(026).
-      lv_button_icon = `sap-icon://begin`.
-      lv_button_ucomm = cs_ucomm-execute.
+      result = VALUE #( text  = 'Execute'(026)
+                        icon  = `sap-icon://begin`
+                        ucomm = cs_ucomm-execute ).
     ENDIF.
 
-    DATA(toolbar) = page->ele( `footer`
-        )->ele( `OverflowToolbar` ).
 
-    messages_render( page    = page
-                     toolbar = toolbar ).
+  ENDMETHOD.
 
-    IF mv_cgui_denied = abap_true.
-      client->view_display( view->stringify( ) ).
-      RETURN.
-    ENDIF.
+  METHOD view_display_toolbar.
 
     IF mv_cgui_screen = cs_screen-selection AND mt_cgui_field IS NOT INITIAL.
       " RS_SET_SELSCREEN_STATUS switches standard functions off
@@ -7247,6 +7329,13 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
 
     ENDIF.
 
+    view_display_toolbar_keys( toolbar = toolbar
+                               button  = button ).
+
+  ENDMETHOD.
+
+  METHOD view_display_toolbar_keys.
+
     " SELECTION-SCREEN FUNCTION KEY - and SET PF-STATUS on the output
     IF mv_cgui_screen = cs_screen-selection.
       LOOP AT mt_cgui_fkey INTO DATA(ls_fkey).
@@ -7275,19 +7364,21 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
     ENDIF.
 
     toolbar->tag( `ToolbarSpacer` ).
-    IF NOT ( lv_button_ucomm = cs_ucomm-execute AND line_exists( mt_cgui_excl_sel[ table_line = cs_ucomm-execute ] ) ).
+    IF NOT ( button-ucomm = cs_ucomm-execute AND line_exists( mt_cgui_excl_sel[ table_line = cs_ucomm-execute ] ) ).
       toolbar->tag( `Button`
-          )->a( n = `text`    t = lv_button_text
-          )->a( n = `icon`    v = lv_button_icon
+          )->a( n = `text`    t = button-text
+          )->a( n = `icon`    v = button-icon
           )->a( n = `type`    v = `Emphasized`
-          )->a( n = `tooltip` v = COND #( WHEN lv_button_ucomm = cs_ucomm-execute THEN `F8`
-                                          WHEN lv_button_ucomm = cs_ucomm-enter THEN `Enter`
+          )->a( n = `tooltip` v = COND #( WHEN button-ucomm = cs_ucomm-execute THEN `F8`
+                                          WHEN button-ucomm = cs_ucomm-enter THEN `Enter`
                                           ELSE `F3` )
-          )->a( n = `press`   v = client->_event( lv_button_ucomm ) ).
+          )->a( n = `press`   v = client->_event( button-ucomm ) ).
     ENDIF.
 
-    client->view_display( view->stringify( ) ).
-    shortcuts_register( ).
+
+  ENDMETHOD.
+
+  METHOD view_display_after.
 
     " inside the Fiori launchpad the shell shows the title of the report
     IF client->get( )-check_launchpad_active = abap_true AND mv_cgui_title <> mv_cgui_title_shell.
@@ -7303,12 +7394,12 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
       CLEAR mv_cgui_cursor_field.
     ENDIF.
 
-    IF lv_window = abap_true.
+    IF window = abap_true.
       view_display_window( ).
     ELSEIF mv_cgui_window_shown = abap_true.
       client->popup_destroy( ).
     ENDIF.
-    mv_cgui_window_shown = lv_window.
+    mv_cgui_window_shown = window.
 
     IF mv_cgui_dynnr IS NOT INITIAL.
       view_display_dynnr( ).

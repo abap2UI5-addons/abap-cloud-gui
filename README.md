@@ -907,14 +907,17 @@ The last meter for the user
 
 Simpler to read, simpler to change - the API stays
 
-- [ ] `z2ui5_cl_cgui_report` split behind its API into collaborators -
-      selection screen, output, variants and parameters, dynpro and GUI
-      stand-ins, navigation; no method over 80 lines, no class over 2,000.
-      So far: `z2ui5_cl_cgui_memory` (variants, parameters, draft, history),
-      `z2ui5_cl_cgui_command` (URL, command field, shortcuts), the grid's
-      table work in `z2ui5_cl_cgui_alv` - 8,730 to 7,718 lines, the PUBLIC
-      and PROTECTED sections byte-identical; next the GUI rendering and the
-      three 200-line methods
+- [x] `z2ui5_cl_cgui_report` split behind its API, the PUBLIC and
+      PROTECTED sections byte-identical: `z2ui5_cl_cgui_memory` (variants,
+      parameters, draft, history), `z2ui5_cl_cgui_command` (URL, command
+      field, shortcuts), `z2ui5_cl_cgui_gui_view` (the stand-ins rendered),
+      the grid's table work in `z2ui5_cl_cgui_alv`, and the long methods of
+      the report split into steps - `on_event` 221 to 30 lines,
+      `view_display` 227 to 58, `gui_render` 233 to a walk; the report
+      8,730 to 7,809 lines, one method still over 80 (`write`, its 25
+      `IS SUPPLIED` checks). Each collaborator is stateless, takes the
+      state as a structure of references the report builds per call, and
+      never names the report as a type - no cycle, no friend
 - [x] `convert.mjs` split by statement family - `convert-screen`, `-decl`,
       `-list`, `-alv`, `-calls`, `-functions`, `-dynpro`, `-gui`, `-locals`,
       `-rewrites` as methods mixed into the one Converter, the tables and
