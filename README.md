@@ -905,8 +905,11 @@ Simpler to read, simpler to change - the API stays
 - [ ] `z2ui5_cl_cgui_report` split behind its API into collaborators -
       selection screen, output, variants and parameters, dynpro and GUI
       stand-ins, navigation; no method over 80 lines, no class over 2,000
-- [ ] `convert.mjs` split by statement family - selection screen, list,
-      ALV, dynpro, GUI, popups, SUBMIT - the snapshots unchanged
+- [x] `convert.mjs` split by statement family - `convert-screen`, `-decl`,
+      `-list`, `-alv`, `-calls`, `-functions`, `-dynpro`, `-gui`, `-locals`,
+      `-rewrites` as methods mixed into the one Converter, the tables and
+      helpers in `convert-shared` - the snapshots unchanged, the largest
+      file 2,100 lines instead of 8,700
 - [x] The API in two tiers in this README: the dozen methods a new report
       needs first, the rest as what a converted report may use
 - [x] The rarely used stand-ins (picture, the trees) frozen: kept and

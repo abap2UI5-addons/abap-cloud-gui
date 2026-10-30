@@ -18,7 +18,7 @@ list, ALV grid, messages. Language of code, comments, commits and docs:
 | `src/03` | the test set: the corpus reports of report2cloud as converted (`z2ui5_cl_cgui_r2c_NN`), generated - never edit by hand, `UPDATE_SNAPSHOTS=1 npm run test:report2cloud` writes it. Only the reports whose migration report names nothing for the release, so the package activates on ABAP Cloud too; the gate test's scratch copy leaves it out and lints the conversion of now under `src/r2c` |
 | `tools/report2cloud` | `report2cloud`, a Node CLI (no ABAP object) that converts a classic report into a report class of this addon - THE generator of this repository, see below |
 | `scripts/unit.mjs` | `npm run unit` - the ABAP Unit tests in the transpiled backend, tables included |
-| `site/`, `scripts/build-site.mjs` | `npm run site` - the GitHub Pages site: the page about the addon and the report2cloud playground, the converter bundled for the browser with esbuild (`.github/workflows/pages.yaml` deploys `build/site` from main). The converter stays browser-safe: no `node:` import in `tools/report2cloud/lib/convert.mjs` and what it imports (`report.mjs`, `refusals.mjs`, `abap.mjs`, `abapgit.mjs`, `textpool.mjs`) - file access belongs to the CLI |
+| `site/`, `scripts/build-site.mjs` | `npm run site` - the GitHub Pages site: the page about the addon and the report2cloud playground, the converter bundled for the browser with esbuild (`.github/workflows/pages.yaml` deploys `build/site` from main). The converter stays browser-safe: no `node:` import in `tools/report2cloud/lib/convert*.mjs` and what they import (`report.mjs`, `refusals.mjs`, `abap.mjs`, `abapgit.mjs`, `textpool.mjs`, `includes.mjs`, `package.mjs`) - file access belongs to the CLI |
 | `site/playground/`, `scripts/build-playground.mjs` | `npm run site:playground` - the site's own copy of the abap2UI5 playground (`build/site/playground`), where a converted report runs: the playground at a pin with `site/playground/report2cloud.patch` applied, built with this checkout's addon. The abap2UI5 playground itself carries nothing of reports - keep it that way; a pin bump or a patch that no longer applies: `site/playground/README.md` |
 | `.github/abaplint` | the Cloud and 7.02 gate configs; `abaplint.jsonc` at the root is the v750 inner loop |
 
@@ -240,7 +240,7 @@ the model is compared on the same `--limit` before and after.
   unreleased tables the migration report lists), the 7.02 gate and the
   abap2UI5 linter (no finding). Findings in `src/` itself are `npm run
   check`'s business and only counted. A new PUBLIC or PROTECTED method of
-  `z2ui5_cl_cgui_report` goes into `BASE_METHODS` of `lib/convert.mjs` (a
+  `z2ui5_cl_cgui_report` goes into `BASE_METHODS` of `lib/convert-shared.mjs` (a
   test compares them). Change the converter with the API, then
   `UPDATE_SNAPSHOTS=1 node --test tools/report2cloud/test/convert.test.mjs`
   and review the snapshot diff.
