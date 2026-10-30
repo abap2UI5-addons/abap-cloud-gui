@@ -854,12 +854,12 @@ lines in one file. The stage takes that on, in this order.
 
 The last meter for the user
 
-- [ ] One click into the system: the converted class as an abapGit zip
+- [x] One click into the system: the converted class as an abapGit zip
       from the site (offline import), samples and own report alike - not
       one download per file
-- [ ] A whole package in the browser: an abapGit zip of a package dropped
+- [x] A whole package in the browser: an abapGit zip of a package dropped
       on the site, every report converted with its includes, the order to
-      migrate in, one zip back
+      migrate in, one zip back - nothing leaves the browser
 - [ ] The AI assistant measured: `report2cloud:eval` run with a key on the
       refused reports of the web corpus, the share that ends clean in this
       README - and the loop made the second path of the site if it earns it

@@ -8,7 +8,7 @@ import { join } from "node:path";
 import { callsOf, estateGraph, migrationOrder } from "../lib/estate.mjs";
 import { packageRun } from "../package.mjs";
 import { programs } from "../coverage.mjs";
-import { includesFrom } from "../lib/includes.mjs";
+import { includesFrom } from "../lib/includes-fs.mjs";
 
 test("the calls of a report: SUBMIT, SUBMIT (dobj), PERFORM IN PROGRAM, PERFORM f(prog), CALL TRANSACTION - not in comments", () => {
   const calls = callsOf([

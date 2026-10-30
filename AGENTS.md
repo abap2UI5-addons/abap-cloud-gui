@@ -198,7 +198,9 @@ that removes or retypes something public is a major release.
 from the `.prog.xml`, its includes from the `.prog.abap` files beside it)
 into a class inheriting from `z2ui5_cl_cgui_report`:
 `npm run report2cloud -- zreport.prog.abap [--class zcl_x] [--out dir]`. It
-inlines the includes before the parse (`lib/includes.mjs`, every line of the
+inlines the includes before the parse (`lib/includes.mjs` - no `node:fs`
+in it, the site bundles it; the reader over folders is `lib/includes-fs.mjs`
+- every line of the
 result knows its file and row), parses with `@abaplint/core` at the version
 of `@abaplint/cli` - which expands the macros at their calls - writes the
 class in abapGit format plus a migration report, and refuses with

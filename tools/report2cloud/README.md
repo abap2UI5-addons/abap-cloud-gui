@@ -571,7 +571,9 @@ of the samples: one call per line, the parameters aligned.
 | `web.mjs` | the measurement over the open-source reports of the web (`report2cloud:web`) |
 | `eval.mjs` | the AI loop of the site measured on the refused reports of a corpus (`report2cloud:eval`) |
 | `lib/convert.mjs` | the converter |
-| `lib/includes.mjs` | the INCLUDEs of a report, inlined from the files beside it, with where every line came from |
+| `lib/includes.mjs` | the INCLUDEs of a report, inlined, with where every line came from - reads nothing from disk, the site bundles it |
+| `lib/includes-fs.mjs` | the include reader over folders the CLI, the coverage and the package run use |
+| `lib/package.mjs` | a whole package in memory - the files as `{ path: text }`, every report converted with its includes and text pool, the estate; what the site runs on a dropped abapGit zip |
 | `lib/abap.mjs` | helpers over the syntax tree, the token renderer |
 | `lib/textpool.mjs` | the text pool of a `.prog.xml` |
 | `lib/abapgit.mjs` | the `.clas.xml` and the abapGit format of the source |

@@ -24,6 +24,8 @@ import { parseTextpool } from "../tools/report2cloud/lib/textpool.mjs";
 import { highlightAbap, highlightFile } from "./highlight.mjs";
 import { MODEL, errorText, lineDiff, polishClass, rewriteRefused } from "./assistant.mjs";
 import { abapgitZip } from "./zip.mjs";
+import { unzipTexts } from "./unzip.mjs";
+import { convertPackage } from "../tools/report2cloud/lib/package.mjs";
 
 const $ = (id) => document.getElementById(id);
 const STORE = "report2cloud.own";
@@ -492,6 +494,85 @@ try {
   $("copy").onclick = copyTo($("copy"), () => files[shown()]);
   $("download").onclick = () => shown() && download(shown(), files[shown()]);
   $("download-all").onclick = () => last?.result.ok && downloadZip(files, last.result.className);
+
+  // ---- a whole package: the files of a dropped zip (or the files themselves)
+  // converted in this browser, the order to migrate in, one zip back
+  {
+    const drop = $("pkg-drop");
+    const input = $("pkg-files");
+    const text = $("pkg-drop-text");
+    const zipButton = $("pkg-zip");
+    const clear = $("pkg-clear");
+    const result = $("pkg-result");
+    let out;
+
+    const show = (pkg, name) => {
+      out = pkg;
+      const converted = pkg.rows.filter((r) => r.ok).length;
+      $("pkg-summary").textContent = pkg.rows.length
+        ? `${name}: ${pkg.rows.length} report(s), ${converted} converted, ${pkg.rows.length - converted} refused - in the order to migrate them in, a called report before its caller.`
+        : `${name}: no report in it - a report is a .prog.abap with a REPORT or PROGRAM statement.`;
+      const byName = new Map(pkg.rows.map((r) => [r.name, r]));
+      $("pkg-table").querySelector("tbody").replaceChildren(...pkg.order.map((n, i) => {
+        const r = byName.get(n);
+        const calls = [...new Set(r.calls.filter((c) => c.target).map((c) => c.target))];
+        return el("tr", {},
+          el("td", {}, String(i + 1)),
+          el("td", { class: "mono" }, r.name),
+          el("td", { class: "mono" }, r.className),
+          el("td", { class: r.ok ? "ok" : "bad" }, r.ok ? "converted" : r.crashed ? `crashed: ${r.crashed}` : `refused: ${[...new Set(r.refusalKinds)].join("; ")}`),
+          el("td", {}, r.ok ? String(r.todos.length) : "-"),
+          el("td", { class: "mono" }, calls.join(", ")));
+      }));
+      $("pkg-estate").textContent = pkg.estate;
+      result.hidden = false;
+      zipButton.disabled = converted === 0;
+      clear.hidden = false;
+      text.textContent = `${name} - drop another to replace it`;
+    };
+
+    const take = async (list) => {
+      const files = {};
+      let name = "";
+      for (const f of list) {
+        if (/\.zip$/i.test(f.name)) {
+          name = name || f.name.replace(/\.zip$/i, "");
+          try {
+            Object.assign(files, await unzipTexts(await f.arrayBuffer()));
+          } catch (e) {
+            text.textContent = `${f.name}: ${e.message}`;
+            return;
+          }
+        } else if (/\.(abap|xml)$/i.test(f.name)) files[f.name] = (await f.text()).replace(/^\uFEFF/, "");
+      }
+      name = name || "package";
+      text.textContent = "Converting...";
+      // the conversion on the next frame, so the text shows first
+      await new Promise((r) => setTimeout(r, 0));
+      show(convertPackage(files), name);
+    };
+
+    input.onchange = () => input.files.length && take([...input.files]);
+    drop.ondragover = (e) => {
+      e.preventDefault();
+      drop.classList.add("over");
+    };
+    drop.ondragleave = () => drop.classList.remove("over");
+    drop.ondrop = (e) => {
+      e.preventDefault();
+      drop.classList.remove("over");
+      if (e.dataTransfer?.files?.length) take([...e.dataTransfer.files]);
+    };
+    zipButton.onclick = () => out && download("report2cloud.zip", abapgitZip(out.output, "report2cloud"), "application/zip");
+    clear.onclick = () => {
+      out = undefined;
+      result.hidden = true;
+      zipButton.disabled = true;
+      clear.hidden = true;
+      input.value = "";
+      text.textContent = "Drop the zip or the files here, or click to choose";
+    };
+  }
 
   // a sample to edit: it becomes your own report
   window.addEventListener("r2c-own", (e) => {
