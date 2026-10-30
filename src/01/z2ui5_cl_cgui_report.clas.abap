@@ -1512,41 +1512,6 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
       IMPORTING
         screen TYPE REF TO z2ui5_cl_cgui_selscreen.
 
-    METHODS url_values_get.
-
-    METHODS url_values_apply.
-
-    METHODS url_param
-      IMPORTING
-        name          TYPE string
-      RETURNING
-        VALUE(result) TYPE string.
-
-    METHODS url_params
-      RETURNING
-        VALUE(result) TYPE z2ui5_if_client=>ty_t_name_value.
-
-    METHODS url_decode
-      IMPORTING
-        val           TYPE string
-      RETURNING
-        VALUE(result) TYPE string.
-
-    "! a select-option of the URL - A,B (EQ), A..B (BT), A* (CP), !A (E),
-    "! &gt;=A, &lt;=A, &gt;A, &lt;A, &lt;&gt;A - as values of a variant
-    METHODS url_range
-      IMPORTING
-        name          TYPE string
-        val           TYPE string
-      RETURNING
-        VALUE(result) TYPE z2ui5_cl_cgui_variant=>ty_t_value.
-
-    METHODS url_from_range
-      IMPORTING
-        values        TYPE z2ui5_cl_cgui_variant=>ty_t_value
-      RETURNING
-        VALUE(result) TYPE string.
-
     METHODS memory_id_store.
 
     METHODS on_storage_loaded.
@@ -1581,6 +1546,10 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
     "! the state of the memory of the report (z2ui5_cl_cgui_memory) for one
     "! call: references to the attributes it reads and writes, built now
     "! and kept by nobody
+    METHODS command_ctx
+      RETURNING
+        VALUE(result) TYPE z2ui5_cl_cgui_command=>ty_s_ctx.
+
     METHODS memory_ctx
       RETURNING
         VALUE(result) TYPE z2ui5_cl_cgui_memory=>ty_s_ctx.
@@ -1883,17 +1852,6 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
     "! screen in a popup to search
     METHODS palette_open.
     METHODS palette_result.
-
-    TYPES:
-      BEGIN OF ty_s_cgui_palette,
-        command TYPE c LENGTH 40,
-        text    TYPE c LENGTH 80,
-      END OF ty_s_cgui_palette.
-    TYPES ty_t_cgui_palette TYPE STANDARD TABLE OF ty_s_cgui_palette WITH EMPTY KEY.
-
-    METHODS palette_rows
-      RETURNING
-        VALUE(result) TYPE ty_t_cgui_palette.
 
     METHODS print_lines
       RETURNING
@@ -2775,10 +2733,11 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
     " the fields of the screen - what the URL and MEMORY ID may fill
     mt_cgui_field = screen_fields( ).
     z2ui5_cl_cgui_memory=>memory_id_apply( memory_ctx( ) ).
-    url_values_get( ).
-    url_values_apply( ).
+    z2ui5_cl_cgui_command=>url_values_get( command_ctx( ) ).
+    z2ui5_cl_cgui_command=>url_values_apply( command_ctx( ) ).
 
-    IF mv_cgui_skip = abap_true OR to_upper( url_param( cv_cgui_url_skip ) ) = abap_true OR screen_empty( ) = abap_true.
+    IF mv_cgui_skip = abap_true OR to_upper( z2ui5_cl_cgui_command=>url_param( client = client
+                                                                                            name   = cv_cgui_url_skip ) ) = abap_true OR screen_empty( ) = abap_true.
       IF mv_cgui_variant_start IS NOT INITIAL.
         " the variant arrives with the browser's storage - the run waits for
         " it, and a timer runs it when nothing is stored
@@ -4180,258 +4139,10 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
 
   ENDMETHOD.
 
-  METHOD url_params.
-
-    DATA lt_param TYPE string_table.
-    DATA lv_name  TYPE string.
-    DATA lv_value TYPE string.
-
-    LOOP AT client->get( )-t_comp_params INTO DATA(ls_comp).
-      INSERT VALUE #( n = to_upper( ls_comp-n )
-                      v = ls_comp-v ) INTO TABLE result.
-    ENDLOOP.
-
-    DATA(lv_search) = client->get( )-s_config-search.
-    IF lv_search IS INITIAL.
-      RETURN.
-    ENDIF.
-    IF lv_search(1) = `?`.
-      lv_search = lv_search+1.
-    ENDIF.
-
-    SPLIT lv_search AT `&` INTO TABLE lt_param.
-    LOOP AT lt_param INTO DATA(lv_param).
-      CLEAR: lv_name, lv_value.
-      SPLIT lv_param AT `=` INTO lv_name lv_value.
-      lv_name = to_upper( url_decode( lv_name ) ).
-      IF line_exists( result[ n = lv_name ] ).
-        CONTINUE.
-      ENDIF.
-      INSERT VALUE #( n = lv_name
-                      v = url_decode( lv_value ) ) INTO TABLE result.
-    ENDLOOP.
-
-  ENDMETHOD.
-
-  METHOD url_param.
-
-    DATA(lt_param) = url_params( ).
-    DATA(lv_name) = to_upper( name ).
-    READ TABLE lt_param INTO DATA(ls_param) WITH KEY n = lv_name.
-    IF sy-subrc = 0.
-      result = ls_param-v.
-    ENDIF.
-
-  ENDMETHOD.
-
-  METHOD url_decode.
-
-    DATA lv_hex  TYPE x LENGTH 1.
-    DATA lv_xstr TYPE xstring.
-    DATA lv_char TYPE xstring.
-
-    result = replace( val = val sub = `+` with = ` ` occ = 0 ).
-    IF result NA `%`.
-      RETURN.
-    ENDIF.
-
-    " %XX are the bytes of UTF-8
-    DATA(lv_in) = result.
-    DATA(lv_len) = strlen( lv_in ).
-    DATA(lv_pos) = 0.
-    WHILE lv_pos < lv_len.
-      IF lv_in+lv_pos(1) = `%` AND lv_pos + 3 <= lv_len.
-        DATA(lv_digits) = to_upper( substring( val = lv_in off = lv_pos + 1 len = 2 ) ).
-        IF lv_digits CO `0123456789ABCDEF`.
-          lv_hex = lv_digits.
-          CONCATENATE lv_xstr lv_hex INTO lv_xstr IN BYTE MODE.
-          lv_pos = lv_pos + 3.
-          CONTINUE.
-        ENDIF.
-      ENDIF.
-      lv_char = z2ui5_cl_cgui_context=>conv_get_xstring_by_string( substring( val = lv_in off = lv_pos len = 1 ) ).
-      CONCATENATE lv_xstr lv_char INTO lv_xstr IN BYTE MODE.
-      lv_pos = lv_pos + 1.
-    ENDWHILE.
-
-    DATA(lv_text) = z2ui5_cl_cgui_context=>conv_get_string_by_xstring( lv_xstr ).
-    IF lv_text IS NOT INITIAL.
-      result = lv_text.
-    ENDIF.
-
-  ENDMETHOD.
-
-  METHOD url_values_get.
-
-    " only fields of the screen the user could fill himself - no NO-DISPLAY
-    " field and nothing else of the class is set from the URL
-    CLEAR mt_cgui_url.
-    DATA(lt_param) = url_params( ).
-
-    LOOP AT mt_cgui_field REFERENCE INTO DATA(lr_field) WHERE no_display = abap_false.
-      READ TABLE lt_param INTO DATA(ls_param) WITH KEY n = lr_field->name.
-      IF sy-subrc <> 0.
-        CONTINUE.
-      ENDIF.
-      IF lr_field->kind = z2ui5_cl_cgui_selscreen=>cs_field_kind-select_option.
-        INSERT LINES OF url_range( name = lr_field->name
-                                   val  = ls_param-v ) INTO TABLE mt_cgui_url.
-      ELSE.
-        INSERT VALUE #( name = lr_field->name
-                        kind = z2ui5_cl_cgui_variant=>cs_kind-parameter
-                        low  = ls_param-v ) INTO TABLE mt_cgui_url.
-      ENDIF.
-    ENDLOOP.
-
-  ENDMETHOD.
-
-  METHOD url_values_apply.
-
-    IF mt_cgui_url IS NOT INITIAL.
-      z2ui5_cl_cgui_variant=>values_set( app    = me
-                                         values = mt_cgui_url ).
-    ENDIF.
-
-  ENDMETHOD.
-
-  METHOD url_range.
-
-    DATA lt_part TYPE string_table.
-    DATA ls_value TYPE z2ui5_cl_cgui_variant=>ty_s_value.
-
-    SPLIT val AT `,` INTO TABLE lt_part.
-    LOOP AT lt_part INTO DATA(lv_part).
-      CLEAR ls_value.
-      ls_value-name = name.
-      ls_value-kind = z2ui5_cl_cgui_variant=>cs_kind-select_option.
-      ls_value-sign = `I`.
-      IF lv_part IS NOT INITIAL AND lv_part(1) = `!`.
-        ls_value-sign = `E`.
-        lv_part = lv_part+1.
-      ENDIF.
-      IF lv_part CS `..`.
-        SPLIT lv_part AT `..` INTO ls_value-low ls_value-high.
-        ls_value-option = `BT`.
-      ELSEIF lv_part CP `>=*`.
-        ls_value-option = `GE`.
-        ls_value-low = substring( val = lv_part off = 2 ).
-      ELSEIF lv_part CP `<=*`.
-        ls_value-option = `LE`.
-        ls_value-low = substring( val = lv_part off = 2 ).
-      ELSEIF lv_part CP `<>*`.
-        ls_value-option = `NE`.
-        ls_value-low = substring( val = lv_part off = 2 ).
-      ELSEIF lv_part CP `>*`.
-        ls_value-option = `GT`.
-        ls_value-low = substring( val = lv_part off = 1 ).
-      ELSEIF lv_part CP `<*`.
-        ls_value-option = `LT`.
-        ls_value-low = substring( val = lv_part off = 1 ).
-      ELSEIF lv_part CA `*+`.
-        ls_value-option = `CP`.
-        ls_value-low = lv_part.
-      ELSE.
-        ls_value-option = `EQ`.
-        ls_value-low = lv_part.
-      ENDIF.
-      INSERT ls_value INTO TABLE result.
-    ENDLOOP.
-
-    IF result IS INITIAL.
-      INSERT VALUE #( name = name
-                      kind = z2ui5_cl_cgui_variant=>cs_kind-select_option ) INTO TABLE result.
-    ENDIF.
-
-  ENDMETHOD.
-
-  METHOD url_from_range.
-
-    DATA lv_part TYPE string.
-
-    LOOP AT values REFERENCE INTO DATA(lr_value) WHERE sign IS NOT INITIAL.
-      CASE lr_value->option.
-        WHEN `BT`.
-          lv_part = |{ lr_value->low }..{ lr_value->high }|.
-        WHEN `GE`.
-          lv_part = |>={ lr_value->low }|.
-        WHEN `LE`.
-          lv_part = |<={ lr_value->low }|.
-        WHEN `NE`.
-          lv_part = |<>{ lr_value->low }|.
-        WHEN `GT`.
-          lv_part = |>{ lr_value->low }|.
-        WHEN `LT`.
-          lv_part = |<{ lr_value->low }|.
-        WHEN OTHERS.
-          lv_part = lr_value->low.
-      ENDCASE.
-      IF lr_value->sign = `E`.
-        lv_part = |!{ lv_part }|.
-      ENDIF.
-      IF result IS INITIAL.
-        result = lv_part.
-      ELSE.
-        result = |{ result },{ lv_part }|.
-      ENDIF.
-    ENDLOOP.
-
-  ENDMETHOD.
-
   METHOD get_link.
 
-    DATA lt_name TYPE string_table.
-    DATA lt_query TYPE string_table.
-    DATA lt_keep  TYPE string_table.
-    DATA lv_name  TYPE string.
-    DATA lv_value TYPE string.
-
-    " the parameters of the URL that are no field of the screen stay - the
-    " app to start, the client, the language
-    DATA(lv_search) = client->get( )-s_config-search.
-    IF lv_search IS NOT INITIAL AND lv_search(1) = `?`.
-      lv_search = lv_search+1.
-    ENDIF.
-    SPLIT lv_search AT `&` INTO TABLE lt_query.
-    LOOP AT lt_query INTO DATA(lv_param) WHERE table_line IS NOT INITIAL.
-      CLEAR: lv_name, lv_value.
-      SPLIT lv_param AT `=` INTO lv_name lv_value.
-      lv_name = to_upper( url_decode( lv_name ) ).
-      IF line_exists( mt_cgui_field[ name = lv_name ] ) OR lv_name = cv_cgui_url_skip OR lv_name = `VARIANT`.
-        CONTINUE.
-      ENDIF.
-      INSERT lv_param INTO TABLE lt_keep.
-    ENDLOOP.
-    " a variable, not the template - a WITH KEY operand on 7.02
-    DATA(lv_app_start) = |app_start={ to_lower( variant_key( ) ) }|.
-    IF NOT line_exists( lt_keep[ table_line = lv_app_start ] )
-        AND NOT lv_search CS `app_start`.
-      INSERT lv_app_start INTO TABLE lt_keep.
-    ENDIF.
-
-    LOOP AT mt_cgui_field REFERENCE INTO DATA(lr_field) WHERE no_display = abap_false.
-      INSERT lr_field->name INTO TABLE lt_name.
-    ENDLOOP.
-    DATA(lt_value) = z2ui5_cl_cgui_variant=>values_get( app   = me
-                                                        names = lt_name ).
-
-    LOOP AT mt_cgui_field REFERENCE INTO lr_field WHERE no_display = abap_false.
-      DATA(lt_field_value) = VALUE z2ui5_cl_cgui_variant=>ty_t_value(
-          FOR ls_v IN lt_value WHERE ( name = lr_field->name ) ( ls_v ) ).
-      IF lr_field->kind = z2ui5_cl_cgui_selscreen=>cs_field_kind-select_option.
-        lv_value = url_from_range( lt_field_value ).
-      ELSE.
-        lv_value = VALUE #( lt_field_value[ 1 ]-low OPTIONAL ).
-      ENDIF.
-      IF lv_value IS INITIAL.
-        CONTINUE.
-      ENDIF.
-      INSERT |{ to_lower( lr_field->name ) }={ z2ui5_cl_cgui_context=>url_escape( lv_value ) }| INTO TABLE lt_keep.
-    ENDLOOP.
-    IF skip_screen = abap_true.
-      INSERT |{ to_lower( cv_cgui_url_skip ) }=X| INTO TABLE lt_keep.
-    ENDIF.
-
-    result = |{ client->get( )-s_config-origin }{ client->get( )-s_config-pathname }?{ concat_lines_of( table = lt_keep sep = `&` ) }|.
+    result = z2ui5_cl_cgui_command=>link( ctx         = command_ctx( )
+                                          skip_screen = skip_screen ).
 
   ENDMETHOD.
 
@@ -4672,52 +4383,36 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
     IF lv_code IS INITIAL.
       RETURN.
     ENDIF.
-    DATA(lv_upper) = to_upper( lv_code ).
+    DATA(ls_okcode) = z2ui5_cl_cgui_command=>okcode_parse( code    = lv_code
+                                                           key     = variant_key( )
+                                                           catalog = mo_cgui_catalog ).
 
-    " /n and /o: a transaction here or in a new browser tab - alone, this
-    " report again
-    IF strlen( lv_upper ) >= 2 AND lv_upper(1) = `/`.
-      DATA(lv_target) = condense( substring( val = lv_upper off = 2 ) ).
-      IF lv_target IS INITIAL.
-        lv_target = variant_key( ).
-      ENDIF.
-      CASE lv_upper+1(1).
-        WHEN `N`.
-          IF lv_target = `SU3`.
-            su3_open( ).
-            RETURN.
-          ENDIF.
-          IF lv_target = `SPRO`.
-            spro_open( ).
-            RETURN.
-          ENDIF.
-          okcode_start( code       = lv_target
+    CASE ls_okcode-kind.
+      WHEN z2ui5_cl_cgui_command=>cs_okcode-start.
+        " /nSU3 and /nSPRO are popups of this report
+        IF ls_okcode-code(1) = `/` AND ls_okcode-target = `SU3`.
+          su3_open( ).
+        ELSEIF ls_okcode-code(1) = `/` AND ls_okcode-target = `SPRO`.
+          spro_open( ).
+        ELSE.
+          okcode_start( code       = ls_okcode-target
                         new_window = abap_false ).
-        WHEN `O`.
-          okcode_start( code       = lv_target
-                        new_window = abap_true ).
-        WHEN OTHERS.
-          message( text = replace( val  = 'Command &1 is not supported'(050)
-                                   sub  = `&1`
-                                   with = lv_code )
-                   type = `E` ).
-      ENDCASE.
-      RETURN.
-    ENDIF.
+        ENDIF.
+        RETURN.
+      WHEN z2ui5_cl_cgui_command=>cs_okcode-start_new.
+        okcode_start( code       = ls_okcode-target
+                      new_window = abap_true ).
+        RETURN.
+      WHEN z2ui5_cl_cgui_command=>cs_okcode-unknown.
+        message( text = replace( val  = 'Command &1 is not supported'(050)
+                                 sub  = `&1`
+                                 with = lv_code )
+                 type = `E` ).
+        RETURN.
+    ENDCASE.
 
-    " a transaction of the catalog
-    DATA lt_tcode TYPE z2ui5_if_cgui_catalog=>ty_t_transaction.
-    IF mo_cgui_catalog IS BOUND.
-      lt_tcode = mo_cgui_catalog->get( ).
-    ENDIF.
-    IF line_exists( lt_tcode[ code = lv_upper ] ).
-      okcode_start( code       = lv_upper
-                    new_window = abap_false ).
-      RETURN.
-    ENDIF.
-
-    " else an OK code of the screen - the standard ones of the SAP GUI first
-    CASE lv_upper.
+    " an OK code of the screen - the standard ones of the SAP GUI first
+    CASE ls_okcode-code.
       WHEN `ONLI` OR `F8`.
         IF mv_cgui_screen = cs_screen-selection.
           on_execute( ).
@@ -4733,43 +4428,25 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
       WHEN `SPRO`.
         spro_open( ).
       WHEN OTHERS.
-        user_command( lv_upper ).
+        user_command( ls_okcode-code ).
     ENDCASE.
 
   ENDMETHOD.
 
   METHOD okcode_start.
 
-    DATA lo_app   TYPE REF TO z2ui5_cl_cgui_report.
-    DATA lt_keep  TYPE string_table.
-    DATA lt_query TYPE string_table.
+    DATA lo_app TYPE REF TO z2ui5_cl_cgui_report.
 
-    DATA(lv_report) = code.
-    DATA(lv_variant) = ``.
-    IF mo_cgui_catalog IS BOUND.
-      DATA(lt_tcode) = mo_cgui_catalog->get( ).
-      READ TABLE lt_tcode INTO DATA(ls_tcode) WITH KEY code = code.
-      IF sy-subrc = 0.
-        lv_report = to_upper( ls_tcode-report ).
-        lv_variant = ls_tcode-variant.
-      ENDIF.
-    ENDIF.
-
-    " a report class - nothing else starts from the command field
-    cl_abap_typedescr=>describe_by_name( EXPORTING  p_name         = lv_report
-                                         RECEIVING  p_descr_ref    = DATA(lo_type)
-                                         EXCEPTIONS type_not_found = 1
-                                                    OTHERS         = 2 ).
-    " created, also for a new tab: what is no report fails here, not there
-    DATA(lv_ok) = xsdbool( sy-subrc = 0 AND lo_type->kind = cl_abap_typedescr=>kind_class ).
-    IF lv_ok = abap_true.
-      TRY.
-          CREATE OBJECT lo_app TYPE (lv_report).
-        CATCH cx_sy_create_object_error cx_sy_move_cast_error.
-          lv_ok = abap_false.
-      ENDTRY.
-    ENDIF.
-    IF lv_ok = abap_false.
+    " a report class - nothing else starts from the command field; created
+    " also for a new tab: what is no report fails here, not there
+    DATA(ls_start) = z2ui5_cl_cgui_command=>start_resolve( code    = code
+                                                           catalog = mo_cgui_catalog ).
+    TRY.
+        lo_app ?= ls_start-app.
+      CATCH cx_sy_move_cast_error.
+        CLEAR lo_app.
+    ENDTRY.
+    IF lo_app IS NOT BOUND.
       message( text = replace( val  = 'Transaction &1 does not exist'(051)
                                sub  = `&1`
                                with = code )
@@ -4778,8 +4455,8 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
     ENDIF.
 
     IF new_window = abap_false.
-      IF lv_variant IS NOT INITIAL.
-        lo_app->mv_cgui_variant_start = lv_variant.
+      IF ls_start-variant IS NOT INITIAL.
+        lo_app->mv_cgui_variant_start = ls_start-variant.
       ENDIF.
       lo_app->mv_cgui_called = abap_true.
       mv_cgui_nav = abap_true.
@@ -4787,55 +4464,17 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
       RETURN.
     ENDIF.
 
-    " a new browser tab: the URL of this one with the other app to start -
-    " the client and the language stay
-    DATA(lv_search) = client->get( )-s_config-search.
-    IF lv_search IS NOT INITIAL AND lv_search(1) = `?`.
-      lv_search = lv_search+1.
-    ENDIF.
-    SPLIT lv_search AT `&` INTO TABLE lt_query.
-    LOOP AT lt_query INTO DATA(lv_param) WHERE table_line IS NOT INITIAL.
-      IF to_upper( segment( val = lv_param index = 1 sep = `=` ) ) = `APP_START`
-          OR to_upper( segment( val = lv_param index = 1 sep = `=` ) ) = `VARIANT`.
-        CONTINUE.
-      ENDIF.
-      INSERT lv_param INTO TABLE lt_keep.
-    ENDLOOP.
-    INSERT |app_start={ to_lower( lv_report ) }| INTO TABLE lt_keep.
-    IF lv_variant IS NOT INITIAL.
-      INSERT |variant={ z2ui5_cl_cgui_context=>url_escape( lv_variant ) }| INTO TABLE lt_keep.
-    ENDIF.
+    " a new browser tab: the URL of this one with the other app to start
     client->follow_up_action( val   = client->cs_event-open_new_tab
-                              t_arg = VALUE #( ( |{ client->get( )-s_config-origin }{ client->get( )-s_config-pathname }?| &&
-                                                 concat_lines_of( table = lt_keep sep = `&` ) ) ) ).
-
-  ENDMETHOD.
-
-  METHOD palette_rows.
-
-    IF mo_cgui_catalog IS BOUND.
-      LOOP AT mo_cgui_catalog->get( ) INTO DATA(ls_tcode).
-        INSERT VALUE #( command = to_upper( ls_tcode-code ) text = ls_tcode-text ) INTO TABLE result.
-      ENDLOOP.
-    ENDIF.
-    " the function keys of the screen
-    LOOP AT mt_cgui_fkey INTO DATA(ls_fkey).
-      INSERT VALUE #( command = to_upper( ls_fkey-ucomm ) text = ls_fkey-text ) INTO TABLE result.
-    ENDLOOP.
-    CASE mv_cgui_screen.
-      WHEN cs_screen-selection.
-        INSERT VALUE #( command = `ONLI` text = 'Execute'(026) ) INTO TABLE result.
-      WHEN cs_screen-output.
-        INSERT VALUE #( command = `PRI` text = 'Print'(034) ) INTO TABLE result.
-    ENDCASE.
-    INSERT VALUE #( command = `/O` text = 'This report in a new window'(052) ) INTO TABLE result.
-    INSERT VALUE #( command = `SU3` text = 'User parameters'(055) ) INTO TABLE result.
+                              t_arg = VALUE #( ( z2ui5_cl_cgui_command=>start_url( client  = client
+                                                                                   report  = ls_start-report
+                                                                                   variant = ls_start-variant ) ) ) ).
 
   ENDMETHOD.
 
   METHOD palette_open.
 
-    DATA(lt_row) = palette_rows( ).
+    DATA(lt_row) = z2ui5_cl_cgui_command=>palette_rows( command_ctx( ) ).
     mv_cgui_pending_kind = cs_pending-palette.
     mv_cgui_nav = abap_true.
     client->nav_app_call( z2ui5_cl_cgui_select=>factory( tab   = lt_row
@@ -4845,7 +4484,7 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
 
   METHOD palette_result.
 
-    FIELD-SYMBOLS <row> TYPE ty_s_cgui_palette.
+    FIELD-SYMBOLS <row> TYPE z2ui5_cl_cgui_command=>ty_s_palette.
     DATA lo_popup TYPE REF TO z2ui5_cl_cgui_select.
 
     TRY.
@@ -5139,7 +4778,7 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
                                  with = lv_start )
                  type = `W` ).
       ENDIF.
-      url_values_apply( ).
+      z2ui5_cl_cgui_command=>url_values_apply( command_ctx( ) ).
     ENDIF.
 
     auto_execute( ).
@@ -5354,9 +4993,28 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
 
   ENDMETHOD.
 
+  METHOD command_ctx.
+
+    result = VALUE #( app       = me
+                      client    = client
+                      key       = variant_key( )
+                      catalog   = mo_cgui_catalog
+                      selection = xsdbool( mv_cgui_screen = cs_screen-selection )
+                      output    = xsdbool( mv_cgui_screen = cs_screen-output )
+                      cmd_on    = mv_cgui_cmd_on
+                      fields    = REF #( mt_cgui_field )
+                      url       = REF #( mt_cgui_url )
+                      fkeys     = mt_cgui_fkey
+                      gui       = REF #( mt_cgui_gui )
+                      pf_keys   = mt_cgui_pf_keys
+                      excl_out  = mt_cgui_excl_out ).
+
+  ENDMETHOD.
+
   METHOD variant_from_url.
 
-    result = url_param( `VARIANT` ).
+    result = z2ui5_cl_cgui_command=>url_param( client = client
+                                               name   = `VARIANT` ).
 
   ENDMETHOD.
 
@@ -7027,49 +6685,12 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
 
   METHOD shortcuts_register.
 
-    DATA lt_gui_key TYPE string_table.
-
-    " F8 Execute and F3 Back, as in the SAP GUI - registered with every
-    " view, the frontend binds them to the controller of the view
-    client->follow_up_action( val   = client->cs_event-keyboard_shortcut
-                              t_arg = VALUE #( ( `F8` ) ( cs_ucomm-execute ) ( client->cs_view-main ) ) ).
-    client->follow_up_action( val   = client->cs_event-keyboard_shortcut
-                              t_arg = VALUE #( ( `F3` ) ( cs_ucomm-back ) ( client->cs_view-main ) ) ).
-    " F1 and F4 of a text editor that registered them
-    LOOP AT mt_cgui_gui INTO DATA(ls_editor)
-         WHERE kind = z2ui5_if_cgui_gui=>cs_kind-textedit AND freed = abap_false AND keys IS NOT INITIAL.
-      SPLIT ls_editor-keys AT `,` INTO TABLE DATA(lt_editor_key).
-      LOOP AT lt_editor_key INTO DATA(lv_editor_key).
-        INSERT lv_editor_key INTO TABLE lt_gui_key.
-      ENDLOOP.
-    ENDLOOP.
-    SORT lt_gui_key.
-    DELETE ADJACENT DUPLICATES FROM lt_gui_key.
-    LOOP AT lt_gui_key INTO DATA(lv_gui_key).
+    " registered with every view, the frontend binds them to the controller
+    " of the view
+    DATA(lt_shortcut) = z2ui5_cl_cgui_command=>shortcuts( command_ctx( ) ).
+    LOOP AT lt_shortcut INTO DATA(ls_shortcut).
       client->follow_up_action( val   = client->cs_event-keyboard_shortcut
-                                t_arg = VALUE #( ( lv_gui_key )
-                                                 ( COND #( WHEN lv_gui_key = `F1` THEN cs_ucomm-gui_f1 ELSE cs_ucomm-gui_f4 ) )
-                                                 ( client->cs_view-main ) ) ).
-    ENDLOOP.
-
-    " the command palette - with a command field or a catalog to search
-    IF mv_cgui_cmd_on = abap_true OR mo_cgui_catalog IS BOUND.
-      client->follow_up_action( val   = client->cs_event-keyboard_shortcut
-                                t_arg = VALUE #( ( `Ctrl+K` ) ( cs_ucomm-palette ) ( client->cs_view-main ) ) ).
-      client->follow_up_action( val   = client->cs_event-keyboard_shortcut
-                                t_arg = VALUE #( ( `Meta+K` ) ( cs_ucomm-palette ) ( client->cs_view-main ) ) ).
-    ENDIF.
-
-    " the function keys of SET PF-STATUS, on the output only
-    IF mv_cgui_screen = cs_screen-selection.
-      RETURN.
-    ENDIF.
-    LOOP AT mt_cgui_pf_keys INTO DATA(ls_key).
-      IF line_exists( mt_cgui_excl_out[ table_line = to_upper( ls_key-ucomm ) ] ).
-        CONTINUE.
-      ENDIF.
-      client->follow_up_action( val   = client->cs_event-keyboard_shortcut
-                                t_arg = VALUE #( ( ls_key-key ) ( ls_key-ucomm ) ( client->cs_view-main ) ) ).
+                                t_arg = VALUE #( ( ls_shortcut-key ) ( ls_shortcut-ucomm ) ( client->cs_view-main ) ) ).
     ENDLOOP.
 
   ENDMETHOD.

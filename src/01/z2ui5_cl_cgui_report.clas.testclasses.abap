@@ -1378,8 +1378,8 @@ CLASS ltcl_test IMPLEMENTATION.
 
   METHOD url_range.
 
-    DATA(lt_value) = mo_cut->url_range( name = `S_CODE`
-                                        val  = `A,B..C,!D,>=E,F*` ).
+    DATA(lt_value) = z2ui5_cl_cgui_command=>url_range( name = `S_CODE`
+                                                      val  = `A,B..C,!D,>=E,F*` ).
 
     cl_abap_unit_assert=>assert_equals( act = lines( lt_value )
                                         exp = 5 ).
@@ -1393,7 +1393,7 @@ CLASS ltcl_test IMPLEMENTATION.
                                         exp = `GE` ).
     cl_abap_unit_assert=>assert_equals( act = lt_value[ 5 ]-option
                                         exp = `CP` ).
-    cl_abap_unit_assert=>assert_equals( act = mo_cut->url_from_range( lt_value )
+    cl_abap_unit_assert=>assert_equals( act = z2ui5_cl_cgui_command=>url_from_range( lt_value )
                                         exp = `A,B..C,!D,>=E,F*` ).
 
   ENDMETHOD.
@@ -2041,7 +2041,7 @@ CLASS ltcl_test IMPLEMENTATION.
     DATA lo_palette TYPE REF TO z2ui5_cl_cgui_select.
     lo_palette ?= mo_client->mo_called.
     cl_abap_unit_assert=>assert_bound( lo_palette ).
-    DATA(lt_rows) = mo_cut->palette_rows( ).
+    DATA(lt_rows) = z2ui5_cl_cgui_command=>palette_rows( mo_cut->command_ctx( ) ).
     cl_abap_unit_assert=>assert_true( xsdbool( line_exists( lt_rows[ command = `ZFLY` ] ) ) ).
     cl_abap_unit_assert=>assert_true( xsdbool( line_exists( lt_rows[ command = `ONLI` ] ) ) ).
 
