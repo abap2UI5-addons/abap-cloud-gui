@@ -28,7 +28,7 @@ const CORPUS = join(ROOT, "tools", "report2cloud", "test", "corpus");
 
 rmSync(OUT, { recursive: true, force: true });
 mkdirSync(OUT, { recursive: true });
-for (const f of ["index.html", "style.css"]) cpSync(join(ROOT, "site", f), join(OUT, f));
+for (const f of ["index.html", "style.css", "favicon.png"]) cpSync(join(ROOT, "site", f), join(OUT, f));
 
 await build({
   entryPoints: [join(ROOT, "site", "playground.mjs")],
