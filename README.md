@@ -135,7 +135,26 @@ a complete view.
 ### The report runtime
 
 Inherit from `z2ui5_cl_cgui_report`, declare the selection screen fields as
-**PUBLIC** attributes and redefine the event blocks you need:
+**PUBLIC** attributes and redefine the event blocks you need.
+
+**The dozen a new report needs** - everything else below is for a report
+that was converted, and reads like the classic statement it came from:
+
+| | |
+|---|---|
+| `selection_screen( screen )` | the fields: `screen->parameter( )`, `select_option( )`, `checkbox( )`, `radiobutton( )`, `block_begin( ) / block_end( )`, `button( )` |
+| `initialization`, `at_selection_screen` | the defaults, the checks |
+| `start_of_selection` | the run |
+| `write( )` | the list: `write( val )->write( )->new_line( )`, `uline( )`, `skip( )`, `color =`, `hotspot =` |
+| `alv( table )` | the grid, with `set_column_text( )`, `set_line_selection( )` |
+| `message( )` / `_msg( )` | `S` a toast, `I` a box, `E` stops - `field =` marks the field |
+| `at_line_selection( row hide )` | the click on a hotspot or a row |
+| `at_user_command( ucomm )` | a button, a changed radio button or checkbox with `user_command` |
+| `at_value_request( field )` | your own F4 (`value_help_popup( )`); the DDIC's F4 comes by itself |
+| `popup_to_confirm( )` / `_popup( )` | a question, the answer in `at_user_command( )` or a method of your own |
+| `set_title( )`, `set_variant( )` | the title; start with a saved variant |
+
+The event blocks and when they run:
 
 | Method | When it runs |
 |---|---|
@@ -149,6 +168,21 @@ Inherit from `z2ui5_cl_cgui_report`, declare the selection screen fields as
 | `at_line_selection( row hide )` | a hotspot of the list or a row of the ALV was clicked |
 | `at_user_command( ucomm )` | a button of the selection screen, a checkbox or radio button group with `user_command`, or a confirmed `popup_to_confirm( )` |
 | `at_value_request( field )` | F4 on a field — the default is the standard F4 of its DDIC type; redefine it for your own and call `super->` for the rest |
+
+The rest of the API a converted report may use, by what it came from -
+`report2cloud` writes these, a report written by hand rarely needs them:
+
+| Classic | Methods |
+|---|---|
+| more event blocks | `end_of_selection`, `end_of_page`, `top_of_page_line_selection`, `at_selection_screen_on_block / _radio / _end_of / _help / _exit`, `at_link_click`, `at_data_changed`, `authority_check` |
+| the list read back | `read_list( )`, `get_cursor( )`, `lisel( )`, `set_cursor_field( )`, `lsind( )`, `set_lsind( )`, `format( )`, `set_line_count( )`, `set_pf_status( )`, `set_selscreen_status( )`, `leave_to_selection_screen( )` |
+| the ALV and the tree | `tree( )`, `get_selected_rows( )`, `at_alv_value_request( )`, `at_tree_node / _checkbox / _expand_no_children( )`, `set_layout_store( )` |
+| more popups | `popup_to_decide( )`, `popup_to_decide_list( )`, `popup_get_values( )`, `popup_get_values_sval( )`, `popup_transport( )`, `get_transport( )`, `popup_answer( )`, `popup_values( )`, `message_t100( )`, `messages_from_bapiret( )` |
+| other reports and transactions | `submit( )`, `call_selection_screen( )`, `after_call_selection_screen( )`, `call_transaction( )`, `call_intent( )`, `set_catalog( )`, `set_command_field( )`, `okcode_execute( )` |
+| dynpros | `call_screen( )`, `set_screen( )`, `leave_to_screen( )`, `leave_screen( )`, `screen_left( )`, `after_call_screen( )`, `dynpro_screen / _pbo / _pai( )`, `call_subscreen( )`, `call_subscreen_pai( )`, `tablecontrol_begin / _row / _count / _cell( )`, `current_screen( )`, `window( )`, `selection_screen_dynnr( )`, `vrm_set_values( )` |
+| SAP GUI controls | `at_gui_event( )`, the stand-ins `z2ui5_cl_cgui_gui*` |
+| memory and parameters | `set_parameter_id( )`, `get_parameter_id( )`, `set_system_parameters( )`, `authority_check_customizing( )`, `set_prefill_last( )`, `set_draft( )`, `set_variant_store( )`, `set_fresh_start( )`, `at_roundtrip_start( )`, `cgui_statics_keep / _restore( )` |
+| the log, the job, the link | `set_log( )`, `messages_from_log( )`, `log_display( )`, `set_job( )`, `get_link( )` |
 
 Messages follow the classic semantics — `S` as a toast, `I` as a box, `E`
 stops the run — and every message of a run but `S` is collected in the
@@ -873,7 +907,7 @@ Simpler to read, simpler to change - the API stays
       stand-ins, navigation; no method over 80 lines, no class over 2,000
 - [ ] `convert.mjs` split by statement family - selection screen, list,
       ALV, dynpro, GUI, popups, SUBMIT - the snapshots unchanged
-- [ ] The API in two tiers in this README: the dozen methods a new report
+- [x] The API in two tiers in this README: the dozen methods a new report
       needs first, the rest as what a converted report may use
 - [ ] The rarely used stand-ins (picture, the trees) frozen: kept and
       tested, not extended
