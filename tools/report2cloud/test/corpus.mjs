@@ -9,7 +9,8 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { convert } from "../lib/convert.mjs";
-import { includesFrom, inlineIncludes } from "../lib/includes.mjs";
+import { inlineIncludes } from "../lib/includes.mjs";
+import { includesFrom } from "../lib/includes-fs.mjs";
 import { parseTextpool } from "../lib/textpool.mjs";
 import { migrationReport } from "../lib/report.mjs";
 

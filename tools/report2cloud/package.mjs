@@ -14,7 +14,8 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
 import { defaultClassName } from "./lib/convert.mjs";
-import { includesFrom, inlineIncludes } from "./lib/includes.mjs";
+import { inlineIncludes } from "./lib/includes.mjs";
+import { includesFrom } from "./lib/includes-fs.mjs";
 import { callsOf, estateGraph, estateMarkdown } from "./lib/estate.mjs";
 import { coverage, isReport, programs, summary } from "./coverage.mjs";
 

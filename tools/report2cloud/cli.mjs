@@ -16,7 +16,8 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
 import { convert, defaultClassName } from "./lib/convert.mjs";
-import { includesFrom, inlineIncludes } from "./lib/includes.mjs";
+import { inlineIncludes } from "./lib/includes.mjs";
+import { includesFrom } from "./lib/includes-fs.mjs";
 import { dependenciesOf, dependencyIndex } from "./lib/deps.mjs";
 import { parseTextpool } from "./lib/textpool.mjs";
 import { migrationReport } from "./lib/report.mjs";

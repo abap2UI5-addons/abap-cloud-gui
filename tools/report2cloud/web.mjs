@@ -32,7 +32,7 @@ import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, write
 import { spawn } from "node:child_process";
 import { dirname, join, relative, resolve } from "node:path";
 import { coverage, programs, ranked } from "./coverage.mjs";
-import { includesFrom } from "./lib/includes.mjs";
+import { includesFrom } from "./lib/includes-fs.mjs";
 import { dependencyIndex } from "./lib/deps.mjs";
 import { REPO } from "./lib/gate.mjs";
 import { kindOf as startKindOf } from "./lib/start.mjs";

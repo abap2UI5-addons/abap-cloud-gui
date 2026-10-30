@@ -135,7 +135,26 @@ a complete view.
 ### The report runtime
 
 Inherit from `z2ui5_cl_cgui_report`, declare the selection screen fields as
-**PUBLIC** attributes and redefine the event blocks you need:
+**PUBLIC** attributes and redefine the event blocks you need.
+
+**The dozen a new report needs** - everything else below is for a report
+that was converted, and reads like the classic statement it came from:
+
+| | |
+|---|---|
+| `selection_screen( screen )` | the fields: `screen->parameter( )`, `select_option( )`, `checkbox( )`, `radiobutton( )`, `block_begin( ) / block_end( )`, `button( )` |
+| `initialization`, `at_selection_screen` | the defaults, the checks |
+| `start_of_selection` | the run |
+| `write( )` | the list: `write( val )->write( )->new_line( )`, `uline( )`, `skip( )`, `color =`, `hotspot =` |
+| `alv( table )` | the grid, with `set_column_text( )`, `set_line_selection( )` |
+| `message( )` / `_msg( )` | `S` a toast, `I` a box, `E` stops - `field =` marks the field |
+| `at_line_selection( row hide )` | the click on a hotspot or a row |
+| `at_user_command( ucomm )` | a button, a changed radio button or checkbox with `user_command` |
+| `at_value_request( field )` | your own F4 (`value_help_popup( )`); the DDIC's F4 comes by itself |
+| `popup_to_confirm( )` / `_popup( )` | a question, the answer in `at_user_command( )` or a method of your own |
+| `set_title( )`, `set_variant( )` | the title; start with a saved variant |
+
+The event blocks and when they run:
 
 | Method | When it runs |
 |---|---|
@@ -149,6 +168,21 @@ Inherit from `z2ui5_cl_cgui_report`, declare the selection screen fields as
 | `at_line_selection( row hide )` | a hotspot of the list or a row of the ALV was clicked |
 | `at_user_command( ucomm )` | a button of the selection screen, a checkbox or radio button group with `user_command`, or a confirmed `popup_to_confirm( )` |
 | `at_value_request( field )` | F4 on a field — the default is the standard F4 of its DDIC type; redefine it for your own and call `super->` for the rest |
+
+The rest of the API a converted report may use, by what it came from -
+`report2cloud` writes these, a report written by hand rarely needs them:
+
+| Classic | Methods |
+|---|---|
+| more event blocks | `end_of_selection`, `end_of_page`, `top_of_page_line_selection`, `at_selection_screen_on_block / _radio / _end_of / _help / _exit`, `at_link_click`, `at_data_changed`, `authority_check` |
+| the list read back | `read_list( )`, `get_cursor( )`, `lisel( )`, `set_cursor_field( )`, `lsind( )`, `set_lsind( )`, `format( )`, `set_line_count( )`, `set_pf_status( )`, `set_selscreen_status( )`, `leave_to_selection_screen( )` |
+| the ALV and the tree | `tree( )`, `get_selected_rows( )`, `at_alv_value_request( )`, `at_tree_node / _checkbox / _expand_no_children( )`, `set_layout_store( )` |
+| more popups | `popup_to_decide( )`, `popup_to_decide_list( )`, `popup_get_values( )`, `popup_get_values_sval( )`, `popup_transport( )`, `get_transport( )`, `popup_answer( )`, `popup_values( )`, `message_t100( )`, `messages_from_bapiret( )` |
+| other reports and transactions | `submit( )`, `call_selection_screen( )`, `after_call_selection_screen( )`, `call_transaction( )`, `call_intent( )`, `set_catalog( )`, `set_command_field( )`, `okcode_execute( )` |
+| dynpros | `call_screen( )`, `set_screen( )`, `leave_to_screen( )`, `leave_screen( )`, `screen_left( )`, `after_call_screen( )`, `dynpro_screen / _pbo / _pai( )`, `call_subscreen( )`, `call_subscreen_pai( )`, `tablecontrol_begin / _row / _count / _cell( )`, `current_screen( )`, `window( )`, `selection_screen_dynnr( )`, `vrm_set_values( )` |
+| SAP GUI controls | `at_gui_event( )`, the stand-ins `z2ui5_cl_cgui_gui*` |
+| memory and parameters | `set_parameter_id( )`, `get_parameter_id( )`, `set_system_parameters( )`, `authority_check_customizing( )`, `set_prefill_last( )`, `set_draft( )`, `set_variant_store( )`, `set_fresh_start( )`, `at_roundtrip_start( )`, `cgui_statics_keep / _restore( )` |
+| the log, the job, the link | `set_log( )`, `messages_from_log( )`, `log_display( )`, `set_job( )`, `get_link( )` |
 
 Messages follow the classic semantics — `S` as a toast, `I` as a box, `E`
 stops the run — and every message of a run but `S` is collected in the
@@ -554,8 +588,6 @@ of an abapGit export.
 
 Known limitations:
 
-- ALV cells show dates and times as the model carries them (`2026-01-05`),
-  not in the user's format yet.
 - In the transpiled JavaScript runtime, `IN` only knows `I EQ`, `E EQ` and
   `I CP` — use `z2ui5_cl_cgui_context=>range_check( )` for internal tables if
   the report must also run there. On an SAP system `IN` and
@@ -567,7 +599,12 @@ Known limitations:
   read, and the standard F4 is the domain's fixed values.
 - `alv( )` binds a PUBLIC attribute directly; any other table is copied into
   a data reference, which the draft has to rebuild with RTTI on every
-  roundtrip.
+  roundtrip ([abap2UI5#2963](https://github.com/abap2UI5/abap2UI5/issues/2963)).
+- A large table costs every roundtrip: 10,000 rows in an ALV are 1.1 MB to
+  the browser each time, and two seconds of serializing the app in the
+  transpiled runtime. `set_paging( 500 )` on the ALV brings the payload down
+  to a page; the serialization stays
+  ([abap2UI5#2962](https://github.com/abap2UI5/abap2UI5/issues/2962)).
 
 ## Roadmap
 
@@ -843,6 +880,67 @@ Stage 5 - research
       and `f4` once `set_registered_events( )` names them, the cursor of
       the text area as `get_selection_pos( )` - the help of an SQL or code
       editor on the word under the cursor
+
+Stage 6 - the review of 1.0.0: does it run, and is it fun
+
+A review on 2026-10-30, measured: 634 of 780 open-source reports convert
+(81 %), the converted classes read like hand-written ones, the test-corpus
+reports carry at most five TODOs. What the numbers do not say: how many of
+the converted reports run on a real system, whether the AI assistant helps
+or harms, and the two cores grew into monoliths - the report class has
+8,700 lines, 244 methods and 124 state attributes, the converter 8,700
+lines in one file. The stage takes that on, in this order.
+
+The last meter for the user
+
+- [x] One click into the system: the converted class as an abapGit zip
+      from the site (offline import), samples and own report alike - not
+      one download per file
+- [x] A whole package in the browser: an abapGit zip of a package dropped
+      on the site, every report converted with its includes, the order to
+      migrate in, one zip back - nothing leaves the browser
+- [ ] The AI assistant measured: `report2cloud:eval` run with a key on the
+      refused reports of the web corpus, the share that ends clean in this
+      README - and the loop made the second path of the site if it earns it
+- [ ] Three real reports of real users run on a real system - the
+      measurement the transpiled runtime cannot replace
+
+Simpler to read, simpler to change - the API stays
+
+- [ ] `z2ui5_cl_cgui_report` split behind its API into collaborators -
+      selection screen, output, variants and parameters, dynpro and GUI
+      stand-ins, navigation; no method over 80 lines, no class over 2,000.
+      So far: `z2ui5_cl_cgui_memory` (variants, parameters, draft, history),
+      `z2ui5_cl_cgui_command` (URL, command field, shortcuts), the grid's
+      table work in `z2ui5_cl_cgui_alv` - 8,730 to 7,718 lines, the PUBLIC
+      and PROTECTED sections byte-identical; next the GUI rendering and the
+      three 200-line methods
+- [x] `convert.mjs` split by statement family - `convert-screen`, `-decl`,
+      `-list`, `-alv`, `-calls`, `-functions`, `-dynpro`, `-gui`, `-locals`,
+      `-rewrites` as methods mixed into the one Converter, the tables and
+      helpers in `convert-shared` - the snapshots unchanged, the largest
+      file 2,100 lines instead of 8,700
+- [x] The API in two tiers in this README: the dozen methods a new report
+      needs first, the rest as what a converted report may use
+- [x] The rarely used stand-ins (picture, the trees) frozen: kept and
+      tested, not extended - each is in one or two reports of the web
+      corpus; a report that needs more of them ports the control by hand
+
+What abap2UI5 could take over
+
+- [x] A table bound by reference, not only a public attribute - `alv( )`
+      copies and rebuilds every other table with RTTI on each roundtrip:
+      proposed as [abap2UI5#2963](https://github.com/abap2UI5/abap2UI5/issues/2963)
+- [x] Large tables kept on the server, the page alone to the browser -
+      measured on a 10,000-row ALV in the transpiled runtime: bound as it
+      is, every roundtrip carries 1,137 KB (2.2 s); with `set_paging( 500 )`
+      60 KB on Execute and 4 KB after, but still 2 s - the app with its
+      rows is serialized into the draft and back on every request. The
+      payload the addon solves, the serialization it cannot: proposed as
+      [abap2UI5#2962](https://github.com/abap2UI5/abap2UI5/issues/2962)
+- [x] Dates, times and amounts in the user's locale as a binding type of
+      the framework - the ALV does it itself today: proposed as
+      [abap2UI5#2964](https://github.com/abap2UI5/abap2UI5/issues/2964)
 
 Quality, through every stage
 

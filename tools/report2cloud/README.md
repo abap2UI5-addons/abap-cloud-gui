@@ -570,8 +570,12 @@ of the samples: one call per line, the parameters aligned.
 | `lib/estate.mjs` | the calls between the reports of a package, the order to migrate them in |
 | `web.mjs` | the measurement over the open-source reports of the web (`report2cloud:web`) |
 | `eval.mjs` | the AI loop of the site measured on the refused reports of a corpus (`report2cloud:eval`) |
-| `lib/convert.mjs` | the converter |
-| `lib/includes.mjs` | the INCLUDEs of a report, inlined from the files beside it, with where every line came from |
+| `lib/convert.mjs` | the converter's core: the parse, the segments and event blocks, the dispatch of a statement, the class written at the end, `convert( )` |
+| `lib/convert-<family>.mjs` | the families of statements, each an object of methods mixed into the Converter: `screen`, `decl`, `list`, `alv`, `calls` (SUBMIT, popups, MESSAGE, PERFORM), `functions` (CALL FUNCTION), `dynpro`, `gui` (the stand-ins), `locals`, `rewrites` |
+| `lib/convert-shared.mjs` | the tables (refused, mapped, stand-ins, frontend services, SALV, colours, icons) and the helpers the families share |
+| `lib/includes.mjs` | the INCLUDEs of a report, inlined, with where every line came from - reads nothing from disk, the site bundles it |
+| `lib/includes-fs.mjs` | the include reader over folders the CLI, the coverage and the package run use |
+| `lib/package.mjs` | a whole package in memory - the files as `{ path: text }`, every report converted with its includes and text pool, the estate; what the site runs on a dropped abapGit zip |
 | `lib/abap.mjs` | helpers over the syntax tree, the token renderer |
 | `lib/textpool.mjs` | the text pool of a `.prog.xml` |
 | `lib/abapgit.mjs` | the `.clas.xml` and the abapGit format of the source |

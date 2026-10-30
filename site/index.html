@@ -16,6 +16,7 @@
         <a href="#how">How</a>
         <a href="#samples">Samples</a>
         <a href="#playground">Playground</a>
+        <a href="#package">Package</a>
         <a href="https://github.com/abap2UI5-addons/abap-cloud-gui">GitHub</a>
         <a href="https://abap2ui5.github.io/docs/">abap2UI5</a>
       </nav>
@@ -83,6 +84,9 @@ CLASS zcl_hello IMPLEMENTATION.
 ENDCLASS.</code></pre>
       <p>Start it like any abap2UI5 app (<code>?app_start=zcl_hello</code>): the selection screen comes up,
         <strong>Execute</strong> runs the report and shows the list, <strong>Back</strong> returns.</p>
+      <p>From here into your system: <strong>abapGit zip</strong> under a converted class gives you the files as a
+        zip - in abapGit, <em>New Offline</em> repository, <em>Import zip</em>, pull. The add-on itself is installed the
+        same way, from its <a href="https://github.com/abap2UI5-addons/abap-cloud-gui/releases">release</a>.</p>
     </section>
 
     <section id="samples" class="wide">
@@ -111,6 +115,7 @@ ENDCLASS.</code></pre>
             <span class="head-actions">
               <button id="s-copy" class="link" type="button">Copy</button>
               <button id="s-download" class="link" type="button">Download</button>
+              <button id="s-zip" class="link" type="button" title="The files as the zip abapGit imports offline">abapGit zip</button>
             </span>
           </div>
           <div id="s-tabs" class="tabs" role="tablist"></div>
@@ -172,7 +177,7 @@ ENDCLASS.</code></pre>
             <span class="head-actions">
               <button id="copy" class="link" type="button">Copy</button>
               <button id="download" class="link" type="button">Download</button>
-              <button id="download-all" class="link" type="button">All files</button>
+              <button id="download-all" class="link" type="button" title="The files as the zip abapGit imports offline">abapGit zip</button>
             </span>
           </div>
           <div id="tabs" class="tabs" role="tablist"></div>
@@ -236,6 +241,32 @@ ENDCLASS.</code></pre>
         <div class="card info-card"><h3>ABAP Cloud release check <span id="n-release" class="badge"></span></h3><div id="release" class="muted">Nothing to check.</div></div>
         <div class="card info-card wide-card"><h3>Mapped - classic to abap-cloud-gui <span id="n-mapped" class="badge"></span></h3><div id="mapped" class="muted">Nothing yet.</div></div>
         <div class="card info-card wide-card"><details><summary><h3>Migration report <span class="muted">- the .migration.md, as the CLI writes it</span></h3></summary><pre id="migration" class="code"></pre></details></div>
+      </div>
+    </section>
+
+    <section id="package" class="wide">
+      <h2>A whole package</h2>
+      <p class="muted">The case a migration really is: not one report, a package of them. Drop the abapGit zip of
+        the package here (or its .prog.abap and .prog.xml files) - every report is converted with its includes and
+        its text pool, in this browser, nothing is uploaded anywhere. You get the reports in the order to migrate
+        them in, what was refused, and one abapGit zip with every class and its migration report.</p>
+      <div class="toolbar">
+        <label class="drop" id="pkg-drop">
+          <span id="pkg-drop-text">Drop the zip or the files here, or click to choose</span>
+          <input id="pkg-files" type="file" multiple accept=".zip,.abap,.xml" hidden>
+        </label>
+        <button id="pkg-zip" class="button primary" type="button" disabled title="Every class and its migration report, with estate.md, as the zip abapGit imports offline">abapGit zip</button>
+        <button id="pkg-clear" class="link" type="button" hidden>Clear</button>
+      </div>
+      <div id="pkg-result" hidden>
+        <p id="pkg-summary"></p>
+        <table id="pkg-table" class="table">
+          <thead><tr><th>#</th><th>Report</th><th>Class</th><th>Result</th><th>To do</th><th>Calls</th></tr></thead>
+          <tbody></tbody>
+        </table>
+        <div class="info">
+          <div class="card info-card wide-card"><details><summary><h3>The estate <span class="muted">- estate.md, the graph of the calls and the order</span></h3></summary><pre id="pkg-estate" class="code"></pre></details></div>
+        </div>
       </div>
     </section>
 

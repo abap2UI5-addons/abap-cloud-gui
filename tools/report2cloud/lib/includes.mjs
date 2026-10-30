@@ -14,8 +14,9 @@
 // `INCLUDE x IF FOUND.` without a file is dropped, as the compiler drops it;
 // a plain INCLUDE without a file stays in the source and the converter
 // refuses it, naming the file it looked for.
-import { existsSync, readFileSync } from "node:fs";
-import { basename, join } from "node:path";
+// no node:fs here - the site bundles this module for the browser; the
+// reader over folders is includes-fs.mjs
+const basename = (path) => String(path).split(/[\\/]/).pop();
 
 // a whole-line INCLUDE statement - not INCLUDE TYPE / INCLUDE STRUCTURE,
 // which carry a second word before the name
@@ -114,16 +115,5 @@ export function inlineIncludes(source, { file = "zreport.prog.abap", read } = {}
     origin: (row) => map[row - 1] ?? { file: basename(file), row },
     included,
     missing,
-  };
-}
-
-/** a `read( )` over folders of abapGit files, the first that has the include wins */
-export function includesFrom(dirs) {
-  return (name) => {
-    for (const dir of dirs) {
-      const path = join(dir, includeFileName(name));
-      if (existsSync(path)) return readFileSync(path, "utf8");
-    }
-    return undefined;
   };
 }

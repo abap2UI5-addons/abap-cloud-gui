@@ -927,6 +927,83 @@ CLASS z2ui5_cl_cgui_alv DEFINITION PUBLIC FINAL CREATE PUBLIC.
       RETURNING
         VALUE(result) TYPE string.
 
+    TYPES:
+      "! a column of the grid for the filter popup - character types, the
+      "! popup heads its columns with their names
+      BEGIN OF ty_s_filter_col,
+        column TYPE c LENGTH 30,
+        text   TYPE c LENGTH 60,
+        filter TYPE c LENGTH 60,
+      END OF ty_s_filter_col.
+    TYPES ty_t_filter_col TYPE STANDARD TABLE OF ty_s_filter_col WITH EMPTY KEY.
+
+    "! an event of the grid the report runtime handles - the toolbar, the
+    "! selection, the filter, the paging, F4 of a cell
+    CLASS-METHODS is_grid_event
+      IMPORTING
+        event         TYPE string
+      RETURNING
+        VALUE(result) TYPE abap_bool.
+
+    "! a copy of source with the box field - the selection of old, the
+    "! previous copy, is kept as long as the table keeps its number of rows
+    METHODS box_copy
+      IMPORTING
+        source        TYPE REF TO data
+        old           TYPE REF TO data OPTIONAL
+      RETURNING
+        VALUE(result) TYPE REF TO data.
+
+    "! the input of an editable grid shown as copy (box) back into source,
+    "! row by row - nothing when the tables differ in their number of rows
+    METHODS box_write_back
+      IMPORTING
+        source TYPE REF TO data
+        box    TYPE REF TO data.
+
+    "! the rows of source that pass the filter, as a copy - shown is the
+    "! table the grid shows, with the rows of source one to one
+    METHODS filtered_copy
+      IMPORTING
+        source        TYPE REF TO data
+        shown         TYPE REF TO data
+      RETURNING
+        VALUE(result) TYPE REF TO data.
+
+    "! the rows the grid shows (page) - filtered or paged - back into the
+    "! rows of full they are cut from; index names per row of page the row
+    "! of full
+    METHODS page_write_back
+      IMPORTING
+        full  TYPE REF TO data
+        page  TYPE REF TO data
+        index TYPE ty_t_index.
+
+    "! select all or deselect all on a filtered grid - the rows that pass,
+    "! as the classic ALV does
+    METHODS select_filtered
+      IMPORTING
+        selected TYPE abap_bool
+      CHANGING
+        tab      TYPE STANDARD TABLE.
+
+    "! the columns of the grid for the filter popup, each with the filter
+    "! set on it as text
+    METHODS filter_columns
+      IMPORTING
+        tab           TYPE STANDARD TABLE
+      RETURNING
+        VALUE(result) TYPE ty_t_filter_col.
+
+    "! the multiple selection for the filter of column name - an input, or a
+    "! date or time picker by the type of the column
+    METHODS filter_setting
+      IMPORTING
+        tab           TYPE STANDARD TABLE
+        name          TYPE string
+      RETURNING
+        VALUE(result) TYPE z2ui5_cl_cgui_range=>ty_s_setting.
+
   PROTECTED SECTION.
     " PROTECTED, not PRIVATE: the settings travel in the app's draft, and the
     " transpiled runtime reaches PROTECTED attributes but not PRIVATE ones
@@ -3969,6 +4046,193 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
             tab    = tab ).
 
     result = view->stringify( ).
+
+  ENDMETHOD.
+
+  METHOD is_grid_event.
+
+    result = xsdbool( event = cs_event-select_all
+                   OR event = cs_event-deselect_all
+                   OR event = cs_event-export
+                   OR event = cs_event-export_xlsx
+                   OR event = cs_event-layout
+                   OR event = cs_event-page
+                   OR event = cs_event-filter
+                   OR event = cs_event-filter_clear
+                   OR event = cs_event-details
+                   OR event = cs_event-details_close
+                   OR event = cs_event-chart
+                   OR event = cs_event-chart_close
+                   OR event = cs_event-search
+                   OR event = cs_event-f4 ).
+
+  ENDMETHOD.
+
+  METHOD box_copy.
+
+    DATA lt_comp TYPE cl_abap_structdescr=>component_table.
+    DATA lv_flag TYPE abap_bool.
+    DATA lr_row  TYPE REF TO data.
+    DATA lt_selected TYPE ty_t_row.
+    FIELD-SYMBOLS <src> TYPE STANDARD TABLE.
+    FIELD-SYMBOLS <old> TYPE STANDARD TABLE.
+    FIELD-SYMBOLS <copy> TYPE STANDARD TABLE.
+    FIELD-SYMBOLS <row> TYPE any.
+    FIELD-SYMBOLS <box> TYPE any.
+
+    ASSIGN source->* TO <src>.
+    IF old IS BOUND.
+      ASSIGN old->* TO <old>.
+      IF lines( <old> ) = lines( <src> ).
+        lt_selected = get_selected_rows( <old> ).
+      ENDIF.
+    ENDIF.
+
+    DATA(lo_line) = CAST cl_abap_structdescr( CAST cl_abap_tabledescr(
+        cl_abap_typedescr=>describe_by_data( <src> ) )->get_table_line_type( ) ).
+    lt_comp = lo_line->get_components( ).
+    INSERT VALUE #( name = cv_box_field
+                    type = CAST #( cl_abap_typedescr=>describe_by_data( lv_flag ) ) ) INTO TABLE lt_comp.
+    DATA(lo_type) = cl_abap_tabledescr=>create( cl_abap_structdescr=>create( lt_comp ) ).
+    CREATE DATA result TYPE HANDLE lo_type.
+    ASSIGN result->* TO <copy>.
+
+    LOOP AT <src> ASSIGNING FIELD-SYMBOL(<line>).
+      DATA(lv_index) = sy-tabix.
+      CREATE DATA lr_row LIKE LINE OF <copy>.
+      ASSIGN lr_row->* TO <row>.
+      MOVE-CORRESPONDING <line> TO <row>.
+      IF line_exists( lt_selected[ table_line = lv_index ] ).
+        ASSIGN COMPONENT cv_box_field OF STRUCTURE <row> TO <box>.
+        <box> = abap_true.
+      ENDIF.
+      INSERT <row> INTO TABLE <copy>.
+    ENDLOOP.
+
+  ENDMETHOD.
+
+  METHOD box_write_back.
+
+    FIELD-SYMBOLS <src>  TYPE STANDARD TABLE.
+    FIELD-SYMBOLS <box>  TYPE STANDARD TABLE.
+    FIELD-SYMBOLS <row>  TYPE any.
+    FIELD-SYMBOLS <line> TYPE any.
+
+    ASSIGN source->* TO <src>.
+    ASSIGN box->* TO <box>.
+    IF lines( <src> ) <> lines( <box> ).
+      RETURN.
+    ENDIF.
+
+    LOOP AT <box> ASSIGNING <row>.
+      READ TABLE <src> ASSIGNING <line> INDEX sy-tabix.
+      IF sy-subrc = 0.
+        MOVE-CORRESPONDING <row> TO <line>.
+      ENDIF.
+    ENDLOOP.
+
+  ENDMETHOD.
+
+  METHOD filtered_copy.
+
+    FIELD-SYMBOLS <src>   TYPE STANDARD TABLE.
+    FIELD-SYMBOLS <shown> TYPE STANDARD TABLE.
+    FIELD-SYMBOLS <copy>  TYPE STANDARD TABLE.
+
+    ASSIGN source->* TO <src>.
+    ASSIGN shown->* TO <shown>.
+    DATA(lt_index) = filter_index( <shown> ).
+    CREATE DATA result LIKE <src>.
+    ASSIGN result->* TO <copy>.
+    " empty - the transpiled runtime copies the rows along with LIKE
+    CLEAR <copy>.
+    LOOP AT lt_index INTO DATA(lv_row).
+      READ TABLE <src> ASSIGNING FIELD-SYMBOL(<line>) INDEX lv_row.
+      IF sy-subrc = 0.
+        INSERT <line> INTO TABLE <copy>.
+      ENDIF.
+    ENDLOOP.
+
+  ENDMETHOD.
+
+  METHOD page_write_back.
+
+    FIELD-SYMBOLS <full> TYPE STANDARD TABLE.
+    FIELD-SYMBOLS <page> TYPE STANDARD TABLE.
+
+    ASSIGN full->* TO <full>.
+    ASSIGN page->* TO <page>.
+    LOOP AT <page> ASSIGNING FIELD-SYMBOL(<row>).
+      DATA(lv_shown) = sy-tabix.
+      READ TABLE index INTO DATA(lv_row) INDEX lv_shown.
+      IF sy-subrc <> 0.
+        CONTINUE.
+      ENDIF.
+      READ TABLE <full> ASSIGNING FIELD-SYMBOL(<line>) INDEX lv_row.
+      IF sy-subrc = 0.
+        <line> = <row>.
+      ENDIF.
+    ENDLOOP.
+
+  ENDMETHOD.
+
+  METHOD select_filtered.
+
+    FIELD-SYMBOLS <box> TYPE any.
+
+    DATA(lt_index) = filter_index( tab ).
+    DATA(lv_box) = get_box_field( ).
+    LOOP AT lt_index INTO DATA(lv_row).
+      READ TABLE tab ASSIGNING FIELD-SYMBOL(<line>) INDEX lv_row.
+      IF sy-subrc <> 0.
+        CONTINUE.
+      ENDIF.
+      ASSIGN COMPONENT lv_box OF STRUCTURE <line> TO <box>.
+      IF sy-subrc = 0.
+        <box> = selected.
+      ENDIF.
+    ENDLOOP.
+
+  ENDMETHOD.
+
+  METHOD filter_columns.
+
+    DATA lt_low TYPE string_table.
+
+    DATA(lt_filter) = get_filter( ).
+    DATA(lt_layout) = get_layout( tab ).
+    SORT lt_layout BY position.
+    LOOP AT lt_layout INTO DATA(ls_layout).
+      CLEAR lt_low.
+      READ TABLE lt_filter INTO DATA(ls_filter) WITH KEY name = ls_layout-name.
+      IF sy-subrc = 0.
+        LOOP AT ls_filter-rows INTO DATA(ls_row).
+          INSERT COND string( WHEN ls_row-sign = `E` THEN |≠{ ls_row-low }|
+                              WHEN ls_row-high IS NOT INITIAL THEN |{ ls_row-low }…{ ls_row-high }|
+                              ELSE ls_row-low ) INTO TABLE lt_low.
+        ENDLOOP.
+      ENDIF.
+      INSERT VALUE #( column = ls_layout-name
+                      text   = ls_layout-text
+                      filter = concat_lines_of( table = lt_low sep = `, ` ) ) INTO TABLE result.
+    ENDLOOP.
+
+  ENDMETHOD.
+
+  METHOD filter_setting.
+
+    result-control = z2ui5_cl_cgui_range=>cs_control-input.
+    DATA(lt_layout) = get_layout( tab ).
+    READ TABLE lt_layout INTO DATA(ls_layout) WITH KEY name = name.
+    result-title = COND #( WHEN ls_layout-text IS NOT INITIAL THEN ls_layout-text ELSE name ).
+    DATA(lt_comp) = z2ui5_cl_cgui_context=>rtti_get_t_comp( tab ).
+    READ TABLE lt_comp INTO DATA(ls_comp) WITH KEY name = name.
+    CASE ls_comp-type_kind.
+      WHEN cl_abap_typedescr=>typekind_date.
+        result-control = z2ui5_cl_cgui_range=>cs_control-date.
+      WHEN cl_abap_typedescr=>typekind_time.
+        result-control = z2ui5_cl_cgui_range=>cs_control-time.
+    ENDCASE.
 
   ENDMETHOD.
 
