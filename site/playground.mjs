@@ -9,15 +9,16 @@
 //   its class as an app beside it. Below, what happened and what the
 //   converter found.
 //
-// The converter is tools/report2cloud, bundled for the browser. An app runs in
-// the abap2UI5 playground of this site (playground/, built with report2cloud
-// by scripts/build-playground.mjs) in its app-only view (?view=full) - no
-// editor, no bar, only the app. It is handed the report, with its .prog.xml,
-// in the fragment of its URL, as the playground's own share links carry files
-// (src/shell/share.mjs there: "2", then the JSON of the files deflated and
-// base64url), converts it the same way and starts it. Nothing goes to a
-// server. The frame is of this site, so the page reads its status line to say
-// how far the start got.
+// The converter is tools/report2cloud, bundled for the browser. A class runs
+// in the abap2UI5 playground itself (https://abap2ui5.github.io/playground/),
+// framed in its app-only view (?embed=1&view=app) - no editor, no bar, only
+// the app. It is handed the class the converter wrote, the report runtime of
+// src/01 and the demo tables with their rows, in the fragment of its URL, as
+// the playground's own share links carry files (src/shell/share.mjs there:
+// "2", then the JSON of the files deflated and base64url). Nothing goes to a
+// server. The frame is of another site, so the page listens to what the
+// playground says to the page that framed it (src/shell/embed.mjs there):
+// its status line, and the abaplint errors that stopped a Run.
 import { convert, defaultClassName } from "../tools/report2cloud/lib/convert.mjs";
 import { migrationReport } from "../tools/report2cloud/lib/report.mjs";
 import { parseTextpool } from "../tools/report2cloud/lib/textpool.mjs";
@@ -26,6 +27,7 @@ import { MODEL, errorText, lineDiff, polishClass, rewriteRefused } from "./assis
 import { abapgitZip } from "./zip.mjs";
 import { unzipTexts } from "./unzip.mjs";
 import { convertPackage } from "../tools/report2cloud/lib/package.mjs";
+import { SCARR, SPFLI, sflight } from "../tools/report2cloud/test/runtime/seed.mjs";
 
 const $ = (id) => document.getElementById(id);
 const STORE = "report2cloud.own";
@@ -133,15 +135,36 @@ function stepsOf(name, text, textpool, result) {
   };
 }
 
-// the files for the playground: the report - the first file, the app - and
-// its text pool. abapGit's name of it, lower case; a namespace (/abc/rep)
-// has no file name the playground takes, so such a report goes as zreport
-function reportFiles(text, xml) {
-  const program = nameOf(text);
-  const name = /^[a-z][a-z0-9_]*$/.test(program) ? program : "zreport";
-  const list = [{ name: `${name}.prog.abap`, source: text }];
-  if (xml) list.push({ name: `${name}.prog.xml`, source: xml });
-  return list;
+const PLAYGROUND = "https://abap2ui5.github.io/playground/";
+const FROM_PLAYGROUND = "abap2ui5-playground";
+
+/** the .abap files of a conversion, the class first - the playground takes
+ *  the first file as the app */
+const classFiles = (all, className) => Object.fromEntries(Object.entries(all)
+  .filter(([n]) => n.endsWith(".abap"))
+  .sort(([a], [b]) => (a === `${className}.clas.abap` ? -1 : b === `${className}.clas.abap` ? 1 : a.localeCompare(b))));
+
+// the report runtime and the demo tables (runtime.json, scripts/build-site.mjs),
+// fetched once, when the first app starts
+let runtime;
+const runtimeFiles = () => (runtime ??= fetch("runtime.json").then((r) => {
+  if (!r.ok) throw new Error(`runtime.json: ${r.status}`);
+  return r.json();
+}));
+
+/** the rows of the demo tables, as the playground's .tabu.json takes them -
+ *  the flight dates count from today */
+const demoRows = () => [
+  { name: "scarr.tabu.json", source: JSON.stringify(SCARR, null, 1) },
+  { name: "spfli.tabu.json", source: JSON.stringify(SPFLI, null, 1) },
+  { name: "sflight.tabu.json", source: JSON.stringify(sflight(), null, 1) },
+];
+
+/** everything the playground runs: the class files first, then the runtime */
+async function playgroundFiles(classes) {
+  const own = Object.entries(classes).map(([name, source]) => ({ name, source }));
+  const taken = new Set(own.map((f) => f.name));
+  return [...own, ...(await runtimeFiles()).filter((f) => !taken.has(f.name)), ...demoRows().filter((f) => !taken.has(f.name))];
 }
 
 /** files in the fragment of the playground's URL, as its share links carry them */
@@ -153,60 +176,68 @@ async function fragmentOf(list) {
   return `2${btoa(binary).replaceAll("+", "-").replaceAll("/", "_").replace(/=+$/, "")}`;
 }
 
-/** an app in a frame: start( files, className ) - the report and its text
- *  pool, or a class of the report runtime first - and the start followed,
- *  onStep( { state, text } ) as it goes. Answers how it ended: { ok, said,
- *  problems } - problems what stopped the Run in the playground, by file and
- *  line (its __pgProblems). */
-function appFrame(frame, cover, onStep) {
+/** an app in a frame: start( classes, className ) - the class files of a
+ *  conversion, the app's class first - and the start followed, onStep( {
+ *  state, text } ) as it goes. `open` is a link that opens the same files in
+ *  the playground with its editor. Answers how it ended: { ok, said, problems
+ *  } - problems what stopped the Run in the playground, by file and line. */
+function appFrame(frame, cover, onStep, open) {
   let runs = 0;
-  return async (files, className) => {
+  let heard = () => {};
+  window.addEventListener("message", (e) => {
+    if (e.source === frame.contentWindow && e.data?.source === FROM_PLAYGROUND) heard(e.data);
+  });
+  return async (classes, className) => {
     const run = ++runs;
-    onStep({ state: "wait", text: "Starting it: the abap2UI5 runtime, the report runtime of abap-cloud-gui and the class are loaded in this browser..." });
+    onStep({ state: "wait", text: "Starting it in the abap2UI5 playground: the abap2UI5 runtime, the report runtime of abap-cloud-gui and the class are loaded in this browser..." });
     cover.hidden = false;
     cover.textContent = "Starting...";
-    frame.src = new URL(`playground/?view=full&run=${run}#${await fragmentOf(files)}`, document.baseURI).href;
+    let fragment;
+    try {
+      fragment = await fragmentOf(await playgroundFiles(classes));
+    } catch (e) {
+      cover.textContent = "The report runtime could not be loaded.";
+      onStep({ state: "bad", text: `The report runtime could not be loaded: ${e?.message ?? e}` });
+      return { ok: false, said: String(e?.message ?? e), problems: [] };
+    }
+    if (run !== runs) return { ok: false, said: "started again", problems: [] };
+    if (open) {
+      open.href = `${PLAYGROUND}#${fragment}`;
+      open.hidden = false;
+    }
     const started = Date.now();
-    const read = (pick) => {
-      try {
-        return pick(frame.contentDocument)?.textContent?.trim() ?? "";
-      } catch {
-        return "";
-      }
-    };
-    const problems = () => {
-      try {
-        return frame.contentWindow?.__pgProblems ?? [];
-      } catch {
-        return [];
-      }
-    };
+    let problems = [];
     return new Promise((resolve) => {
-      const poll = () => {
-        if (run !== runs) return resolve({ ok: false, said: "started again", problems: [] });
-        const said = read((d) => d?.getElementById("status"));
-        if (/^running/.test(said)) {
+      const done = (outcome) => {
+        clearTimeout(timer);
+        heard = () => {};
+        resolve(outcome);
+      };
+      const timer = setTimeout(() => {
+        onStep({ state: "bad", text: "It did not start within two minutes - is the network down?" });
+        done({ ok: false, said: "no start within two minutes", problems: [] });
+      }, 120000);
+      heard = (m) => {
+        if (run !== runs) return done({ ok: false, said: "started again", problems: [] });
+        if (m.type === "problems" && Array.isArray(m.problems)) problems = m.problems;
+        if (m.type !== "status" || typeof m.message !== "string") return;
+        const said = m.message.trim();
+        if (m.state === "running" && /^running/.test(said)) {
           cover.hidden = true;
           onStep({ state: "ok", text: `Started the class ${className} as an abap2UI5 app, in ${((Date.now() - started) / 1000).toFixed(1)} s. Use it like the report: the selection screen, Execute (F8), the list.` });
-          return resolve({ ok: true, said, problems: [] });
+          return done({ ok: true, said, problems: [] });
         }
-        if (/could not|cannot|error/i.test(said)) {
-          const log = read((d) => d?.querySelector(".log-body"));
+        if (m.state === "error") {
           cover.textContent = `It did not start: ${said}`;
-          onStep({ state: "bad", text: `It did not start: ${said}${log ? ` - ${log.slice(0, 300)}` : ""}` });
-          return resolve({ ok: false, said: log ? `${said} - ${log}` : said, problems: problems() });
-        }
-        if (Date.now() - started > 120000) {
-          onStep({ state: "bad", text: "It did not start within two minutes - is the network down?" });
-          return resolve({ ok: false, said: "no start within two minutes", problems: [] });
+          onStep({ state: "bad", text: `It did not start: ${said}` });
+          return done({ ok: false, said, problems });
         }
         if (said) {
           cover.textContent = said;
           onStep({ state: "wait", text: `Starting it: ${said}` });
         }
-        setTimeout(poll, 400);
       };
-      setTimeout(poll, 400);
+      frame.src = `${PLAYGROUND}?embed=1&view=app&run=${run}#${fragment}`;
     });
   };
 }
@@ -262,7 +293,7 @@ try {
   const start = appFrame($("s-app"), $("s-cover"), (s) => {
     steps.run = s;
     renderSteps(stepList, steps);
-  });
+  }, $("s-open"));
 
   const pick = () => {
     const e = examples.find((x) => x.name === select.value);
@@ -275,9 +306,10 @@ try {
     shown = fileTabs($("s-tabs"), $("s-output"), files, c.result.className);
     Object.assign(steps, stepsOf(c.name, e.source, e.textpool, c.result), { run: undefined });
     panels("s-", c.result);
-    if (c.result.ok) start(reportFiles(e.source, e.xml), c.result.className);
+    if (c.result.ok) start(classFiles(files, c.result.className), c.result.className);
     else {
       $("s-app").src = "about:blank";
+      $("s-open").hidden = true;
       $("s-cover").hidden = false;
       $("s-cover").textContent = "This sample is refused - the converter says which statements it cannot map, under Refused.";
       steps.run = undefined;
@@ -334,7 +366,7 @@ try {
   const start = appFrame($("app"), $("app-cover"), (s) => {
     steps.run = s;
     renderSteps(stepList, steps);
-  });
+  }, $("app-open"));
 
   // the highlighted copy under the text area: the same text, the same scroll
   const paint = () => {
@@ -431,7 +463,7 @@ try {
     }
     running = last.text;
     appState.textContent = "";
-    start(reportFiles(last.text, textpoolOf().xml), last.result.className);
+    start(classFiles(files, last.result.className), last.result.className);
   };
 
   // kept in this browser - an empty or blocked storage is no error
@@ -693,9 +725,6 @@ try {
   });
 
   // the ABAP files of the class, the class first - what the playground runs
-  const classFiles = (all, className) => Object.fromEntries(Object.entries(all)
-    .filter(([n]) => n.endsWith(".abap"))
-    .sort(([a], [b]) => (a === `${className}.clas.abap` ? -1 : b === `${className}.clas.abap` ? 1 : a.localeCompare(b))));
 
   aiPolish.onclick = () => working(async (signal) => {
     if (!last || !last.result.ok) return;
@@ -717,7 +746,7 @@ try {
       check: (next) => {
         preview(true);
         running = undefined;
-        return start(Object.entries(next).map(([name, source]) => ({ name, source })), className);
+        return start(classFiles(next, className), className);
       },
       onStep: aiStep,
       signal,

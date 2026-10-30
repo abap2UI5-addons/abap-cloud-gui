@@ -4,7 +4,7 @@
   --text: #1d2733;
   --muted: #5b6878;
   --line: #dde3ea;
-  --accent: #1873b4;
+  --accent: #d03c4a;
   --accent-text: #ffffff;
   --code-bg: #f0f3f7;
   --bad: #b42318;
@@ -19,8 +19,8 @@
     --text: #e3e9ef;
     --muted: #9aa8b6;
     --line: #2b3642;
-    --accent: #5aa9e6;
-    --accent-text: #0b1218;
+    --accent: #f0606d;
+    --accent-text: #16171a;
     --code-bg: #0e141a;
     --bad: #f97066;
     --warn: #f5b546;
@@ -218,3 +218,4 @@ textarea::placeholder { color: var(--muted); white-space: pre-wrap; }
 .table td.ok { color: var(--ok); }
 .table td.bad { color: var(--bad); }
 .table .mono { font-family: var(--mono); font-size: 13px; }
+.pane-head a.link { margin: 0 12px; }

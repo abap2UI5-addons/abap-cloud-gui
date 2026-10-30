@@ -21,7 +21,6 @@
     "test:report2cloud:runtime": "node --test --test-concurrency=1 \"tools/report2cloud/test/runtime/*.test.mjs\"",
     "unit": "node scripts/unit.mjs",
     "site": "node scripts/build-site.mjs",
-    "site:playground": "node scripts/build-playground.mjs",
     "test:report2cloud:browser": "node --test tools/report2cloud/test/browser/*.test.mjs"
   },
   "repository": {

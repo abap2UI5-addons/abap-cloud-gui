@@ -1,15 +1,18 @@
 #!/usr/bin/env node
 // The site of the repository (site/) - the page that presents the addon and
 // the report2cloud playground, the converter bundled for the browser - into
-// build/site, which the Pages workflow (.github/workflows/pages.yaml) deploys
-// with the abap2UI5 playground beside it (npm run site:playground,
-// scripts/build-playground.mjs), where a converted report runs.
+// build/site, which the Pages workflow (.github/workflows/pages.yaml) deploys.
+// A converted report runs in the abap2UI5 playground itself
+// (https://abap2ui5.github.io/playground/), handed the class, the report
+// runtime and the demo tables in its URL - runtime.json below.
 //
 //   npm run site           build/site
 //   npm run site -- --serve   and serve it on http://localhost:8080
 //
 // examples.json: the reports of the converter's corpus that convert, with
 // their text pools - the examples of the playground.
+// runtime.json: what the playground needs beside a converted class
+// (scripts/playground-runtime.mjs).
 import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { createServer } from "node:http";
 import { extname, join } from "node:path";
@@ -17,6 +20,7 @@ import { fileURLToPath } from "node:url";
 import { build } from "esbuild";
 import { convert } from "../tools/report2cloud/lib/convert.mjs";
 import { parseTextpool } from "../tools/report2cloud/lib/textpool.mjs";
+import { runtimeFiles } from "./playground-runtime.mjs";
 
 const ROOT = join(fileURLToPath(import.meta.url), "..", "..");
 const OUT = join(ROOT, "build", "site");
@@ -57,7 +61,6 @@ for (const f of readdirSync(CORPUS).filter((x) => x.endsWith(".prog.abap")).sort
   const textpool = xmlText ? parseTextpool(xmlText) : undefined;
   const title = /^\*&\s+(?!Report\b)(.+?)\s*$/m.exec(source)?.[1] ?? name;
   const result = convert(source, { file: f, programName: name, textpool });
-  // xml: the .prog.xml itself, for the playground of the site (Run)
   examples.push({ name, title: title.replace(/[-,:]\s*$/, "").slice(0, 70), source, textpool, xml: xmlText, ok: result.ok });
 }
 // the ones that convert first, one that is refused at the end
@@ -65,6 +68,9 @@ examples.sort((a, b) => Number(b.ok) - Number(a.ok) || a.name.localeCompare(b.na
 // a text pool holds Maps - written as { "$map": entries }, revived by the page
 const replacer = (k, v) => (v instanceof Map ? { $map: [...v] } : v);
 writeFileSync(join(OUT, "examples.json"), JSON.stringify(examples.map(({ ok, ...e }) => e), replacer));
+const runtime = runtimeFiles(ROOT);
+writeFileSync(join(OUT, "runtime.json"), JSON.stringify(runtime));
+console.log(`build/site: runtime.json, ${runtime.length} files for the playground`);
 console.log(`build/site: ${examples.length} examples, ${examples.filter((e) => !e.ok).length} of them refused`);
 
 if (process.argv.includes("--serve")) {
