@@ -284,12 +284,15 @@ CLASS z2ui5_cl_cgui_gui_view IMPLEMENTATION.
     FIELD-SYMBOLS <gui> TYPE z2ui5_if_cgui_gui=>ty_t_control.
 
     ASSIGN ctx-gui->* TO <gui>.
+    " the row of the report's table itself - a binding is found by the
+    " reference of the value, a copy of the row has none
+    ASSIGN <gui>[ id ] TO FIELD-SYMBOL(<control>).
     node->tag( `TextArea`
         )->a( n = `id`       t = |{ z2ui5_cl_cgui_report=>cv_cgui_textedit_id }{ id }|
-        )->a( n = `value`    v = ctx-client->_bind( val       = control-text
+        )->a( n = `value`    v = ctx-client->_bind( val       = <control>-text
                                                     tab       = <gui>
                                                     tab_index = id )
-        )->a( n = `editable` b = xsdbool( control-readonly = abap_false )
+        )->a( n = `editable` b = xsdbool( <control>-readonly = abap_false )
         )->a( n = `width`    v = `100%`
         )->a( n = `rows`     v = `12`
         )->a( n = `growing`  b = abap_true
@@ -302,7 +305,10 @@ CLASS z2ui5_cl_cgui_gui_view IMPLEMENTATION.
     FIELD-SYMBOLS <gui> TYPE z2ui5_if_cgui_gui=>ty_t_control.
 
     ASSIGN ctx-gui->* TO <gui>.
-    IF control-html IS NOT INITIAL AND html_frame( ctx ) = abap_true.
+    " the row of the report's table itself - a binding is found by the
+    " reference of the value, a copy of the row has none
+    ASSIGN <gui>[ id ] TO FIELD-SYMBOL(<control>).
+    IF <control>-html IS NOT INITIAL AND html_frame( ctx ) = abap_true.
       " the document as it is, in a frame under the page's policy: its
       " styles apply, no script of it runs; a SAPEVENT link or a form
       " posted to a SAPEVENT action is the event, its action, query and
@@ -310,7 +316,7 @@ CLASS z2ui5_cl_cgui_gui_view IMPLEMENTATION.
       " would be read as a binding in the view
       node->tag( n = `HTMLFrame` ns = `z2ui5`
           )->a( n = `xmlns:z2ui5` v = `z2ui5.cc`
-          )->a( n = `content`     v = ctx-client->_bind( val       = control-html
+          )->a( n = `content`     v = ctx-client->_bind( val       = <control>-html
                                                          tab       = <gui>
                                                          tab_index = id )
           )->a( n = `width`       v = `100%`
@@ -321,11 +327,11 @@ CLASS z2ui5_cl_cgui_gui_view IMPLEMENTATION.
                                              arg1 = `${$parameters>/action}`
                                              arg2 = `${$parameters>/getdata}`
                                              arg3 = `${$parameters>/postdata}` ) ).
-    ELSEIF control-html IS NOT INITIAL.
+    ELSEIF <control>-html IS NOT INITIAL.
       " sanitized: no script, no event handler of the document
       node->tag( n = `HTML` ns = `core`
           )->a( n = `xmlns:core`      v = `sap.ui.core`
-          )->a( n = `content`         v = ctx-client->_bind( val       = control-html
+          )->a( n = `content`         v = ctx-client->_bind( val       = <control>-html
                                                              tab       = <gui>
                                                              tab_index = id )
           )->a( n = `sanitizeContent` b = abap_true
@@ -334,7 +340,7 @@ CLASS z2ui5_cl_cgui_gui_view IMPLEMENTATION.
       DATA(lo_links) = node->ele( `HBox`
           )->a( n = `wrap`  v = `Wrap`
           )->a( n = `class` v = `sapUiTinyMarginTop` ).
-      LOOP AT z2ui5_cl_cgui_gui_html_viewer=>sapevent_links( control-html ) INTO DATA(ls_link).
+      LOOP AT z2ui5_cl_cgui_gui_html_viewer=>sapevent_links( <control>-html ) INTO DATA(ls_link).
         lo_links->tag( `Link`
             )->a( n = `text`  t = COND #( WHEN ls_link-text IS NOT INITIAL THEN ls_link-text ELSE ls_link-action )
             )->a( n = `class` v = `sapUiSmallMarginEnd`
@@ -343,10 +349,10 @@ CLASS z2ui5_cl_cgui_gui_view IMPLEMENTATION.
                                          name = `SAPEVENT`
                                          arg1 = ls_link-action ) ).
       ENDLOOP.
-    ELSEIF control-url IS NOT INITIAL.
+    ELSEIF <control>-url IS NOT INITIAL.
       node->tag( `Link`
-          )->a( n = `text`   t = control-url
-          )->a( n = `href`   t = control-url
+          )->a( n = `text`   t = <control>-url
+          )->a( n = `href`   t = <control>-url
           )->a( n = `target` v = `_blank` ).
     ENDIF.
 
@@ -357,19 +363,22 @@ CLASS z2ui5_cl_cgui_gui_view IMPLEMENTATION.
     FIELD-SYMBOLS <gui> TYPE z2ui5_if_cgui_gui=>ty_t_control.
 
     ASSIGN ctx-gui->* TO <gui>.
-    IF control-url CP `sap-icon://*`.
+    " the row of the report's table itself - a binding is found by the
+    " reference of the value, a copy of the row has none
+    ASSIGN <gui>[ id ] TO FIELD-SYMBOL(<control>).
+    IF <control>-url CP `sap-icon://*`.
       node->tag( n = `Icon` ns = `core`
           )->a( n = `xmlns:core` v = `sap.ui.core`
-          )->a( n = `src`        t = control-url
+          )->a( n = `src`        t = <control>-url
           )->a( n = `size`       v = `3rem`
           )->a( n = `press`      v = event( ctx = ctx id = id name = `PICTURE_CLICK` ) ).
-    ELSEIF control-url IS NOT INITIAL.
+    ELSEIF <control>-url IS NOT INITIAL.
       " stretch and fit fill the width of the container
       node->tag( `Image`
-          )->a( n = `src`   v = ctx-client->_bind( val       = control-url
+          )->a( n = `src`   v = ctx-client->_bind( val       = <control>-url
                                                    tab       = <gui>
                                                    tab_index = id )
-          )->a( n = `width` v = COND #( WHEN control-mode = 1 OR control-mode = 2 OR control-mode = 4 THEN `100%` )
+          )->a( n = `width` v = COND #( WHEN <control>-mode = 1 OR <control>-mode = 2 OR <control>-mode = 4 THEN `100%` )
           )->a( n = `press` v = event( ctx = ctx id = id name = `PICTURE_CLICK` ) ).
     ENDIF.
 
