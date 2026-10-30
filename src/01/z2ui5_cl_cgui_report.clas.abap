@@ -1458,10 +1458,6 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
       RETURNING
         VALUE(result) TYPE string.
 
-    METHODS draft_name
-      RETURNING
-        VALUE(result) TYPE string.
-
     "! the values of the selection screen kept as the draft, when they
     "! changed since it was kept last
     METHODS draft_keep.
@@ -1551,23 +1547,9 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
       RETURNING
         VALUE(result) TYPE string.
 
-    METHODS memory_id_apply.
-
     METHODS memory_id_store.
 
-    METHODS spa_get
-      RETURNING
-        VALUE(result) TYPE z2ui5_if_client=>ty_t_name_value.
-
-    METHODS spa_set
-      IMPORTING
-        values TYPE z2ui5_if_client=>ty_t_name_value.
-
     METHODS on_storage_loaded.
-
-    "! the user parameters out of the server store - every report of the
-    "! user sees the same ones, in every browser
-    METHODS spa_load.
 
     "! SU3 in the command field: the user's parameters in a popup to change
     METHODS su3_open.
@@ -1577,32 +1559,6 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
     "! change - with authority_check_customizing( ) and a server store only
     METHODS spro_open.
     METHODS spro_result.
-
-    "! the parameters of a store variant as lines ID=value
-    METHODS spa_lines
-      IMPORTING
-        values        TYPE z2ui5_cl_cgui_variant=>ty_t_value
-      RETURNING
-        VALUE(result) TYPE string.
-
-    TYPES:
-      BEGIN OF ty_s_cgui_history,
-        name   TYPE string,
-        values TYPE string_table,
-      END OF ty_s_cgui_history.
-    TYPES ty_t_cgui_history TYPE STANDARD TABLE OF ty_s_cgui_history WITH EMPTY KEY.
-
-    "! the input history of mv_cgui_history
-    METHODS history_get
-      RETURNING
-        VALUE(result) TYPE ty_t_cgui_history.
-
-    "! the entries of the fields of this run into the history - the latest
-    "! first, each once, cv_cgui_history_size of them - and to the browser
-    METHODS history_store.
-
-    "! set_prefill_last( ): an empty field takes its latest entry
-    METHODS history_apply.
 
     METHODS auto_execute.
 
@@ -1614,12 +1570,6 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
       RETURNING
         VALUE(result) TYPE string.
 
-    METHODS variant_apply
-      IMPORTING
-        name          TYPE string
-      RETURNING
-        VALUE(result) TYPE abap_bool.
-
     METHODS variant_save
       IMPORTING
         popup TYPE REF TO z2ui5_cl_cgui_popup.
@@ -1628,13 +1578,12 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
       IMPORTING
         name TYPE string.
 
-    METHODS variant_store
-      IMPORTING
-        variants TYPE z2ui5_cl_cgui_variant=>ty_t_variant.
-
-    METHODS variant_catalog
+    "! the state of the memory of the report (z2ui5_cl_cgui_memory) for one
+    "! call: references to the attributes it reads and writes, built now
+    "! and kept by nobody
+    METHODS memory_ctx
       RETURNING
-        VALUE(result) TYPE z2ui5_cl_cgui_variant=>ty_t_variant.
+        VALUE(result) TYPE z2ui5_cl_cgui_memory=>ty_s_ctx.
 
     METHODS variant_key
       RETURNING
@@ -1949,11 +1898,6 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
     METHODS print_lines
       RETURNING
         VALUE(result) TYPE string_table.
-
-    "! the variant attributes onto the screen
-    METHODS variant_attributes_apply
-      IMPORTING
-        screen TYPE REF TO z2ui5_cl_cgui_selscreen.
 
     "! VALUE CHECK, ON BLOCK and ON RADIOBUTTON GROUP
     METHODS check_values
@@ -2801,8 +2745,8 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
 
     " a server store reads the variants now, the browser once it rendered
     IF mo_cgui_store IS BOUND.
-      variant_store( mo_cgui_store->load( variant_key( ) ) ).
-      spa_load( ).
+      z2ui5_cl_cgui_memory=>variant_load( memory_ctx( ) ).
+      z2ui5_cl_cgui_memory=>spa_load( memory_ctx( ) ).
     ENDIF.
 
     " a variant in the URL wins over the one initialization( ) set
@@ -2818,7 +2762,9 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
     IF mv_cgui_variant_start IS NOT INITIAL AND mo_cgui_store IS BOUND.
       DATA(lv_start) = mv_cgui_variant_start.
       CLEAR mv_cgui_variant_start.
-      IF variant_apply( lv_start ) = abap_false AND mv_cgui_variant_url = abap_true.
+      IF z2ui5_cl_cgui_memory=>variant_apply( ctx    = memory_ctx( )
+                                              fields = screen_fields( )
+                                              name   = lv_start ) = abap_false AND mv_cgui_variant_url = abap_true.
         message( text = replace( val  = 'Variant &1 does not exist'(002)
                                  sub  = `&1`
                                  with = lv_start )
@@ -2828,7 +2774,7 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
 
     " the fields of the screen - what the URL and MEMORY ID may fill
     mt_cgui_field = screen_fields( ).
-    memory_id_apply( ).
+    z2ui5_cl_cgui_memory=>memory_id_apply( memory_ctx( ) ).
     url_values_get( ).
     url_values_apply( ).
 
@@ -3997,7 +3943,9 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
 
       WHEN cs_pending-variant_get.
         DATA(lv_name) = variant_selected( ).
-        IF lv_name IS NOT INITIAL AND variant_apply( lv_name ) = abap_true.
+        IF lv_name IS NOT INITIAL AND z2ui5_cl_cgui_memory=>variant_apply( ctx    = memory_ctx( )
+                                                                            fields = screen_fields( )
+                                                                            name   = lv_name ) = abap_true.
           message( replace( val  = 'Variant &1 loaded'(005)
                             sub  = `&1`
                             with = lv_name ) ).
@@ -4487,137 +4435,14 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
 
   ENDMETHOD.
 
-  METHOD memory_id_apply.
-
-    " MEMORY ID: an empty field takes the value of its parameter ID - a
-    " select-option as its line I EQ
-    FIELD-SYMBOLS <field_val>   TYPE any.
-    FIELD-SYMBOLS <range> TYPE STANDARD TABLE.
-
-    LOOP AT mt_cgui_field REFERENCE INTO DATA(lr_field) WHERE memory_id IS NOT INITIAL.
-      DATA(lr_val) = attri_assign( lr_field->name ).
-      IF lr_val IS NOT BOUND.
-        CONTINUE.
-      ENDIF.
-      ASSIGN lr_val->* TO <field_val>.
-      IF <field_val> IS NOT INITIAL.
-        CONTINUE.
-      ENDIF.
-      DATA(lv_value) = get_parameter_id( lr_field->memory_id ).
-      IF lv_value IS INITIAL.
-        CONTINUE.
-      ENDIF.
-      IF lr_field->kind = z2ui5_cl_cgui_selscreen=>cs_field_kind-select_option.
-        ASSIGN lr_val->* TO <range>.
-        z2ui5_cl_cgui_range=>rows_to_range( EXPORTING rows  = VALUE #( ( sign = `I` option = `EQ` low = lv_value ) )
-                                            IMPORTING error = DATA(lv_error)
-                                            CHANGING  range = <range> ).
-        IF lv_error IS NOT INITIAL.
-          CLEAR <range>.
-        ENDIF.
-        CONTINUE.
-      ENDIF.
-      TRY.
-          <field_val> = lv_value.
-        CATCH cx_root ##NO_HANDLER.
-      ENDTRY.
-    ENDLOOP.
-
-  ENDMETHOD.
-
   METHOD memory_id_store.
 
-    " MEMORY ID: the run sets the parameter ID of every field with a value -
-    " of a select-option the first value
-    FIELD-SYMBOLS <field_val>   TYPE any.
-    FIELD-SYMBOLS <range> TYPE STANDARD TABLE.
-    FIELD-SYMBOLS <low>   TYPE any.
-
-    LOOP AT mt_cgui_field REFERENCE INTO DATA(lr_field) WHERE memory_id IS NOT INITIAL.
-      DATA(lr_val) = attri_assign( lr_field->name ).
-      IF lr_val IS NOT BOUND.
-        CONTINUE.
-      ENDIF.
-      IF lr_field->kind = z2ui5_cl_cgui_selscreen=>cs_field_kind-select_option.
-        ASSIGN lr_val->* TO <range>.
-        READ TABLE <range> ASSIGNING FIELD-SYMBOL(<line>) INDEX 1.
-        IF sy-subrc <> 0.
-          CONTINUE.
-        ENDIF.
-        ASSIGN COMPONENT `LOW` OF STRUCTURE <line> TO <low>.
-        IF sy-subrc = 0 AND <low> IS NOT INITIAL.
-          set_parameter_id( id    = lr_field->memory_id
-                            value = <low> ).
-        ENDIF.
-        CONTINUE.
-      ENDIF.
-      ASSIGN lr_val->* TO <field_val>.
-      IF <field_val> IS NOT INITIAL.
-        set_parameter_id( id    = lr_field->memory_id
-                          value = <field_val> ).
-      ENDIF.
-    ENDLOOP.
-
-  ENDMETHOD.
-
-  METHOD spa_get.
-
-    DATA lt_line TYPE string_table.
-    DATA lv_id   TYPE string.
-    DATA lv_val  TYPE string.
-
-    SPLIT mv_cgui_spa AT cl_abap_char_utilities=>newline INTO TABLE lt_line.
-    LOOP AT lt_line INTO DATA(lv_line) WHERE table_line IS NOT INITIAL.
-      SPLIT lv_line AT `=` INTO lv_id lv_val.
-      INSERT VALUE #( n = to_upper( lv_id )
-                      v = lv_val ) INTO TABLE result.
-    ENDLOOP.
-
-  ENDMETHOD.
-
-  METHOD spa_set.
-
-    DATA lt_line TYPE string_table.
-
-    LOOP AT values INTO DATA(ls_value).
-      INSERT |{ ls_value-n }={ ls_value-v }| INTO TABLE lt_line.
-    ENDLOOP.
-    mv_cgui_spa = concat_lines_of( table = lt_line sep = cl_abap_char_utilities=>newline ).
-
-    " a server store keeps them for the user - else the browser
-    IF mo_cgui_store IS BOUND.
-      TRY.
-          mo_cgui_store->save( report  = cv_cgui_spa_report
-                               variant = VALUE #( name   = to_upper( sy-uname )
-                                                  text   = 'User parameters'(055)
-                                                  values = VALUE #( FOR ls_spa IN values
-                                                                    ( name = ls_spa-n kind = `P` low = ls_spa-v ) ) ) ).
-        CATCH z2ui5_cx_cgui_error INTO DATA(lx_error).
-          message( text = lx_error->get_text( )
-                   type = `W` ).
-      ENDTRY.
-    ELSEIF client IS BOUND AND mv_cgui_batch = abap_false.
-      client->follow_up_action( val   = client->cs_event-store_data
-                                t_arg = VALUE #( ( z2ui5_cl_cgui_variant=>storage_json( prefix = cv_cgui_spa_prefix
-                                                                                        key    = cv_cgui_spa_key
-                                                                                        val    = mv_cgui_spa ) ) ) ).
-    ENDIF.
-
-  ENDMETHOD.
-
-  METHOD spa_load.
-
-    DATA(lt_variant) = mo_cgui_store->load( cv_cgui_spa_report ).
-    " the customizing of the installation, for every user
-    READ TABLE lt_variant INTO DATA(ls_cust) WITH KEY name = cv_cgui_spa_customizing.
-    IF sy-subrc = 0.
-      mv_cgui_spa_cust = spa_lines( ls_cust-values ).
-    ENDIF.
-    READ TABLE lt_variant INTO DATA(ls_variant) WITH KEY name = to_upper( sy-uname ).
-    IF sy-subrc <> 0.
-      RETURN.
-    ENDIF.
-    mv_cgui_spa = spa_lines( ls_variant-values ).
+    TRY.
+        z2ui5_cl_cgui_memory=>memory_id_store( memory_ctx( ) ).
+      CATCH z2ui5_cx_cgui_error INTO DATA(lx_error).
+        message( text = lx_error->get_text( )
+                 type = `W` ).
+    ENDTRY.
 
   ENDMETHOD.
 
@@ -4625,7 +4450,7 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
 
     DATA lt_field TYPE z2ui5_cl_cgui_popup=>ty_t_field.
 
-    LOOP AT spa_get( ) INTO DATA(ls_spa).
+    LOOP AT z2ui5_cl_cgui_memory=>spa_get( memory_ctx( ) ) INTO DATA(ls_spa).
       INSERT VALUE #( name = ls_spa-n text = ls_spa-n value = ls_spa-v ) INTO TABLE lt_field.
     ENDLOOP.
     " a parameter of its own - the ID and the value
@@ -4643,7 +4468,6 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
 
   METHOD su3_result.
 
-    DATA lt_spa TYPE z2ui5_if_client=>ty_t_name_value.
     DATA lo_popup TYPE REF TO z2ui5_cl_cgui_popup.
 
     TRY.
@@ -4651,93 +4475,49 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
       CATCH cx_root.
         RETURN.
     ENDTRY.
-    DATA(ls_result) = lo_popup->result( ).
-    IF ls_result-confirmed = abap_false.
-      RETURN.
-    ENDIF.
-
-    LOOP AT ls_result-fields INTO DATA(ls_field) WHERE value IS NOT INITIAL AND name(1) <> `%`.
-      INSERT VALUE #( n = to_upper( ls_field-name ) v = ls_field-value ) INTO TABLE lt_spa.
-    ENDLOOP.
-    DATA(lv_new) = to_upper( condense( lo_popup->result_value( `%NEW_ID` ) ) ).
-    DATA(lv_value) = lo_popup->result_value( `%NEW_VALUE` ).
-    IF lv_new IS NOT INITIAL AND lv_value IS NOT INITIAL.
-      DELETE lt_spa WHERE n = lv_new.
-      INSERT VALUE #( n = lv_new v = lv_value ) INTO TABLE lt_spa.
-    ENDIF.
-    spa_set( lt_spa ).
-    message( text = 'User parameters saved'(059)
-             type = `S` ).
+    TRY.
+        IF z2ui5_cl_cgui_memory=>su3_result( ctx   = memory_ctx( )
+                                             popup = lo_popup ) = abap_true.
+          message( text = 'User parameters saved'(059)
+                   type = `S` ).
+        ENDIF.
+      CATCH z2ui5_cx_cgui_error INTO DATA(lx_error).
+        message( text = lx_error->get_text( )
+                 type = `W` ).
+    ENDTRY.
 
   ENDMETHOD.
 
   METHOD set_parameter_id.
 
-    DATA(lt_spa) = spa_get( ).
-    DATA(lv_name) = to_upper( id ).
-    DELETE lt_spa WHERE n = lv_name.
-    INSERT VALUE #( n = lv_name
-                    v = |{ value }| ) INTO TABLE lt_spa.
-    spa_set( lt_spa ).
+    TRY.
+        z2ui5_cl_cgui_memory=>param_set( ctx   = memory_ctx( )
+                                         id    = id
+                                         value = value ).
+      CATCH z2ui5_cx_cgui_error INTO DATA(lx_error).
+        message( text = lx_error->get_text( )
+                 type = `W` ).
+    ENDTRY.
 
   ENDMETHOD.
 
   METHOD get_parameter_id.
 
-    DATA lt_line TYPE string_table.
-    DATA lv_id   TYPE string.
-    DATA lv_val  TYPE string.
-
-    DATA(lv_name) = to_upper( id ).
-    DATA(lt_spa) = spa_get( ).
-    READ TABLE lt_spa INTO DATA(ls_spa) WITH KEY n = lv_name.
-    IF sy-subrc = 0.
-      result = ls_spa-v.
-      RETURN.
-    ENDIF.
-
-    " the customizing of the installation
-    SPLIT mv_cgui_spa_cust AT cl_abap_char_utilities=>newline INTO TABLE lt_line.
-    LOOP AT lt_line INTO DATA(lv_line) WHERE table_line IS NOT INITIAL.
-      SPLIT lv_line AT `=` INTO lv_id lv_val.
-      IF to_upper( lv_id ) = lv_name.
-        result = lv_val.
-        RETURN.
-      ENDIF.
-    ENDLOOP.
-
-    " the system parameters given in code
-    READ TABLE mt_cgui_spa_system INTO DATA(ls_system) WITH KEY n = lv_name.
-    IF sy-subrc = 0.
-      result = ls_system-v.
-    ENDIF.
+    result = z2ui5_cl_cgui_memory=>param_get( ctx = memory_ctx( )
+                                              id  = id ).
 
   ENDMETHOD.
 
   METHOD set_system_parameters.
 
-    CLEAR mt_cgui_spa_system.
-    LOOP AT values INTO DATA(ls_value).
-      INSERT VALUE #( n = to_upper( ls_value-n )
-                      v = ls_value-v ) INTO TABLE mt_cgui_spa_system.
-    ENDLOOP.
+    z2ui5_cl_cgui_memory=>system_set( ctx    = memory_ctx( )
+                                      values = values ).
 
   ENDMETHOD.
 
   METHOD authority_check_customizing.
 
     result = abap_false.
-
-  ENDMETHOD.
-
-  METHOD spa_lines.
-
-    DATA lt_line TYPE string_table.
-
-    LOOP AT values INTO DATA(ls_value).
-      INSERT |{ to_upper( ls_value-name ) }={ ls_value-low }| INTO TABLE lt_line.
-    ENDLOOP.
-    result = concat_lines_of( table = lt_line sep = cl_abap_char_utilities=>newline ).
 
   ENDMETHOD.
 
@@ -4779,7 +4559,6 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
 
   METHOD spro_result.
 
-    DATA lt_value TYPE z2ui5_cl_cgui_variant=>ty_t_value.
     DATA lo_popup TYPE REF TO z2ui5_cl_cgui_popup.
 
     TRY.
@@ -4787,36 +4566,19 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
       CATCH cx_root.
         RETURN.
     ENDTRY.
-    DATA(ls_result) = lo_popup->result( ).
-    IF ls_result-confirmed = abap_false OR authority_check_customizing( ) = abap_false OR mo_cgui_store IS NOT BOUND.
+    IF authority_check_customizing( ) = abap_false.
       RETURN.
     ENDIF.
-
-    LOOP AT ls_result-fields INTO DATA(ls_field) WHERE value IS NOT INITIAL AND name(1) <> `%`.
-      INSERT VALUE #( name = to_upper( ls_field-name ) kind = `P` low = ls_field-value ) INTO TABLE lt_value.
-    ENDLOOP.
-    DATA(lv_new) = to_upper( condense( lo_popup->result_value( `%NEW_ID` ) ) ).
-    DATA(lv_value) = lo_popup->result_value( `%NEW_VALUE` ).
-    IF lv_new IS NOT INITIAL AND lv_value IS NOT INITIAL.
-      DELETE lt_value WHERE name = lv_new.
-      INSERT VALUE #( name = lv_new kind = `P` low = lv_value ) INTO TABLE lt_value.
-    ENDIF.
-
     TRY.
-        " shared: every user reads them, not only the one who saved them
-        mo_cgui_store->save( report  = cv_cgui_spa_report
-                             variant = VALUE #( name   = cv_cgui_spa_customizing
-                                                text   = 'Customizing parameters'(065)
-                                                values = lt_value
-                                                shared = abap_true ) ).
+        IF z2ui5_cl_cgui_memory=>spro_result( ctx   = memory_ctx( )
+                                              popup = lo_popup ) = abap_true.
+          message( text = 'Customizing parameters saved'(067)
+                   type = `S` ).
+        ENDIF.
       CATCH z2ui5_cx_cgui_error INTO DATA(lx_error).
         message( text = lx_error->get_text( )
                  type = `E` ).
-        RETURN.
     ENDTRY.
-    mv_cgui_spa_cust = spa_lines( lt_value ).
-    message( text = 'Customizing parameters saved'(067)
-             type = `S` ).
 
   ENDMETHOD.
 
@@ -5115,7 +4877,7 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
       RETURN.
     ENDIF.
     memory_id_store( ).
-    history_store( ).
+    z2ui5_cl_cgui_memory=>history_store( memory_ctx( ) ).
 
     LOOP AT mt_cgui_field REFERENCE INTO DATA(lr_field).
       INSERT lr_field->name INTO TABLE lt_name.
@@ -5294,46 +5056,21 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
 
   ENDMETHOD.
 
-  METHOD draft_name.
-
-    result = |%DRAFT_{ to_upper( sy-uname ) }|.
-
-  ENDMETHOD.
-
   METHOD draft_keep.
 
-    DATA lt_name TYPE string_table.
-
-    LOOP AT mt_cgui_field REFERENCE INTO DATA(lr_field).
-      INSERT lr_field->name INTO TABLE lt_name.
-    ENDLOOP.
-    DATA(lt_value) = z2ui5_cl_cgui_variant=>values_get( app   = me
-                                                        names = lt_name ).
-    " every part of every value - a change anywhere is a new draft
-    DATA(lv_text) = ``.
-    LOOP AT lt_value INTO DATA(ls_value).
-      lv_text = |{ lv_text }{ ls_value-name }\|{ ls_value-sign }\|{ ls_value-option }\|{ ls_value-low }\|{ ls_value-high };|.
-    ENDLOOP.
-    IF lv_text = mv_cgui_draft_last.
-      RETURN.
-    ENDIF.
-    mv_cgui_draft_last = lv_text.
-    variant_put( VALUE #( name   = draft_name( )
-                          text   = 'Draft'(069)
-                          values = lt_value ) ).
+    TRY.
+        z2ui5_cl_cgui_memory=>draft_keep( memory_ctx( ) ).
+      CATCH z2ui5_cx_cgui_error INTO DATA(lx_error).
+        message( text = lx_error->get_text( )
+                 type = `E` ).
+    ENDTRY.
 
   ENDMETHOD.
 
   METHOD draft_restore.
 
-    DATA(lt_variant) = variant_catalog( ).
-    IF NOT line_exists( lt_variant[ name = draft_name( ) ] ).
-      RETURN.
-    ENDIF.
-    IF variant_apply( draft_name( ) ) = abap_true.
-      " a draft is no variant the user picked
-      CLEAR mv_cgui_variant.
-      mv_cgui_draft_restored = abap_true.
+    IF z2ui5_cl_cgui_memory=>draft_restore( ctx    = memory_ctx( )
+                                            fields = screen_fields( ) ) = abap_true.
       message( 'Your entries that were not executed are back as a draft'(070) ).
     ENDIF.
 
@@ -5341,11 +5078,12 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
 
   METHOD draft_drop.
 
-    CLEAR: mv_cgui_draft_last, mv_cgui_draft_restored.
-    DATA(lt_variant) = variant_catalog( ).
-    IF line_exists( lt_variant[ name = draft_name( ) ] ).
-      variant_remove( draft_name( ) ).
-    ENDIF.
+    TRY.
+        z2ui5_cl_cgui_memory=>draft_drop( memory_ctx( ) ).
+      CATCH z2ui5_cx_cgui_error INTO DATA(lx_error).
+        message( text = lx_error->get_text( )
+                 type = `E` ).
+    ENDTRY.
 
   ENDMETHOD.
 
@@ -5374,143 +5112,15 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
 
   ENDMETHOD.
 
-  METHOD history_get.
-
-    DATA lt_line TYPE string_table.
-
-    SPLIT mv_cgui_history AT cl_abap_char_utilities=>newline INTO TABLE lt_line.
-    LOOP AT lt_line INTO DATA(lv_line) WHERE table_line IS NOT INITIAL.
-      SPLIT lv_line AT cl_abap_char_utilities=>horizontal_tab INTO TABLE DATA(lt_part).
-      IF lines( lt_part ) < 2.
-        CONTINUE.
-      ENDIF.
-      DATA(ls_history) = VALUE ty_s_cgui_history( name = to_upper( lt_part[ 1 ] ) ).
-      LOOP AT lt_part INTO DATA(lv_part) FROM 2 WHERE table_line IS NOT INITIAL.
-        INSERT lv_part INTO TABLE ls_history-values.
-      ENDLOOP.
-      INSERT ls_history INTO TABLE result.
-    ENDLOOP.
-
-  ENDMETHOD.
-
-  METHOD history_store.
-
-    DATA lt_line TYPE string_table.
-    DATA lv_value TYPE string.
-    FIELD-SYMBOLS <field_val> TYPE any.
-    FIELD-SYMBOLS <range>     TYPE STANDARD TABLE.
-    FIELD-SYMBOLS <low>       TYPE any.
-
-    DATA(lt_history) = history_get( ).
-    " the fields a user types into - no radio button, no NO-DISPLAY
-    LOOP AT mt_cgui_field REFERENCE INTO DATA(lr_field) WHERE no_display = abap_false AND group IS INITIAL.
-      DATA(lr_val) = attri_assign( lr_field->name ).
-      IF lr_val IS NOT BOUND.
-        CONTINUE.
-      ENDIF.
-      CLEAR lv_value.
-      IF lr_field->kind = z2ui5_cl_cgui_selscreen=>cs_field_kind-select_option.
-        ASSIGN lr_val->* TO <range>.
-        READ TABLE <range> ASSIGNING FIELD-SYMBOL(<line>) INDEX 1.
-        IF sy-subrc = 0.
-          ASSIGN COMPONENT `LOW` OF STRUCTURE <line> TO <low>.
-          IF sy-subrc = 0 AND <low> IS NOT INITIAL.
-            lv_value = condense( CONV string( <low> ) ).
-          ENDIF.
-        ENDIF.
-      ELSE.
-        ASSIGN lr_val->* TO <field_val>.
-        " a checkbox - a field of one character - has no history
-        DATA(lo_type) = cl_abap_typedescr=>describe_by_data( <field_val> ).
-        IF <field_val> IS NOT INITIAL
-            AND NOT ( lo_type->type_kind = cl_abap_typedescr=>typekind_char
-                      AND lo_type->length <= cl_abap_char_utilities=>charsize ).
-          lv_value = condense( CONV string( <field_val> ) ).
-        ENDIF.
-      ENDIF.
-      " a tab or a line end would break the history apart
-      IF lv_value IS INITIAL OR lv_value CA |{ cl_abap_char_utilities=>horizontal_tab }{ cl_abap_char_utilities=>newline }|.
-        CONTINUE.
-      ENDIF.
-      READ TABLE lt_history ASSIGNING FIELD-SYMBOL(<history>) WITH KEY name = lr_field->name.
-      IF sy-subrc <> 0.
-        INSERT VALUE #( name = lr_field->name ) INTO TABLE lt_history ASSIGNING <history>.
-      ENDIF.
-      DELETE <history>-values WHERE table_line = lv_value.
-      INSERT lv_value INTO <history>-values INDEX 1.
-      WHILE lines( <history>-values ) > cv_cgui_history_size.
-        DELETE <history>-values INDEX lines( <history>-values ).
-      ENDWHILE.
-    ENDLOOP.
-
-    LOOP AT lt_history INTO DATA(ls_history).
-      " the name, then its values - APPEND LINES OF rather than LINES OF in
-      " VALUE, which the transpiler of the abap2UI5 playground does not take
-      DATA(lt_cells) = VALUE string_table( ( ls_history-name ) ).
-      APPEND LINES OF ls_history-values TO lt_cells.
-      INSERT concat_lines_of( table = lt_cells
-                              sep   = cl_abap_char_utilities=>horizontal_tab ) INTO TABLE lt_line.
-    ENDLOOP.
-    DATA(lv_history) = concat_lines_of( table = lt_line sep = cl_abap_char_utilities=>newline ).
-    IF lv_history = mv_cgui_history.
-      RETURN.
-    ENDIF.
-    mv_cgui_history = lv_history.
-    IF client IS BOUND AND mv_cgui_batch = abap_false.
-      client->follow_up_action( val   = client->cs_event-store_data
-                                t_arg = VALUE #( ( z2ui5_cl_cgui_variant=>storage_json( prefix = cv_cgui_history_prefix
-                                                                                        key    = variant_key( )
-                                                                                        val    = mv_cgui_history ) ) ) ).
-    ENDIF.
-
-  ENDMETHOD.
-
-  METHOD history_apply.
-
-    FIELD-SYMBOLS <field_val> TYPE any.
-    FIELD-SYMBOLS <range>     TYPE STANDARD TABLE.
-
-    LOOP AT history_get( ) INTO DATA(ls_history).
-      READ TABLE mt_cgui_field INTO DATA(ls_field) WITH KEY name = ls_history-name.
-      IF sy-subrc <> 0 OR ls_history-values IS INITIAL.
-        CONTINUE.
-      ENDIF.
-      DATA(lr_val) = attri_assign( ls_field-name ).
-      IF lr_val IS NOT BOUND.
-        CONTINUE.
-      ENDIF.
-      ASSIGN lr_val->* TO <field_val>.
-      IF <field_val> IS NOT INITIAL.
-        CONTINUE.
-      ENDIF.
-      DATA(lv_value) = ls_history-values[ 1 ].
-      IF ls_field-kind = z2ui5_cl_cgui_selscreen=>cs_field_kind-select_option.
-        ASSIGN lr_val->* TO <range>.
-        z2ui5_cl_cgui_range=>rows_to_range( EXPORTING rows  = VALUE #( ( sign = `I` option = `EQ` low = lv_value ) )
-                                            IMPORTING error = DATA(lv_error)
-                                            CHANGING  range = <range> ).
-        IF lv_error IS NOT INITIAL.
-          CLEAR <range>.
-        ENDIF.
-        CONTINUE.
-      ENDIF.
-      TRY.
-          <field_val> = lv_value.
-        CATCH cx_root ##NO_HANDLER.
-      ENDTRY.
-    ENDLOOP.
-
-  ENDMETHOD.
-
   METHOD on_storage_loaded.
 
     " the storage controls have put what the browser holds into
     " mv_cgui_variants and mv_cgui_spa: the parameter IDs fill empty fields,
     " then the last entries (set_prefill_last( )), the start variant
     " overwrites them, the URL wins over both
-    memory_id_apply( ).
+    z2ui5_cl_cgui_memory=>memory_id_apply( memory_ctx( ) ).
     IF mv_cgui_prefill = abap_true.
-      history_apply( ).
+      z2ui5_cl_cgui_memory=>history_apply( memory_ctx( ) ).
     ENDIF.
     " a draft wins over the last entries, the start variant over the draft
     " (a server store has it from on_init( ))
@@ -5521,7 +5131,9 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
     IF mv_cgui_variant_start IS NOT INITIAL.
       DATA(lv_start) = mv_cgui_variant_start.
       CLEAR mv_cgui_variant_start.
-      IF variant_apply( lv_start ) = abap_false AND mv_cgui_variant_url = abap_true.
+      IF z2ui5_cl_cgui_memory=>variant_apply( ctx    = memory_ctx( )
+                                              fields = screen_fields( )
+                                              name   = lv_start ) = abap_false AND mv_cgui_variant_url = abap_true.
         message( text = replace( val  = 'Variant &1 does not exist'(002)
                                  sub  = `&1`
                                  with = lv_start )
@@ -5545,12 +5157,6 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
 
   ENDMETHOD.
 
-  METHOD variant_catalog.
-
-    result = z2ui5_cl_cgui_variant=>catalog_from_string( mv_cgui_variants ).
-
-  ENDMETHOD.
-
   METHOD variant_popup.
 
     DATA lt_row TYPE ty_t_variant_row.
@@ -5558,7 +5164,7 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
     DATA lt_listbox TYPE z2ui5_cl_cgui_popup=>ty_t_listbox.
     FIELD-SYMBOLS <field_val> TYPE any.
 
-    DATA(lt_variant) = variant_catalog( ).
+    DATA(lt_variant) = z2ui5_cl_cgui_memory=>variant_catalog( memory_ctx( ) ).
     " a draft is no variant to pick or save over
     DELETE lt_variant WHERE name CP `%DRAFT_*`.
 
@@ -5687,101 +5293,16 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
 
   ENDMETHOD.
 
-  METHOD variant_apply.
-
-    DATA lt_value TYPE z2ui5_cl_cgui_variant=>ty_t_value.
-
-    DATA(lt_variant) = variant_catalog( ).
-
-    READ TABLE lt_variant REFERENCE INTO DATA(lr_variant) WITH KEY name = name.
-    IF sy-subrc <> 0.
-      RETURN.
-    ENDIF.
-
-    " only the fields of the screen, as variant_save( ) collects them - a
-    " catalog from the browser's local storage holds what the browser sent
-    " and sets no other attribute of the class
-    DATA(lt_field) = screen_fields( ).
-    LOOP AT lr_variant->values REFERENCE INTO DATA(lr_value).
-      DATA(lv_field) = to_upper( lr_value->name ).
-      IF line_exists( lt_field[ name = lv_field ] ).
-        INSERT lr_value->* INTO TABLE lt_value.
-      ENDIF.
-    ENDLOOP.
-
-    z2ui5_cl_cgui_variant=>values_set( app    = me
-                                       values = lt_value ).
-    mv_cgui_variant = name.
-    mt_cgui_var_protect = lr_variant->protect.
-    mt_cgui_var_hide = lr_variant->hide.
-    result = abap_true.
-
-  ENDMETHOD.
-
   METHOD variant_save.
 
-    DATA lt_name TYPE string_table.
-
-    DATA(lv_name) = condense( popup->result_value( `NAME` ) ).
-    IF lv_name IS INITIAL OR lv_name CP '##*'.
-      message( text = 'Enter a name for the variant'(017)
-               type = `E` ).
-      RETURN.
-    ENDIF.
-
-    LOOP AT mt_cgui_field REFERENCE INTO DATA(lr_field).
-      INSERT lr_field->name INTO TABLE lt_name.
-    ENDLOOP.
-    DATA(lt_value) = z2ui5_cl_cgui_variant=>values_get( app   = me
-                                                        names = lt_name ).
-
-    " the dynamic dates replace the values they stand for
-    LOOP AT lt_value REFERENCE INTO DATA(lr_value).
-      DATA(lv_dynamic) = popup->result_value( |DYN_{ lr_value->name }| ).
-      IF lv_dynamic IS NOT INITIAL.
-        lr_value->dynamic = lv_dynamic.
-        IF lr_value->kind = z2ui5_cl_cgui_variant=>cs_kind-select_option AND lr_value->sign IS INITIAL.
-          lr_value->sign = `I`.
-          lr_value->option = `EQ`.
-        ENDIF.
-      ENDIF.
-      DATA(lv_dynamic_high) = popup->result_value( |DYNH_{ lr_value->name }| ).
-      IF lv_dynamic_high IS NOT INITIAL AND lr_value->kind = z2ui5_cl_cgui_variant=>cs_kind-select_option.
-        lr_value->dynamic_high = lv_dynamic_high.
-        lr_value->sign = `I`.
-        lr_value->option = `BT`.
-      ENDIF.
-    ENDLOOP.
-
-    DATA(ls_variant) = VALUE z2ui5_cl_cgui_variant=>ty_s_variant(
-        name      = lv_name
-        text      = z2ui5_cl_cgui_variant=>values_to_text( values = lt_value
-                                                           fields = mt_cgui_field )
-        values    = lt_value
-        shared    = xsdbool( popup->result_value( `SHARED` ) IS NOT INITIAL )
-        protected = xsdbool( popup->result_value( `PROTECTED` ) IS NOT INITIAL )
-        protect   = popup->result_keys( `PROTECT` )
-        hide      = popup->result_keys( `HIDE` ) ).
-
-    IF mo_cgui_store IS BOUND.
-      TRY.
-          mo_cgui_store->save( report  = variant_key( )
-                               variant = ls_variant ).
-        CATCH z2ui5_cx_cgui_error INTO DATA(lx_error).
-          message( text = lx_error->get_text( )
-                   type = `E` ).
-          RETURN.
-      ENDTRY.
-      variant_store( mo_cgui_store->load( variant_key( ) ) ).
-    ELSE.
-      DATA(lt_variant) = variant_catalog( ).
-      DELETE lt_variant WHERE name = lv_name.
-      INSERT ls_variant INTO TABLE lt_variant.
-      SORT lt_variant BY name.
-      variant_store( lt_variant ).
-    ENDIF.
-
-    mv_cgui_variant = lv_name.
+    TRY.
+        DATA(lv_name) = z2ui5_cl_cgui_memory=>variant_save( ctx   = memory_ctx( )
+                                                            popup = popup ).
+      CATCH z2ui5_cx_cgui_error INTO DATA(lx_error).
+        message( text = lx_error->get_text( )
+                 type = `E` ).
+        RETURN.
+    ENDTRY.
     message( replace( val  = 'Variant &1 saved'(018)
                       sub  = `&1`
                       with = lv_name ) ).
@@ -5790,54 +5311,46 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
 
   METHOD variant_delete.
 
-    IF mo_cgui_store IS BOUND.
-      TRY.
-          mo_cgui_store->delete( report = variant_key( )
-                                 name   = name ).
-        CATCH z2ui5_cx_cgui_error INTO DATA(lx_error).
-          message( text = lx_error->get_text( )
-                   type = `E` ).
-          RETURN.
-      ENDTRY.
-      variant_store( mo_cgui_store->load( variant_key( ) ) ).
-    ELSE.
-      DATA(lt_variant) = variant_catalog( ).
-      DELETE lt_variant WHERE name = name.
-      variant_store( lt_variant ).
-    ENDIF.
-
-    IF mv_cgui_variant = name.
-      CLEAR mv_cgui_variant.
-    ENDIF.
+    TRY.
+        z2ui5_cl_cgui_memory=>variant_delete( ctx  = memory_ctx( )
+                                              name = name ).
+      CATCH z2ui5_cx_cgui_error INTO DATA(lx_error).
+        message( text = lx_error->get_text( )
+                 type = `E` ).
+        RETURN.
+    ENDTRY.
     message( replace( val  = 'Variant &1 deleted'(019)
                       sub  = `&1`
                       with = name ) ).
 
   ENDMETHOD.
 
-  METHOD variant_store.
-
-    " the bound value and the stored one stay the same, so the storage
-    " control has nothing to report on the next render. An empty catalog
-    " removes the key. A server store keeps the catalog only in memory
-    CLEAR mv_cgui_variants.
-    IF variants IS NOT INITIAL.
-      mv_cgui_variants = z2ui5_cl_cgui_variant=>catalog_to_string( variants ).
-    ENDIF.
-
-    IF mo_cgui_store IS BOUND OR client IS NOT BOUND OR mv_cgui_batch = abap_true.
-      RETURN.
-    ENDIF.
-    client->follow_up_action( val   = client->cs_event-store_data
-                              t_arg = VALUE #( ( z2ui5_cl_cgui_variant=>storage_json( prefix = cv_cgui_variant_prefix
-                                                                                      key    = variant_key( )
-                                                                                      val    = mv_cgui_variants ) ) ) ).
-
-  ENDMETHOD.
-
   METHOD variant_key.
 
     result = cl_abap_typedescr=>describe_by_object_ref( me )->get_relative_name( ).
+
+  ENDMETHOD.
+
+  METHOD memory_ctx.
+
+    result = VALUE #( app           = me
+                      client        = client
+                      store         = mo_cgui_store
+                      key           = variant_key( )
+                      batch         = mv_cgui_batch
+                      fields        = REF #( mt_cgui_field )
+                      variants      = REF #( mv_cgui_variants )
+                      variant       = REF #( mv_cgui_variant )
+                      variant_start = REF #( mv_cgui_variant_start )
+                      variant_url   = REF #( mv_cgui_variant_url )
+                      protect       = REF #( mt_cgui_var_protect )
+                      hide          = REF #( mt_cgui_var_hide )
+                      spa           = REF #( mv_cgui_spa )
+                      spa_cust      = REF #( mv_cgui_spa_cust )
+                      spa_system    = REF #( mt_cgui_spa_system )
+                      history       = REF #( mv_cgui_history )
+                      draft_last    = REF #( mv_cgui_draft_last )
+                      draft_restore = REF #( mv_cgui_draft_restored ) ).
 
   ENDMETHOD.
 
@@ -5853,7 +5366,9 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
 
     lv_name = name.
     mv_cgui_variant_url = abap_false.
-    IF mv_cgui_variants IS INITIAL OR variant_apply( lv_name ) = abap_false.
+    IF mv_cgui_variants IS INITIAL OR z2ui5_cl_cgui_memory=>variant_apply( ctx    = memory_ctx( )
+                                                                           fields = screen_fields( )
+                                                                           name   = lv_name ) = abap_false.
       mv_cgui_variant_start = lv_name.
     ENDIF.
 
@@ -5977,7 +5492,7 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
     ENDIF.
 
     memory_id_store( ).
-    history_store( ).
+    z2ui5_cl_cgui_memory=>history_store( memory_ctx( ) ).
 
     CLEAR: mo_cgui_list, mo_cgui_alv, mr_cgui_alv, mr_cgui_alv_box, mv_cgui_alv_name, mt_cgui_level,
            mr_cgui_alv_page, mt_cgui_alv_index, mo_cgui_tree, mt_cgui_tree_view,
@@ -7559,24 +7074,6 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
 
   ENDMETHOD.
 
-  METHOD variant_attributes_apply.
-
-    IF mt_cgui_var_protect IS INITIAL AND mt_cgui_var_hide IS INITIAL.
-      RETURN.
-    ENDIF.
-    DATA(lt_screen) = screen->loop_at_screen( ).
-    LOOP AT lt_screen INTO DATA(ls_screen).
-      IF line_exists( mt_cgui_var_hide[ table_line = ls_screen-name ] ).
-        ls_screen-active = abap_false.
-        screen->modify_screen( ls_screen ).
-      ELSEIF line_exists( mt_cgui_var_protect[ table_line = ls_screen-name ] ).
-        ls_screen-input = abap_false.
-        screen->modify_screen( ls_screen ).
-      ENDIF.
-    ENDLOOP.
-
-  ENDMETHOD.
-
   METHOD print_lines.
 
     FIELD-SYMBOLS <tab> TYPE STANDARD TABLE.
@@ -7625,7 +7122,7 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
       result = lo_store->load( report = variant_key( )
                                handle = layout_handle( ) ).
     ELSE.
-      result = z2ui5_cl_cgui_layout=>from_variants( variant_catalog( ) ).
+      result = z2ui5_cl_cgui_layout=>from_variants( z2ui5_cl_cgui_memory=>variant_catalog( memory_ctx( ) ) ).
     ENDIF.
 
   ENDMETHOD.
@@ -7735,44 +7232,28 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
 
   METHOD variant_put.
 
-    IF mo_cgui_store IS BOUND.
-      TRY.
-          mo_cgui_store->save( report  = variant_key( )
-                               variant = variant ).
-        CATCH z2ui5_cx_cgui_error INTO DATA(lx_error).
-          message( text = lx_error->get_text( )
-                   type = `E` ).
-          RETURN.
-      ENDTRY.
-      variant_store( mo_cgui_store->load( variant_key( ) ) ).
-    ELSE.
-      DATA(lt_variant) = variant_catalog( ).
-      DELETE lt_variant WHERE name = variant-name.
-      INSERT variant INTO TABLE lt_variant.
-      SORT lt_variant BY name.
-      variant_store( lt_variant ).
-    ENDIF.
+    TRY.
+        z2ui5_cl_cgui_memory=>variant_put( ctx     = memory_ctx( )
+                                           variant = variant ).
+      CATCH z2ui5_cx_cgui_error INTO DATA(lx_error).
+        message( text = lx_error->get_text( )
+                 type = `E` ).
+        RETURN.
+    ENDTRY.
     result = abap_true.
 
   ENDMETHOD.
 
   METHOD variant_remove.
 
-    IF mo_cgui_store IS BOUND.
-      TRY.
-          mo_cgui_store->delete( report = variant_key( )
-                                 name   = name ).
-        CATCH z2ui5_cx_cgui_error INTO DATA(lx_error).
-          message( text = lx_error->get_text( )
-                   type = `E` ).
-          RETURN.
-      ENDTRY.
-      variant_store( mo_cgui_store->load( variant_key( ) ) ).
-    ELSE.
-      DATA(lt_variant) = variant_catalog( ).
-      DELETE lt_variant WHERE name = name.
-      variant_store( lt_variant ).
-    ENDIF.
+    TRY.
+        z2ui5_cl_cgui_memory=>variant_remove( ctx  = memory_ctx( )
+                                              name = name ).
+      CATCH z2ui5_cx_cgui_error INTO DATA(lx_error).
+        message( text = lx_error->get_text( )
+                 type = `E` ).
+        RETURN.
+    ENDTRY.
     result = abap_true.
 
   ENDMETHOD.
@@ -8352,13 +7833,14 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
     mo_cgui_screen = result.
     at_selection_screen_output( result ).
     CLEAR mo_cgui_screen.
-    variant_attributes_apply( result ).
+    z2ui5_cl_cgui_memory=>variant_attributes_apply( ctx    = memory_ctx( )
+                                                    screen = result ).
     value_state_set( result ).
     mt_cgui_field = result->get_fields( ).
     mt_cgui_fkey = result->get_function_keys( ).
     so_buffer_prepare( result ).
     tab_binding_prepare( result ).
-    LOOP AT history_get( ) INTO DATA(ls_history).
+    LOOP AT z2ui5_cl_cgui_memory=>history_get( memory_ctx( ) ) INTO DATA(ls_history).
       result->set_history( name   = ls_history-name
                            values = ls_history-values ).
     ENDLOOP.

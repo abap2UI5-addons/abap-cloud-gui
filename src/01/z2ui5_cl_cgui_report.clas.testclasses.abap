@@ -1832,7 +1832,7 @@ CLASS ltcl_test IMPLEMENTATION.
                                         exp = `0017` ).
     cl_abap_unit_assert=>assert_initial( mo_cut->get_parameter_id( `ZCGUI_DEL` ) ).
     " and on the server
-    lo_next->spa_load( ).
+    z2ui5_cl_cgui_memory=>spa_load( lo_next->memory_ctx( ) ).
     cl_abap_unit_assert=>assert_equals( act = lo_next->get_parameter_id( `ZCGUI_ADD` )
                                         exp = `0017` ).
 
@@ -1847,7 +1847,7 @@ CLASS ltcl_test IMPLEMENTATION.
     mo_report->p_carrid = `LH`.
     event( z2ui5_cl_cgui_report=>cs_ucomm-enter ).
     DATA(lt_variant) = mo_cut->mo_cgui_store->load( mo_cut->variant_key( ) ).
-    cl_abap_unit_assert=>assert_true( xsdbool( line_exists( lt_variant[ name = mo_cut->draft_name( ) ] ) ) ).
+    cl_abap_unit_assert=>assert_true( xsdbool( line_exists( lt_variant[ name = z2ui5_cl_cgui_memory=>draft_name( ) ] ) ) ).
 
     " the next start brings it back, with Discard Draft
     DATA(lo_next) = NEW ltcl_report( ).
@@ -1869,7 +1869,7 @@ CLASS ltcl_test IMPLEMENTATION.
     lo_next_client->mv_event = z2ui5_cl_cgui_report=>cs_ucomm-execute.
     lo_next->z2ui5_if_app~main( lo_next_client ).
     lt_variant = mo_cut->mo_cgui_store->load( mo_cut->variant_key( ) ).
-    cl_abap_unit_assert=>assert_false( xsdbool( line_exists( lt_variant[ name = mo_cut->draft_name( ) ] ) ) ).
+    cl_abap_unit_assert=>assert_false( xsdbool( line_exists( lt_variant[ name = z2ui5_cl_cgui_memory=>draft_name( ) ] ) ) ).
 
   ENDMETHOD.
 
@@ -2401,7 +2401,7 @@ CLASS ltcl_test IMPLEMENTATION.
     cl_abap_unit_assert=>assert_true( lo_store->mt_layout[ name = `MINE` ]-is_default ).
     cl_abap_unit_assert=>assert_equals( act = mo_cut->layout_handle( )
                                         exp = `MT_ROW` ).
-    DATA(lt_catalog) = mo_cut->variant_catalog( ).
+    DATA(lt_catalog) = z2ui5_cl_cgui_memory=>variant_catalog( mo_cut->memory_ctx( ) ).
     cl_abap_unit_assert=>assert_false( xsdbool( line_exists( lt_catalog[ name = `#L#MINE` ] ) ) ).
 
     " the next run starts with the default layout - the switch of the test
@@ -2442,7 +2442,7 @@ CLASS ltcl_test IMPLEMENTATION.
     cl_abap_unit_assert=>assert_equals( act = mo_cut->mv_cgui_layout
                                         exp = `MINE` ).
     " kept as a variant - but none the variant popup offers
-    DATA(lt_catalog) = mo_cut->variant_catalog( ).
+    DATA(lt_catalog) = z2ui5_cl_cgui_memory=>variant_catalog( mo_cut->memory_ctx( ) ).
     cl_abap_unit_assert=>assert_true( xsdbool( line_exists( lt_catalog[ name = `#L#MINE` ] ) ) ).
 
   ENDMETHOD.

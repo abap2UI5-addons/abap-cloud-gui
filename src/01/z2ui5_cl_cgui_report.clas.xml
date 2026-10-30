@@ -111,12 +111,6 @@
     </item>
     <item>
      <ID>I</ID>
-     <KEY>017</KEY>
-     <ENTRY>Enter a name for the variant</ENTRY>
-     <LENGTH>38</LENGTH>
-    </item>
-    <item>
-     <ID>I</ID>
      <KEY>018</KEY>
      <ENTRY>Variant &amp;1 saved</ENTRY>
      <LENGTH>26</LENGTH>
@@ -395,12 +389,6 @@
      <ID>I</ID>
      <KEY>068</KEY>
      <ENTRY>Cancel</ENTRY>
-     <LENGTH>10</LENGTH>
-    </item>
-    <item>
-     <ID>I</ID>
-     <KEY>069</KEY>
-     <ENTRY>Draft</ENTRY>
      <LENGTH>10</LENGTH>
     </item>
     <item>
