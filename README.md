@@ -909,8 +909,9 @@ Simpler to read, simpler to change - the API stays
       ALV, dynpro, GUI, popups, SUBMIT - the snapshots unchanged
 - [x] The API in two tiers in this README: the dozen methods a new report
       needs first, the rest as what a converted report may use
-- [ ] The rarely used stand-ins (picture, the trees) frozen: kept and
-      tested, not extended
+- [x] The rarely used stand-ins (picture, the trees) frozen: kept and
+      tested, not extended - each is in one or two reports of the web
+      corpus; a report that needs more of them ports the control by hand
 
 What abap2UI5 could take over
 

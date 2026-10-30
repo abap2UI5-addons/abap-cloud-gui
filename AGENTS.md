@@ -83,6 +83,15 @@ publishes the GitHub release with the abapGit zip and the 7.02 zip. From
 1.0.0 on the public API of `src/01` follows semantic versioning - a change
 that removes or retypes something public is a major release.
 
+## Frozen stand-ins
+
+`z2ui5_cl_cgui_gui_picture`, `_simple_tree`, `_column_tree` and
+`_list_tree` are frozen since 1.0.0: kept, tested, bugs fixed, no new
+members. Each stands in for a control one or two reports of the web corpus
+use; a report that needs more of `cl_gui_picture` or the trees ports that
+control by hand. The containers, the text editor, the HTML viewer, the
+toolbar and the grid are not frozen.
+
 ## Rules learned the hard way
 
 - **No PRIVATE instance attributes on an app class or on an object an app
