@@ -1,6 +1,6 @@
 // The files the abap2UI5 playground needs beside a converted class to run it:
 // the report runtime of src/01, the demo tables SCARR, SPFLI and SFLIGHT and
-// the structure SNODETEXT (tools/report2cloud/test/ddic; their rows come from the page, see
+// the structure SNODETEXT (tools/report2ui5/test/ddic; their rows come from the page, see
 // site/playground.mjs). scripts/build-site.mjs writes them to runtime.json.
 //
 // The playground takes classes, interfaces and database tables - not data
@@ -59,6 +59,6 @@ export function runtimeFiles(root) {
     if (!/^[a-z0-9_]+\.(clas|intf)\.abap$/.test(f)) throw new Error(`playground runtime: ${f} is no file the playground takes`);
     sources.push({ name: f, source: read(join(dir, f)).replace(named, (m) => fieldOf.get(m.toUpperCase())) });
   }
-  const demo = DEMO_TABLES.map((t) => ({ name: `${t}.tabl.xml`, source: read(join(root, "tools", "report2cloud", "test", "ddic", `${t}.tabl.xml`)) }));
+  const demo = DEMO_TABLES.map((t) => ({ name: `${t}.tabl.xml`, source: read(join(root, "tools", "report2ui5", "test", "ddic", `${t}.tabl.xml`)) }));
   return [...sources, ...files, ...demo];
 }

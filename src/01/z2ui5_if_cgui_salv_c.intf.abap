@@ -1,4 +1,4 @@
-"! The constants of the SALV interfaces in one - report2cloud writes
+"! The constants of the SALV interfaces in one - report2UI5 writes
 "! z2ui5_if_cgui_salv_c=>selection_mode-row_column for
 "! if_salv_c_selection_mode=>row_column, and the same for
 "! if_salv_c_function_position, if_salv_c_cell_type, if_salv_c_alignment,

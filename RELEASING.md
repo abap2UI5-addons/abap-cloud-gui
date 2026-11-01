@@ -9,7 +9,7 @@ the repository at the tag or import the zip of its GitHub release;
 `main` is what the CI proved; a tag is what an installation pins. The
 public API of `src/01` follows semantic versioning from 1.0.0 on
 (CHANGELOG.md, 1.0.0): removed or changed is major, added is minor, fixed
-is a patch. report2cloud writes against that API, so a major release of the
+is a patch. report2UI5 writes against that API, so a major release of the
 runtime is a major release of the converter too - they are one version.
 
 ## Cutting a release
@@ -44,7 +44,7 @@ The workflow then
 
 ## After the release
 
-- The documentation (abap2UI5/docs): the preview notes of report2cloud and
+- The documentation (abap2UI5/docs): the preview notes of report2UI5 and
   `migrate_report` go - `advanced/report_migration.md`,
   `advanced/mcp_server.md`, `resources/addons.md`.
 - The roadmap item of the release in README.md is ticked.

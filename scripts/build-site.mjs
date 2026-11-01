@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // The site of the repository (site/) - the page that presents the addon and
-// the report2cloud playground, the converter bundled for the browser - into
+// the report2UI5 playground, the converter bundled for the browser - into
 // build/site, which the Pages workflow (.github/workflows/pages.yaml) deploys.
 // A converted report runs in the abap2UI5 playground itself
 // (https://abap2ui5.github.io/playground/), handed the class, the report
@@ -18,13 +18,13 @@ import { createServer } from "node:http";
 import { extname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { build } from "esbuild";
-import { convert } from "../tools/report2cloud/lib/convert.mjs";
-import { parseTextpool } from "../tools/report2cloud/lib/textpool.mjs";
+import { convert } from "../tools/report2ui5/lib/convert.mjs";
+import { parseTextpool } from "../tools/report2ui5/lib/textpool.mjs";
 import { runtimeFiles } from "./playground-runtime.mjs";
 
 const ROOT = join(fileURLToPath(import.meta.url), "..", "..");
 const OUT = join(ROOT, "build", "site");
-const CORPUS = join(ROOT, "tools", "report2cloud", "test", "corpus");
+const CORPUS = join(ROOT, "tools", "report2ui5", "test", "corpus");
 
 rmSync(OUT, { recursive: true, force: true });
 mkdirSync(OUT, { recursive: true });

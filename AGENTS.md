@@ -15,11 +15,12 @@ list, ALV grid, messages. Language of code, comments, commits and docs:
 |---|---|
 | `src/01` | the framework: `z2ui5_cl_cgui_report` (report runtime), `_selscreen`, `_list`, `_alv`, `_tree`, `_layout` (the layout dialog of the ALV), `_popup`, `_range`, `_select`, `_variant` (selection variants), `_context` (RTTI and conversion helpers), `z2ui5_cx_cgui_error`; the two stores: `z2ui5_if_cgui_variant_store` with `z2ui5_cl_cgui_variant_db` (table `Z2UI5_CGUI_VAR`, data elements `Z2UI5_CGUI_VAR_*`) and `z2ui5_if_cgui_layout_store` with `z2ui5_cl_cgui_layout_db` (table `Z2UI5_CGUI_LAY`) |
 | `src/02` | samples `z2ui5_cl_cgui_sample_01` … `_11` |
-| `src/03` | the test set: the corpus reports of report2cloud as converted (`z2ui5_cl_cgui_r2c_NN`), generated - never edit by hand, `UPDATE_SNAPSHOTS=1 npm run test:report2cloud` writes it. Only the reports whose migration report names nothing for the release, so the package activates on ABAP Cloud too; the gate test's scratch copy leaves it out and lints the conversion of now under `src/r2c` |
-| `tools/report2cloud` | `report2cloud`, a Node CLI (no ABAP object) that converts a classic report into a report class of this addon - THE generator of this repository, see below |
+| `src/03` | the test set: the corpus reports of report2UI5 as converted (`z2ui5_cl_cgui_r2c_NN`), generated - never edit by hand, `UPDATE_SNAPSHOTS=1 npm run test:report2ui5` writes it. Only the reports of `CLOUD_READY` in `tools/report2ui5/test/corpus.mjs` - those that read no table and call no API ABAP Cloud lacks, so the package activates there too; the gate test's scratch copy leaves it out and lints the conversion of now under `src/r2c` |
+| `tools/report2ui5` | `report2UI5`, a Node CLI (no ABAP object) that converts a classic report into a report class of this addon - THE generator of this repository, see below |
+| `tools/report2cloud/lib` | the path of the converter before its rename - three re-exports of `tools/report2ui5/lib/{convert,textpool,report}.mjs` for abap2UI5/mcp-server's `migrate_report`; nothing else goes there |
 | `scripts/unit.mjs` | `npm run unit` - the ABAP Unit tests in the transpiled backend, tables included |
-| `site/`, `scripts/build-site.mjs` | `npm run site` - the GitHub Pages site: the page about the addon and the report2cloud playground, the converter bundled for the browser with esbuild (`.github/workflows/pages.yaml` deploys `build/site` from main). The converter stays browser-safe: no `node:` import in `tools/report2cloud/lib/convert*.mjs` and what they import (`report.mjs`, `refusals.mjs`, `abap.mjs`, `abapgit.mjs`, `textpool.mjs`, `includes.mjs`, `package.mjs`) - file access belongs to the CLI |
-| `scripts/playground-runtime.mjs` | `runtime.json` of the site: what the abap2UI5 playground (https://abap2ui5.github.io/playground/) needs beside a converted class - the classes and interfaces of `src/01`, its tables with their data elements written in as built-in types (the playground knows no data elements; a source naming one names the table field instead), the demo tables SCARR, SPFLI, SFLIGHT and the structure SNODETEXT of `tools/report2cloud/test/ddic` (their rows: `test/runtime/seed.mjs`, filled in by the page). The page frames the playground's app-only view (`?embed=1&view=app`) with these files in the URL's fragment and follows its `postMessage`s: `status`, and `problems` (the abaplint errors that stopped a Run). The playground carries nothing of reports - keep it that way. Messages of the report's own message class show as their key there (its T100 is a table of open-abap and cannot be seeded). `node --test scripts/playground-runtime.test.mjs` |
+| `site/`, `scripts/build-site.mjs` | `npm run site` - the GitHub Pages site: the page about the addon and the report2UI5 playground, the converter bundled for the browser with esbuild (`.github/workflows/pages.yaml` deploys `build/site` from main). The converter stays browser-safe: no `node:` import in `tools/report2ui5/lib/convert*.mjs` and what they import (`report.mjs`, `refusals.mjs`, `abap.mjs`, `abapgit.mjs`, `textpool.mjs`, `includes.mjs`, `package.mjs`) - file access belongs to the CLI |
+| `scripts/playground-runtime.mjs` | `runtime.json` of the site: what the abap2UI5 playground (https://abap2ui5.github.io/playground/) needs beside a converted class - the classes and interfaces of `src/01`, its tables with their data elements written in as built-in types (the playground knows no data elements; a source naming one names the table field instead), the demo tables SCARR, SPFLI, SFLIGHT and the structure SNODETEXT of `tools/report2ui5/test/ddic` (their rows: `test/runtime/seed.mjs`, filled in by the page). The page frames the playground's app-only view (`?embed=1&view=app`) with these files in the URL's fragment and follows its `postMessage`s: `status`, and `problems` (the abaplint errors that stopped a Run). The playground carries nothing of reports - keep it that way. Messages of the report's own message class show as their key there (its T100 is a table of open-abap and cannot be seeded). `node --test scripts/playground-runtime.test.mjs` |
 | `.github/abaplint` | the Cloud and 7.02 gate configs; `abaplint.jsonc` at the root is the v750 inner loop |
 
 Naming: every class is `Z2UI5_CL_CGUI_*` / `Z2UI5_CX_CGUI_*`, every interface
@@ -31,7 +32,7 @@ tables and data elements use built-in types (`CHAR`, `STRG`) or data
 elements that are released on ABAP Cloud and exist on 7.02 (`MANDT`,
 `TIMESTAMPL`, `TZNTSTMPL`, `CHAR40`) - never an on-premise one such as
 `SEOCLSNAME` or `XUBNAME`. Report and class generation runs in Node only
-(`tools/report2cloud`).
+(`tools/report2ui5`).
 
 ## Dependencies
 
@@ -201,51 +202,57 @@ toolbar and the grid are not frozen.
   screen calls `view_display( )` — unless a popup app was called in the same
   roundtrip (`mv_cgui_nav`).
 
-## report2cloud
+## report2UI5
 
-`tools/report2cloud` converts a classic report (`.prog.abap`, its text pool
+`tools/report2ui5` converts a classic report (`.prog.abap`, its text pool
 from the `.prog.xml`, its includes from the `.prog.abap` files beside it)
 into a class inheriting from `z2ui5_cl_cgui_report`:
-`npm run report2cloud -- zreport.prog.abap [--class zcl_x] [--out dir]`. It
+`npm run report2ui5 -- zreport.prog.abap [--class zcl_x] [--out dir]`. It
 inlines the includes before the parse (`lib/includes.mjs` - no `node:fs`
 in it, the site bundles it; the reader over folders is `lib/includes-fs.mjs`
 - every line of the
 result knows its file and row), parses with `@abaplint/core` at the version
 of `@abaplint/cli` - which expands the macros at their calls - writes the
 class in abapGit format plus a migration report, and refuses with
-`file:row:col` what has no counterpart (dynpros, batch input, `SUBMIT`,
-native SQL, ...). The mapping table and the refusals are in its README.
+`file:row:col` what of the user interface has no counterpart (dynpros it
+cannot build, reading the list back by index, ...). The mapping table and
+the refusals are in its README.
+
+**It converts the user interface and nothing else** - the selection
+screen, the event blocks, the list, the ALV, the messages, the popups. The
+logic of a report (its tables, function modules, classes, native SQL,
+batch input, background jobs) is copied as it is written; whether it runs
+on the target system is the user's business. Do not add a release check of
+tables or APIs, successor rewrites, wrapper classes, ATC imports, migration
+planning or an AI step back - they were removed after 1.0.0 on purpose.
 It is the only converter and the only generator of this repository - there
-is no ABAP tooling on the stack. `npm run report2cloud:coverage -- <dir>`
+is no ABAP tooling on the stack. `npm run report2ui5:coverage -- <dir>`
 (`coverage.mjs`) is the measurement over a folder of reports: converted,
 refused and why, ranked - the README's roadmap is ordered by it, so run it
 on a real corpus before picking the next construct to map. `npm run
-report2cloud:web` (`web.mjs`) is that corpus: the reports of the
+report2ui5:web` (`web.mjs`) is that corpus: the reports of the
 open-source ABAP repositories of the dotabap list, cloned sparse into
 `build/web-corpus` (read, never run, never committed - a test case taken
 from it is rewritten by hand), measured weekly by
-`.github/workflows/report2cloud-web.yaml`. `npm run report2cloud:eval`
-(`eval.mjs`) measures the AI loop of the site (`site/assistant.mjs`) on
-the reports of that corpus the converter refuses - accepted, clean, per
-kind of refusal; with `--dry` it needs no key. A change to the prompt or
-the model is compared on the same `--limit` before and after.
+`.github/workflows/report2ui5-web.yaml`.
 
 - **It writes against the API of `src/01` as it is.** A change to a
   signature of `z2ui5_cl_cgui_report`, `_selscreen`, `_list` or `_alv`
   (a parameter renamed, a method dropped) breaks the generated classes:
-  `npm run test:report2cloud` lints every class of its corpus in a scratch
+  `npm run test:report2ui5` lints every class of its corpus in a scratch
   copy of this repository - v750 with every rule of `abaplint.jsonc` (no
   finding in a generated class; `test/ddic` has stubs of the flight
-  tables), ABAP Cloud with `.github/abaplint/abap_cloud.jsonc` (only the
-  unreleased tables the migration report lists), the 7.02 gate and the
+  tables), ABAP Cloud with `.github/abaplint/abap_cloud.jsonc` (no finding
+  in a class of the test set `src/03`, `CLOUD_READY` of `test/corpus.mjs`),
+  the 7.02 gate and the
   abap2UI5 linter (no finding). Findings in `src/` itself are `npm run
   check`'s business and only counted. A new PUBLIC or PROTECTED method of
   `z2ui5_cl_cgui_report` goes into `BASE_METHODS` of `lib/convert-shared.mjs` (a
   test compares them). Change the converter with the API, then
-  `UPDATE_SNAPSHOTS=1 node --test tools/report2cloud/test/convert.test.mjs`
+  `UPDATE_SNAPSHOTS=1 node --test tools/report2ui5/test/convert.test.mjs`
   and review the snapshot diff.
 - **A class that lints is not a class that runs.**
-  `npm run test:report2cloud:runtime` (opt-in; needs an mcp-server checkout
+  `npm run test:report2ui5:runtime` (opt-in; needs an mcp-server checkout
   at `MCP_SERVER_HOME` or `../mcp-server`, git and network) transpiles the
   corpus classes with `src/01` (its tables and data elements included)
   and the seeded flight table stubs
@@ -268,7 +275,7 @@ the model is compared on the same `--limit` before and after.
   the class fails before its first screen) and `IN` on a select-option
   (the runtime's `IN` knows `I EQ`, `E EQ`, `I CP` - `range_check( )`, the
   rule above). Run it after a change to the converter or to `src/01`.
-  `npm run test:report2cloud:browser` runs the same classes as the real app
+  `npm run test:report2ui5:browser` runs the same classes as the real app
   in headless Chromium (UI5 from the `@openui5` devDependencies): boot,
   render, Execute, no page error - what the JSON protocol cannot see (a
   property value UI5 rejects ends the app before its first screen).
@@ -285,9 +292,8 @@ the model is compared on the same `--limit` before and after.
   way); a token of an expanded macro stands at the call's position and
   keeps its body position as `vrow` / `vcol`, which `renderTokens( )` reads
   the spacing from.
-- CI: `.github/workflows/report2cloud.yaml`; the weekly web corpus
-  `.github/workflows/report2cloud-web.yaml`; the AI loop, by hand,
-  `.github/workflows/report2cloud-eval.yaml`.
+- CI: `.github/workflows/report2ui5.yaml`; the weekly web corpus
+  `.github/workflows/report2ui5-web.yaml`.
 
 ## Verifying at runtime
 
@@ -296,7 +302,7 @@ The views can be driven without an SAP system: transpile `src` against
 `lib/npm-backend.mjs` `buildNpm`), start `lib/npm-host.mjs`, and drive the
 app with Playwright. The unit tests run the same way, in CI
 (`.github/workflows/unit.yaml`) and locally: `npm run unit`
-(`scripts/unit.mjs`, the build of the report2cloud runtime test with the test
+(`scripts/unit.mjs`, the build of the report2UI5 runtime test with the test
 includes; mcp-server at `MCP_SERVER_HOME` or `../mcp-server`). The MCP server's own unit action deploys classes and
 interfaces only - no tables - hence the script.
 Where the UI5 CDN (`sdk.openui5.org`) is not reachable, serve the

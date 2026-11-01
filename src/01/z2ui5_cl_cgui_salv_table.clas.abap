@@ -1,7 +1,7 @@
 "! The stand-in of cl_salv_table and cl_salv_events_table - for a report
 "! that keeps its SALV object and uses it after display( ): an attribute of
 "! a local class, its event handlers, get_selections( ) of the rows the user
-"! picked (report2cloud writes alv( ) for a SALV a report only sets up and
+"! picked (report2UI5 writes alv( ) for a SALV a report only sets up and
 "! shows). The table shows as a grid (z2ui5_cl_cgui_gui_alv_grid) in
 "! r_container, or on the screen itself: the columns with their texts,
 "! hidden and technical columns and hotspots, the title, the striped rows,
