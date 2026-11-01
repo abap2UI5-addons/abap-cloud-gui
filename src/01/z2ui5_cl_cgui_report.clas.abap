@@ -557,7 +557,7 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
         ucomm TYPE string.
 
     "! the fields of dynpro dynnr, written onto screen like the selection
-    "! screen - report2cloud writes it from the screen of the .prog.xml
+    "! screen - report2UI5 writes it from the screen of the .prog.xml
     METHODS dynpro_screen
       IMPORTING
         dynnr  TYPE string

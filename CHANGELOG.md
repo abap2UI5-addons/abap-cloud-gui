@@ -6,6 +6,28 @@ release.
 
 ## Unreleased
 
+**report2cloud is report2UI5, and converts the user interface only**
+
+- Renamed: `tools/report2ui5`, `npm run report2ui5` (and `report2ui5:coverage`,
+  `:package`, `:web`, `:docs`, `test:report2ui5`), the workflows
+  `report2ui5.yaml` and `report2ui5-web.yaml`. The ABAP objects keep their
+  names (`z2ui5_cl_cgui_r2c_*` in `src/03`).
+- It converts the selection screen, the event blocks, the list, the ALV,
+  the messages and the popups. The logic of a report is copied as it is
+  written, and whether it runs on the target system is the user's to check.
+- Removed: the release check of tables and APIs for ABAP Cloud (the
+  migration report no longer lists them), `--successors`, `--wrappers`,
+  `--atc`, the ABAP Cloud lint of `--check` (v750 only), the call graph and
+  migration order of a package (`estate.md` is now `summary.md`), the AI
+  assistant of the site and `report2cloud:eval` with its workflow.
+- `tools/report2cloud/lib/{convert,textpool,report}.mjs` stay as a
+  re-export of the new path, and `convert( )` still answers `release` -
+  always empty - for the consumers of 1.0.0 (abap2UI5/mcp-server's
+  `migrate_report`).
+- No longer refused, copied as written: `EXEC SQL`, `CALL TRANSACTION ...
+  USING` and the `BDC_*` function modules, `GENERATE REPORT` /
+  `SUBROUTINE POOL`, `INSERT REPORT`, `SUBMIT ... VIA JOB`.
+
 ## 1.0.0 - 2026-10-30
 
 The first release: the report runtime, report2cloud and the tools around

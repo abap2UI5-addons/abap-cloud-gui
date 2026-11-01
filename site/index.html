@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>abap-cloud-gui</title>
-  <meta name="description" content="Write abap2UI5 apps like classic ABAP reports - and convert the reports you have with report2cloud, here in the browser.">
+  <meta name="description" content="Write abap2UI5 apps like classic ABAP reports - and convert the reports you have with report2UI5, here in the browser.">
   <link rel="icon" type="image/png" href="favicon.png">
   <link rel="stylesheet" href="style.css">
 </head>
@@ -29,7 +29,7 @@
       <h1>Classic ABAP reports, as UI5 apps - on ABAP Cloud and down to 7.02</h1>
       <p class="lead">Selection screen, <code>WRITE</code> list, ALV grid, <code>START-OF-SELECTION</code>,
         <code>AT LINE-SELECTION</code>, <code>MESSAGE</code>: write a class that reads like a report and get
-        an app in the browser. Convert the reports you already have with <strong>report2cloud</strong> -
+        an app in the browser. Convert the reports you already have with <strong>report2UI5</strong> -
         try it below, nothing leaves your browser.</p>
       <p class="actions">
         <a class="button primary" href="#samples">See the samples</a>
@@ -52,9 +52,10 @@
       </div>
       <div class="card">
         <h2>Converted, not rewritten</h2>
-        <p>report2cloud turns a <code>.prog.abap</code> into a report class: FORMs into methods, the list and the
-          ALV into their counterparts, dynpros and SAP GUI controls into stand-ins. What it cannot convert it
-          refuses with the line - it never guesses.</p>
+        <p>report2UI5 converts the user interface of a <code>.prog.abap</code>: the selection screen, the list
+          and the ALV into their counterparts, dynpros and SAP GUI controls into stand-ins. The logic of the
+          report goes over as it is - that part stays yours. What it cannot convert it refuses with the line -
+          it never guesses.</p>
       </div>
     </section>
 
@@ -91,7 +92,7 @@ ENDCLASS.</code></pre>
 
     <section id="samples" class="wide">
       <h2>Samples - a classic report, the class it becomes, the app</h2>
-      <p class="muted">Each sample is a classic report of the converter's corpus. report2cloud converts it here
+      <p class="muted">Each sample is a classic report of the converter's corpus. report2UI5 converts it here
         in the page - the report and its class side by side - and the class starts below them as an abap2UI5 app - the converter and the abap2UI5
         runtime run in your browser, nothing is sent anywhere.</p>
 
@@ -111,7 +112,7 @@ ENDCLASS.</code></pre>
         </div>
         <div class="pane">
           <div class="pane-head">
-            <span><span class="step-no">2</span> Converted by report2cloud</span>
+            <span><span class="step-no">2</span> Converted by report2UI5</span>
             <span class="head-actions">
               <button id="s-copy" class="link" type="button">Copy</button>
               <button id="s-download" class="link" type="button">Download</button>
@@ -137,7 +138,6 @@ ENDCLASS.</code></pre>
         <div class="card info-card wide-card"><h3>What happened</h3><ol id="s-steps" class="steps"></ol></div>
         <div class="card info-card"><h3>Refused <span id="s-n-refused" class="badge"></span></h3><div id="s-refused" class="muted">Nothing.</div></div>
         <div class="card info-card"><h3>To do <span id="s-n-todo" class="badge"></span></h3><div id="s-todo" class="muted">Nothing.</div></div>
-        <div class="card info-card"><h3>ABAP Cloud release check <span id="s-n-release" class="badge"></span></h3><div id="s-release" class="muted">Nothing to check.</div></div>
         <div class="card info-card wide-card"><details><summary><h3>Mapped - classic to abap-cloud-gui <span id="s-n-mapped" class="badge"></span></h3></summary><div id="s-mapped" class="muted">Nothing yet.</div></details></div>
       </div>
     </section>
@@ -174,7 +174,7 @@ ENDCLASS.</code></pre>
         </div>
         <div class="pane">
           <div class="pane-head">
-            <span><span class="step-no">2</span> The class report2cloud writes</span>
+            <span><span class="step-no">2</span> The class report2UI5 writes</span>
             <span class="head-actions">
               <button id="copy" class="link" type="button">Copy</button>
               <button id="download" class="link" type="button">Download</button>
@@ -198,41 +198,6 @@ ENDCLASS.</code></pre>
 
       <div id="status" class="status" role="status"></div>
 
-      <div id="ai" class="card ai">
-        <h3>AI assistant <span class="muted"></span></h3>
-        <p class="muted">The converter does not guess. The assistant does the two things it leaves to you, and a
-          check decides on every answer - up to three rounds, then you see the changes and decide.</p>
-        <ul class="muted ai-modes">
-          <li><strong>Rewrite the refused statements</strong> - of your report, so that the converter takes it, with
-            the rewrites the converter suggests and the samples above as its guide. The judge: the converter.</li>
-          <li><strong>Polish the class</strong> - the class the converter wrote, as a person would write it for
-            abap-cloud-gui: names, structure, the TODOs where the report makes them clear. The judge: it has to start
-            in the preview, checked against the report runtime and abap2UI5.</li>
-        </ul>
-        <div class="toolbar">
-          <label>Anthropic API key
-            <input id="ai-key" type="password" autocomplete="off" spellcheck="false" placeholder="sk-ant-...">
-          </label>
-          <label class="check"><input id="ai-remember" type="checkbox"> keep it in this browser</label>
-          <button id="ai-run" class="button primary" type="button" disabled>Rewrite the refused statements</button>
-          <button id="ai-polish" class="button primary" type="button" disabled>Polish the class</button>
-          <button id="ai-stop" class="button" type="button" hidden>Stop</button>
-        </div>
-        <p class="muted small">Your key and your report go from this browser to api.anthropic.com, and nowhere else;
-          the requests are billed to your key.</p>
-        <ol id="ai-steps" class="steps"></ol>
-        <div id="ai-result" hidden>
-          <div id="ai-notes" class="ai-notes"></div>
-          <div class="pane-head"><span>The changes</span>
-            <span class="head-actions">
-              <button id="ai-take" class="button primary" type="button">Take it</button>
-              <button id="ai-drop" class="button" type="button">Discard</button>
-            </span>
-          </div>
-          <pre id="ai-diff" class="output diff" tabindex="0"></pre>
-        </div>
-      </div>
-
       <div class="info">
         <div class="card info-card wide-card">
           <h3>What happened</h3>
@@ -240,7 +205,6 @@ ENDCLASS.</code></pre>
         </div>
         <div class="card info-card"><h3>Refused <span id="n-refused" class="badge"></span></h3><div id="refused" class="muted">Nothing.</div></div>
         <div class="card info-card"><h3>To do <span id="n-todo" class="badge"></span></h3><div id="todo" class="muted">Nothing.</div></div>
-        <div class="card info-card"><h3>ABAP Cloud release check <span id="n-release" class="badge"></span></h3><div id="release" class="muted">Nothing to check.</div></div>
         <div class="card info-card wide-card"><h3>Mapped - classic to abap-cloud-gui <span id="n-mapped" class="badge"></span></h3><div id="mapped" class="muted">Nothing yet.</div></div>
         <div class="card info-card wide-card"><details><summary><h3>Migration report <span class="muted">- the .migration.md, as the CLI writes it</span></h3></summary><pre id="migration" class="code"></pre></details></div>
       </div>
@@ -250,24 +214,24 @@ ENDCLASS.</code></pre>
       <h2>A whole package</h2>
       <p class="muted">The case a migration really is: not one report, a package of them. Drop the abapGit zip of
         the package here (or its .prog.abap and .prog.xml files) - every report is converted with its includes and
-        its text pool, in this browser, nothing is uploaded anywhere. You get the reports in the order to migrate
-        them in, what was refused, and one abapGit zip with every class and its migration report.</p>
+        its text pool, in this browser, nothing is uploaded anywhere. You get what was converted, what was
+        refused, and one abapGit zip with every class and its migration report.</p>
       <div class="toolbar">
         <label class="drop" id="pkg-drop">
           <span id="pkg-drop-text">Drop the zip or the files here, or click to choose</span>
           <input id="pkg-files" type="file" multiple accept=".zip,.abap,.xml" hidden>
         </label>
-        <button id="pkg-zip" class="button primary" type="button" disabled title="Every class and its migration report, with estate.md, as the zip abapGit imports offline">abapGit zip</button>
+        <button id="pkg-zip" class="button primary" type="button" disabled title="Every class and its migration report, with summary.md, as the zip abapGit imports offline">abapGit zip</button>
         <button id="pkg-clear" class="link" type="button" hidden>Clear</button>
       </div>
       <div id="pkg-result" hidden>
         <p id="pkg-summary"></p>
         <table id="pkg-table" class="table">
-          <thead><tr><th>#</th><th>Report</th><th>Class</th><th>Result</th><th>To do</th><th>Calls</th></tr></thead>
+          <thead><tr><th>#</th><th>Report</th><th>Class</th><th>Result</th><th>To do</th></tr></thead>
           <tbody></tbody>
         </table>
         <div class="info">
-          <div class="card info-card wide-card"><details><summary><h3>The estate <span class="muted">- estate.md, the graph of the calls and the order</span></h3></summary><pre id="pkg-estate" class="code"></pre></details></div>
+          <div class="card info-card wide-card"><details><summary><h3>Summary <span class="muted">- summary.md, the refusals ranked</span></h3></summary><pre id="pkg-overview" class="code"></pre></details></div>
         </div>
       </div>
     </section>
@@ -294,7 +258,7 @@ ENDCLASS.</code></pre>
   <footer class="wrap foot">
     <a href="https://github.com/abap2UI5-addons/abap-cloud-gui">abap2UI5-addons/abap-cloud-gui</a> ·
     <a href="https://github.com/abap2UI5/abap2UI5">abap2UI5</a> ·
-    <a href="https://github.com/abap2UI5-addons/abap-cloud-gui/blob/main/tools/report2cloud/README.md">report2cloud</a>
+    <a href="https://github.com/abap2UI5-addons/abap-cloud-gui/blob/main/tools/report2ui5/README.md">report2UI5</a>
   </footer>
 
   <script type="module" src="playground.js"></script>

@@ -1,7 +1,7 @@
 name: pages
 
 # The site of the repository on GitHub Pages: the page that presents the
-# addon and the report2cloud playground - the converter bundled for the
+# addon and the report2UI5 playground - the converter bundled for the
 # browser (npm run site, scripts/build-site.mjs). A converted report runs in
 # the abap2UI5 playground itself, handed the class and the report runtime in
 # its URL (runtime.json, scripts/playground-runtime.mjs). A pull request
@@ -14,23 +14,23 @@ on:
     paths:
       - 'site/**'
       - 'src/**'
-      - 'tools/report2cloud/lib/**'
-      - 'tools/report2cloud/test/corpus/**'
+      - 'tools/report2ui5/lib/**'
+      - 'tools/report2ui5/test/corpus/**'
       - 'scripts/build-site.mjs'
       - 'scripts/playground-runtime*.mjs'
-      - 'tools/report2cloud/test/ddic/**'
-      - 'tools/report2cloud/test/runtime/seed.mjs'
+      - 'tools/report2ui5/test/ddic/**'
+      - 'tools/report2ui5/test/runtime/seed.mjs'
       - 'package-lock.json'
       - '.github/workflows/pages.yaml'
   pull_request:
     paths:
       - 'site/**'
       - 'src/**'
-      - 'tools/report2cloud/lib/**'
+      - 'tools/report2ui5/lib/**'
       - 'scripts/build-site.mjs'
       - 'scripts/playground-runtime*.mjs'
-      - 'tools/report2cloud/test/ddic/**'
-      - 'tools/report2cloud/test/runtime/seed.mjs'
+      - 'tools/report2ui5/test/ddic/**'
+      - 'tools/report2ui5/test/runtime/seed.mjs'
       - 'package-lock.json'
       - '.github/workflows/pages.yaml'
   workflow_dispatch:

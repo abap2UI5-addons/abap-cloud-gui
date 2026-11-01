@@ -1,6 +1,6 @@
 "! CL_GUI_FRONTEND_SERVICES for a report in the browser - the methods a
 "! report uses for its files, with their names, parameters and classic
-"! exceptions, so that report2cloud writes z2ui5_cl_cgui_frontend=>gui_upload(
+"! exceptions, so that report2UI5 writes z2ui5_cl_cgui_frontend=>gui_upload(
 "! ... ) for cl_gui_frontend_services=>gui_upload( ... ) and the rest of the
 "! statement - EXCEPTIONS and sy-subrc included - stays as it is.
 "!

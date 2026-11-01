@@ -8,7 +8,7 @@
 [![abaplint](https://img.shields.io/github/actions/workflow/status/abap2UI5-addons/abap-cloud-gui/abaplint.yaml?branch=main&label=abaplint)](https://github.com/abap2UI5-addons/abap-cloud-gui/actions/workflows/abaplint.yaml)
 [![ABAP Unit](https://img.shields.io/github/actions/workflow/status/abap2UI5-addons/abap-cloud-gui/unit.yaml?branch=main&label=ABAP%20Unit)](https://github.com/abap2UI5-addons/abap-cloud-gui/actions/workflows/unit.yaml)
 [![check-abap2UI5](https://img.shields.io/github/actions/workflow/status/abap2UI5-addons/abap-cloud-gui/check-abap2ui5.yaml?branch=main&label=check-abap2UI5)](https://github.com/abap2UI5-addons/abap-cloud-gui/actions/workflows/check-abap2ui5.yaml)
-[![report2cloud](https://img.shields.io/github/actions/workflow/status/abap2UI5-addons/abap-cloud-gui/report2cloud.yaml?branch=main&label=report2cloud)](https://github.com/abap2UI5-addons/abap-cloud-gui/actions/workflows/report2cloud.yaml)
+[![report2UI5](https://img.shields.io/github/actions/workflow/status/abap2UI5-addons/abap-cloud-gui/report2ui5.yaml?branch=main&label=report2UI5)](https://github.com/abap2UI5-addons/abap-cloud-gui/actions/workflows/report2ui5.yaml)
 
 **[Try the report converter in the browser](https://abap2ui5-addons.github.io/abap-cloud-gui/#playground)**
 
@@ -43,7 +43,7 @@ What it is not:
 - **Not a way to run existing reports unchanged.** A report is rewritten as a
   class: event blocks become methods, `PARAMETERS` become attributes, `WRITE`
   becomes `write( )`. The structure stays, the syntax changes -
-  [report2cloud](#converting-existing-reports-report2cloud) does most of it.
+  [report2UI5](#converting-existing-reports-report2ui5) does most of it.
 - **Not a SAP GUI clone.** It uses the classic *programming model*, the screens
   look like modern UI5. If you are looking for SE80, SE16N or SM37 in the
   browser, that is [abap2UI5-addons/sapgui](https://github.com/abap2UI5-addons/sapgui).
@@ -125,7 +125,7 @@ is a complete report.
 Everything is ABAP Cloud ready, transpilable to Node and downportable to
 7.02: classes, two interfaces, the two tables with their data elements -
 no programs, no tooling on the stack. Reports are converted with
-[report2cloud](#converting-existing-reports-report2cloud), which runs in Node.
+[report2UI5](#converting-existing-reports-report2ui5), which runs in Node.
 
 All views are built with `z2ui5_cl_ui5_view_builder`. The selection screen,
 the list and the ALV can also be used on their own inside any abap2UI5 app:
@@ -170,7 +170,7 @@ The event blocks and when they run:
 | `at_value_request( field )` | F4 on a field — the default is the standard F4 of its DDIC type; redefine it for your own and call `super->` for the rest |
 
 The rest of the API a converted report may use, by what it came from -
-`report2cloud` writes these, a report written by hand rarely needs them:
+`report2UI5` writes these, a report written by hand rarely needs them:
 
 | Classic | Methods |
 |---|---|
@@ -279,7 +279,7 @@ the report class of the catalog with its variant, Back returns here.
 ### In the Fiori launchpad
 
 A report class is a tile of the launchpad like any abap2UI5 app - the
-migration report of report2cloud lists its target mapping (semantic object
+migration report of report2UI5 lists its target mapping (semantic object
 the class, action `display`, parameter `app_start`). Inside the launchpad
 the shell shows the title of the report, and the startup parameters of the
 tile fill the selection screen as the URL does (`P_CARRID=LH`, `variant`).
@@ -509,13 +509,13 @@ lo_report->cgui_run_in_background( EXPORTING values   = values
 
 ### The converted reports: src/03
 
-`src/03` holds report classes as report2cloud writes them - the reports of
-its test corpus (`tools/report2cloud/test/corpus`) converted, not touched by
+`src/03` holds report classes as report2UI5 writes them - the reports of
+its test corpus (`tools/report2ui5/test/corpus`) converted, not touched by
 hand: the test set to pull onto a system and run, `?app_start=z2ui5_cl_cgui_r2c_01`
 and so on. Only the reports that need nothing ABAP Cloud lacks are in it
 (no SFLIGHT, SPFLI, SCARR - those convert too, see the snapshots), so the
 repository installs on every target. The converter test keeps `src/03` equal
-to the conversion; `UPDATE_SNAPSHOTS=1 npm run test:report2cloud` writes it
+to the conversion; `UPDATE_SNAPSHOTS=1 npm run test:report2ui5` writes it
 anew.
 
 | Class | Report |
@@ -546,10 +546,10 @@ anew.
 | `z2ui5_cl_cgui_r2c_39` | `zr2c_39_textedit` - A note editor on the screen itself |
 | `z2ui5_cl_cgui_r2c_40` | `zr2c_40_sapevent` - A menu as an HTML page on the screen |
 
-## Converting existing reports: report2cloud
+## Converting existing reports: report2UI5
 
 A report that exists already does not have to be rewritten by hand.
-[`tools/report2cloud`](tools/report2cloud/README.md) converts a classic
+[`tools/report2ui5`](tools/report2ui5/README.md) converts a classic
 report into a report class of this addon - `PARAMETERS` and
 `SELECT-OPTIONS` into attributes and `selection_screen( )`, the event blocks
 into the methods of the same name, `WRITE` / `FORMAT` / `HIDE` into the list,
@@ -558,22 +558,23 @@ into the methods of the same name, `WRITE` / `FORMAT` / `HIDE` into the list,
 
 ```bash
 npm ci
-npm run report2cloud -- zflights.prog.abap --out src/02
+npm run report2ui5 -- zflights.prog.abap --out src/02
 ```
 
 The includes of a report are read from beside it, as abapGit writes them,
 and macros are expanded at their calls. It is deterministic and refuses
-rather than guesses: what has no counterpart in a browser app (`CALL SCREEN`,
-dynpro modules, batch input, `SUBMIT`, native SQL) is reported with file,
-line and column. `npm run report2cloud:coverage -- <dir>` converts a whole
+rather than guesses: a part of the user interface that has no counterpart
+in a browser app (`CALL SCREEN` without its screen, dynpro modules, reading
+the list back by index) is reported with file, line and column. It converts
+the user interface only: the logic of the report - its tables, function
+modules, native SQL, batch input - is copied as it is, and whether it runs
+on the target system is the user's to check. `npm run report2ui5:coverage -- <dir>` converts a whole
 folder of reports in memory and says how many convert and what stops the
 rest - the measurement the roadmap below is ordered by. Next to the class it writes a
-migration report - the TODOs, and the tables and APIs that are not released on
-ABAP Cloud, with their successors as hints: the work list for a person or an
-AI model, checked with abaplint's ABAP Cloud rules, the abap2UI5 linter and
-unit tests.
+migration report - what was mapped, the TODOs and what was not carried
+over.
 
-report2cloud is the generator of this repository: there is no converter or
+report2UI5 is the generator of this repository: there is no converter or
 painter on the stack any more, the conversion runs in Node, on the reports
 of an abapGit export.
 
@@ -633,7 +634,7 @@ Known limitations:
 - [x] Phase 7 — selection variants: get, save as, delete, start with a
       variant from the URL or `set_variant( )`, kept in the browser's local
       storage
-- [x] Phase 8 — selection screen painter (since replaced by report2cloud:
+- [x] Phase 8 — selection screen painter (since replaced by report2UI5:
       reports and classes are generated in Node, not on the stack)
 - [x] Phase 9 — message popover: the messages of a run in one place,
       counted in the footer, opened by W and E, each message of a field
@@ -641,28 +642,28 @@ Known limitations:
 
 **Next**
 
-The order is the measurement's: `report2cloud:coverage` over a corpus of
+The order is the measurement's: `report2ui5:coverage` over a corpus of
 real reports says which construct stops the most of them, and that construct
 is next. Every stage is a release of its own.
 
 Stage 0 - release, and the number to move
 
-- [x] A release of this addon with report2cloud and the MCP server's
+- [x] A release of this addon with report2UI5 and the MCP server's
       `migrate_report`: [v1.0.0](https://github.com/abap2UI5-addons/abap-cloud-gui/releases/tag/v1.0.0),
       with the abapGit zip and the 7.02 zip
 - [x] A corpus of real reports: the open-source ABAP of the web, converted
-      weekly (`report2cloud:web`), the share that converts without a refusal
+      weekly (`report2ui5:web`), the share that converts without a refusal
       and the refusals ranked in the job summary - the number every stage
       below is measured by
 - [x] The share of the web corpus that starts in the transpiled runtime:
-      `report2cloud:web --start` checks, builds and starts the converted
+      `report2ui5:web --start` checks, builds and starts the converted
       reports weekly, the funnel and where they stopped in the job summary
       (first run: 74 of 596 converted reports start, 82 with the upload
       dialog of `GUI_UPLOAD` and `cl_demo_output`; most of the others read
       a class or table of their repository the sparse clone lacks)
 - [x] A site with the converter in the browser - GitHub Pages, the
       playground converts a pasted report on the page (`npm run site`)
-- [x] `report2cloud:coverage` - the measurement over a folder of reports
+- [x] `report2ui5:coverage` - the measurement over a folder of reports
 - [x] Includes inlined from beside the report, macros expanded
 
 Stage 1 - the converter: the constructs that stop the most reports
@@ -698,7 +699,7 @@ Stage 1 - the converter: the constructs that stop the most reports
       `TABBED BLOCK` and `BEGIN OF SCREEN` (`AS WINDOW` and `AS SUBSCREEN`)
       on the runtime's own counterparts
 - [x] A documentation page per refusal: why, and the rewrite that unblocks it
-      ([tools/report2cloud/docs/refusals.md](tools/report2cloud/docs/refusals.md),
+      ([tools/report2ui5/docs/refusals.md](tools/report2ui5/docs/refusals.md),
       linked from every refusal of the migration report)
 
 Stage 2 - the runtime: what a report's user sees
@@ -760,7 +761,7 @@ Dialogs and screens
       reads the attributes of `lo_screens` as the dynpro left them
 - [x] The selection screen of another report, as a popup or by screen
       number: `submit( using_selection_screen = '1100' )` (SUBMIT ... USING
-      SELECTION-SCREEN, converted by report2cloud) and `submit( as_window =
+      SELECTION-SCREEN, converted by report2UI5) and `submit( as_window =
       abap_true )` - the called report's screen as a dialog box over the
       caller, Execute shows its output, Cancel returns
 
@@ -789,20 +790,17 @@ Navigation and transactions
       ones (`SPRO` in the command field, `authority_check_customizing( )`),
       then the system ones (`set_system_parameters( )`)
 
-Stage 3 - clean core at the scale of a code base
+Stage 3 - at the scale of a code base
 
-- [x] A `SELECT` from a table with a known released successor rewritten,
-      field names included, where the mapping is certain (`--successors`)
-- [x] A wrapper stub for an unreleased function module, for a person to type
-      and release (`--wrappers`: `<class>_fmw`, the call through its method)
-- [x] ATC findings in the migration report: `--atc` takes the findings of
-      the classic report (the ADT worklist XML, or a CSV), and the report
-      says for each what the conversion did on its line - converted,
-      refused, TODO, or to check
-- [x] A whole package converted in one run (`tools/report2cloud/package.mjs`):
-      the dependency graph over `SUBMIT` and `PERFORM ... IN PROGRAM`, the
-      order to migrate in, one coverage table for the estate, the refusals
-      ranked across it
+- [x] A whole package converted in one run (`tools/report2ui5/package.mjs`):
+      the classes and one summary, the refusals ranked across the package
+
+The converter was narrowed to the user interface after 1.0.0 and renamed
+from report2cloud to report2UI5: the release check of tables and APIs, the
+released successors (`--successors`), the function module wrappers
+(`--wrappers`), the ATC findings (`--atc`), the call graph and migration
+order of a package and the AI assistant are gone - the logic of a report is
+the user's.
 
 Stage 4 - in the browser, and with an agent
 
@@ -812,22 +810,8 @@ Stage 4 - in the browser, and with an agent
       and the running app side by side, highlighted - and below them a
       converter for your own report, with its preview on demand - nothing
       to install
-- [x] An AI assistant on the site for the statements the converter refuses:
-      with the user's own Anthropic API key, from the browser, it rewrites
-      them in the classic report - the refusal catalogue's rewrites and the
-      closest samples as its guide - and the converter checks every answer,
-      up to three rounds; the user sees the diff and takes it or not
-- [x] The AI assistant polishes the converted class: names, structure, the
-      TODOs where the report makes them clear - each answer started in the
-      preview, checked against the report runtime and abap2UI5, and what
-      stops it goes back to the model, up to three rounds
 - [x] `migrate_report` in the MCP server with the class deployed into the
       sandbox and its first screen answered
-- [x] An evaluation harness for the AI loop: a model works the refused
-      reports of the web corpus, and the share that ends clean is measured
-      (`report2cloud:eval`) - accepted by the converter, clean when the
-      rest of the report is unchanged, per kind of refusal, with the rounds
-      and the tokens; `--dry` without a key
 
 Stage 5 - research
 
@@ -885,8 +869,7 @@ Stage 6 - the review of 1.0.0: does it run, and is it fun
 A review on 2026-10-30, measured: 634 of 780 open-source reports convert
 (81 %), the converted classes read like hand-written ones, the test-corpus
 reports carry at most five TODOs. What the numbers do not say: how many of
-the converted reports run on a real system, whether the AI assistant helps
-or harms, and the two cores grew into monoliths - the report class has
+the converted reports run on a real system, and the two cores grew into monoliths - the report class has
 8,700 lines, 244 methods and 124 state attributes, the converter 8,700
 lines in one file. The stage takes that on, in this order.
 
@@ -896,11 +879,8 @@ The last meter for the user
       from the site (offline import), samples and own report alike - not
       one download per file
 - [x] A whole package in the browser: an abapGit zip of a package dropped
-      on the site, every report converted with its includes, the order to
-      migrate in, one zip back - nothing leaves the browser
-- [ ] The AI assistant measured: `report2cloud:eval` run with a key on the
-      refused reports of the web corpus, the share that ends clean in this
-      README - and the loop made the second path of the site if it earns it
+      on the site, every report converted with its includes, one zip back -
+      nothing leaves the browser
 - [ ] Three real reports of real users run on a real system - the
       measurement the transpiled runtime cannot replace
 
@@ -977,7 +957,7 @@ npm run check:702       # downport a scratch copy to 7.02 and check it
 npm run check:abap2ui5  # abap2UI5-linter over apps and views
 npm run check:regex     # no regular expressions in src/
 npm run unit            # ABAP Unit in the transpiled backend (needs ../mcp-server)
-npm run test:report2cloud  # the report converter: snapshots and abaplint over its output
+npm run test:report2ui5  # the report converter: snapshots and abaplint over its output
 npm run site            # the GitHub Pages site with the converter playground into build/site (-- --serve: on :8080)
 ```
 

@@ -1,4 +1,4 @@
-// The report2cloud part of the site, in two sections:
+// The report2UI5 part of the site, in two sections:
 //
 // - Samples: a report of the converter's own corpus (examples.json, written
 //   by scripts/build-site.mjs with its text pool), the class the converter
@@ -9,7 +9,7 @@
 //   its class as an app beside it. Below, what happened and what the
 //   converter found.
 //
-// The converter is tools/report2cloud, bundled for the browser. A class runs
+// The converter is tools/report2ui5, bundled for the browser. A class runs
 // in the abap2UI5 playground itself (https://abap2ui5.github.io/playground/),
 // framed in its app-only view (?embed=1&view=app) - no editor, no bar, only
 // the app. It is handed the class the converter wrote, the report runtime of
@@ -19,19 +19,17 @@
 // server. The frame is of another site, so the page listens to what the
 // playground says to the page that framed it (src/shell/embed.mjs there):
 // its status line, and the abaplint errors that stopped a Run.
-import { convert, defaultClassName } from "../tools/report2cloud/lib/convert.mjs";
-import { migrationReport } from "../tools/report2cloud/lib/report.mjs";
-import { parseTextpool } from "../tools/report2cloud/lib/textpool.mjs";
+import { convert, defaultClassName } from "../tools/report2ui5/lib/convert.mjs";
+import { migrationReport } from "../tools/report2ui5/lib/report.mjs";
+import { parseTextpool } from "../tools/report2ui5/lib/textpool.mjs";
 import { highlightAbap, highlightFile } from "./highlight.mjs";
-import { MODEL, errorText, lineDiff, polishClass, rewriteRefused } from "./assistant.mjs";
 import { abapgitZip } from "./zip.mjs";
 import { unzipTexts } from "./unzip.mjs";
-import { convertPackage } from "../tools/report2cloud/lib/package.mjs";
-import { SCARR, SPFLI, sflight } from "../tools/report2cloud/test/runtime/seed.mjs";
+import { convertPackage } from "../tools/report2ui5/lib/package.mjs";
+import { SCARR, SPFLI, sflight } from "../tools/report2ui5/test/runtime/seed.mjs";
 
 const $ = (id) => document.getElementById(id);
-const STORE = "report2cloud.own";
-const KEY_STORE = "report2cloud.ai-key";
+const STORE = "report2ui5.own";
 
 const el = (tag, attrs = {}, ...kids) => {
   const e = document.createElement(tag);
@@ -101,14 +99,13 @@ function panel(id, items, empty, render) {
 /** the panels of a conversion; prefix "s-" for the samples */
 function panels(prefix, result) {
   if (!result) {
-    for (const [id, empty] of [["refused", "Nothing."], ["todo", "Nothing."], ["release", "Nothing to check."], ["mapped", "Nothing yet."]]) {
+    for (const [id, empty] of [["refused", "Nothing."], ["todo", "Nothing."], ["mapped", "Nothing yet."]]) {
       if ($(prefix + id)) panel(prefix + id, [], empty);
     }
     return;
   }
   if ($(`${prefix}refused`)) panel(`${prefix}refused`, result.refusals, "Nothing.", (items) => listOf(items, (r) => el("li", { class: "bad" }, rowOf(r), r.message)));
   panel(`${prefix}todo`, result.todos, "Nothing.", (items) => listOf(items, (t) => el("li", { class: "warn" }, rowOf(t), t.message)));
-  panel(`${prefix}release`, result.release, "Nothing to check.", (items) => listOf(items, (r) => el("li", {}, rowOf(r), `${r.kind} ${r.name}${r.successor ? ` - ${r.successor}` : ""}`)));
   panel(`${prefix}mapped`, result.mapped, "Nothing yet.", (items) => {
     const table = el("table", { class: "mapped" }, el("thead", {}, el("tr", {}, el("th", {}, "Line"), el("th", {}, "Classic"), el("th", {}, "abap-cloud-gui"))));
     const body = el("tbody");
@@ -419,19 +416,17 @@ try {
     }
     last = { result: c.result, text };
     files = c.files;
-    polished = undefined;
     shown = fileTabs($("tabs"), output, files, c.result.className);
     const { result } = c;
     status.className = result.ok ? "status ok" : "status bad";
     status.textContent = result.ok
-      ? `Converted into ${result.className} - ${result.mapped.length} statement(s) mapped, ${result.todos.length} TODO(s), ${result.release.length} object(s) to check for ABAP Cloud.`
+      ? `Converted into ${result.className} - ${result.mapped.length} statement(s) mapped, ${result.todos.length} TODO(s).`
       : `Refused: ${result.refusals.length} statement(s) have no counterpart - the draft shows how far it got; nothing can run until they are rewritten.`;
     Object.assign(steps, stepsOf(c.name, text, textpool, result));
     renderSteps(stepList, steps);
     panels("", result);
     $("migration").textContent = c.report;
     markStale();
-    aiReady();
   };
 
   /** the app in the frame was started with another source - Preview starts this one */
@@ -476,7 +471,8 @@ try {
   };
   const load = () => {
     try {
-      return JSON.parse(localStorage.getItem(STORE) ?? "null");
+      // the key of the name before report2UI5 - a report kept then is read once more
+      return JSON.parse(localStorage.getItem(STORE) ?? localStorage.getItem("report2cloud.own") ?? "null");
     } catch {
       return null;
     }
@@ -528,7 +524,7 @@ try {
   $("download-all").onclick = () => last?.result.ok && downloadZip(files, last.result.className);
 
   // ---- a whole package: the files of a dropped zip (or the files themselves)
-  // converted in this browser, the order to migrate in, one zip back
+  // converted in this browser, one zip back
   {
     const drop = $("pkg-drop");
     const input = $("pkg-files");
@@ -542,21 +538,17 @@ try {
       out = pkg;
       const converted = pkg.rows.filter((r) => r.ok).length;
       $("pkg-summary").textContent = pkg.rows.length
-        ? `${name}: ${pkg.rows.length} report(s), ${converted} converted, ${pkg.rows.length - converted} refused - in the order to migrate them in, a called report before its caller.`
+        ? `${name}: ${pkg.rows.length} report(s), ${converted} converted, ${pkg.rows.length - converted} refused.`
         : `${name}: no report in it - a report is a .prog.abap with a REPORT or PROGRAM statement.`;
-      const byName = new Map(pkg.rows.map((r) => [r.name, r]));
-      $("pkg-table").querySelector("tbody").replaceChildren(...pkg.order.map((n, i) => {
-        const r = byName.get(n);
-        const calls = [...new Set(r.calls.filter((c) => c.target).map((c) => c.target))];
+      $("pkg-table").querySelector("tbody").replaceChildren(...pkg.rows.map((r, i) => {
         return el("tr", {},
           el("td", {}, String(i + 1)),
           el("td", { class: "mono" }, r.name),
           el("td", { class: "mono" }, r.className),
           el("td", { class: r.ok ? "ok" : "bad" }, r.ok ? "converted" : r.crashed ? `crashed: ${r.crashed}` : `refused: ${[...new Set(r.refusalKinds)].join("; ")}`),
-          el("td", {}, r.ok ? String(r.todos.length) : "-"),
-          el("td", { class: "mono" }, calls.join(", ")));
+          el("td", {}, r.ok ? String(r.todos.length) : "-"));
       }));
-      $("pkg-estate").textContent = pkg.estate;
+      $("pkg-overview").textContent = pkg.summary;
       result.hidden = false;
       zipButton.disabled = converted === 0;
       clear.hidden = false;
@@ -595,7 +587,7 @@ try {
       drop.classList.remove("over");
       if (e.dataTransfer?.files?.length) take([...e.dataTransfer.files]);
     };
-    zipButton.onclick = () => out && download("report2cloud.zip", abapgitZip(out.output, "report2cloud"), "application/zip");
+    zipButton.onclick = () => out && download("report2ui5.zip", abapgitZip(out.output, "report2ui5"), "application/zip");
     clear.onclick = () => {
       out = undefined;
       result.hidden = true;
@@ -616,177 +608,6 @@ try {
     $("playground").scrollIntoView({ behavior: "smooth" });
     source.focus({ preventScroll: true });
   });
-
-  // ---- the AI assistant: the refused statements rewritten (the converter the
-  // judge), then the class polished (the start the judge)
-  const aiKey = $("ai-key");
-  const aiRun = $("ai-run");
-  const aiPolish = $("ai-polish");
-  const aiSteps = $("ai-steps");
-  let aiAnswer;
-  let aiAbort;
-  // the polished files, while they are what the class pane shows
-  let polished;
-  const aiLog = [];
-  const aiStep = (s) => {
-    if (aiLog.at(-1)?.state === "wait") aiLog.pop();
-    aiLog.push(s);
-    aiSteps.replaceChildren(...aiLog.map((x) => el("li", { class: x.state }, x.text)));
-  };
-  function aiReady() {
-    const key = Boolean(aiKey.value.trim());
-    const busy = Boolean(aiAbort);
-    const refused = last && !last.result.ok;
-    const converted = last && last.result.ok;
-    aiRun.disabled = !refused || !key || busy;
-    aiRun.title = !refused ? "Nothing is refused - nothing for the assistant to do" : !key ? "Your Anthropic API key first" : "";
-    aiPolish.disabled = !converted || !key || busy;
-    aiPolish.title = !converted ? "The report converts first - rewrite what is refused" : !key ? "Your Anthropic API key first" : "";
-  }
-  try {
-    aiKey.value = localStorage.getItem(KEY_STORE) ?? "";
-    $("ai-remember").checked = Boolean(aiKey.value);
-  } catch {
-    /* no storage in this context */
-  }
-  const keepKey = () => {
-    try {
-      if ($("ai-remember").checked && aiKey.value.trim()) localStorage.setItem(KEY_STORE, aiKey.value.trim());
-      else localStorage.removeItem(KEY_STORE);
-    } catch {
-      /* no storage in this context */
-    }
-  };
-  aiKey.addEventListener("input", () => {
-    keepKey();
-    aiReady();
-  });
-  $("ai-remember").addEventListener("change", keepKey);
-
-  /** the changed lines with three lines around them, as HTML */
-  const diffHtml = (before, after) => {
-    const rows = lineDiff(before, after);
-    const near = rows.map((r, i) => rows.slice(Math.max(0, i - 3), i + 4).some((x) => x.kind !== " "));
-    const out = [];
-    let gap = false;
-    rows.forEach((r, i) => {
-      if (!near[i]) {
-        if (!gap) out.push(`<span class="gap">...</span>`);
-        gap = true;
-        return;
-      }
-      gap = false;
-      const code = highlightAbap(r.text) || " ";
-      out.push(`<span class="${r.kind === "+" ? "add" : r.kind === "-" ? "del" : "ctx"}">${r.kind === " " ? " " : r.kind} ${code}</span>`);
-    });
-    // a line each - the spans are blocks
-    return out.join("");
-  };
-  const escape = (t) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;");
-
-  // the assistant at work: one at a time, Stop for it
-  const working = async (job) => {
-    aiLog.length = 0;
-    $("ai-result").hidden = true;
-    aiAbort = new AbortController();
-    aiReady();
-    $("ai-stop").hidden = false;
-    try {
-      await job(aiAbort.signal);
-    } catch (e) {
-      aiStep({ state: "bad", text: `The assistant stopped: ${errorText(e)}.` });
-    } finally {
-      aiAbort = undefined;
-      $("ai-stop").hidden = true;
-      aiReady();
-    }
-  };
-  const okSamples = () => examples.filter((e) => e.source !== last?.text).map((e) => ({ e, c: convertReport(e.source, { textpool: e.textpool }) })).filter((x) => x.c.result.ok);
-
-  aiRun.onclick = () => working(async (signal) => {
-    if (!last || last.result.ok) return;
-    const report = last.text;
-    const { textpool } = textpoolOf();
-    const answer = await rewriteRefused({
-      apiKey: aiKey.value.trim(),
-      report,
-      result: last.result,
-      samples: okSamples().map((x) => x.e),
-      convert: (text) => convertReport(text, { textpool, className: classname.value.trim() || undefined }).result,
-      onStep: aiStep,
-      signal,
-    });
-    aiAnswer = { kind: "report", ...answer };
-    $("ai-notes").textContent = answer.notes;
-    $("ai-diff").innerHTML = diffHtml(report, answer.source);
-    $("ai-result").hidden = false;
-    $("ai-take").textContent = answer.result.ok ? "Take it" : "Take it anyway";
-    if (!answer.result.ok) aiStep({ state: "bad", text: `After ${answer.rounds} rounds, ${answer.result.refusals.length} statement(s) are still refused - take what it did and rewrite those by hand, or discard it.` });
-  });
-
-  // the ABAP files of the class, the class first - what the playground runs
-
-  aiPolish.onclick = () => working(async (signal) => {
-    if (!last || !last.result.ok) return;
-    const { className } = last.result;
-    const before = classFiles(files, className);
-    // the classes of the two samples closest to the report: the runtime's API in use
-    const words = new Set(last.text.toLowerCase().match(/[a-z_][\w-]{2,}/g) ?? []);
-    const references = okSamples()
-      .map((x) => ({ x, score: (x.e.source.toLowerCase().match(/[a-z_][\w-]{2,}/g) ?? []).filter((w) => words.has(w)).length }))
-      .sort((a, b) => b.score - a.score).slice(0, 2)
-      .map(({ x }) => ({ name: `${x.c.result.className}.clas.abap`, source: x.c.files[`${x.c.result.className}.clas.abap`] }));
-    const answer = await polishClass({
-      apiKey: aiKey.value.trim(),
-      report: last.text,
-      files: before,
-      todos: last.result.todos,
-      references,
-      // the preview the judge: the polished files started there
-      check: (next) => {
-        preview(true);
-        running = undefined;
-        return start(classFiles(next, className), className);
-      },
-      onStep: aiStep,
-      signal,
-    });
-    aiAnswer = { kind: "class", before, ...answer };
-    const changed = Object.keys(answer.files).filter((n) => answer.files[n] !== before[n]);
-    $("ai-notes").textContent = answer.notes;
-    $("ai-diff").innerHTML = changed.map((n) => `<span class="gap">${escape(n)}</span>${diffHtml(before[n], answer.files[n])}`).join("");
-    $("ai-result").hidden = false;
-    $("ai-take").textContent = answer.ok ? "Take it" : "Take it anyway";
-    if (!answer.ok) aiStep({ state: "bad", text: `After ${answer.rounds} rounds the polished class still does not start - take it to fix it by hand, or discard it.` });
-  });
-
-  $("ai-stop").onclick = () => aiAbort?.abort();
-  $("ai-take").onclick = () => {
-    if (!aiAnswer) return;
-    if (aiAnswer.kind === "report") {
-      source.value = aiAnswer.source;
-      save();
-      run();
-      aiStep({ state: "ok", text: "Taken into your report - converted again above." });
-    } else {
-      // the class pane shows the polished files - until the report is converted again
-      polished = { text: last.text, files: aiAnswer.files };
-      Object.assign(files, aiAnswer.files);
-      shown = fileTabs($("tabs"), output, files, last.result.className);
-      status.className = "status ok";
-      status.textContent = `Polished by the AI assistant - ${last.result.className} as it started in the preview. A change to the report converts it again and replaces it.`;
-      aiStep({ state: "ok", text: "Taken into the class - Copy, Download and All files give the polished files." });
-    }
-    $("ai-result").hidden = true;
-    aiAnswer = undefined;
-  };
-  $("ai-drop").onclick = () => {
-    $("ai-result").hidden = true;
-    aiAnswer = undefined;
-    // the preview showed the polished class: the converted one again
-    if (!polished && last?.result.ok && $("preview").hidden === false) runApp();
-  };
-  $("ai").querySelector("h3 .muted").textContent = `- ${MODEL}`;
 
   const kept = load();
   source.value = kept?.source ?? "";
