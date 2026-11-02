@@ -168,3 +168,35 @@
 .r2u .small { font-size: 14px; }
 .r2u section.first { margin-top: 16px; }
 .r2u section.first .status:empty { display: none; }
+
+/* the playground, top to bottom: start from (tabs), the class, the preview,
+   the details (tabs) */
+.r2u .switch { display: flex; flex-wrap: wrap; gap: 4px; padding: 4px; margin: 4px 0 16px; border: 1px solid var(--line); border-radius: 10px; background: var(--vp-c-bg-soft); width: fit-content; max-width: 100%; }
+.r2u .switch button {
+  border: 0; background: none; color: var(--muted); border-radius: 7px; padding: 6px 14px;
+  font: inherit; font-size: 14px; font-weight: 500; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;
+}
+.r2u .switch button:hover { color: var(--text); }
+.r2u .switch button[aria-selected="true"] { background: var(--vp-c-bg); color: var(--text); font-weight: 600; box-shadow: 0 1px 3px rgba(0, 0, 0, .12); }
+.r2u .switch button[hidden] { display: none; }
+.r2u h2 .step-no { vertical-align: 2px; }
+.r2u section > .pane-head { flex-wrap: wrap; }
+.r2u section > .pane-head h2 { padding-top: 0; border-top: 0; margin: 0; }
+.r2u #converted, .r2u #preview, .r2u #details { padding-top: 24px; border-top: 1px solid var(--line); }
+.r2u #converted .pane-head, .r2u #preview .pane-head { margin-bottom: 10px; }
+.r2u #converted .status { margin: 0 0 10px; }
+.r2u #converted .status:empty { display: none; }
+.r2u #converted .output { height: 560px; }
+.r2u #preview .head-actions { align-items: center; }
+.r2u .pkg { margin-top: 16px; }
+.r2u .pkg .pane-head { font-weight: 600; }
+.r2u .table-wrap { max-height: 420px; overflow: auto; }
+.r2u .detail { padding: 16px 18px; min-height: 120px; }
+.r2u .detail ul { margin: 0; padding-left: 18px; list-style: disc; }
+.r2u .detail li { margin: 3px 0; font-size: 14px; }
+.r2u .detail .row { font-family: var(--mono); font-size: 12px; color: var(--muted); margin-right: 6px; }
+.r2u .detail .bad { color: var(--bad); }
+.r2u .detail .warn { color: var(--warn); }
+.r2u .detail #migration, .r2u .detail #pkg-overview { max-height: 520px; white-space: pre-wrap; margin-top: 0; }
+.r2u .detail p.small { margin: 0 0 10px; }
+.r2u #details > h2 { padding-top: 0; border-top: 0; }

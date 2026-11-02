@@ -21,6 +21,15 @@ release.
   with its text pool, a link to a repository or a folder converts its
   reports as a package (each one opens in the editor from the table).
   `?github=<link>` imports at once.
+- The playground reads top to bottom: where to start from (your own
+  source, a GitHub link, an abapGit zip - as tabs), the class report2UI5
+  writes, the preview, and the conversion in detail in tabs (what
+  happened, refused, to do, mapped, the migration report, the summary of
+  a package). Run in the preview of your own report starts the app again
+  - it did not start since the move to VitePress, whose root element has
+  the id the frame had.
+- `/playground#package` (and `#zip`) opens the zip tab, `#github` the
+  GitHub tab - the old link `…/abap-cloud-gui/#package` lands there too.
   `npm run site` builds into `build/site` as before, `npm run site:dev`
   starts the dev server.
 
