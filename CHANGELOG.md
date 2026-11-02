@@ -28,6 +28,8 @@ release.
   a package). Run in the preview of your own report starts the app again
   - it did not start since the move to VitePress, whose root element has
   the id the frame had.
+- `/playground#package` (and `#zip`) opens the zip tab, `#github` the
+  GitHub tab - the old link `…/abap-cloud-gui/#package` lands there too.
   `npm run site` builds into `build/site` as before, `npm run site:dev`
   starts the dev server.
 

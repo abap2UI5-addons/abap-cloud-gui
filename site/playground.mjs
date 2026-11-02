@@ -319,6 +319,7 @@ export async function mount({ go = (path) => { location.href = new URL(`..${path
     const own = ownSection(signal);
     const pkg = packageSection(own);
     githubSection(own, pkg, signal);
+    followHash(signal);
   }
   return () => ac.abort();
 }
@@ -338,6 +339,23 @@ function switches() {
       };
     }
   }
+}
+
+// where to start from, by the fragment of the URL: #package (the link of
+// the one-page site before) and #zip open the zip tab, #github the GitHub
+// tab, #source your own source
+const START_TABS = { "#package": "src-zip", "#zip": "src-zip", "#github": "src-gh", "#source": "src-own" };
+
+/** the start tab the fragment names - now, and when it changes */
+function followHash(signal) {
+  const follow = () => {
+    const tab = START_TABS[location.hash.toLowerCase()];
+    if (!tab) return;
+    selectTab(tab);
+    $("playground").scrollIntoView();
+  };
+  follow();
+  window.addEventListener("hashchange", follow, { signal });
 }
 
 /** shows a tab of a row - onlyIfHidden: only when the selected tab is gone */
