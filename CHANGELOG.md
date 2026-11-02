@@ -6,6 +6,17 @@ release.
 
 ## Unreleased
 
+**The site is VitePress**
+
+- <https://abap2ui5-addons.github.io/abap-cloud-gui/> is built with VitePress
+  (`site/.vitepress`): a home page, a guide (`/guide`) and the report2UI5
+  playground on a page of its own (`/playground`), with search and a dark
+  mode. The playground keeps its code (`site/playground.mjs`, bundled with
+  esbuild as before) and is mounted by a Vue component; links to the old
+  sections (`#samples`, `#playground`, `#package`) lead to it.
+  `npm run site` builds into `build/site` as before, `npm run site:dev`
+  starts the dev server.
+
 **report2cloud is report2UI5, and converts the user interface only**
 
 - Renamed: `tools/report2ui5`, `npm run report2ui5` (and `report2ui5:coverage`,

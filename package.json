@@ -20,6 +20,7 @@
     "test:report2ui5:runtime": "node --test --test-concurrency=1 \"tools/report2ui5/test/runtime/*.test.mjs\"",
     "unit": "node scripts/unit.mjs",
     "site": "node scripts/build-site.mjs",
+    "site:dev": "node scripts/build-site.mjs --dev",
     "test:report2ui5:browser": "node --test tools/report2ui5/test/browser/*.test.mjs"
   },
   "repository": {
@@ -42,7 +43,8 @@
     "@openui5/sap.ui.unified": "1.153.0",
     "@openui5/themelib_sap_horizon": "1.153.0",
     "esbuild": "0.28.1",
-    "playwright": "1.63.0"
+    "playwright": "1.63.0",
+    "vitepress": "^1.6.4"
   },
   "engines": {
     "node": ">=22"

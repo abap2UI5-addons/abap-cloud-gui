@@ -10,7 +10,7 @@
 [![check-abap2UI5](https://img.shields.io/github/actions/workflow/status/abap2UI5-addons/abap-cloud-gui/check-abap2ui5.yaml?branch=main&label=check-abap2UI5)](https://github.com/abap2UI5-addons/abap-cloud-gui/actions/workflows/check-abap2ui5.yaml)
 [![report2UI5](https://img.shields.io/github/actions/workflow/status/abap2UI5-addons/abap-cloud-gui/report2ui5.yaml?branch=main&label=report2UI5)](https://github.com/abap2UI5-addons/abap-cloud-gui/actions/workflows/report2ui5.yaml)
 
-**[Try the report converter in the browser](https://abap2ui5-addons.github.io/abap-cloud-gui/#playground)**
+**[Try the report converter in the browser](https://abap2ui5-addons.github.io/abap-cloud-gui/playground)**
 
 **Write abap2UI5 apps the way you write a classic ABAP report.** Selection
 screen, `WRITE` list, ALV grid, `START-OF-SELECTION`, `AT LINE-SELECTION`,
@@ -958,7 +958,8 @@ npm run check:abap2ui5  # abap2UI5-linter over apps and views
 npm run check:regex     # no regular expressions in src/
 npm run unit            # ABAP Unit in the transpiled backend (needs ../mcp-server)
 npm run test:report2ui5  # the report converter: snapshots and abaplint over its output
-npm run site            # the GitHub Pages site with the converter playground into build/site (-- --serve: on :8080)
+npm run site            # the GitHub Pages site (VitePress) with the converter playground into build/site (-- --serve: on :4173)
+npm run site:dev        # the same with the VitePress dev server
 ```
 
 The ABAP Unit tests run in CI in the transpiled abap2UI5 backend

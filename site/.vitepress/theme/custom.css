@@ -1,0 +1,16 @@
+/* the red of abap-cloud-gui as the brand color of the default theme */
+:root {
+  --vp-c-brand-1: #c0303e;
+  --vp-c-brand-2: #d03c4a;
+  --vp-c-brand-3: #d03c4a;
+  --vp-c-brand-soft: rgba(208, 60, 74, 0.14);
+  --vp-home-hero-name-color: transparent;
+  --vp-home-hero-name-background: linear-gradient(120deg, #d03c4a 30%, #f08a4b);
+  --vp-button-brand-text: #ffffff;
+}
+.dark {
+  --vp-c-brand-1: #f0606d;
+  --vp-c-brand-2: #e14d5a;
+  --vp-c-brand-3: #d03c4a;
+  --vp-c-brand-soft: rgba(240, 96, 109, 0.16);
+}

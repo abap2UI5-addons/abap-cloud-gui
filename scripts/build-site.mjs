@@ -1,34 +1,42 @@
 #!/usr/bin/env node
-// The site of the repository (site/) - the page that presents the addon and
-// the report2UI5 playground, the converter bundled for the browser - into
-// build/site, which the Pages workflow (.github/workflows/pages.yaml) deploys.
-// A converted report runs in the abap2UI5 playground itself
-// (https://abap2ui5.github.io/playground/), handed the class, the report
-// runtime and the demo tables in its URL - runtime.json below.
+// The site of the repository (site/) - a VitePress site: the pages that
+// present the addon and the report2UI5 playground, the converter bundled for
+// the browser - into build/site, which the Pages workflow
+// (.github/workflows/pages.yaml) deploys. A converted report runs in the
+// abap2UI5 playground itself (https://abap2ui5.github.io/playground/), handed
+// the class, the report runtime and the demo tables in its URL - runtime.json
+// below.
 //
-//   npm run site           build/site
-//   npm run site -- --serve   and serve it on http://localhost:8080
+// Two steps: the converter is bundled with esbuild into site/public/r2u
+// (playground.js, examples.json, runtime.json - generated, not committed),
+// which VitePress copies as it is; then VitePress builds the pages, whose
+// Playground component loads playground.js.
+//
+//   npm run site              build/site
+//   npm run site -- --serve   and serve it on http://localhost:4173
+//   npm run site:dev          the bundle, then VitePress' dev server
 //
 // examples.json: the reports of the converter's corpus that convert, with
 // their text pools - the examples of the playground.
 // runtime.json: what the playground needs beside a converted class
 // (scripts/playground-runtime.mjs).
-import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { createServer } from "node:http";
-import { extname, join } from "node:path";
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { build } from "esbuild";
+import { build as buildPages, createServer, serve } from "vitepress";
 import { convert } from "../tools/report2ui5/lib/convert.mjs";
 import { parseTextpool } from "../tools/report2ui5/lib/textpool.mjs";
 import { runtimeFiles } from "./playground-runtime.mjs";
 
 const ROOT = join(fileURLToPath(import.meta.url), "..", "..");
-const OUT = join(ROOT, "build", "site");
+const SITE = join(ROOT, "site");
+// the bundle and its data, which VitePress copies into build/site/r2u
+const OUT = join(SITE, "public", "r2u");
 const CORPUS = join(ROOT, "tools", "report2ui5", "test", "corpus");
 
 rmSync(OUT, { recursive: true, force: true });
 mkdirSync(OUT, { recursive: true });
-for (const f of ["index.html", "style.css", "favicon.png"]) cpSync(join(ROOT, "site", f), join(OUT, f));
 
 await build({
   entryPoints: [join(ROOT, "site", "playground.mjs")],
@@ -70,17 +78,15 @@ const replacer = (k, v) => (v instanceof Map ? { $map: [...v] } : v);
 writeFileSync(join(OUT, "examples.json"), JSON.stringify(examples.map(({ ok, ...e }) => e), replacer));
 const runtime = runtimeFiles(ROOT);
 writeFileSync(join(OUT, "runtime.json"), JSON.stringify(runtime));
-console.log(`build/site: runtime.json, ${runtime.length} files for the playground`);
-console.log(`build/site: ${examples.length} examples, ${examples.filter((e) => !e.ok).length} of them refused`);
+console.log(`site/public/r2u: runtime.json, ${runtime.length} files for the playground`);
+console.log(`site/public/r2u: ${examples.length} examples, ${examples.filter((e) => !e.ok).length} of them refused`);
 
-if (process.argv.includes("--serve")) {
-  const types = { ".html": "text/html", ".css": "text/css", ".js": "text/javascript", ".json": "application/json" };
-  createServer((req, res) => {
-    const path = join(OUT, decodeURIComponent(new URL(req.url, "http://x").pathname).replace(/\/$/, "/index.html"));
-    if (!path.startsWith(OUT) || !existsSync(path)) {
-      res.writeHead(404).end();
-      return;
-    }
-    res.writeHead(200, { "content-type": types[extname(path)] ?? "application/octet-stream" }).end(readFileSync(path));
-  }).listen(8080, () => console.log("http://localhost:8080"));
+if (process.argv.includes("--dev")) {
+  const server = await createServer(SITE);
+  await server.listen();
+  server.printUrls();
+} else {
+  // the dist folder is build/site (outDir of site/.vitepress/config.mts)
+  await buildPages(SITE);
+  if (process.argv.includes("--serve")) await serve({ root: SITE });
 }
