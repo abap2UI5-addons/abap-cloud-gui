@@ -579,7 +579,9 @@ CLASS z2ui5_cl_cgui_memory IMPLEMENTATION.
     IF sy-subrc = 0.
       ctx-spa_cust->* = spa_lines( ls_cust-values ).
     ENDIF.
-    READ TABLE lt_variant INTO DATA(ls_variant) WITH KEY name = to_upper( sy-uname ).
+    " the key in a variable: a built-in function is no READ TABLE key operand before 7.40
+    DATA(lv_key) = to_upper( sy-uname ).
+    READ TABLE lt_variant INTO DATA(ls_variant) WITH KEY name = lv_key.
     IF sy-subrc <> 0.
       RETURN.
     ENDIF.

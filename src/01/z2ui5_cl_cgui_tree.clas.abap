@@ -616,7 +616,9 @@ CLASS z2ui5_cl_cgui_tree IMPLEMENTATION.
 
   METHOD set_column_text.
 
-    READ TABLE mt_column REFERENCE INTO DATA(lr_column) WITH KEY name = to_upper( name ).
+    " the key in a variable: a built-in function is no READ TABLE key operand before 7.40
+    DATA(lv_key) = to_upper( name ).
+    READ TABLE mt_column REFERENCE INTO DATA(lr_column) WITH KEY name = lv_key.
     IF sy-subrc = 0.
       lr_column->text = text.
     ENDIF.
@@ -626,7 +628,9 @@ CLASS z2ui5_cl_cgui_tree IMPLEMENTATION.
 
   METHOD set_column_hidden.
 
-    READ TABLE mt_column REFERENCE INTO DATA(lr_column) WITH KEY name = to_upper( name ).
+    " the key in a variable: a built-in function is no READ TABLE key operand before 7.40
+    DATA(lv_key) = to_upper( name ).
+    READ TABLE mt_column REFERENCE INTO DATA(lr_column) WITH KEY name = lv_key.
     IF sy-subrc = 0.
       lr_column->hidden = val.
     ENDIF.

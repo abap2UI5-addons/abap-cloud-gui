@@ -2359,7 +2359,9 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
 
   METHOD call_subscreen_pai.
 
-    READ TABLE mt_cgui_subscreen INTO DATA(ls_sub) WITH KEY area = to_upper( condense( CONV string( area ) ) ).
+    " the key in a variable: a built-in function is no READ TABLE key operand before 7.40
+    DATA(lv_key) = to_upper( condense( CONV string( area ) ) ).
+    READ TABLE mt_cgui_subscreen INTO DATA(ls_sub) WITH KEY area = lv_key.
     IF sy-subrc = 0.
       dynpro_pai( dynnr = ls_sub-dynnr
                   ucomm = ucomm ).
@@ -2425,7 +2427,9 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
 
   METHOD z2ui5_if_cgui_gui~subscreen_render.
 
-    READ TABLE mt_cgui_subscreen INTO DATA(ls_sub) WITH KEY area = to_upper( area ).
+    " the key in a variable: a built-in function is no READ TABLE key operand before 7.40
+    DATA(lv_key) = to_upper( area ).
+    READ TABLE mt_cgui_subscreen INTO DATA(ls_sub) WITH KEY area = lv_key.
     IF sy-subrc <> 0.
       RETURN.
     ENDIF.
@@ -3125,7 +3129,9 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
 
     FIELD-SYMBOLS <tab> TYPE STANDARD TABLE.
 
-    READ TABLE mt_cgui_field REFERENCE INTO DATA(lr_mc) WITH KEY name = to_upper( field ).
+    " the key in a variable: a built-in function is no READ TABLE key operand before 7.40
+    DATA(lv_key) = to_upper( field ).
+    READ TABLE mt_cgui_field REFERENCE INTO DATA(lr_mc) WITH KEY name = lv_key.
     " a CDS entity named as the value help comes first - its rows, the
     " element named the value (else its first column)
     IF sy-subrc <> 0 OR lr_mc->entity IS INITIAL.
@@ -3159,7 +3165,9 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
     FIELD-SYMBOLS <tab> TYPE STANDARD TABLE.
 
     " MATCHCODE OBJECT - the search help named at the field
-    READ TABLE mt_cgui_field REFERENCE INTO DATA(lr_mc) WITH KEY name = to_upper( field ).
+    " the key in a variable: a built-in function is no READ TABLE key operand before 7.40
+    DATA(lv_key) = to_upper( field ).
+    READ TABLE mt_cgui_field REFERENCE INTO DATA(lr_mc) WITH KEY name = lv_key.
     IF sy-subrc = 0 AND lr_mc->matchcode IS NOT INITIAL.
       DATA(ls_mc) = VALUE z2ui5_cl_cgui_context=>ty_s_search_help( name  = lr_mc->matchcode
                                                                   field = matchcode_field( lr_mc->matchcode ) ).
