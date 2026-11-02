@@ -18,6 +18,7 @@ export default defineConfig({
     logo: "/favicon.png",
     nav: [
       { text: "Guide", link: "/guide" },
+      { text: "Samples", link: "/samples" },
       { text: "Playground", link: "/playground" },
       {
         text: "Links",

@@ -14,6 +14,13 @@ release.
   mode. The playground keeps its code (`site/playground.mjs`, bundled with
   esbuild as before) and is mounted by a Vue component; links to the old
   sections (`#samples`, `#playground`, `#package`) lead to it.
+- Two pages for report2UI5: **Samples** (`/samples`) - the converted
+  reports of the corpus, the report, its class and the running app; and
+  **Playground** (`/playground`) - your own report, the package, and an
+  **import from GitHub**: a link to a `.prog.abap` opens it in the editor
+  with its text pool, a link to a repository or a folder converts its
+  reports as a package (each one opens in the editor from the table).
+  `?github=<link>` imports at once.
   `npm run site` builds into `build/site` as before, `npm run site:dev`
   starts the dev server.
 
