@@ -19,6 +19,13 @@
 // server. The frame is of another site, so the page listens to what the
 // playground says to the page that framed it (src/shell/embed.mjs there):
 // its status line, and the abaplint errors that stopped a Run.
+//
+// The page is VitePress (site/.vitepress): its Playground component renders
+// the markup and calls mount( ) once it is in the document - again after
+// every visit of the page, as VitePress navigates without a reload; the
+// function mount( ) answers takes the listeners of the window down. This
+// module is bundled by scripts/build-site.mjs into public/r2u/playground.js,
+// beside examples.json and runtime.json, which it fetches relative to itself.
 import { convert, defaultClassName } from "../tools/report2ui5/lib/convert.mjs";
 import { migrationReport } from "../tools/report2ui5/lib/report.mjs";
 import { parseTextpool } from "../tools/report2ui5/lib/textpool.mjs";
@@ -144,7 +151,7 @@ const classFiles = (all, className) => Object.fromEntries(Object.entries(all)
 // the report runtime and the demo tables (runtime.json, scripts/build-site.mjs),
 // fetched once, when the first app starts
 let runtime;
-const runtimeFiles = () => (runtime ??= fetch("runtime.json").then((r) => {
+const runtimeFiles = () => (runtime ??= fetch(new URL("runtime.json", import.meta.url)).then((r) => {
   if (!r.ok) throw new Error(`runtime.json: ${r.status}`);
   return r.json();
 }));
@@ -178,12 +185,12 @@ async function fragmentOf(list) {
  *  state, text } ) as it goes. `open` is a link that opens the same files in
  *  the playground with its editor. Answers how it ended: { ok, said, problems
  *  } - problems what stopped the Run in the playground, by file and line. */
-function appFrame(frame, cover, onStep, open) {
+function appFrame(frame, cover, onStep, open, signal) {
   let runs = 0;
   let heard = () => {};
   window.addEventListener("message", (e) => {
     if (e.source === frame.contentWindow && e.data?.source === FROM_PLAYGROUND) heard(e.data);
-  });
+  }, { signal });
   return async (classes, className) => {
     const run = ++runs;
     onStep({ state: "wait", text: "Starting it in the abap2UI5 playground: the abap2UI5 runtime, the report runtime of abap-cloud-gui and the class are loaded in this browser..." });
@@ -266,352 +273,364 @@ const download = (name, text, type = "text/plain") => {
 // the system in one click
 const downloadZip = (files, className) => download(`${className}.zip`, abapgitZip(files, className), "application/zip");
 
-// for the code on the page that is no sample: the example class of "How"
-for (const code of document.querySelectorAll("code.abap")) code.innerHTML = highlightAbap(code.textContent);
-
-let examples = [];
-try {
-  // the Maps of a text pool come as { "$map": entries } (scripts/build-site.mjs)
-  const reviver = (k, v) => (v && typeof v === "object" && Array.isArray(v.$map) ? new Map(v.$map) : v);
-  examples = JSON.parse(await (await fetch("examples.json")).text(), reviver);
-} catch {
-  examples = [];
+/** the playground on the page: the samples, your own report and the
+ *  package - answers the function that takes it down again */
+export async function mount() {
+  const ac = new AbortController();
+  const { signal } = ac;
+  let examples = [];
+  try {
+    // the Maps of a text pool come as { "$map": entries } (scripts/build-site.mjs)
+    const reviver = (k, v) => (v && typeof v === "object" && Array.isArray(v.$map) ? new Map(v.$map) : v);
+    examples = JSON.parse(await (await fetch(new URL("examples.json", import.meta.url))).text(), reviver);
+  } catch {
+    examples = [];
+  }
+  // the page was left while the examples loaded
+  if (!$("samples")) return () => {};
+  sections(examples, signal);
+  return () => ac.abort();
 }
 
-// ---------------------------------------------------------------- samples
+function sections(examples, signal) {
+  // ---------------------------------------------------------------- samples
 
-{
-  const select = $("s-example");
-  const steps = {};
-  const stepList = $("s-steps");
-  let sample;
-  let shown = () => undefined;
-  let files = {};
-  const start = appFrame($("s-app"), $("s-cover"), (s) => {
-    steps.run = s;
-    renderSteps(stepList, steps);
-  }, $("s-open"));
-
-  const pick = () => {
-    const e = examples.find((x) => x.name === select.value);
-    if (!e) return;
-    sample = e;
-    $("s-name").textContent = `${e.name}.prog.abap`;
-    $("s-source").innerHTML = highlightAbap(e.source);
-    const c = convertReport(e.source, { textpool: e.textpool });
-    files = c.files;
-    shown = fileTabs($("s-tabs"), $("s-output"), files, c.result.className);
-    Object.assign(steps, stepsOf(c.name, e.source, e.textpool, c.result), { run: undefined });
-    panels("s-", c.result);
-    if (c.result.ok) start(classFiles(files, c.result.className), c.result.className);
-    else {
-      $("s-app").src = "about:blank";
-      $("s-open").hidden = true;
-      $("s-cover").hidden = false;
-      $("s-cover").textContent = "This sample is refused - the converter says which statements it cannot map, under Refused.";
-      steps.run = undefined;
-    }
-    renderSteps(stepList, steps);
-  };
-
-  select.replaceChildren(...examples.map((e) => el("option", { value: e.name }, `${e.name} - ${e.title}`)));
-  select.onchange = pick;
-  const step = (by) => () => {
-    select.selectedIndex = (select.selectedIndex + by + select.options.length) % select.options.length;
-    pick();
-  };
-  $("s-prev").onclick = step(-1);
-  $("s-next").onclick = step(1);
-  $("s-restart").onclick = () => pick();
-  $("s-copy").onclick = copyTo($("s-copy"), () => files[shown()]);
-  $("s-download").onclick = () => shown() && download(shown(), files[shown()]);
-  $("s-zip").onclick = () => sample && Object.keys(files).length && downloadZip(files, convertReport(sample.source, { textpool: sample.textpool }).result.className);
-  // the sample as your own report, to change it
-  $("s-try").onclick = () => sample && window.dispatchEvent(new CustomEvent("r2c-own", { detail: sample }));
-  if (examples.length) {
-    select.value = examples[0].name;
-    // started once the section comes into view - not for a visitor who never scrolls there
-    new IntersectionObserver((entries, observer) => {
-      if (!entries.some((x) => x.isIntersecting)) return;
-      observer.disconnect();
-      pick();
-    }, { rootMargin: "200px" }).observe($("samples"));
-  } else {
-    $("samples").hidden = true;
-  }
-}
-
-// ---------------------------------------------------------- your own report
-
-{
-  const source = $("source");
-  const highlighted = $("source-hl");
-  const output = $("output");
-  const status = $("status");
-  const classname = $("classname");
-  const textpoolXml = $("textpool");
-  const appState = $("app-state");
-  const runButton = $("run");
-  const stepList = $("steps");
-  const steps = {};
-  let files = {};
-  let shown = () => undefined;
-  // the last conversion, and the source the app in the frame was started with
-  let last;
-  let running;
-
-  const start = appFrame($("app"), $("app-cover"), (s) => {
-    steps.run = s;
-    renderSteps(stepList, steps);
-  }, $("app-open"));
-
-  // the highlighted copy under the text area: the same text, the same scroll
-  const paint = () => {
-    // a last line break shows as a line in a text area, not in a <pre>
-    highlighted.innerHTML = `${highlightAbap(source.value)}\n`;
-    highlighted.scrollTop = source.scrollTop;
-    highlighted.scrollLeft = source.scrollLeft;
-  };
-  source.addEventListener("scroll", () => {
-    highlighted.scrollTop = source.scrollTop;
-    highlighted.scrollLeft = source.scrollLeft;
-  });
-
-  const textpoolOf = () => {
-    const xml = textpoolXml.value.trim();
-    if (!xml) return {};
-    try {
-      return { xml, textpool: parseTextpool(xml) };
-    } catch {
-      return { xml };
-    }
-  };
-
-  const run = () => {
-    const text = source.value;
-    paint();
-    if (!text.trim()) {
-      files = {};
-      last = undefined;
-      $("tabs").replaceChildren();
-      output.replaceChildren(el("span", { class: "muted" }, "The generated class appears here."));
-      status.className = "status";
-      status.textContent = "";
-      steps.read = steps.convert = undefined;
-      renderSteps(stepList, steps);
-      panels("", undefined);
-      $("migration").textContent = "";
-      markStale();
-      return;
-    }
-    const { textpool } = textpoolOf();
-    if (!classname.value.trim()) classname.placeholder = defaultClassName(nameOf(text));
-    let c;
-    try {
-      c = convertReport(text, { textpool, className: classname.value.trim() || undefined });
-    } catch (e) {
-      status.className = "status bad";
-      status.textContent = `The converter crashed - a bug worth an issue: ${e?.message ?? e}`;
-      return;
-    }
-    last = { result: c.result, text };
-    files = c.files;
-    shown = fileTabs($("tabs"), output, files, c.result.className);
-    const { result } = c;
-    status.className = result.ok ? "status ok" : "status bad";
-    status.textContent = result.ok
-      ? `Converted into ${result.className} - ${result.mapped.length} statement(s) mapped, ${result.todos.length} TODO(s).`
-      : `Refused: ${result.refusals.length} statement(s) have no counterpart - the draft shows how far it got; nothing can run until they are rewritten.`;
-    Object.assign(steps, stepsOf(c.name, text, textpool, result));
-    renderSteps(stepList, steps);
-    panels("", result);
-    $("migration").textContent = c.report;
-    markStale();
-  };
-
-  /** the app in the frame was started with another source - Preview starts this one */
-  function markStale() {
-    if (running === undefined) return;
-    appState.textContent = last && running === last.text ? "" : "the report changed - Preview starts it again";
-  }
-
-  const preview = (on) => {
-    $("preview").hidden = !on;
-    $("own-panes").classList.toggle("with-preview", on);
-    runButton.setAttribute("aria-pressed", String(on));
-  };
-
-  const runApp = () => {
-    if (!source.value.trim()) {
-      status.className = "status bad";
-      status.textContent = "Paste a report first - or take a sample above (Edit it below).";
-      return;
-    }
-    if (!last || last.text !== source.value) run();
-    preview(true);
-    if (!last.result.ok) {
-      steps.run = { state: "bad", text: "Not started: the converter refused statements of the report - rewrite them first." };
-      renderSteps(stepList, steps);
-      $("app-cover").hidden = false;
-      $("app-cover").textContent = "The report has statements the converter refuses - see Refused below.";
-      return;
-    }
-    running = last.text;
-    appState.textContent = "";
-    start(classFiles(files, last.result.className), last.result.className);
-  };
-
-  // kept in this browser - an empty or blocked storage is no error
-  const save = () => {
-    try {
-      localStorage.setItem(STORE, JSON.stringify({ source: source.value, textpool: textpoolXml.value, classname: classname.value }));
-    } catch {
-      /* no storage in this context */
-    }
-  };
-  const load = () => {
-    try {
-      // the key of the name before report2UI5 - a report kept then is read once more
-      return JSON.parse(localStorage.getItem(STORE) ?? localStorage.getItem("report2cloud.own") ?? "null");
-    } catch {
-      return null;
-    }
-  };
-
-  // converted as it is typed or pasted - a pause of a moment first; the
-  // highlighting follows every key at once
-  let timer;
-  const later = () => {
-    paint();
-    clearTimeout(timer);
-    timer = setTimeout(() => {
-      save();
-      run();
-    }, 350);
-  };
-
-  runButton.onclick = () => runApp();
-  $("convert").onclick = () => {
-    save();
-    run();
-  };
-  $("clear").onclick = () => {
-    source.value = "";
-    textpoolXml.value = "";
-    classname.value = "";
-    save();
-    run();
-    source.focus();
-  };
-  source.addEventListener("input", later);
-  textpoolXml.addEventListener("input", later);
-  classname.addEventListener("input", later);
-  source.addEventListener("keydown", (e) => {
-    if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
-      clearTimeout(timer);
-      save();
-      run();
-    }
-    // a tab indents, as in an editor
-    if (e.key === "Tab" && !e.shiftKey && !e.ctrlKey && !e.metaKey) {
-      e.preventDefault();
-      document.execCommand?.("insertText", false, "  ") || source.setRangeText("  ", source.selectionStart, source.selectionEnd, "end");
-      later();
-    }
-  });
-  $("copy").onclick = copyTo($("copy"), () => files[shown()]);
-  $("download").onclick = () => shown() && download(shown(), files[shown()]);
-  $("download-all").onclick = () => last?.result.ok && downloadZip(files, last.result.className);
-
-  // ---- a whole package: the files of a dropped zip (or the files themselves)
-  // converted in this browser, one zip back
   {
-    const drop = $("pkg-drop");
-    const input = $("pkg-files");
-    const text = $("pkg-drop-text");
-    const zipButton = $("pkg-zip");
-    const clear = $("pkg-clear");
-    const result = $("pkg-result");
-    let out;
+    const select = $("s-example");
+    const steps = {};
+    const stepList = $("s-steps");
+    let sample;
+    let shown = () => undefined;
+    let files = {};
+    const start = appFrame($("s-app"), $("s-cover"), (s) => {
+      steps.run = s;
+      renderSteps(stepList, steps);
+    }, $("s-open"), signal);
 
-    const show = (pkg, name) => {
-      out = pkg;
-      const converted = pkg.rows.filter((r) => r.ok).length;
-      $("pkg-summary").textContent = pkg.rows.length
-        ? `${name}: ${pkg.rows.length} report(s), ${converted} converted, ${pkg.rows.length - converted} refused.`
-        : `${name}: no report in it - a report is a .prog.abap with a REPORT or PROGRAM statement.`;
-      $("pkg-table").querySelector("tbody").replaceChildren(...pkg.rows.map((r, i) => {
-        return el("tr", {},
-          el("td", {}, String(i + 1)),
-          el("td", { class: "mono" }, r.name),
-          el("td", { class: "mono" }, r.className),
-          el("td", { class: r.ok ? "ok" : "bad" }, r.ok ? "converted" : r.crashed ? `crashed: ${r.crashed}` : `refused: ${[...new Set(r.refusalKinds)].join("; ")}`),
-          el("td", {}, r.ok ? String(r.todos.length) : "-"));
-      }));
-      $("pkg-overview").textContent = pkg.summary;
-      result.hidden = false;
-      zipButton.disabled = converted === 0;
-      clear.hidden = false;
-      text.textContent = `${name} - drop another to replace it`;
-    };
-
-    const take = async (list) => {
-      const files = {};
-      let name = "";
-      for (const f of list) {
-        if (/\.zip$/i.test(f.name)) {
-          name = name || f.name.replace(/\.zip$/i, "");
-          try {
-            Object.assign(files, await unzipTexts(await f.arrayBuffer()));
-          } catch (e) {
-            text.textContent = `${f.name}: ${e.message}`;
-            return;
-          }
-        } else if (/\.(abap|xml)$/i.test(f.name)) files[f.name] = (await f.text()).replace(/^\uFEFF/, "");
+    const pick = () => {
+      const e = examples.find((x) => x.name === select.value);
+      if (!e) return;
+      sample = e;
+      $("s-name").textContent = `${e.name}.prog.abap`;
+      $("s-source").innerHTML = highlightAbap(e.source);
+      const c = convertReport(e.source, { textpool: e.textpool });
+      files = c.files;
+      shown = fileTabs($("s-tabs"), $("s-output"), files, c.result.className);
+      Object.assign(steps, stepsOf(c.name, e.source, e.textpool, c.result), { run: undefined });
+      panels("s-", c.result);
+      if (c.result.ok) start(classFiles(files, c.result.className), c.result.className);
+      else {
+        $("s-app").src = "about:blank";
+        $("s-open").hidden = true;
+        $("s-cover").hidden = false;
+        $("s-cover").textContent = "This sample is refused - the converter says which statements it cannot map, under Refused.";
+        steps.run = undefined;
       }
-      name = name || "package";
-      text.textContent = "Converting...";
-      // the conversion on the next frame, so the text shows first
-      await new Promise((r) => setTimeout(r, 0));
-      show(convertPackage(files), name);
+      renderSteps(stepList, steps);
     };
 
-    input.onchange = () => input.files.length && take([...input.files]);
-    drop.ondragover = (e) => {
-      e.preventDefault();
-      drop.classList.add("over");
+    select.replaceChildren(...examples.map((e) => el("option", { value: e.name }, `${e.name} - ${e.title}`)));
+    select.onchange = pick;
+    const step = (by) => () => {
+      select.selectedIndex = (select.selectedIndex + by + select.options.length) % select.options.length;
+      pick();
     };
-    drop.ondragleave = () => drop.classList.remove("over");
-    drop.ondrop = (e) => {
-      e.preventDefault();
-      drop.classList.remove("over");
-      if (e.dataTransfer?.files?.length) take([...e.dataTransfer.files]);
-    };
-    zipButton.onclick = () => out && download("report2ui5.zip", abapgitZip(out.output, "report2ui5"), "application/zip");
-    clear.onclick = () => {
-      out = undefined;
-      result.hidden = true;
-      zipButton.disabled = true;
-      clear.hidden = true;
-      input.value = "";
-      text.textContent = "Drop the zip or the files here, or click to choose";
-    };
+    $("s-prev").onclick = step(-1);
+    $("s-next").onclick = step(1);
+    $("s-restart").onclick = () => pick();
+    $("s-copy").onclick = copyTo($("s-copy"), () => files[shown()]);
+    $("s-download").onclick = () => shown() && download(shown(), files[shown()]);
+    $("s-zip").onclick = () => sample && Object.keys(files).length && downloadZip(files, convertReport(sample.source, { textpool: sample.textpool }).result.className);
+    // the sample as your own report, to change it
+    $("s-try").onclick = () => sample && window.dispatchEvent(new CustomEvent("r2c-own", { detail: sample }));
+    if (examples.length) {
+      select.value = examples[0].name;
+      // started once the section comes into view - not for a visitor who never scrolls there
+      const observer = new IntersectionObserver((entries) => {
+        if (!entries.some((x) => x.isIntersecting)) return;
+        observer.disconnect();
+        pick();
+      }, { rootMargin: "200px" });
+      observer.observe($("samples"));
+      signal.addEventListener("abort", () => observer.disconnect());
+    } else {
+      $("samples").hidden = true;
+    }
   }
 
-  // a sample to edit: it becomes your own report
-  window.addEventListener("r2c-own", (e) => {
-    source.value = e.detail.source;
-    textpoolXml.value = e.detail.xml ?? "";
-    classname.value = "";
-    save();
-    run();
-    $("playground").scrollIntoView({ behavior: "smooth" });
-    source.focus({ preventScroll: true });
-  });
+  // ---------------------------------------------------------- your own report
 
-  const kept = load();
-  source.value = kept?.source ?? "";
-  textpoolXml.value = kept?.textpool ?? "";
-  classname.value = kept?.classname ?? "";
-  run();
+  {
+    const source = $("source");
+    const highlighted = $("source-hl");
+    const output = $("output");
+    const status = $("status");
+    const classname = $("classname");
+    const textpoolXml = $("textpool");
+    const appState = $("app-state");
+    const runButton = $("run");
+    const stepList = $("steps");
+    const steps = {};
+    let files = {};
+    let shown = () => undefined;
+    // the last conversion, and the source the app in the frame was started with
+    let last;
+    let running;
+
+    const start = appFrame($("app"), $("app-cover"), (s) => {
+      steps.run = s;
+      renderSteps(stepList, steps);
+    }, $("app-open"), signal);
+
+    // the highlighted copy under the text area: the same text, the same scroll
+    const paint = () => {
+      // a last line break shows as a line in a text area, not in a <pre>
+      highlighted.innerHTML = `${highlightAbap(source.value)}\n`;
+      highlighted.scrollTop = source.scrollTop;
+      highlighted.scrollLeft = source.scrollLeft;
+    };
+    source.addEventListener("scroll", () => {
+      highlighted.scrollTop = source.scrollTop;
+      highlighted.scrollLeft = source.scrollLeft;
+    });
+
+    const textpoolOf = () => {
+      const xml = textpoolXml.value.trim();
+      if (!xml) return {};
+      try {
+        return { xml, textpool: parseTextpool(xml) };
+      } catch {
+        return { xml };
+      }
+    };
+
+    const run = () => {
+      const text = source.value;
+      paint();
+      if (!text.trim()) {
+        files = {};
+        last = undefined;
+        $("tabs").replaceChildren();
+        output.replaceChildren(el("span", { class: "muted" }, "The generated class appears here."));
+        status.className = "status";
+        status.textContent = "";
+        steps.read = steps.convert = undefined;
+        renderSteps(stepList, steps);
+        panels("", undefined);
+        $("migration").textContent = "";
+        markStale();
+        return;
+      }
+      const { textpool } = textpoolOf();
+      if (!classname.value.trim()) classname.placeholder = defaultClassName(nameOf(text));
+      let c;
+      try {
+        c = convertReport(text, { textpool, className: classname.value.trim() || undefined });
+      } catch (e) {
+        status.className = "status bad";
+        status.textContent = `The converter crashed - a bug worth an issue: ${e?.message ?? e}`;
+        return;
+      }
+      last = { result: c.result, text };
+      files = c.files;
+      shown = fileTabs($("tabs"), output, files, c.result.className);
+      const { result } = c;
+      status.className = result.ok ? "status ok" : "status bad";
+      status.textContent = result.ok
+        ? `Converted into ${result.className} - ${result.mapped.length} statement(s) mapped, ${result.todos.length} TODO(s).`
+        : `Refused: ${result.refusals.length} statement(s) have no counterpart - the draft shows how far it got; nothing can run until they are rewritten.`;
+      Object.assign(steps, stepsOf(c.name, text, textpool, result));
+      renderSteps(stepList, steps);
+      panels("", result);
+      $("migration").textContent = c.report;
+      markStale();
+    };
+
+    /** the app in the frame was started with another source - Preview starts this one */
+    function markStale() {
+      if (running === undefined) return;
+      appState.textContent = last && running === last.text ? "" : "the report changed - Preview starts it again";
+    }
+
+    const preview = (on) => {
+      $("preview").hidden = !on;
+      $("own-panes").classList.toggle("with-preview", on);
+      runButton.setAttribute("aria-pressed", String(on));
+    };
+
+    const runApp = () => {
+      if (!source.value.trim()) {
+        status.className = "status bad";
+        status.textContent = "Paste a report first - or take a sample above (Edit it below).";
+        return;
+      }
+      if (!last || last.text !== source.value) run();
+      preview(true);
+      if (!last.result.ok) {
+        steps.run = { state: "bad", text: "Not started: the converter refused statements of the report - rewrite them first." };
+        renderSteps(stepList, steps);
+        $("app-cover").hidden = false;
+        $("app-cover").textContent = "The report has statements the converter refuses - see Refused below.";
+        return;
+      }
+      running = last.text;
+      appState.textContent = "";
+      start(classFiles(files, last.result.className), last.result.className);
+    };
+
+    // kept in this browser - an empty or blocked storage is no error
+    const save = () => {
+      try {
+        localStorage.setItem(STORE, JSON.stringify({ source: source.value, textpool: textpoolXml.value, classname: classname.value }));
+      } catch {
+        /* no storage in this context */
+      }
+    };
+    const load = () => {
+      try {
+        // the key of the name before report2UI5 - a report kept then is read once more
+        return JSON.parse(localStorage.getItem(STORE) ?? localStorage.getItem("report2cloud.own") ?? "null");
+      } catch {
+        return null;
+      }
+    };
+
+    // converted as it is typed or pasted - a pause of a moment first; the
+    // highlighting follows every key at once
+    let timer;
+    const later = () => {
+      paint();
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        save();
+        run();
+      }, 350);
+    };
+
+    runButton.onclick = () => runApp();
+    $("convert").onclick = () => {
+      save();
+      run();
+    };
+    $("clear").onclick = () => {
+      source.value = "";
+      textpoolXml.value = "";
+      classname.value = "";
+      save();
+      run();
+      source.focus();
+    };
+    source.addEventListener("input", later);
+    textpoolXml.addEventListener("input", later);
+    classname.addEventListener("input", later);
+    source.addEventListener("keydown", (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+        clearTimeout(timer);
+        save();
+        run();
+      }
+      // a tab indents, as in an editor
+      if (e.key === "Tab" && !e.shiftKey && !e.ctrlKey && !e.metaKey) {
+        e.preventDefault();
+        document.execCommand?.("insertText", false, "  ") || source.setRangeText("  ", source.selectionStart, source.selectionEnd, "end");
+        later();
+      }
+    });
+    $("copy").onclick = copyTo($("copy"), () => files[shown()]);
+    $("download").onclick = () => shown() && download(shown(), files[shown()]);
+    $("download-all").onclick = () => last?.result.ok && downloadZip(files, last.result.className);
+
+    // ---- a whole package: the files of a dropped zip (or the files themselves)
+    // converted in this browser, one zip back
+    {
+      const drop = $("pkg-drop");
+      const input = $("pkg-files");
+      const text = $("pkg-drop-text");
+      const zipButton = $("pkg-zip");
+      const clear = $("pkg-clear");
+      const result = $("pkg-result");
+      let out;
+
+      const show = (pkg, name) => {
+        out = pkg;
+        const converted = pkg.rows.filter((r) => r.ok).length;
+        $("pkg-summary").textContent = pkg.rows.length
+          ? `${name}: ${pkg.rows.length} report(s), ${converted} converted, ${pkg.rows.length - converted} refused.`
+          : `${name}: no report in it - a report is a .prog.abap with a REPORT or PROGRAM statement.`;
+        $("pkg-table").querySelector("tbody").replaceChildren(...pkg.rows.map((r, i) => {
+          return el("tr", {},
+            el("td", {}, String(i + 1)),
+            el("td", { class: "mono" }, r.name),
+            el("td", { class: "mono" }, r.className),
+            el("td", { class: r.ok ? "ok" : "bad" }, r.ok ? "converted" : r.crashed ? `crashed: ${r.crashed}` : `refused: ${[...new Set(r.refusalKinds)].join("; ")}`),
+            el("td", {}, r.ok ? String(r.todos.length) : "-"));
+        }));
+        $("pkg-overview").textContent = pkg.summary;
+        result.hidden = false;
+        zipButton.disabled = converted === 0;
+        clear.hidden = false;
+        text.textContent = `${name} - drop another to replace it`;
+      };
+
+      const take = async (list) => {
+        const files = {};
+        let name = "";
+        for (const f of list) {
+          if (/\.zip$/i.test(f.name)) {
+            name = name || f.name.replace(/\.zip$/i, "");
+            try {
+              Object.assign(files, await unzipTexts(await f.arrayBuffer()));
+            } catch (e) {
+              text.textContent = `${f.name}: ${e.message}`;
+              return;
+            }
+          } else if (/\.(abap|xml)$/i.test(f.name)) files[f.name] = (await f.text()).replace(/^\uFEFF/, "");
+        }
+        name = name || "package";
+        text.textContent = "Converting...";
+        // the conversion on the next frame, so the text shows first
+        await new Promise((r) => setTimeout(r, 0));
+        show(convertPackage(files), name);
+      };
+
+      input.onchange = () => input.files.length && take([...input.files]);
+      drop.ondragover = (e) => {
+        e.preventDefault();
+        drop.classList.add("over");
+      };
+      drop.ondragleave = () => drop.classList.remove("over");
+      drop.ondrop = (e) => {
+        e.preventDefault();
+        drop.classList.remove("over");
+        if (e.dataTransfer?.files?.length) take([...e.dataTransfer.files]);
+      };
+      zipButton.onclick = () => out && download("report2ui5.zip", abapgitZip(out.output, "report2ui5"), "application/zip");
+      clear.onclick = () => {
+        out = undefined;
+        result.hidden = true;
+        zipButton.disabled = true;
+        clear.hidden = true;
+        input.value = "";
+        text.textContent = "Drop the zip or the files here, or click to choose";
+      };
+    }
+
+    // a sample to edit: it becomes your own report
+    window.addEventListener("r2c-own", (e) => {
+      source.value = e.detail.source;
+      textpoolXml.value = e.detail.xml ?? "";
+      classname.value = "";
+      save();
+      run();
+      $("playground").scrollIntoView({ behavior: "smooth" });
+      source.focus({ preventScroll: true });
+    }, { signal });
+    signal.addEventListener("abort", () => clearTimeout(timer));
+
+    const kept = load();
+    source.value = kept?.source ?? "";
+    textpoolXml.value = kept?.textpool ?? "";
+    classname.value = kept?.classname ?? "";
+    run();
+  }
 }

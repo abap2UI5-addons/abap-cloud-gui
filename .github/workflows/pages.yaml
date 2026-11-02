@@ -1,8 +1,8 @@
 name: pages
 
-# The site of the repository on GitHub Pages: the page that presents the
-# addon and the report2UI5 playground - the converter bundled for the
-# browser (npm run site, scripts/build-site.mjs). A converted report runs in
+# The site of the repository on GitHub Pages, built with VitePress: the
+# pages that present the addon and the report2UI5 playground - the converter
+# bundled for the browser (npm run site, scripts/build-site.mjs). A converted report runs in
 # the abap2UI5 playground itself, handed the class and the report runtime in
 # its URL (runtime.json, scripts/playground-runtime.mjs). A pull request
 # builds and tests it, a push to main deploys it. The repository's Pages

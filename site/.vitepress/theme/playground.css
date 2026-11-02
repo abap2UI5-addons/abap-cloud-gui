@@ -1,0 +1,163 @@
+/* The report2UI5 playground (Playground.vue, site/playground.mjs) - its own
+   styles, under .r2u so they meet nothing of the default theme, and its
+   colors taken from the theme's, so it follows light and dark. */
+.r2u {
+  --bg: var(--vp-c-bg);
+  --surface: var(--vp-c-bg);
+  --text: var(--vp-c-text-1);
+  --muted: var(--vp-c-text-2);
+  --line: var(--vp-c-divider);
+  --accent: var(--vp-c-brand-1);
+  --accent-text: var(--vp-button-brand-text);
+  --code-bg: var(--vp-c-bg-soft);
+  --bad: var(--vp-c-danger-1);
+  --warn: var(--vp-c-warning-1);
+  --ok: var(--vp-c-success-1);
+  --mono: var(--vp-font-family-mono);
+  max-width: 1680px;
+  margin: 0 auto;
+  padding: 32px 24px 64px;
+  color: var(--text);
+  font-size: 16px;
+  line-height: 1.55;
+}
+.r2u * { box-sizing: border-box; }
+.r2u [hidden] { display: none !important; }
+.r2u a { color: var(--accent); }
+.r2u code { font-family: var(--mono); font-size: .92em; }
+.r2u .muted { color: var(--muted); }
+
+.r2u h1 { font-size: 32px; line-height: 1.2; font-weight: 700; margin: 0 0 12px; }
+.r2u h2 { font-size: 22px; font-weight: 600; margin: 0 0 10px; padding-top: 24px; border-top: 1px solid var(--line); }
+.r2u .lead { font-size: 17px; color: var(--muted); max-width: 900px; margin: 0; }
+.r2u section { margin: 40px 0; scroll-margin-top: calc(var(--vp-nav-height) + 16px); }
+.r2u .jump { display: flex; gap: 18px; flex-wrap: wrap; margin-top: 16px; font-size: 15px; }
+
+.r2u .button {
+  display: inline-block; padding: 7px 16px; border-radius: 20px; border: 1px solid var(--vp-button-alt-border);
+  background: var(--vp-button-alt-bg); color: var(--vp-button-alt-text); text-decoration: none;
+  font: inherit; font-size: 14px; font-weight: 600; cursor: pointer;
+}
+.r2u .button:hover { background: var(--vp-button-alt-hover-bg); }
+.r2u .button.primary { background: var(--vp-button-brand-bg); border-color: var(--vp-button-brand-border); color: var(--vp-button-brand-text); }
+.r2u .button.primary:hover { background: var(--vp-button-brand-hover-bg); }
+.r2u .button:disabled { opacity: .5; cursor: default; }
+.r2u .link { background: none; border: 0; color: var(--accent); cursor: pointer; font: inherit; font-size: 14px; padding: 0; }
+
+.r2u .card { background: var(--vp-c-bg-soft); border: 1px solid var(--line); border-radius: 12px; padding: 20px; }
+.r2u .code, .r2u .output {
+  background: var(--code-bg); border: 1px solid var(--line); border-radius: 10px; padding: 14px;
+  font: 13px/1.5 var(--mono); overflow: auto; margin: 0; color: var(--text);
+}
+
+.r2u .toolbar { display: flex; gap: 12px; align-items: end; flex-wrap: wrap; margin: 16px 0; }
+.r2u .toolbar label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--muted); min-width: 0; max-width: 100%; }
+.r2u #s-example { width: 460px; }
+.r2u select, .r2u input {
+  font: inherit; font-size: 15px; padding: 6px 10px; border-radius: 8px; border: 1px solid var(--line);
+  background: var(--surface); color: var(--text); min-width: 220px; max-width: 100%;
+}
+.r2u select { appearance: auto; }
+/* the two code panes in one row, the preview below them over the whole width */
+.r2u .three { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.r2u .three > .pane:nth-child(3) { grid-column: 1 / -1; }
+@media (max-width: 900px) { .r2u .three { grid-template-columns: minmax(0, 1fr); } }
+/* your own report: report and class, the preview below them when it is on */
+.r2u .two { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.r2u .two > #preview { grid-column: 1 / -1; }
+@media (max-width: 900px) { .r2u .two { grid-template-columns: minmax(0, 1fr); } }
+.r2u #run[aria-pressed="true"] { box-shadow: inset 0 0 0 2px var(--accent-text); }
+
+/* the editor: a text area with transparent text over its highlighted copy */
+.r2u .editor { position: relative; height: 480px; }
+.r2u .editor textarea, .r2u .editor-hl {
+  position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; padding: 14px;
+  border: 1px solid var(--line); border-radius: 10px; font: 13px/1.5 var(--mono); tab-size: 2;
+  white-space: pre; overflow: auto; overflow-wrap: normal; letter-spacing: 0;
+}
+.r2u .editor-hl { background: var(--code-bg); color: var(--text); pointer-events: none; }
+.r2u .editor textarea { background: transparent; color: transparent; caret-color: var(--text); resize: none; }
+.r2u .editor textarea::selection { background: color-mix(in srgb, var(--accent) 30%, transparent); color: transparent; }
+.r2u .editor textarea::placeholder { color: var(--muted); }
+
+/* ABAP highlighting (site/highlight.mjs) */
+.r2u .hl-kw { color: #0b5cad; font-weight: 600; }
+.r2u .hl-str { color: #a3410b; }
+.r2u .hl-com { color: #5f7a4d; font-style: italic; }
+.r2u .hl-num { color: #7a3eb1; }
+.r2u .hl-op { color: var(--muted); }
+.dark .r2u .hl-kw { color: #7cb8f2; }
+.dark .r2u .hl-str { color: #f0a46c; }
+.dark .r2u .hl-com { color: #8fb07a; }
+.dark .r2u .hl-num { color: #c49af0; }
+
+.r2u .step-no {
+  display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; margin-right: 6px;
+  background: var(--accent); color: var(--accent-text); font-size: 12px; font-weight: 700;
+}
+.r2u .app { position: relative; height: 620px; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: var(--surface); }
+.r2u .app iframe { width: 100%; height: 100%; border: 0; display: block; background: var(--surface); }
+.r2u .app-cover {
+  position: absolute; inset: 0; display: grid; place-items: center; padding: 24px; text-align: center;
+  background: var(--surface); color: var(--muted);
+}
+.r2u .app-cover[hidden] { display: none; }
+.r2u .info { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin-top: 16px; }
+@media (max-width: 1180px) { .r2u .info { grid-template-columns: minmax(0, 1fr); } }
+.r2u .info-card { padding: 16px 18px; min-width: 0; }
+.r2u .info-card h3 { font-size: 15px; font-weight: 600; margin: 0 0 8px; display: inline; }
+.r2u .info-card > h3 { display: block; }
+.r2u .info-card summary { cursor: pointer; }
+.r2u .info-card ul { margin: 0; padding-left: 18px; list-style: disc; }
+.r2u .info-card li { margin: 3px 0; font-size: 14px; }
+.r2u .info-card .row { font-family: var(--mono); font-size: 12px; color: var(--muted); margin-right: 6px; }
+.r2u .info-card .bad { color: var(--bad); }
+.r2u .info-card .warn { color: var(--warn); }
+.r2u .wide-card { grid-column: 1 / -1; }
+.r2u .badge { display: inline-block; min-width: 20px; padding: 0 7px; border-radius: 10px; background: var(--line); color: var(--text); font-size: 12px; text-align: center; }
+.r2u .badge:empty { display: none; }
+.r2u .steps { margin: 0; padding-left: 22px; list-style: decimal; }
+.r2u .steps li { margin: 4px 0; font-size: 14px; }
+.r2u .steps .ok::marker { color: var(--ok); }
+.r2u .steps li.ok { color: var(--text); }
+.r2u .steps li.bad { color: var(--bad); }
+.r2u .steps li.wait { color: var(--muted); }
+.r2u .mapped { width: 100%; border-collapse: collapse; font-size: 13px; }
+.r2u .mapped th, .r2u .mapped td { text-align: left; padding: 4px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+.r2u .mapped td:first-child { font-family: var(--mono); color: var(--muted); white-space: nowrap; }
+.r2u .mapped code { font-size: 12px; }
+.r2u #migration { max-height: 420px; white-space: pre-wrap; margin-top: 10px; }
+.r2u .pane { display: flex; flex-direction: column; min-width: 0; }
+.r2u .pane-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 34px; font-weight: 600; font-size: 14px; }
+.r2u .pane-head a.link { margin: 0 12px; }
+.r2u textarea {
+  width: 100%; height: 520px; resize: vertical; padding: 14px; border-radius: 10px; border: 1px solid var(--line);
+  background: var(--code-bg); color: var(--text); font: 13px/1.5 var(--mono); tab-size: 2;
+  white-space: pre; overflow-wrap: normal; overflow: auto;
+}
+.r2u .output { height: 480px; white-space: pre; }
+.r2u .tabs { display: flex; gap: 4px; overflow-x: auto; }
+.r2u .tabs button {
+  border: 1px solid var(--line); background: var(--surface); color: var(--muted); border-radius: 6px;
+  padding: 3px 8px; font: 12px var(--mono); cursor: pointer; white-space: nowrap;
+}
+.r2u .tabs button[aria-selected="true"] { color: var(--text); border-color: var(--accent); }
+.r2u .head-actions { display: flex; gap: 12px; flex-shrink: 0; }
+.r2u .texts { margin-top: 10px; font-size: 14px; }
+.r2u .texts summary { cursor: pointer; font-weight: 600; }
+.r2u .texts textarea { height: 160px; margin-top: 8px; }
+.r2u textarea::placeholder { color: var(--muted); white-space: pre-wrap; }
+
+.r2u .status { margin: 14px 0 6px; font-weight: 600; }
+.r2u .status.ok { color: var(--ok); }
+.r2u .status.bad { color: var(--bad); }
+
+/* the package section: the drop zone and the table of the reports */
+.r2u .drop { display: flex; align-items: center; justify-content: center; flex: 1 1 320px; min-height: 64px; padding: 12px 16px; border: 2px dashed var(--line); border-radius: 12px; color: var(--muted); cursor: pointer; text-align: center; }
+.r2u .drop.over, .r2u .drop:hover { border-color: var(--accent); color: var(--text); }
+.r2u .table { display: table; width: 100%; border-collapse: collapse; font-size: 14px; margin-top: 8px; }
+.r2u .table th, .r2u .table td { text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+.r2u .table th { color: var(--muted); font-weight: 500; }
+.r2u .table td.ok { color: var(--ok); }
+.r2u .table td.bad { color: var(--bad); }
+.r2u .table .mono { font-family: var(--mono); font-size: 13px; }
