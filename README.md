@@ -53,7 +53,9 @@ What it is not:
 **Requirements**
 
 - ABAP Cloud (BTP ABAP Environment, S/4HANA Cloud) or Standard ABAP 7.50 or
-  higher; NetWeaver 7.02 with a downported copy (see [Compatibility](#compatibility))
+  higher; NetWeaver 7.02 - 7.40 with the branch `702`, downported automatically
+  from `main` on every push, or a downported release copy (see
+  [Compatibility](#compatibility))
 - [abap2UI5](https://github.com/abap2UI5/abap2UI5) - nothing else: the popups
   (value help, ranges, confirmation, values, transport request) are classes
   of this addon

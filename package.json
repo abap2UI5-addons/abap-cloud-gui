@@ -21,7 +21,10 @@
     "unit": "node scripts/unit.mjs",
     "site": "node scripts/build-site.mjs",
     "site:dev": "node scripts/build-site.mjs --dev",
-    "test:report2ui5:browser": "node --test tools/report2ui5/test/browser/*.test.mjs"
+    "test:report2ui5:browser": "node --test tools/report2ui5/test/browser/*.test.mjs",
+    "syfixes": "find src -type f -name '*.abap' -exec sed -i -e 's/ RAISE EXCEPTION TYPE cx_sy_itab_line_not_found/ ASSERT 1 = 0/g' {} +",
+    "strip_trailing_ws": "find src -type f -name '*.abap' -exec sed -i 's/[[:space:]]\\+$//' {} +",
+    "auto_downport": "npm run check:702 && rm -rf src && cp -r build/702/src src && npm run syfixes && npm run strip_trailing_ws && cp -f .github/abaplint/abap_702.jsonc abaplint.jsonc && abaplint abaplint.jsonc"
   },
   "repository": {
     "type": "git",
