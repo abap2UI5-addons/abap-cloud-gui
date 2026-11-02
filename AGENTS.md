@@ -13,7 +13,7 @@ list, ALV grid, messages. Language of code, comments, commits and docs:
 
 | Path | Content |
 |---|---|
-| `src/01` | the framework: `z2ui5_cl_cgui_report` (report runtime), `_selscreen`, `_list`, `_alv`, `_tree`, `_layout` (the layout dialog of the ALV), `_popup`, `_range`, `_select`, `_variant` (selection variants), `_context` (RTTI and conversion helpers), `z2ui5_cx_cgui_error`; the two stores: `z2ui5_if_cgui_variant_store` with `z2ui5_cl_cgui_variant_db` (table `Z2UI5_CGUI_VAR`, data elements `Z2UI5_CGUI_VAR_*`) and `z2ui5_if_cgui_layout_store` with `z2ui5_cl_cgui_layout_db` (table `Z2UI5_CGUI_LAY`) |
+| `src/01` | the framework: `z2ui5_cl_cgui_report` (report runtime), `_selscreen`, `_list`, `_alv`, `_tree`, `_layout` (the layout dialog of the ALV), `_popup`, `_range`, `_select`, `_variant` (selection variants), `_context` (RTTI and conversion helpers), `z2ui5_cx_cgui_error`; the two stores: `z2ui5_if_cgui_variant_store` with `z2ui5_cl_cgui_variant_db` (table `Z2UI5_T_19`, data elements `Z2UI5_CGUI_VAR_*`) and `z2ui5_if_cgui_layout_store` with `z2ui5_cl_cgui_layout_db` (table `Z2UI5_T_18`) |
 | `src/02` | samples `z2ui5_cl_cgui_sample_01` … `_11` |
 | `src/03` | the test set: the corpus reports of report2UI5 as converted (`z2ui5_cl_cgui_r2c_NN`), generated - never edit by hand, `UPDATE_SNAPSHOTS=1 npm run test:report2ui5` writes it. Only the reports of `CLOUD_READY` in `tools/report2ui5/test/corpus.mjs` - those that read no table and call no API ABAP Cloud lacks, so the package activates there too; the gate test's scratch copy leaves it out and lints the conversion of now under `src/r2c` |
 | `tools/report2ui5` | `report2UI5`, a Node CLI (no ABAP object) that converts a classic report into a report class of this addon - THE generator of this repository, see below |
@@ -133,7 +133,7 @@ toolbar and the grid are not frozen.
   to `selected` - so a table that brings a `ZZSELKZ` comes up checked. The
   popup heads a column with the DDIC label of its type, and with `STRING`
   for a string: give value lists character types.
-- **Variants live in table `Z2UI5_CGUI_VAR` by default**
+- **Variants live in table `Z2UI5_T_19` by default**
   (`z2ui5_cl_cgui_variant_db`: shared and protected variants, one owner each,
   set after `initialization( )` unless it chose otherwise);
   `set_variant_store( store )` plugs in another `z2ui5_if_cgui_variant_store`,
@@ -147,7 +147,7 @@ toolbar and the grid are not frozen.
   empty VALUE deletes the key. Keep bound and stored value equal after a
   write, or the control reports again on the next render. A variant in the
   URL is read after `initialization( )`, so it wins over `set_variant( )`.
-- **ALV layouts live in table `Z2UI5_CGUI_LAY` by default**
+- **ALV layouts live in table `Z2UI5_T_18` by default**
   (`z2ui5_cl_cgui_layout_db`, one namespace per report class and ALV handle -
   the attribute `alv( )` shows): shared and protected like the variants, and
   the default layout is personal - the store keeps one per user and counts

@@ -29,7 +29,7 @@
 "!                         authorization, no report
 "! The runtime shows the selection screen, runs the blocks on Execute (F8),
 "! shows the output and goes back on Back (F3). The values of the selection
-"! screen can be saved as variants, kept in table Z2UI5_CGUI_VAR per report,
+"! screen can be saved as variants, kept in table Z2UI5_T_19 per report,
 "! in a store of your own or in the browser's local storage
 "! (set_variant_store( )) - start with one by
 "! set_variant( ) in initialization( ) or with the URL parameter
@@ -1114,14 +1114,14 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
       IMPORTING
         name TYPE clike.
 
-    "! keep the selection variants in store instead of table Z2UI5_CGUI_VAR
+    "! keep the selection variants in store instead of table Z2UI5_T_19
     "! (z2ui5_cl_cgui_variant_db, the default) - set it in initialization( ).
     "! Without a store the variants are kept in the browser's local storage
     METHODS set_variant_store
       IMPORTING
         store TYPE REF TO z2ui5_if_cgui_variant_store OPTIONAL.
 
-    "! keep the ALV layouts in store instead of table Z2UI5_CGUI_LAY
+    "! keep the ALV layouts in store instead of table Z2UI5_T_18
     "! (z2ui5_cl_cgui_layout_db, the default) - set it in initialization( ).
     "! Without a store the layouts are kept with the selection variants
     METHODS set_layout_store

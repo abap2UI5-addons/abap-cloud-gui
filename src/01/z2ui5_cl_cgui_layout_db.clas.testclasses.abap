@@ -1,5 +1,5 @@
 " the server store of the ALV layouts against its table - DANGEROUS, it
-" writes Z2UI5_CGUI_LAY; every row of the test report goes in teardown
+" writes Z2UI5_T_18; every row of the test report goes in teardown
 CLASS ltcl_test DEFINITION FINAL FOR TESTING
   DURATION SHORT
   RISK LEVEL DANGEROUS.
@@ -51,8 +51,8 @@ CLASS ltcl_test IMPLEMENTATION.
 
   METHOD delete_test_rows.
 
-    DATA(lv_report) = CONV z2ui5_cgui_lay-report( cv_report ).
-    DELETE FROM z2ui5_cgui_lay WHERE report = @lv_report.
+    DATA(lv_report) = CONV z2ui5_t_18-report( cv_report ).
+    DELETE FROM z2ui5_t_18 WHERE report = @lv_report.
 
   ENDMETHOD.
 
@@ -67,7 +67,7 @@ CLASS ltcl_test IMPLEMENTATION.
 
   METHOD other_user.
 
-    DATA ls_db TYPE z2ui5_cgui_lay.
+    DATA ls_db TYPE z2ui5_t_18.
 
     ls_db-report    = cv_report.
     ls_db-handle    = cv_handle.
@@ -79,7 +79,7 @@ CLASS ltcl_test IMPLEMENTATION.
     DATA(lt_layout) = layout( ).
     CALL TRANSFORMATION id SOURCE layout = lt_layout
                            RESULT XML ls_db-data.
-    MODIFY z2ui5_cgui_lay FROM @ls_db.
+    MODIFY z2ui5_t_18 FROM @ls_db.
 
   ENDMETHOD.
 
@@ -180,10 +180,10 @@ CLASS ltcl_test IMPLEMENTATION.
       CATCH z2ui5_cx_cgui_error ##NO_HANDLER.
         " refused is fine as well - the row must stay either way
     ENDTRY.
-    DATA(lv_report) = CONV z2ui5_cgui_lay-report( cv_report ).
-    DATA(lv_handle) = CONV z2ui5_cgui_lay-handle( cv_handle ).
-    DATA(lv_private) = CONV z2ui5_cgui_lay-layout( `PRIVATE` ).
-    SELECT SINGLE owner FROM z2ui5_cgui_lay
+    DATA(lv_report) = CONV z2ui5_t_18-report( cv_report ).
+    DATA(lv_handle) = CONV z2ui5_t_18-handle( cv_handle ).
+    DATA(lv_private) = CONV z2ui5_t_18-layout( `PRIVATE` ).
+    SELECT SINGLE owner FROM z2ui5_t_18
       WHERE report = @lv_report AND handle = @lv_handle AND layout = @lv_private
       INTO @DATA(lv_owner).
     cl_abap_unit_assert=>assert_subrc( exp = 0 ).

@@ -1,5 +1,5 @@
 "! The store of the selection variants of a report. The default is the
-"! server store of this addon - table Z2UI5_CGUI_VAR, shared and protected
+"! server store of this addon - table Z2UI5_T_19, shared and protected
 "! variants (z2ui5_cl_cgui_variant_db). A store of your own (another table,
 "! a RAP business object) implements this interface and is set in
 "! initialization( ) with set_variant_store( store ); set_variant_store( )

@@ -11,7 +11,7 @@ ENDCLASS.
 
 " a layout store of a customer - in memory, plugged in with
 " set_layout_store( ); the tests keep the default store, the table
-" Z2UI5_CGUI_LAY, out of the way with it
+" Z2UI5_T_18, out of the way with it
 CLASS ltcl_layout_store DEFINITION FINAL.
   PUBLIC SECTION.
     INTERFACES z2ui5_if_cgui_layout_store.
@@ -367,7 +367,7 @@ CLASS ltcl_report IMPLEMENTATION.
                           text = `Code`
         )->parameter( val                = p_var
                       text               = `Report of a variant`
-                      value_help_entity  = `Z2UI5_CGUI_VAR`
+                      value_help_entity  = `Z2UI5_T_19`
                       value_help_element = `REPORT` ).
 
   ENDMETHOD.

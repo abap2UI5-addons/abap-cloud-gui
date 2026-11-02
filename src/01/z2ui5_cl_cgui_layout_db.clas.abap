@@ -1,4 +1,4 @@
-"! ALV layouts on the server - kept in table Z2UI5_CGUI_LAY, one namespace
+"! ALV layouts on the server - kept in table Z2UI5_T_18, one namespace
 "! per report and ALV handle as in the classic layout maintenance. A layout
 "! belongs to the user who saved it first; shared it is seen by every user,
 "! protected only its owner changes or deletes it, private nobody else
@@ -70,12 +70,12 @@ CLASS z2ui5_cl_cgui_layout_db IMPLEMENTATION.
     DATA ls_saved TYPE z2ui5_cl_cgui_layout=>ty_s_saved.
     DATA lt_other TYPE z2ui5_cl_cgui_layout=>ty_t_saved.
 
-    DATA(lv_report) = CONV z2ui5_cgui_lay-report( to_upper( report ) ).
-    DATA(lv_handle) = CONV z2ui5_cgui_lay-handle( to_upper( handle ) ).
-    DATA(lv_user) = CONV z2ui5_cgui_lay-owner( user( ) ).
+    DATA(lv_report) = CONV z2ui5_t_18-report( to_upper( report ) ).
+    DATA(lv_handle) = CONV z2ui5_t_18-handle( to_upper( handle ) ).
+    DATA(lv_user) = CONV z2ui5_t_18-owner( user( ) ).
 
     SELECT layout, owner, shared, protected, is_default, data
-      FROM z2ui5_cgui_lay
+      FROM z2ui5_t_18
       WHERE report = @lv_report
         AND handle = @lv_handle
         AND ( owner = @lv_user OR shared = @abap_true )
@@ -108,15 +108,15 @@ CLASS z2ui5_cl_cgui_layout_db IMPLEMENTATION.
 
   METHOD z2ui5_if_cgui_layout_store~save.
 
-    DATA ls_db TYPE z2ui5_cgui_lay.
+    DATA ls_db TYPE z2ui5_t_18.
 
     ls_db-report = to_upper( report ).
     ls_db-handle = to_upper( handle ).
     ls_db-layout = layout-name.
-    DATA(lv_user) = CONV z2ui5_cgui_lay-owner( user( ) ).
+    DATA(lv_user) = CONV z2ui5_t_18-owner( user( ) ).
 
     SELECT SINGLE owner, shared, protected, is_default
-      FROM z2ui5_cgui_lay
+      FROM z2ui5_t_18
       WHERE report = @ls_db-report AND handle = @ls_db-handle AND layout = @ls_db-layout
       INTO @DATA(ls_old).
     IF sy-subrc = 0.
@@ -155,24 +155,24 @@ CLASS z2ui5_cl_cgui_layout_db IMPLEMENTATION.
 
     " one default layout per user
     IF ls_db-is_default = abap_true AND ls_db-owner = lv_user.
-      UPDATE z2ui5_cgui_lay SET is_default = @abap_false
+      UPDATE z2ui5_t_18 SET is_default = @abap_false
         WHERE report = @ls_db-report AND handle = @ls_db-handle
           AND owner = @lv_user AND is_default = @abap_true
           AND layout <> @ls_db-layout.
     ENDIF.
 
-    MODIFY z2ui5_cgui_lay FROM @ls_db.
+    MODIFY z2ui5_t_18 FROM @ls_db.
 
   ENDMETHOD.
 
   METHOD z2ui5_if_cgui_layout_store~delete.
 
-    DATA(lv_report) = CONV z2ui5_cgui_lay-report( to_upper( report ) ).
-    DATA(lv_handle) = CONV z2ui5_cgui_lay-handle( to_upper( handle ) ).
-    DATA(lv_name) = CONV z2ui5_cgui_lay-layout( name ).
+    DATA(lv_report) = CONV z2ui5_t_18-report( to_upper( report ) ).
+    DATA(lv_handle) = CONV z2ui5_t_18-handle( to_upper( handle ) ).
+    DATA(lv_name) = CONV z2ui5_t_18-layout( name ).
 
     SELECT SINGLE owner, shared, protected
-      FROM z2ui5_cgui_lay
+      FROM z2ui5_t_18
       WHERE report = @lv_report AND handle = @lv_handle AND layout = @lv_name
       INTO @DATA(ls_old).
     " another user's private layout is none of this user's business
@@ -184,7 +184,7 @@ CLASS z2ui5_cl_cgui_layout_db IMPLEMENTATION.
                        owner = ls_old-owner ).
     ENDIF.
 
-    DELETE FROM z2ui5_cgui_lay WHERE report = @lv_report AND handle = @lv_handle AND layout = @lv_name.
+    DELETE FROM z2ui5_t_18 WHERE report = @lv_report AND handle = @lv_handle AND layout = @lv_name.
 
   ENDMETHOD.
 

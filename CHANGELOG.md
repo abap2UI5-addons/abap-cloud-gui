@@ -81,7 +81,7 @@ it.
 - Value helps: fixed values, value and text tables, search helps,
   `MATCHCODE OBJECT`, CDS value helps (`value_help_entity`), F4 inside the
   range popup.
-- Selection variants on the server (`Z2UI5_CGUI_VAR`) or in the browser,
+- Selection variants on the server (`Z2UI5_T_19`) or in the browser,
   shared and protected, dynamic dates; the last entries; a draft of a
   selection screen left without executing (`set_draft( )`).
 - Parameters on three levels: the user's (`SU3`), the installation's
@@ -90,7 +90,7 @@ it.
   checkboxes and icons, `ULINE`, `NEW-PAGE`, secondary lists, `READ LINE` /
   `MODIFY LINE`; print as PDF, execute in background.
 - The ALV (`CL_SALV_TABLE`): columns from RTTI and the DDIC, sort, filter,
-  totals and subtotals, layouts on the server (`Z2UI5_CGUI_LAY`), Excel
+  totals and subtotals, layouts on the server (`Z2UI5_T_18`), Excel
   export, editable cells, a toolbar of the report's own, a chart; the ALV
   tree (`CL_SALV_TREE`) and the tree lists of `RS_TREE_LIST_DISPLAY`.
 - Messages in a status bar and a popover, the application log as their

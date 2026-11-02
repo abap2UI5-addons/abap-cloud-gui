@@ -1,4 +1,4 @@
-"! Selection variants on the server - kept in table Z2UI5_CGUI_VAR, one
+"! Selection variants on the server - kept in table Z2UI5_T_19, one
 "! namespace per report as in the classic variant maintenance. A variant
 "! belongs to the user who saved it first; shared it is seen by every user,
 "! protected only its owner changes or deletes it, private nobody else
@@ -49,11 +49,11 @@ CLASS z2ui5_cl_cgui_variant_db IMPLEMENTATION.
 
     DATA ls_variant TYPE z2ui5_cl_cgui_variant=>ty_s_variant.
 
-    DATA(lv_report) = CONV z2ui5_cgui_var-report( to_upper( report ) ).
+    DATA(lv_report) = CONV z2ui5_t_19-report( to_upper( report ) ).
     DATA(lv_user) = CONV z2ui5_cgui_var_owner( user( ) ).
 
     SELECT variant, owner, shared, protected, data
-      FROM z2ui5_cgui_var
+      FROM z2ui5_t_19
       WHERE report = @lv_report
         AND ( owner = @lv_user OR shared = @abap_true )
       ORDER BY variant
@@ -81,14 +81,14 @@ CLASS z2ui5_cl_cgui_variant_db IMPLEMENTATION.
 
   METHOD z2ui5_if_cgui_variant_store~save.
 
-    DATA ls_db TYPE z2ui5_cgui_var.
+    DATA ls_db TYPE z2ui5_t_19.
 
     ls_db-report  = to_upper( report ).
     ls_db-variant = variant-name.
     DATA(lv_user) = user( ).
 
     SELECT SINGLE owner, shared, protected
-      FROM z2ui5_cgui_var
+      FROM z2ui5_t_19
       WHERE report = @ls_db-report AND variant = @ls_db-variant
       INTO @DATA(ls_old).
     IF sy-subrc = 0.
@@ -128,17 +128,17 @@ CLASS z2ui5_cl_cgui_variant_db IMPLEMENTATION.
                                   hide    = variant-hide
                            RESULT XML ls_db-data.
 
-    MODIFY z2ui5_cgui_var FROM @ls_db.
+    MODIFY z2ui5_t_19 FROM @ls_db.
 
   ENDMETHOD.
 
   METHOD z2ui5_if_cgui_variant_store~delete.
 
-    DATA(lv_report) = CONV z2ui5_cgui_var-report( to_upper( report ) ).
+    DATA(lv_report) = CONV z2ui5_t_19-report( to_upper( report ) ).
     DATA(lv_name) = CONV z2ui5_cgui_var_name( name ).
 
     SELECT SINGLE owner, shared, protected
-      FROM z2ui5_cgui_var
+      FROM z2ui5_t_19
       WHERE report = @lv_report AND variant = @lv_name
       INTO @DATA(ls_old).
     " another user's private variant is none of this user's business
@@ -155,7 +155,7 @@ CLASS z2ui5_cl_cgui_variant_db IMPLEMENTATION.
                          with = ls_old-owner ).
     ENDIF.
 
-    DELETE FROM z2ui5_cgui_var WHERE report = @lv_report AND variant = @lv_name.
+    DELETE FROM z2ui5_t_19 WHERE report = @lv_report AND variant = @lv_name.
 
   ENDMETHOD.
 

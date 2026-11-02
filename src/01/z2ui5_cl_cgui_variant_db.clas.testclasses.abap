@@ -1,5 +1,5 @@
 " the server store of the selection variants against its table - DANGEROUS,
-" it writes Z2UI5_CGUI_VAR; every row of the test report goes in teardown
+" it writes Z2UI5_T_19; every row of the test report goes in teardown
 CLASS ltcl_test DEFINITION FINAL FOR TESTING
   DURATION SHORT
   RISK LEVEL DANGEROUS.
@@ -43,8 +43,8 @@ CLASS ltcl_test IMPLEMENTATION.
 
   METHOD delete_test_rows.
 
-    DATA(lv_report) = CONV z2ui5_cgui_var-report( cv_report ).
-    DELETE FROM z2ui5_cgui_var WHERE report = @lv_report.
+    DATA(lv_report) = CONV z2ui5_t_19-report( cv_report ).
+    DELETE FROM z2ui5_t_19 WHERE report = @lv_report.
 
   ENDMETHOD.
 
@@ -92,7 +92,7 @@ CLASS ltcl_test IMPLEMENTATION.
 
   METHOD other_users_variants.
 
-    DATA ls_db TYPE z2ui5_cgui_var.
+    DATA ls_db TYPE z2ui5_t_19.
 
     " a protected, shared variant of another user and a private one,
     " written past the store
@@ -107,11 +107,11 @@ CLASS ltcl_test IMPLEMENTATION.
                                   protect = ls_variant-protect
                                   hide    = ls_variant-hide
                            RESULT XML ls_db-data.
-    MODIFY z2ui5_cgui_var FROM @ls_db.
+    MODIFY z2ui5_t_19 FROM @ls_db.
     ls_db-variant   = `PRIVATE`.
     ls_db-shared    = abap_false.
     ls_db-protected = abap_false.
-    MODIFY z2ui5_cgui_var FROM @ls_db.
+    MODIFY z2ui5_t_19 FROM @ls_db.
 
     DATA(lt_variant) = mo_store->load( cv_report ).
     cl_abap_unit_assert=>assert_equals( act = lines( lt_variant )
@@ -148,9 +148,9 @@ CLASS ltcl_test IMPLEMENTATION.
       CATCH z2ui5_cx_cgui_error ##NO_HANDLER.
         " refused is fine as well - the row must stay either way
     ENDTRY.
-    DATA(lv_report) = CONV z2ui5_cgui_var-report( cv_report ).
-    DATA(lv_private) = CONV z2ui5_cgui_var-variant( `PRIVATE` ).
-    SELECT SINGLE owner FROM z2ui5_cgui_var
+    DATA(lv_report) = CONV z2ui5_t_19-report( cv_report ).
+    DATA(lv_private) = CONV z2ui5_t_19-variant( `PRIVATE` ).
+    SELECT SINGLE owner FROM z2ui5_t_19
       WHERE report = @lv_report AND variant = @lv_private
       INTO @DATA(lv_owner).
     cl_abap_unit_assert=>assert_subrc( exp = 0 ).

@@ -60,11 +60,23 @@ What it is not:
   (value help, ranges, confirmation, values, transport request) are classes
   of this addon
 
+**Renumbered tables (2026-11).** The tables follow the numbering all addons share now: `Z2UI5_CGUI_LAY` is `Z2UI5_T_18`, `Z2UI5_CGUI_VAR` is `Z2UI5_T_19`. The pull creates the new tables empty, and the data stays in the old ones. Copy it once per client before you delete an old table - for each pair, in a scratch report:
+
+```abap
+DATA lr_rows TYPE REF TO data.
+FIELD-SYMBOLS <rows> TYPE STANDARD TABLE.
+CREATE DATA lr_rows TYPE STANDARD TABLE OF ('Z2UI5_T_18').
+ASSIGN lr_rows->* TO <rows>.
+SELECT * FROM ('Z2UI5_CGUI_LAY') INTO TABLE <rows>.
+MODIFY ('Z2UI5_T_18') FROM TABLE <rows>.
+COMMIT WORK.
+```
+
 **Steps** - with [abapGit](https://abapgit.org), in this order:
 
 1. [abap2UI5](https://github.com/abap2UI5/abap2UI5)
 2. this repository - classes, two interfaces and the two tables
-   `Z2UI5_CGUI_VAR` / `Z2UI5_CGUI_LAY`; nothing else to set up. A release
+   `Z2UI5_T_19` / `Z2UI5_T_18`; nothing else to set up. A release
    (a tag `vX.Y.Z`, [CHANGELOG.md](CHANGELOG.md)) is what to pin: pull the
    tag, or import the zip of its
    [GitHub release](https://github.com/abap2UI5-addons/abap-cloud-gui/releases)
@@ -120,8 +132,8 @@ is a complete report.
 | `z2ui5_cl_cgui_alv` | `CL_SALV_TABLE` — columns and headers from RTTI/DDIC, sort, filter, double click |
 | `z2ui5_cl_cgui_tree` | `CL_SALV_TREE` — an ALV tree with lazy nodes and checkboxes |
 | `z2ui5_cl_cgui_variant` | selection variants — get, save, delete, start with a variant |
-| `z2ui5_cl_cgui_variant_db` | the server store of the selection variants — table `Z2UI5_CGUI_VAR`, shared and protected variants |
-| `z2ui5_cl_cgui_layout`, `z2ui5_cl_cgui_layout_db` | the ALV layout dialog and the store of the layouts — table `Z2UI5_CGUI_LAY`, shared, protected and a default per user |
+| `z2ui5_cl_cgui_variant_db` | the server store of the selection variants — table `Z2UI5_T_19`, shared and protected variants |
+| `z2ui5_cl_cgui_layout`, `z2ui5_cl_cgui_layout_db` | the ALV layout dialog and the store of the layouts — table `Z2UI5_T_18`, shared, protected and a default per user |
 | `z2ui5_cl_cgui_context` | helpers — among them `range_check( )`, the `IN` of a select-option for internal tables |
 
 Everything is ABAP Cloud ready, transpilable to Node and downportable to
@@ -396,7 +408,7 @@ METHOD initialization.
 ENDMETHOD.
 ```
 
-The variants are kept in table `Z2UI5_CGUI_VAR`
+The variants are kept in table `Z2UI5_T_19`
 (`z2ui5_cl_cgui_variant_db`), one namespace per report class — nothing to
 set up, on ABAP Cloud as on premise: shared with all users, protected against
 changes of others, one owner each. A store of your own - another table, a
@@ -457,7 +469,7 @@ The layout button of every ALV opens the classic "Change Layout": the
 columns shown and their order, sort, totals and subtotals. A layout is saved
 under a name, shared with all users or protected when wanted, and one of
 them is the user's default - the report starts with it. They are kept in
-table `Z2UI5_CGUI_LAY` (`z2ui5_cl_cgui_layout_db`), one namespace per report
+table `Z2UI5_T_18` (`z2ui5_cl_cgui_layout_db`), one namespace per report
 class and ALV. A store of your own implements `z2ui5_if_cgui_layout_store`
 and is set with `set_layout_store( store )` in `initialization( )`;
 `set_layout_store( )` without a store keeps the layouts with the selection
@@ -719,14 +731,14 @@ Selection screen
 - [x] A phone layout of the selection screen: labels above the fields, a
       select-option's from and to and a line of fields wrap instead of
       squeezing (the browser test checks it at 390 px, themed)
-- [x] Selection variants on the server (table `Z2UI5_CGUI_VAR`): shared
+- [x] Selection variants on the server (table `Z2UI5_T_19`): shared
       and protected variants, a pluggable store beside the browser's local
       storage, dynamic date values
 
 Output
 
 - [x] ALV: Excel export (Office Open XML), layouts on the server (table
-      `Z2UI5_CGUI_LAY`, shared, protected, a default per user)
+      `Z2UI5_T_18`, shared, protected, a default per user)
 - [x] ALV: formatted dates, times and amounts (the locale of the browser),
       totals and subtotals, hotspot per column, toolbar with own functions,
       editable cells

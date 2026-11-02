@@ -8,7 +8,7 @@
 "!   popups            POPUP_TO_DECIDE, POPUP_GET_VALUES and a selection
 "!                     screen as popup (CALL SELECTION-SCREEN)
 "!   SUBMIT            the flight report sample 05, with the airline
-"!   variants          on the server (table Z2UI5_CGUI_VAR): shared,
+"!   variants          on the server (table Z2UI5_T_19): shared,
 "!                     protected, dynamic dates
 "! Start it with ?app_start=z2ui5_cl_cgui_sample_08 - or with values and
 "! without selection screen: &p_carrid=LH&skip_screen=X

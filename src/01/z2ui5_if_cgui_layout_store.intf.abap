@@ -1,5 +1,5 @@
 "! The store of the ALV layouts of a report - the classic "Save Layout".
-"! The report runtime keeps them in table Z2UI5_CGUI_LAY by default
+"! The report runtime keeps them in table Z2UI5_T_18 by default
 "! (z2ui5_cl_cgui_layout_db): a layout belongs to the user who saved it
 "! first, shared every user sees it, protected only its owner changes or
 "! deletes it, and every user has a default layout of his own. A store of
