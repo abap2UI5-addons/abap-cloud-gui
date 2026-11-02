@@ -1,12 +1,16 @@
-<!-- The report2UI5 playground (site/playground.md): the markup of its three
-     sections - the samples, your own report, a whole package. The behavior
+<!-- The report2UI5 pages: part="samples" (site/samples.md) - the samples of
+     the converter's corpus; part="playground" (site/playground.md) - import
+     from GitHub, your own report, a whole package. The behavior
      is site/playground.mjs, bundled by scripts/build-site.mjs into
      public/r2u/playground.js: loaded once the component is mounted, and its
      listeners taken down when it is left. The ids are what the script finds
      its elements by. -->
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted } from "vue";
-import { withBase } from "vitepress";
+import { useRouter, withBase } from "vitepress";
+
+defineProps<{ part: "samples" | "playground" }>();
+const router = useRouter();
 
 let unmount: (() => void) | undefined;
 let left = false;
@@ -16,10 +20,10 @@ onMounted(async () => {
     const url = withBase("/r2u/playground.js");
     const module = await import(/* @vite-ignore */ url);
     if (left) return;
-    unmount = await module.mount();
+    unmount = await module.mount({ go: (path: string) => router.go(withBase(path)) });
     if (left) unmount?.();
   } catch (e) {
-    const status = document.getElementById("status");
+    const status = document.getElementById("status") ?? document.getElementById("s-status");
     if (status) {
       status.className = "status bad";
       status.textContent = `The converter could not be loaded: ${(e as Error)?.message ?? e}`;
@@ -34,23 +38,17 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="r2u">
+  <div v-if="part === 'samples'" class="r2u">
     <header>
-      <h1>report2UI5 playground</h1>
-      <p class="lead">Convert a classic ABAP report into a report class of abap-cloud-gui and run it as an
-        abap2UI5 app - the converter and the abap2UI5 runtime run in your browser, nothing is sent anywhere.</p>
-      <p class="jump">
-        <a href="#samples">Samples</a>
-        <a href="#playground">Your own report</a>
-        <a href="#package">A whole package</a>
-      </p>
+      <h1>Samples</h1>
+      <p class="lead">Classic reports of the converter's corpus, converted by report2UI5 here in the page - the
+        report and its class side by side, the class running below them as an abap2UI5 app. The converter and the
+        abap2UI5 runtime run in your browser, nothing is sent anywhere. To convert a report of your own, go to the
+        <a :href="withBase('/playground')">playground</a>.</p>
     </header>
 
-    <section id="samples">
-      <h2>Samples - a classic report, the class it becomes, the app</h2>
-      <p class="muted">Each sample is a classic report of the converter's corpus. report2UI5 converts it here
-        in the page - the report and its class side by side - and the class starts below them as an abap2UI5 app - the converter and the abap2UI5
-        runtime run in your browser, nothing is sent anywhere.</p>
+    <section id="samples" class="first">
+      <div id="s-status" class="status" role="status"></div>
 
       <div class="toolbar">
         <label>Sample
@@ -58,7 +56,7 @@ onBeforeUnmount(() => {
         </label>
         <button id="s-prev" class="button" type="button" aria-label="Previous sample">&larr;</button>
         <button id="s-next" class="button" type="button" aria-label="Next sample">&rarr;</button>
-        <button id="s-try" class="button" type="button">Edit it below</button>
+        <button id="s-try" class="button" type="button">Edit it in the playground</button>
       </div>
 
       <div class="three">
@@ -98,9 +96,43 @@ onBeforeUnmount(() => {
       </div>
     </section>
 
+  </div>
+
+  <div v-else class="r2u">
+    <header>
+      <h1>Playground</h1>
+      <p class="lead">Convert a classic ABAP report of your own into a report class of abap-cloud-gui and run it as
+        an abap2UI5 app - pasted, imported from GitHub, or a whole package at once. The converter and the abap2UI5
+        runtime run in your browser; an import reads straight from GitHub, nothing is sent anywhere else.
+        Ready-made conversions are under <a :href="withBase('/samples')">Samples</a>.</p>
+      <p class="jump">
+        <a href="#github">Import from GitHub</a>
+        <a href="#playground">Your own report</a>
+        <a href="#package">A whole package</a>
+      </p>
+    </header>
+
+    <section id="github">
+      <h2>Import from GitHub</h2>
+      <p class="muted">A link to a <code>.prog.abap</code> of a public repository opens it in the editor below,
+        with the <code>.prog.xml</code> beside it as its text pool. A link to a repository or a folder converts
+        every report in it as a package - with their includes and text pools.</p>
+      <div class="toolbar">
+        <label class="grow">GitHub link
+          <input id="gh-url" type="url" spellcheck="false"
+            placeholder="https://github.com/owner/repo/blob/main/src/zreport.prog.abap - or a repository, or …/tree/main/src">
+        </label>
+        <button id="gh-import" class="button primary" type="button">Import</button>
+      </div>
+      <p class="muted small">For example:
+        <a href="#" data-gh="https://github.com/abap2UI5-addons/abap-cloud-gui/blob/main/tools/report2ui5/test/corpus/zr2c_02_flights.prog.abap">one report</a> ·
+        <a href="#" data-gh="https://github.com/abap2UI5-addons/abap-cloud-gui/tree/main/tools/report2ui5/test/corpus">the converter's corpus, as a package</a></p>
+      <div id="gh-status" class="status" role="status"></div>
+    </section>
+
     <section id="playground">
       <h2>Your own report</h2>
-      <p class="muted">Paste a classic report of your own. It is converted as you type, and kept in this browser
+      <p class="muted">Paste a classic report of your own, or import it above. It is converted as you type, and kept in this browser
         for your next visit. <strong>Preview</strong> starts the class as an app. Includes and the DDIC of your
         system are not there; the flight tables SCARR, SPFLI and SFLIGHT are, with rows to list.</p>
 
@@ -183,7 +215,7 @@ onBeforeUnmount(() => {
       <div id="pkg-result" hidden>
         <p id="pkg-summary"></p>
         <table id="pkg-table" class="table">
-          <thead><tr><th>#</th><th>Report</th><th>Class</th><th>Result</th><th>To do</th></tr></thead>
+          <thead><tr><th>#</th><th>Report</th><th>Class</th><th>Result</th><th>To do</th><th></th></tr></thead>
           <tbody></tbody>
         </table>
         <div class="info">

@@ -161,3 +161,10 @@
 .r2u .table td.ok { color: var(--ok); }
 .r2u .table td.bad { color: var(--bad); }
 .r2u .table .mono { font-family: var(--mono); font-size: 13px; }
+
+/* the GitHub link takes the row; the first section of a page has no rule above it */
+.r2u .toolbar label.grow { flex: 1 1 420px; }
+.r2u .toolbar label.grow input { width: 100%; }
+.r2u .small { font-size: 14px; }
+.r2u section.first { margin-top: 16px; }
+.r2u section.first .status:empty { display: none; }

@@ -10,7 +10,7 @@
 [![check-abap2UI5](https://img.shields.io/github/actions/workflow/status/abap2UI5-addons/abap-cloud-gui/check-abap2ui5.yaml?branch=main&label=check-abap2UI5)](https://github.com/abap2UI5-addons/abap-cloud-gui/actions/workflows/check-abap2ui5.yaml)
 [![report2UI5](https://img.shields.io/github/actions/workflow/status/abap2UI5-addons/abap-cloud-gui/report2ui5.yaml?branch=main&label=report2UI5)](https://github.com/abap2UI5-addons/abap-cloud-gui/actions/workflows/report2ui5.yaml)
 
-**[Try the report converter in the browser](https://abap2ui5-addons.github.io/abap-cloud-gui/playground)**
+**[See converted samples](https://abap2ui5-addons.github.io/abap-cloud-gui/samples) · [Convert your own report in the browser](https://abap2ui5-addons.github.io/abap-cloud-gui/playground)** - pasted or imported from GitHub
 
 **Write abap2UI5 apps the way you write a classic ABAP report.** Selection
 screen, `WRITE` list, ALV grid, `START-OF-SELECTION`, `AT LINE-SELECTION`,

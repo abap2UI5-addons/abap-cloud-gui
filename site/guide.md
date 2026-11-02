@@ -66,9 +66,10 @@ the event blocks into the methods of the same name, `WRITE` / `FORMAT` /
 `HIDE` into the list, `CL_SALV_TABLE` and `REUSE_ALV_GRID_DISPLAY` into
 `alv( )`, `MESSAGE` into `message( )`, FORMs into methods.
 
-- **In the browser** - the [playground](/playground): a sample of the
-  converter's corpus, your own report, or the abapGit zip of a whole package.
-  The class starts right there as an abap2UI5 app; nothing leaves the browser.
+- **In the browser** - the [samples](/samples) show the reports of the
+  converter's corpus converted; the [playground](/playground) converts your
+  own report - pasted, imported from GitHub, or the abapGit zip of a whole
+  package. The class starts right there as an abap2UI5 app.
 - **On the command line** - for a folder of reports:
 
   ```bash

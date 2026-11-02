@@ -10,7 +10,10 @@ hero:
     alt: abap2UI5
   actions:
     - theme: brand
-      text: Try report2UI5
+      text: See the samples
+      link: /samples
+    - theme: alt
+      text: Convert your own report
       link: /playground
     - theme: alt
       text: Guide
@@ -26,8 +29,8 @@ features:
     details: Event blocks are methods of the same name, PARAMETERS and SELECT-OPTIONS are attributes, write( ) writes the list, alv( ) shows a grid - with drilldown, value helps, variants and messages. No UI5 knowledge needed.
   - title: Converted, not rewritten
     details: report2UI5 converts the user interface of a .prog.abap - the selection screen, the list and the ALV into their counterparts, dynpros and SAP GUI controls into stand-ins. The logic goes over as it is. What it cannot convert it refuses with the line - it never guesses.
-    link: /playground
-    linkText: Convert a report in the browser
+    link: /samples
+    linkText: See it on the samples
   - title: Measured on the web
     details: Every week the converter runs over the open-source ABAP of the web - the share that converts, the refusals ranked, and how many of the converted reports start in the transpiled runtime.
   - title: Checked like code
@@ -42,13 +45,15 @@ features:
 
 <script setup>
 // the sections of the playground lived on this page before the site was
-// VitePress - its old links (#samples, #playground, #package) lead there now
+// VitePress - its old links (#samples, #playground, #package) lead to the
+// samples and the playground now
 import { onMounted } from "vue";
 import { useRouter, withBase } from "vitepress";
 
 const router = useRouter();
 onMounted(() => {
   const { hash } = window.location;
-  if (["#samples", "#playground", "#package"].includes(hash)) router.go(withBase(`/playground${hash}`));
+  if (hash === "#samples") router.go(withBase("/samples"));
+  else if (["#playground", "#package"].includes(hash)) router.go(withBase(`/playground${hash}`));
 });
 </script>
