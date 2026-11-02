@@ -1,13 +1,16 @@
-// The report2UI5 part of the site, in two sections:
+// The report2UI5 part of the site, on two pages:
 //
 // - Samples: a report of the converter's own corpus (examples.json, written
 //   by scripts/build-site.mjs with its text pool), the class the converter
 //   writes of it and that class running as an abap2UI5 app - side by side,
 //   started when the sample is picked.
-// - Your own report: a report pasted or typed, converted as it is typed and
-//   kept in this browser (localStorage) for the next visit; Preview starts
-//   its class as an app beside it. Below, what happened and what the
-//   converter found.
+// - Playground, top to bottom: (1) where to start from - your own source
+//   (converted as it is typed, kept in this browser for the next visit), a
+//   GitHub link (site/github.mjs) or an abapGit zip; a folder or a zip lists
+//   its reports, each of which opens as your own source; (2) the class the
+//   converter writes; (3) the preview - Run starts the class as an app;
+//   (4) the conversion in detail, in tabs: what happened, refused, to do,
+//   mapped, the migration report, the summary of a package.
 //
 // The converter is tools/report2ui5, bundled for the browser. A class runs
 // in the abap2UI5 playground itself (https://abap2ui5.github.io/playground/),
@@ -312,11 +315,37 @@ export async function mount({ go = (path) => { location.href = new URL(`..${path
     samplesSection(examples, signal, go);
   }
   if ($("playground")) {
+    switches();
     const own = ownSection(signal);
     const pkg = packageSection(own);
     githubSection(own, pkg, signal);
   }
   return () => ac.abort();
+}
+
+/** the tab rows of the page ([data-tabs]): a button with data-tab shows the
+ *  panel of that id and hides the panels of the others */
+function switches() {
+  for (const list of document.querySelectorAll("[data-tabs]")) {
+    const buttons = [...list.querySelectorAll("[data-tab]")];
+    for (const b of buttons) {
+      b.onclick = () => {
+        for (const x of buttons) {
+          const on = x === b;
+          x.setAttribute("aria-selected", String(on));
+          $(x.dataset.tab).hidden = !on;
+        }
+      };
+    }
+  }
+}
+
+/** shows a tab of a row - onlyIfHidden: only when the selected tab is gone */
+function selectTab(id, onlyIfHidden = false) {
+  const b = document.querySelector(`[data-tab="${id}"]`);
+  if (!b) return;
+  if (onlyIfHidden && [...b.parentElement.querySelectorAll("[data-tab]")].some((x) => x.getAttribute("aria-selected") === "true" && !x.hidden)) return;
+  b.click();
 }
 
 // ---------------------------------------------------------------- samples
@@ -392,6 +421,8 @@ function samplesSection(examples, signal, go) {
 
 // ---------------------------------------------------------- your own report
 
+const COVER = "Run starts the class as an abap2UI5 app - the selection screen, Execute (F8), the list.";
+
 /** the editor of your own report - answers open( { source, xml } ), which
  *  makes a report your own: kept, converted, shown */
 function ownSection(signal) {
@@ -412,10 +443,10 @@ function ownSection(signal) {
   let last;
   let running;
 
-  const start = appFrame($("app"), $("app-cover"), (s) => {
+  const start = appFrame($("own-app"), $("own-app-cover"), (s) => {
     steps.run = s;
     renderSteps(stepList, steps);
-  }, $("app-open"), signal);
+  }, $("own-app-open"), signal);
 
   // the highlighted copy under the text area: the same text, the same scroll
   const paint = () => {
@@ -475,37 +506,38 @@ function ownSection(signal) {
       ? `Converted into ${result.className} - ${result.mapped.length} statement(s) mapped, ${result.todos.length} TODO(s).`
       : `Refused: ${result.refusals.length} statement(s) have no counterpart - the draft shows how far it got; nothing can run until they are rewritten.`;
     Object.assign(steps, stepsOf(c.name, text, textpool, result));
+    // the app in the frame is of another report - its start is no step of this one
+    if (running !== text) steps.run = undefined;
     renderSteps(stepList, steps);
     panels("", result);
     $("migration").textContent = c.report;
     markStale();
   };
 
-  /** the app in the frame was started with another source - Preview starts this one */
+  /** the app in the frame was started with another source - Run starts this one */
   function markStale() {
-    if (running === undefined) return;
-    appState.textContent = last && running === last.text ? "" : "the report changed - Preview starts it again";
+    if (running === undefined) {
+      $("own-app-cover").textContent = COVER;
+      return;
+    }
+    appState.textContent = last && running === last.text ? "" : "the report changed - Run starts it again";
   }
-
-  const preview = (on) => {
-    $("preview").hidden = !on;
-    $("own-panes").classList.toggle("with-preview", on);
-    runButton.setAttribute("aria-pressed", String(on));
-  };
 
   const runApp = () => {
     if (!source.value.trim()) {
       status.className = "status bad";
-      status.textContent = "Paste a report first - or take a sample above (Edit it below).";
+      status.textContent = "Start from a report first - your own source, a GitHub link or a zip (1).";
+      $("own-app-cover").hidden = false;
+      $("own-app-cover").textContent = "No report yet - start from one under 1, or take a sample (Samples, Edit it in the playground).";
       return;
     }
     if (!last || last.text !== source.value) run();
-    preview(true);
     if (!last.result.ok) {
       steps.run = { state: "bad", text: "Not started: the converter refused statements of the report - rewrite them first." };
       renderSteps(stepList, steps);
-      $("app-cover").hidden = false;
-      $("app-cover").textContent = "The report has statements the converter refuses - see Refused below.";
+      $("own-app-cover").hidden = false;
+      $("own-app-cover").textContent = "The report has statements the converter refuses - see Refused below.";
+      selectTab("det-refused");
       return;
     }
     running = last.text;
@@ -574,8 +606,8 @@ function ownSection(signal) {
     classname.value = "";
     save();
     run();
-    $("playground").scrollIntoView({ behavior: "smooth" });
-    source.focus({ preventScroll: true });
+    selectTab("src-own");
+    $("converted").scrollIntoView({ behavior: "smooth" });
   };
   return { open };
 }
@@ -613,6 +645,7 @@ function packageSection(own) {
       el("td", {}, openButton(r.file)));
     }));
     $("pkg-overview").textContent = pkg.summary;
+    $("det-tab-pkg").hidden = false;
     result.hidden = false;
     zipButton.disabled = converted === 0;
     clear.hidden = false;
@@ -621,7 +654,7 @@ function packageSection(own) {
 
   /** a report of the package into the editor, with its text pool */
   const openButton = (file) => {
-    const b = el("button", { class: "link", type: "button", title: "Open the report in the editor above" }, "Open");
+    const b = el("button", { class: "link", type: "button", title: "Convert this report on its own, show its class and run it" }, "Open");
     const path = Object.keys(sources).find((x) => x.split("/").pop() === file);
     const xml = Object.keys(sources).find((x) => x.split("/").pop().toLowerCase() === file.replace(/\.abap$/i, ".xml").toLowerCase());
     b.onclick = () => path && own.open({ source: sources[path], xml: xml && sources[xml] });
@@ -634,7 +667,7 @@ function packageSection(own) {
     // the conversion on the next frame, so the text shows first
     await new Promise((r) => setTimeout(r, 0));
     show(convertPackage(files), name);
-    $("package").scrollIntoView({ behavior: "smooth" });
+    result.scrollIntoView({ behavior: "smooth", block: "nearest" });
   };
 
   const take = async (list) => {
@@ -670,6 +703,8 @@ function packageSection(own) {
     out = undefined;
     sources = {};
     result.hidden = true;
+    $("det-tab-pkg").hidden = true;
+    selectTab("det-steps", true);
     zipButton.disabled = true;
     clear.hidden = true;
     input.value = "";
@@ -738,6 +773,7 @@ function githubSection(own, pkg, signal) {
   }
   const linked = new URLSearchParams(location.search).get("github");
   if (linked) {
+    selectTab("src-gh");
     input.value = linked;
     importFrom(linked);
   }
