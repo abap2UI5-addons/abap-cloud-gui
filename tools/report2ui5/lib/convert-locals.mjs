@@ -103,9 +103,9 @@ export const localsMethods = {
     const out = [];
     for (const u of this.locals.filter((x) => x.kind === "ClassDefinition")) {
       const cls = lc(nodeText(child(u.stmts[0], "ClassName") ?? u.stmts[0].getChildren()[1]));
-      let section = "PublicSection";
+      let section = "Public";
       for (const x of u.stmts) {
-        if (["PublicSection", "ProtectedSection", "PrivateSection"].includes(kind(x))) section = kind(x);
+        if (["Public", "Protected", "Private"].includes(kind(x))) section = kind(x);
         if (kind(x) === "ClassDataBegin") {
           this.todo(x, `CLASS-DATA BEGIN OF in ${cls} - a static structure starts initial in every roundtrip; declare it with a TYPES structure to keep it`);
           continue;
@@ -113,7 +113,7 @@ export const localsMethods = {
         if (kind(x) !== "ClassData" || this.insideBegin(x)) continue;
         const name = lc(declName(x) ?? "");
         if (!name) continue;
-        if (section !== "PublicSection" || words(x).includes("READ-ONLY")) {
+        if (section !== "Public" || words(x).includes("READ-ONLY")) {
           this.todo(x, `CLASS-DATA ${name} of ${cls} is not PUBLIC or READ-ONLY - it starts initial in every roundtrip (a roundtrip is a session of its own); make it PUBLIC to keep it with the app`);
           continue;
         }
@@ -291,14 +291,17 @@ export const localsMethods = {
         }
       }
 
-      // the copy, with the converted bodies and the replaced tokens
+      // the copy, with the converted bodies and the replaced tokens - and
+      // the source row of every line (undefined for a line written anew)
       const out = [];
+      const outRows = [];
       let row = first;
       const repl = replace.sort((a, b) => a.from - b.from);
       while (row <= last) {
         const r = repl.find((x) => x.from === row);
         if (r) {
           out.push(...r.lines);
+          outRows.push(...r.lines.map(() => undefined));
           row = Math.max(r.to, row - 1) + 1;
           continue;
         }
@@ -307,7 +310,28 @@ export const localsMethods = {
           line = line.slice(0, sb.col - 1) + sb.text + line.slice(sb.col - 1 + sb.len);
         }
         out.push(line);
+        outRows.push(row);
         row++;
+      }
+      // a handler of a SAP GUI control: PUBLIC, the stand-in calls it from
+      // z2ui5_cl_cgui_gui (guiHandlerMoves)
+      const moves = this.guiHandlerMoves(u);
+      if (moves.rows.size && outRows.includes(moves.before ?? moves.insertAfter)) {
+        const moved = out.filter((_, i) => moves.rows.has(outRows[i]));
+        for (let i = out.length - 1; i >= 0; i--) {
+          if (moves.rows.has(outRows[i])) {
+            out.splice(i, 1);
+            outRows.splice(i, 1);
+          }
+        }
+        if (moves.before !== undefined) {
+          const at = outRows.indexOf(moves.before);
+          out.splice(at, 0, ...moved);
+        } else {
+          const at = outRows.indexOf(moves.insertAfter) + 1;
+          const pad = (out.slice(at).find((l) => /^\s*(PROTECTED|PRIVATE)\s+SECTION\b/i.test(l)) ?? "  ").match(/^\s*/)[0];
+          out.splice(at, 0, `${pad}PUBLIC SECTION.`, ...moved);
+        }
       }
       // an instance of a local class the report keeps survives the
       // roundtrip with the app - its class must be serializable

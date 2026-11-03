@@ -199,6 +199,18 @@ toolbar and the grid are not frozen.
   `CS` / `CN` / `CA` / `NA` and `substring( )`. abaplint has no rule for it:
   `npm run check:regex` (`scripts/check-regex.mjs`) fails on any regex in
   `src`.
+- **An event handler of a SAP GUI control is PUBLIC.** The stand-ins call
+  it with `CALL METHOD o->(m)` from `z2ui5_cl_cgui_gui` (`raise_event`); a
+  system refuses a PRIVATE or PROTECTED method there
+  (`CX_SY_DYN_CALL_ILLEGAL_METHOD`), the transpiled runtime ignores the
+  visibility - a green test proves nothing. report2UI5 moves a `FOR EVENT`
+  handler of a control into the PUBLIC SECTION (`guiHandlerMoves`, not
+  `FRIENDS`: it holds for a global handler class too); `raise_event` turns
+  a call that fails into `z2ui5_cx_cgui_error` `GUI_HANDLER_NOT_CALLABLE`.
+  The `sender` is typed by the absolute name of the control's class (a local
+  subclass of a stand-in has no relative name `z2ui5_cl_cgui_gui` can
+  resolve), then the relative one, then the class above it - the runtime
+  knows the relative names of global classes only.
 - **The report dispatcher is one IF/ELSEIF chain** over `check_on_init`,
   `check_on_navigated`, `check_on_event`, and every branch that shows the
   screen calls `view_display( )` — unless a popup app was called in the same

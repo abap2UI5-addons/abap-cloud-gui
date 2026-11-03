@@ -189,6 +189,67 @@ export const guiMethods = {
   },
 
 
+  /** the rows of a local class definition that move into its PUBLIC
+   *  SECTION: the FOR EVENT handlers of a SAP GUI control declared PROTECTED
+   *  or PRIVATE (and a REDEFINITION of one), each with the comment lines
+   *  right above it. The stand-in calls a handler dynamically from
+   *  z2ui5_cl_cgui_gui (CALL METHOD o->(m)), which a system refuses for a
+   *  method that class cannot see - CX_SY_DYN_CALL_ILLEGAL_METHOD; the
+   *  transpiled runtime does not check the visibility. PUBLIC, not FRIENDS
+   *  z2ui5_cl_cgui_gui: it holds for a handler a global class declares too,
+   *  and for a subclass of the stand-in that raises the event. A statement
+   *  sharing its rows with one that stays (a chain mixing handlers with
+   *  other methods) cannot be moved - noted. Returns { rows, before,
+   *  insertAfter }: the moved lines go in front of the line of source row
+   *  before (the end of the PUBLIC SECTION), or - a class without one -
+   *  behind source row insertAfter (its CLASS ... DEFINITION) with a PUBLIC
+   *  SECTION of their own; rows is empty when nothing moves */
+  guiHandlerMoves(u) {
+    const none = { rows: new Set() };
+    if (u.kind !== "ClassDefinition" || !this.guiVars?.size) return none;
+    const handlers = new Set();
+    for (const [name, list] of this.guiHandlers()) if (list.some((h) => guiClass(h.of))) handlers.add(name);
+    if (!handlers.size) return none;
+    const span = (s) => [s.getFirstToken().getRow(), s.getLastToken().getRow()];
+    let section = "Public";
+    const move = [];
+    const stay = [];
+    for (const s of u.stmts) {
+      const k = kind(s);
+      // the statement kinds of abaplint: Public, Protected, Private
+      if (["Public", "Protected", "Private"].includes(k)) section = k;
+      const name = k === "MethodDef" ? lc(nodeText(child(s, "MethodName"))) : "";
+      const handler = name && handlers.has(name) && section !== "Public"
+        && ((child(s, "EventHandler") && guiClass(lc(nodeText(child(child(s, "EventHandler"), "ClassName")))))
+          || words(s).includes("REDEFINITION"));
+      // a comment is a statement of abaplint too - it goes with what it heads
+      if (k !== "Comment") (handler ? move : stay).push(s);
+    }
+    if (!move.length) return none;
+    const rows = new Set();
+    const taken = (r) => stay.some((s) => span(s)[0] <= r && r <= span(s)[1]);
+    for (const s of move) {
+      const [from, to] = span(s);
+      let blocked = false;
+      for (let r = from; r <= to; r++) if (taken(r)) blocked = true;
+      if (blocked) {
+        this.note(`the handler ${lc(nodeText(child(s, "MethodName")))} of a SAP GUI control shares its statement with other methods - make it PUBLIC by hand: the stand-in calls it from z2ui5_cl_cgui_gui`);
+        continue;
+      }
+      let top = from;
+      while (top - 1 > span(u.stmts[0])[1] && /^\s*(\*|")/.test(this.lines[top - 2]) && !taken(top - 1)) top--;
+      for (let r = top; r <= to; r++) rows.add(r);
+    }
+    if (!rows.size) return none;
+    const pub = u.stmts.find((s) => kind(s) === "Public");
+    // at the end of the PUBLIC SECTION - before the section or ENDCLASS after it
+    const next = u.stmts.find((s) => ["Protected", "Private", "EndClass"].includes(kind(s))
+      && (!pub || span(s)[0] > span(pub)[1]));
+    this.note("a handler of a SAP GUI control declared PROTECTED or PRIVATE moves into the PUBLIC SECTION - the stand-in calls it dynamically from z2ui5_cl_cgui_gui, which a system refuses for a method that class cannot see");
+    return { rows, before: pub ? span(next)[0] : undefined, insertAfter: pub ? undefined : span(u.stmts[0])[1] };
+  },
+
+
   /** SET HANDLER h->m FOR go_x [ACTIVATION a] - go_x->set_handler( ): the
    *  stand-in keeps the handler, the classic registration would not
    *  survive the roundtrip */

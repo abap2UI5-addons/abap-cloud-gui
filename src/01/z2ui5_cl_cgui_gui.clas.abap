@@ -269,24 +269,67 @@ CLASS z2ui5_cl_cgui_gui IMPLEMENTATION.
 
     DATA lt_param TYPE abap_parmbind_tab.
     DATA lr_sender TYPE REF TO data.
+    DATA lo_class TYPE REF TO cl_abap_classdescr.
+    DATA lo_super TYPE REF TO cl_abap_classdescr.
+    DATA lv_name TYPE string.
     FIELD-SYMBOLS <sender> TYPE any.
 
-    " sender typed as the class of the control - the handler's parameter is
-    " typed with the class of the event (the stand-in or a parent of it)
-    DATA(lv_class) = cl_abap_typedescr=>describe_by_object_ref( me )->get_relative_name( ).
-    CREATE DATA lr_sender TYPE REF TO (lv_class).
-    ASSIGN lr_sender->* TO <sender>.
-    <sender> ?= me.
     IF go_report IS NOT BOUND.
       RETURN.
     ENDIF.
+
+    " sender typed as the class of the control - the handler's parameter is
+    " typed with the class of the event (the stand-in or a parent of it). By
+    " the absolute name: a local subclass of a stand-in has no relative name
+    " this class can resolve. The transpiled runtime knows the relative name
+    " of a global class only - so the relative name next, then the class
+    " above, up to the stand-in
+    lo_class ?= cl_abap_typedescr=>describe_by_object_ref( me ).
+    WHILE lo_class IS BOUND AND lr_sender IS NOT BOUND.
+      TRY.
+          lv_name = lo_class->absolute_name.
+          CREATE DATA lr_sender TYPE REF TO (lv_name).
+        CATCH cx_sy_create_data_error.
+          TRY.
+              lv_name = lo_class->get_relative_name( ).
+              CREATE DATA lr_sender TYPE REF TO (lv_name).
+            CATCH cx_sy_create_data_error.
+              CLEAR lo_super.
+              lo_class->get_super_class_type( RECEIVING  p_descr_ref           = lo_super
+                                              EXCEPTIONS super_class_not_found = 1
+                                                         OTHERS                = 2 ).
+              IF sy-subrc <> 0.
+                CLEAR lo_super.
+              ENDIF.
+              lo_class = lo_super.
+          ENDTRY.
+      ENDTRY.
+    ENDWHILE.
+    IF lr_sender IS BOUND.
+      ASSIGN lr_sender->* TO <sender>.
+      <sender> ?= me.
+    ENDIF.
+
     DATA(lt_handler) = go_report->handlers_get( ).
     LOOP AT lt_handler INTO DATA(ls_handler) WHERE id = mv_id AND event = event.
       " the parameters the handler method takes - an event handler names a
       " part of the event's parameters
-      DATA(lo_type) = COND #( WHEN ls_handler-handler IS BOUND
-                              THEN CAST cl_abap_objectdescr( cl_abap_typedescr=>describe_by_object_ref( ls_handler-handler ) )
-                              ELSE CAST cl_abap_objectdescr( cl_abap_typedescr=>describe_by_name( ls_handler-class ) ) ).
+      DATA lo_type TYPE REF TO cl_abap_objectdescr.
+      DATA lo_descr TYPE REF TO cl_abap_typedescr.
+      IF ls_handler-handler IS BOUND.
+        lo_type = CAST cl_abap_objectdescr( cl_abap_typedescr=>describe_by_object_ref( ls_handler-handler ) ).
+      ELSE.
+        " a class name that does not resolve is a classic exception - the
+        " functional call would dump
+        cl_abap_typedescr=>describe_by_name( EXPORTING  p_name         = ls_handler-class
+                                             RECEIVING  p_descr_ref    = lo_descr
+                                             EXCEPTIONS type_not_found = 1
+                                                        OTHERS         = 2 ).
+        IF sy-subrc <> 0.
+          CONTINUE.
+        ENDIF.
+        lo_type = CAST cl_abap_objectdescr( lo_descr ).
+      ENDIF.
       READ TABLE lo_type->methods INTO DATA(ls_method) WITH KEY name = ls_handler-method.
       IF sy-subrc <> 0.
         CONTINUE.
@@ -294,9 +337,11 @@ CLASS z2ui5_cl_cgui_gui IMPLEMENTATION.
       CLEAR lt_param.
       LOOP AT ls_method-parameters INTO DATA(ls_parameter).
         IF ls_parameter-name = `SENDER`.
-          INSERT VALUE #( name  = `SENDER`
-                          kind  = cl_abap_objectdescr=>exporting
-                          value = lr_sender ) INTO TABLE lt_param.
+          IF lr_sender IS BOUND.
+            INSERT VALUE #( name  = `SENDER`
+                            kind  = cl_abap_objectdescr=>exporting
+                            value = lr_sender ) INTO TABLE lt_param.
+          ENDIF.
           CONTINUE.
         ENDIF.
         READ TABLE params INTO DATA(ls_param) WITH TABLE KEY name = ls_parameter-name.
@@ -304,13 +349,25 @@ CLASS z2ui5_cl_cgui_gui IMPLEMENTATION.
           INSERT ls_param INTO TABLE lt_param.
         ENDIF.
       ENDLOOP.
-      IF ls_handler-handler IS BOUND.
-        CALL METHOD ls_handler-handler->(ls_handler-method)
-          PARAMETER-TABLE lt_param.
-      ELSE.
-        CALL METHOD (ls_handler-class)=>(ls_handler-method)
-          PARAMETER-TABLE lt_param.
-      ENDIF.
+      " a system calls only what this class can see - a PRIVATE or PROTECTED
+      " handler is CX_SY_DYN_CALL_ILLEGAL_METHOD (the transpiled runtime does
+      " not check it); said as an error of the addon, not a short dump
+      TRY.
+          IF ls_handler-handler IS BOUND.
+            CALL METHOD ls_handler-handler->(ls_handler-method)
+              PARAMETER-TABLE lt_param.
+          ELSE.
+            CALL METHOD (ls_handler-class)=>(ls_handler-method)
+              PARAMETER-TABLE lt_param.
+          ENDIF.
+        CATCH cx_sy_dyn_call_error INTO DATA(lx_call).
+          RAISE EXCEPTION TYPE z2ui5_cx_cgui_error
+            EXPORTING
+              val      = |GUI_HANDLER_NOT_CALLABLE - { to_lower( lo_type->get_relative_name( ) ) }->| &&
+                         |{ to_lower( ls_handler-method ) } for the event { to_lower( event ) }: { lx_call->get_text( ) } | &&
+                         |- declare the handler method in the PUBLIC SECTION of its class|
+              previous = lx_call.
+      ENDTRY.
     ENDLOOP.
 
   ENDMETHOD.

@@ -6,6 +6,18 @@ release.
 
 ## Unreleased
 
+**Event handlers of the SAP GUI controls on a system**
+
+- A handler a stand-in cannot call - a PRIVATE or PROTECTED method, which a
+  system refuses to `z2ui5_cl_cgui_gui` - ends the event in
+  `z2ui5_cx_cgui_error` (`GUI_HANDLER_NOT_CALLABLE`, naming the handler)
+  instead of a short dump. report2UI5 moves a `FOR EVENT` handler of a
+  control into the PUBLIC SECTION of its class; the snapshots of the
+  converted grid and tree reports show it.
+- The `sender` of an event raised by a local subclass of a stand-in is
+  typed by the absolute name of its class (or the class above it) - the
+  relative name made `CREATE DATA` fail.
+
 **The value help and table controls in windows too**
 
 - The hit list of `z2ui5_cl_cgui_select` (F4, the variant catalog) and the

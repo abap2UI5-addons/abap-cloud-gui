@@ -12,6 +12,7 @@
 
 Layout, formatting and behaviour of the classic report that the list, the ALV or the selection screen of abap-cloud-gui do not have:
 
+- a handler of a SAP GUI control declared PROTECTED or PRIVATE moves into the PUBLIC SECTION - the stand-in calls it dynamically from z2ui5_cl_cgui_gui, which a system refuses for a method that class cannot see
 - a local class whose instance the report keeps implements if_serializable_object - the app is serialized between two roundtrips, its attributes with it
 - local classes that write the list, call a FORM or use a global of the report reach the report through lcl_r2c=>app, the instance of the class - LOCAL FRIENDS of the class, so the FORMs and the methods of the runtime are theirs to call
 

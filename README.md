@@ -860,7 +860,11 @@ Stage 5 - research
       same methods (the subclasses of `z2ui5_cl_cgui_gui`), in a local class too
 - [x] Their events: the toolbar (`function_selected`, `dropdown_clicked`),
       the SAPEVENT links and forms of the HTML viewer, the close of a dialog box -
-      `SET HANDLER` as `set_handler( )` of the stand-in
+      `SET HANDLER` as `set_handler( )` of the stand-in. The stand-in calls
+      the handler dynamically from `z2ui5_cl_cgui_gui`, so a handler method
+      must be PUBLIC (a system refuses a PRIVATE or PROTECTED one); report2UI5
+      moves a converted one there, and one that is not ends the event in
+      `z2ui5_cx_cgui_error` (`GUI_HANDLER_NOT_CALLABLE`), not in a dump
 - [x] The grid in a local class: the stand-in `z2ui5_cl_cgui_alv_grid`,
       the ALV of the report in its container, with its toolbar, user
       command, double click and hotspot
