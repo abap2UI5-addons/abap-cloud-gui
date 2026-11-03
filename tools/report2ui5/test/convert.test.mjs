@@ -1585,3 +1585,25 @@ test("the path before the rename - tools/report2cloud/lib - still answers, with 
   assert.equal(typeof parseTextpool, "function");
   assert.match(migrationReport(r, { source: "zt.prog.abap" }), /^# report2UI5: ZT/);
 });
+
+test("SALV stand-in: set_screen_status( ) adds the report's functions of its GUI status, added_function OF cl_salv_events, c_functions_all", () => {
+  const abap = classOf("zr2c_53_salvstatus");
+  const locals = converted.get("zr2c_53_salvstatus").result.draft["z2ui5_cl_cgui_r2c_53.clas.locals_def.abap"];
+  assert.match(abap, /set_functions = gr_alv->c_functions_all/);
+  assert.match(abap, /gr_alv->get_functions\( \)->add_function\( name = `PROCESS` text = `Process` tooltip = `Process selected calls \(Shift\+F1\)` \)\./);
+  assert.match(abap, /gr_alv->get_functions\( \)->add_function\( name = `REFRESH` icon = `sap-icon:\/\/refresh` tooltip = `Refresh \(F5\)` \)\./);
+  // the SALV functions of the status are the grid's own
+  assert.ok(!/name = `&/.test(abap), "no &-function as a button");
+  assert.match(locals, /on_user_command FOR EVENT added_function OF z2ui5_cl_cgui_salv_table/);
+  assert.equal(converted.get("zr2c_53_salvstatus").result.ok, true);
+});
+
+test("SALV stand-in: a tree's handler of added_function OF cl_salv_events is refused - the stand-in of the table declares it", () => {
+  const src = readFileSync(join(import.meta.dirname, "corpus", "zr2c_47_salvtree.prog.abap"), "utf8")
+    .replace("    CLASS-METHODS on_double_click FOR EVENT", "    CLASS-METHODS on_function FOR EVENT added_function OF cl_salv_events\n      IMPORTING e_salv_function.\n    CLASS-METHODS on_double_click FOR EVENT")
+    .replace("  METHOD on_double_click.", "  METHOD on_function.\n  ENDMETHOD.\n\n  METHOD on_double_click.")
+    .replace("  SET HANDLER lcl_handler=>on_double_click FOR lo_events.", "  SET HANDLER lcl_handler=>on_double_click FOR lo_events.\n  SET HANDLER lcl_handler=>on_function FOR lo_events.");
+  const r = convert(src, { file: "zt.prog.abap", className: "zcl_t" });
+  assert.equal(r.ok, false);
+  assert.ok(r.refusals.some((x) => /SET HANDLER on_function/.test(x.message)), r.refusals.map((x) => x.message).join("\n"));
+});

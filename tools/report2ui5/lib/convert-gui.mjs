@@ -217,7 +217,10 @@ export const guiMethods = {
         this.refuse(s, `SAP GUI controls: SET HANDLER ${method} FOR ${target} - no SAP GUI control of the report; port this statement by hand`);
         return;
       }
-      const candidates = (this.guiHandlers().get(method) ?? []).filter((h) => guiClass(h.of) && guiEvent(cls, h.event));
+      // FOR EVENT added_function OF cl_salv_events: the stand-in of the table
+      // declares it, so a tree registering such a handler is not one of them
+      const candidates = (this.guiHandlers().get(method) ?? []).filter((h) => guiClass(h.of) && guiEvent(cls, h.event)
+        && (h.of !== "cl_salv_events" || cls === "z2ui5_cl_cgui_salv_table"));
       if (!candidates.length) {
         this.refuse(s, `SAP GUI controls: SET HANDLER ${method} - no handler FOR EVENT of the control in a local class, or an event its stand-in ${cls} does not raise`);
         return;

@@ -622,13 +622,20 @@ Known limitations:
   ABAP Cloud. Print is a PDF in the browser, not a spool request.
 - Value tables are read on premise only — on ABAP Cloud the DDIC is not
   read, and the standard F4 is the domain's fixed values.
-- `alv( )` binds a PUBLIC attribute directly; any other table is copied into
-  a data reference, which the draft has to rebuild with RTTI on every
-  roundtrip ([abap2UI5#2963](https://github.com/abap2UI5/abap2UI5/issues/2963)).
+- `alv( )` binds a PUBLIC attribute directly; any other table - a local of
+  a method or a FORM - is copied into a data reference, which the draft has
+  to rebuild with RTTI on every roundtrip. Keep the table the grid shows in a
+  public attribute (report2UI5 does so for the globals of a report). A bind
+  by reference would not save the copy: the local is gone before the view is
+  built, and the draft keeps a copy of every data reference anyway
+  ([abap2UI5#2963](https://github.com/abap2UI5/abap2UI5/issues/2963#issuecomment-6598446414)).
 - A large table costs every roundtrip: 10,000 rows in an ALV are 1.1 MB to
   the browser each time, and two seconds of serializing the app in the
   transpiled runtime. `set_paging( 500 )` on the ALV brings the payload down
-  to a page; the serialization stays
+  to a window of 500 rows: the grid binds the table with abap2UI5's
+  `_bind_tab( )`, scrolling fetches the next rows, and a sort or a filter
+  from a column menu runs on the server over all rows - the sort of the
+  layout is the order the server starts from. The serialization stays
   ([abap2UI5#2962](https://github.com/abap2UI5/abap2UI5/issues/2962)).
 
 ## Roadmap
@@ -934,9 +941,14 @@ Simpler to read, simpler to change - the API stays
 
 What abap2UI5 could take over
 
-- [x] A table bound by reference, not only a public attribute - `alv( )`
-      copies and rebuilds every other table with RTTI on each roundtrip:
-      proposed as [abap2UI5#2963](https://github.com/abap2UI5/abap2UI5/issues/2963)
+- [x] A table bound by reference, not only a public attribute - checked
+      and dropped as a fix for the copy: the local table of `alv( )` is gone
+      before the view is built, the draft serializes a data reference as a
+      copy and rebuilds its type with RTTI whoever holds it, and the user's
+      changes cannot be written back to a table that no longer exists. What
+      is left is convenience, not cost - see
+      [abap2UI5#2963](https://github.com/abap2UI5/abap2UI5/issues/2963#issuecomment-6598446414);
+      the cost is the serialization of large tables (next item)
 - [x] Large tables kept on the server, the page alone to the browser -
       measured on a 10,000-row ALV in the transpiled runtime: bound as it
       is, every roundtrip carries 1,137 KB (2.2 s); with `set_paging( 500 )`

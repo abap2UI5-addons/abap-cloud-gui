@@ -25,6 +25,49 @@ release.
   again). Delete the old objects after the pull. A major release.
 - `npm run rename` and the manual workflow `build-rename`: abap2UI5's
   namespace rename for this addon, references to abap2UI5 renamed along.
+**A large ALV in windows instead of pages**
+
+- `set_paging( n )` binds the table with abap2UI5's `_bind_tab( )`
+  (abap2UI5/abap2UI5#2980, #2981) instead of cutting a page out of it: the
+  browser gets n rows and the next ones as the grid scrolls, a sort or a
+  filter from a column menu runs on the server over all rows instead of
+  over the page shown, and the sort of the layout is the order the server
+  starts from. The page buttons are gone; hotspots, line selection, cell
+  clicks and F4 map the row the browser shows to the table's row through
+  `_bind_tab_row( )`. The filter of the ALV still binds a copy of the rows
+  it lets through. `get_page( )`, `get_page_offset( )` and `page_turn( )`
+  stay and do nothing the grid shows. Needs abap2UI5 with `_bind_tab( )` -
+  the core pin moves with the release that has it.
+
+**report2UI5: a SALV with a GUI status of its own**
+
+- `x->set_screen_status( pfstatus = 'S' ... )` of a SALV the stand-ins
+  take over adds the report's functions of status S (from the `.prog.xml`)
+  as buttons of the grid - each raises `added_function` as the classic
+  toolbar did; the SALV functions of the status (`&ALL`, `&ILT`, ...) stay
+  the grid's. Before, the call was kept and did nothing: the buttons were
+  gone.
+- A handler `FOR EVENT added_function OF cl_salv_events` - the class that
+  declares the event - is taken over like one of `cl_salv_events_table`
+  (refused for a SALV tree); `c_functions_none` / `_default` / `_all` are
+  constants of `z2ui5_cl_cgui_salv_table`; a `FORM` parameter typed with a
+  SALV type (`salv_de_function`, ...) gets the type of the stand-ins.
+- The corpus report `zr2c_53_salvstatus` (test set `src/03`) covers the
+  three. Found on `ZAFL_VIEWER` of abap-fm-logger, which converts now.
+
+**Typed UI5 bindings from the ABAP type (`z2ui5_cl_cgui_context`)**
+
+- `ui5_binding_typed( path val )` writes the binding of a field with the
+  UI5 type of its ABAP type - Date and Time with the source pattern the
+  model carries, Integer and Float with grouping and the decimals of a
+  packed number, Currency / Unit with `currency_path` / `unit_path`;
+  `ui5_binding_typed_comp( struc comp )` does the same for a cell of a
+  table template and takes the reference field of an amount or a quantity
+  from the DDIC (`rtti_get_ref_field`, on-premise only).
+  `ui5_get_type_require( )` is the `core:require` the types need.
+  `ui5_binding_by_kind`, `ui5_get_model_type` and `ui5_get_format_options`
+  are the parts. The ALV's cell bindings use them now - unchanged output
+  (abap2UI5/abap2UI5#2964).
 
 **The site is VitePress**
 

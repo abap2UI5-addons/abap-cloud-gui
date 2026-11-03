@@ -16,6 +16,12 @@ CLASS z2ui5_cl_cgui_salv_table DEFINITION PUBLIC
     TYPES ty_function TYPE c LENGTH 30.
     TYPES ty_column TYPE c LENGTH 30.
 
+    "! set_functions of set_screen_status( ) - the classic values; the
+    "! functions of the grid do not depend on them here
+    CONSTANTS c_functions_none TYPE i VALUE 0.
+    CONSTANTS c_functions_default TYPE i VALUE 1.
+    CONSTANTS c_functions_all TYPE i VALUE 2.
+
     EVENTS added_function
       EXPORTING
         VALUE(e_salv_function) TYPE ty_function OPTIONAL.

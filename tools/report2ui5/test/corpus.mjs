@@ -66,7 +66,7 @@ export function convertEntry(entry) {
  *  a report as it is and does not judge it; the gate test checks that each
  *  of these is clean on ABAP Cloud (abaplint.test.mjs). */
 export const CLOUD_READY = new Set([
-  "01", "03", "06", "08", "09", "11", "12", "13", "22", "23", "25", "26", "28", "29", "30", "31", "32", "33", "34", "35", "36", "37", "38", "39", "40", "41", "42", "43", "44", "45", "47", "51", "52",
+  "01", "03", "06", "08", "09", "11", "12", "13", "22", "23", "25", "26", "28", "29", "30", "31", "32", "33", "34", "35", "36", "37", "38", "39", "40", "41", "42", "43", "44", "45", "47", "51", "52", "53",
 ]);
 
 /** the conversions that belong into the test set src/03 */

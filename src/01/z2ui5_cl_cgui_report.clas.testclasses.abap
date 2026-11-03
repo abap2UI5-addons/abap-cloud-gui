@@ -214,6 +214,11 @@ CLASS ltcl_client DEFINITION FINAL FOR TESTING.
     DATA mv_left      TYPE abap_bool.
     DATA mv_box       TYPE string.
     DATA mv_box_type  TYPE string.
+    " _bind_tab( ): the window asked for, and the order the server would
+    " show the rows in - _bind_tab_row( ) answers from it (the position
+    " itself when it is empty)
+    DATA mv_window       TYPE i.
+    DATA mt_window_order TYPE STANDARD TABLE OF i WITH EMPTY KEY.
 
     " the name of the public attribute val is - or, as the framework's model
     " dissolves a reference, the attribute whose REF TO data points at val
@@ -300,6 +305,7 @@ CLASS ltcl_test DEFINITION FINAL FOR TESTING
     METHODS value_check_and_block FOR TESTING.
     METHODS footer_print_function_key FOR TESTING.
     METHODS alv_paging_maps_rows FOR TESTING.
+    METHODS alv_paging_filtered_maps_rows FOR TESTING.
     METHODS alv_filter_by_popup FOR TESTING.
     METHODS window_shows_dialog FOR TESTING.
     METHODS exit_command FOR TESTING.
@@ -806,6 +812,22 @@ CLASS ltcl_client IMPLEMENTATION.
         RETURN.
       ENDIF.
     ENDLOOP.
+
+  ENDMETHOD.
+
+  METHOD z2ui5_if_client~_bind_tab.
+
+    mv_window = window.
+    result = z2ui5_if_client~_bind( val ).
+
+  ENDMETHOD.
+
+  METHOD z2ui5_if_client~_bind_tab_row.
+
+    result = row.
+    IF mt_window_order IS NOT INITIAL.
+      result = VALUE #( mt_window_order[ row ] OPTIONAL ).
+    ENDIF.
 
   ENDMETHOD.
 
@@ -2583,21 +2605,53 @@ CLASS ltcl_test IMPLEMENTATION.
     DATA(lv_rows) = lines( mo_report->mt_row ).
     cl_abap_unit_assert=>assert_true( xsdbool( lv_rows >= 2 ) ).
 
-    " one row a page - the page shown is a copy, the title counts all rows
+    " one row a window: the grid binds the table itself with _bind_tab( ) -
+    " no copy of a page, the title counts all rows
     mo_cut->mo_cgui_alv->set_paging( 1 ).
-    event( z2ui5_cl_cgui_alv=>cs_event-page ).
-    event( name = z2ui5_cl_cgui_alv=>cs_event-page
-           args = VALUE #( ( z2ui5_cl_cgui_alv=>cs_page-next ) ) ).
-    cl_abap_unit_assert=>assert_equals( act = mo_cut->mo_cgui_alv->get_page( )
-                                        exp = 2 ).
-    cl_abap_unit_assert=>assert_bound( mo_cut->mr_cgui_alv_page ).
+    event( name = z2ui5_cl_cgui_alv=>cs_event-search
+           args = VALUE #( ( `` ) ) ).
+    cl_abap_unit_assert=>assert_equals( act = mo_client->mv_window
+                                        exp = 1 ).
+    cl_abap_unit_assert=>assert_not_bound( mo_cut->mr_cgui_alv_page ).
     cl_abap_unit_assert=>assert_true( xsdbool( mo_client->mv_view CS |({ lv_rows })| ) ).
 
-    " a line selection on the page is the second row of the table
+    " the server shows the rows in its own order - the last row first: a
+    " line selection on the first row shown is the last row of the table
+    mo_client->mt_window_order = VALUE #( ( lv_rows ) ).
+    DO lv_rows - 1 TIMES.
+      INSERT sy-index INTO TABLE mo_client->mt_window_order.
+    ENDDO.
+    event( name = z2ui5_cl_cgui_alv=>cs_event-line_selection
+           args = VALUE #( ( `/XX/MT_ROW/0` ) ) ).
+    cl_abap_unit_assert=>assert_equals( act = mo_report->mv_lsel_row
+                                        exp = lv_rows ).
+
+  ENDMETHOD.
+
+  METHOD alv_paging_filtered_maps_rows.
+
+    init( ).
+    mo_report->p_carrid = `LH`.
+    mo_report->mv_alv = abap_true.
+    event( z2ui5_cl_cgui_report=>cs_ucomm-execute ).
+
+    " filtered and large: the copy of the rows the filter lets through is
+    " bound with _bind_tab( ) - a position leads to the copy's row first,
+    " the copy's row to the table's
+    mo_cut->mo_cgui_alv->set_paging( 1 ).
+    event( name = z2ui5_cl_cgui_alv=>cs_event-search
+           args = VALUE #( ( `UA` ) ) ).
+    cl_abap_unit_assert=>assert_bound( mo_cut->mr_cgui_alv_page ).
+    cl_abap_unit_assert=>assert_equals( act = mo_client->mv_window
+                                        exp = 1 ).
+    DATA(lv_copy) = lines( mo_cut->mt_cgui_alv_index ).
+    cl_abap_unit_assert=>assert_true( xsdbool( lv_copy >= 1 ) ).
+
+    mo_client->mt_window_order = VALUE #( ( lv_copy ) ).
     event( name = z2ui5_cl_cgui_alv=>cs_event-line_selection
            args = VALUE #( ( `/XX/MR_CGUI_ALV_PAGE/0` ) ) ).
     cl_abap_unit_assert=>assert_equals( act = mo_report->mv_lsel_row
-                                        exp = 2 ).
+                                        exp = mo_cut->mt_cgui_alv_index[ lv_copy ] ).
 
   ENDMETHOD.
 

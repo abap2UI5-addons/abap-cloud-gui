@@ -38,6 +38,9 @@ CLASS ltcl_client DEFINITION FINAL FOR TESTING.
     DATA mv_action TYPE string.
     DATA mt_action TYPE string_table.
     DATA mv_popup  TYPE string.
+    " what the last _bind_tab( ) was asked for
+    DATA mv_window TYPE i.
+    DATA mt_window_sort TYPE z2ui5_if_client=>ty_t_bind_tab_sort.
 
 ENDCLASS.
 
@@ -100,6 +103,15 @@ CLASS ltcl_client IMPLEMENTATION.
 
   METHOD z2ui5_if_client~_bind.
 
+    result = |\{/{ z2ui5_cl_cgui_context=>attri_name_by_ref( app = mo_app
+                                                             val = val ) }\}|.
+
+  ENDMETHOD.
+
+  METHOD z2ui5_if_client~_bind_tab.
+
+    mv_window      = window.
+    mt_window_sort = t_sort.
     result = |\{/{ z2ui5_cl_cgui_context=>attri_name_by_ref( app = mo_app
                                                              val = val ) }\}|.
 
@@ -478,15 +490,24 @@ CLASS ltcl_test IMPLEMENTATION.
     cl_abap_unit_assert=>assert_equals( act = lo_alv->get_page( )
                                         exp = 3 ).
 
-    " the page shows its rows, the title the whole table
+    " a large table is bound with _bind_tab( ): the browser gets a window
+    " of page_size rows, the title counts the whole table, no page buttons
     DATA(lo_view) = z2ui5_cl_ui5_view_builder=>factory( )->ele( `VBox` ).
-    lo_alv->set_title( `Flights` )->render( node   = lo_view
-                                            client = mo_client
-                                            tab    = mo_app->mt_row
-                                            total  = 5 ).
+    lo_alv->set_title( `Flights` )->set_sort( name       = `PRICE`
+                                              descending = abap_true ).
+    lo_alv->render( node   = lo_view
+                    client = mo_client
+                    tab    = mo_app->mt_row
+                    total  = 5 ).
     DATA(lv_view) = lo_view->stringify( ).
     cl_abap_unit_assert=>assert_true( xsdbool( lv_view CS `Flights (5)` ) ).
-    cl_abap_unit_assert=>assert_true( xsdbool( lv_view CS `Page 3 of 3` ) ).
+    cl_abap_unit_assert=>assert_false( xsdbool( lv_view CS `Page 3 of 3` ) ).
+    cl_abap_unit_assert=>assert_true( xsdbool( lv_view CS `rows="{/MT_ROW}"` ) ).
+    cl_abap_unit_assert=>assert_equals( act = mo_client->mv_window
+                                        exp = 2 ).
+    " the sort of the layout is the order the server applies
+    cl_abap_unit_assert=>assert_equals( act = mo_client->mt_window_sort
+                                        exp = VALUE z2ui5_if_client=>ty_t_bind_tab_sort( ( path = `PRICE` descending = abap_true ) ) ).
 
     lo_alv->page_turn( direction = z2ui5_cl_cgui_alv=>cs_page-first
                        lines     = 5 ).

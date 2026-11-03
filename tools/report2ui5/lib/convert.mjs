@@ -1861,6 +1861,7 @@ class Converter {
     const ov = this.rewrites(s, b.ctx, b);
     const text = renderTokens(stmtTokens(s), ov, s.getColon()).replace(/^([\w-]+)(\s*):\s*/, "$1 ");
     out.push(`${text}.`);
+    if (this.guiVars?.size) this.salvScreenStatus(s, text, out);
   }
 
 

@@ -454,10 +454,11 @@ CLASS z2ui5_cl_cgui_alv DEFINITION PUBLIC FINAL CREATE PUBLIC.
       RETURNING
         VALUE(result) TYPE REF TO z2ui5_cl_cgui_alv.
 
-    "! large tables: the browser gets page_size rows at a time, the toolbar
-    "! pages through them (cs_event-page). The report runtime shows a copy
-    "! of the page and maps rows, selection and input back; sorting and
-    "! filtering in the browser apply to the page shown. 0 switches it off
+    "! large tables: the browser gets page_size rows at a time and the next
+    "! ones as the grid scrolls - the rows are bound with _bind_tab( ), so a
+    "! sort or a filter in a column menu runs on the server over all rows,
+    "! and selection, input and events land in the rows they were made in.
+    "! 0 switches it off
     METHODS set_paging
       IMPORTING
         page_size     TYPE i DEFAULT 500
@@ -3294,6 +3295,14 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
 
     DATA(lv_multi) = xsdbool( has_selection( ) = abap_true AND has_box_field( tab ) = abap_true ).
     DATA(lv_sorter) = sorter( tab ).
+    " a large table (set_paging) is bound with _bind_tab( ): the browser
+    " holds a window of the rows and the server sorts and filters them - a
+    " sorter in the binding would order the window alone. The sort of the
+    " layout is the order the app passes; a click in a column menu sorts
+    " anew on the server, and a render with the same layout keeps that
+    DATA(lt_window_sort) = VALUE z2ui5_if_client=>ty_t_bind_tab_sort( FOR ls_order IN sort_order( tab )
+                                                                     ( path       = ls_order-name
+                                                                       descending = ls_order-descending ) ).
 
     render_header( node ).
 
@@ -3301,7 +3310,11 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
         )->a( n = `xmlns:table`        v = `sap.ui.table`
         )->a( n = `xmlns:core`         v = `sap.ui.core`
         )->a( n = `core:require`       v = type_require( )
-        )->a( n = `rows`               v = COND #( WHEN lv_sorter IS INITIAL
+        )->a( n = `rows`               v = COND #( WHEN mv_page_size > 0
+                                                   THEN client->_bind_tab( val    = tab
+                                                                           window = mv_page_size
+                                                                           t_sort = lt_window_sort )
+                                                   WHEN lv_sorter IS INITIAL
                                                    THEN client->_bind( tab )
                                                    ELSE |\{path: '{ client->_bind( val  = tab
                                                                                    path = abap_true ) }', sorter: { lv_sorter }\}| )
@@ -3378,33 +3391,6 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
         )->a( n = `text` t = |{ mv_title } ({ lv_count })|
         )->tag( `ToolbarSpacer` ).
 
-    " the pages of a large table
-    IF mv_page_size > 0 AND total > mv_page_size.
-      DATA(lv_pages) = ( total + mv_page_size - 1 ) DIV mv_page_size.
-      DATA(lv_page) = get_page( ).
-      lo_bar->tag( `Button`
-          )->a( n = `icon`    v = `sap-icon://close-command-field`
-          )->a( n = `enabled` b = xsdbool( lv_page > 1 )
-          )->a( n = `press`   v = client->_event( val = cs_event-page arg = cs_page-first )
-          )->tag( `Button`
-          )->a( n = `icon`    v = `sap-icon://navigation-left-arrow`
-          )->a( n = `enabled` b = xsdbool( lv_page > 1 )
-          )->a( n = `press`   v = client->_event( val = cs_event-page arg = cs_page-previous )
-          )->tag( `Text`
-          )->a( n = `text` t = replace( val  = replace( val  = 'Page &1 of &2'(008)
-                                                        sub  = `&1`
-                                                        with = |{ lv_page }| )
-                                        sub  = `&2`
-                                        with = |{ lv_pages }| )
-          )->tag( `Button`
-          )->a( n = `icon`    v = `sap-icon://navigation-right-arrow`
-          )->a( n = `enabled` b = xsdbool( lv_page < lv_pages )
-          )->a( n = `press`   v = client->_event( val = cs_event-page arg = cs_page-next )
-          )->tag( `Button`
-          )->a( n = `icon`    v = `sap-icon://open-command-field`
-          )->a( n = `enabled` b = xsdbool( lv_page < lv_pages )
-          )->a( n = `press`   v = client->_event( val = cs_event-page arg = cs_page-last ) ).
-    ENDIF.
 
     IF multi = abap_true.
       lo_bar->tag( `Button`
@@ -3809,34 +3795,11 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
 
   METHOD cell_binding.
 
-    IF column-currency IS NOT INITIAL.
-      result = |\{parts: [\{path: '{ comp-name }'\}, \{path: '{ column-currency }'\}], type: 'CurrType', formatOptions: \{showMeasure: false\}\}|.
-      RETURN.
-    ENDIF.
-    IF column-quantity IS NOT INITIAL.
-      result = |\{parts: [\{path: '{ comp-name }'\}, \{path: '{ column-quantity }'\}], type: 'UnitType', formatOptions: \{showMeasure: false\}\}|.
-      RETURN.
-    ENDIF.
-
-    CASE comp-type_kind.
-      WHEN cl_abap_typedescr=>typekind_date.
-        result = |\{path: '{ comp-name }', type: 'DateType', formatOptions: \{source: \{pattern: 'yyyy-MM-dd'\}\}\}|.
-      WHEN cl_abap_typedescr=>typekind_time.
-        result = |\{path: '{ comp-name }', type: 'TimeType', formatOptions: \{source: \{pattern: 'HH:mm:ss'\}\}\}|.
-      WHEN cl_abap_typedescr=>typekind_int
-          OR cl_abap_typedescr=>typekind_int1
-          OR cl_abap_typedescr=>typekind_int2
-          OR cl_abap_typedescr=>typekind_int8.
-        result = |\{path: '{ comp-name }', type: 'IntType', formatOptions: \{groupingEnabled: true\}\}|.
-      WHEN cl_abap_typedescr=>typekind_packed.
-        result = |\{path: '{ comp-name }', type: 'FloatType', formatOptions: \{minFractionDigits: { comp-decimals }, maxFractionDigits: { comp-decimals }, groupingEnabled: true\}\}|.
-      WHEN cl_abap_typedescr=>typekind_float
-          OR cl_abap_typedescr=>typekind_decfloat16
-          OR cl_abap_typedescr=>typekind_decfloat34.
-        result = |\{path: '{ comp-name }', type: 'FloatType', formatOptions: \{groupingEnabled: true\}\}|.
-      WHEN OTHERS.
-        result = |\{{ comp-name }\}|.
-    ENDCASE.
+    result = z2ui5_cl_cgui_context=>ui5_binding_by_kind( path          = comp-name
+                                                        type_kind     = comp-type_kind
+                                                        decimals      = comp-decimals
+                                                        currency_path = column-currency
+                                                        unit_path     = column-quantity ).
 
   ENDMETHOD.
 
@@ -4022,9 +3985,7 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
 
   METHOD type_require.
 
-    result = `{DateType: 'sap/ui/model/type/Date', TimeType: 'sap/ui/model/type/Time', `
-          && `FloatType: 'sap/ui/model/type/Float', IntType: 'sap/ui/model/type/Integer', `
-          && `CurrType: 'sap/ui/model/type/Currency', UnitType: 'sap/ui/model/type/Unit'}`.
+    result = z2ui5_cl_cgui_context=>ui5_get_type_require( ).
 
   ENDMETHOD.
 
