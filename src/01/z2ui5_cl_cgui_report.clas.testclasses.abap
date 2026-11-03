@@ -5,7 +5,7 @@ CLASS z2ui5_cl_cgui_report DEFINITION LOCAL FRIENDS ltcl_test.
 " set_variant_store( ); it travels in the draft with the report
 CLASS ltcl_variant_store DEFINITION FINAL.
   PUBLIC SECTION.
-    INTERFACES z2ui5_if_cgui_variant_store.
+    INTERFACES z2ui5_if_cgui_variants.
     DATA mt_variant TYPE z2ui5_cl_cgui_variant=>ty_t_variant.
 ENDCLASS.
 
@@ -14,16 +14,16 @@ ENDCLASS.
 " Z2UI5_T_18, out of the way with it
 CLASS ltcl_layout_store DEFINITION FINAL.
   PUBLIC SECTION.
-    INTERFACES z2ui5_if_cgui_layout_store.
+    INTERFACES z2ui5_if_cgui_layouts.
     DATA mt_layout TYPE z2ui5_cl_cgui_layout=>ty_t_saved.
 ENDCLASS.
 
 CLASS ltcl_layout_store IMPLEMENTATION.
-  METHOD z2ui5_if_cgui_layout_store~load.
+  METHOD z2ui5_if_cgui_layouts~load.
     result = mt_layout.
   ENDMETHOD.
 
-  METHOD z2ui5_if_cgui_layout_store~save.
+  METHOD z2ui5_if_cgui_layouts~save.
     IF layout-is_default = abap_true.
       LOOP AT mt_layout REFERENCE INTO DATA(lr_layout).
         lr_layout->is_default = abap_false.
@@ -33,30 +33,30 @@ CLASS ltcl_layout_store IMPLEMENTATION.
     INSERT layout INTO TABLE mt_layout.
   ENDMETHOD.
 
-  METHOD z2ui5_if_cgui_layout_store~delete.
+  METHOD z2ui5_if_cgui_layouts~delete.
     DELETE mt_layout WHERE name = name.
   ENDMETHOD.
 
-  METHOD z2ui5_if_cgui_layout_store~check_sharing.
+  METHOD z2ui5_if_cgui_layouts~check_sharing.
     result = abap_true.
   ENDMETHOD.
 ENDCLASS.
 
 CLASS ltcl_variant_store IMPLEMENTATION.
-  METHOD z2ui5_if_cgui_variant_store~load.
+  METHOD z2ui5_if_cgui_variants~load.
     result = mt_variant.
   ENDMETHOD.
 
-  METHOD z2ui5_if_cgui_variant_store~save.
+  METHOD z2ui5_if_cgui_variants~save.
     DELETE mt_variant WHERE name = variant-name.
     INSERT variant INTO TABLE mt_variant.
   ENDMETHOD.
 
-  METHOD z2ui5_if_cgui_variant_store~delete.
+  METHOD z2ui5_if_cgui_variants~delete.
     DELETE mt_variant WHERE name = name.
   ENDMETHOD.
 
-  METHOD z2ui5_if_cgui_variant_store~check_sharing.
+  METHOD z2ui5_if_cgui_variants~check_sharing.
     result = abap_false.
   ENDMETHOD.
 ENDCLASS.
@@ -117,7 +117,7 @@ CLASS ltcl_report DEFINITION INHERITING FROM z2ui5_cl_cgui_report FINAL.
     DATA mv_pai      TYPE string.
     " a text editor in the custom control area CC of screen 0100
     DATA mv_gui      TYPE abap_bool.
-    DATA mo_edit     TYPE REF TO z2ui5_cl_cgui_gui_textedit.
+    DATA mo_edit     TYPE REF TO z2ui5_cl_cgui_textedit.
     DATA mv_note     TYPE string.
     " F1 in it: the line and position of the cursor
     DATA mv_f1       TYPE string.
@@ -136,7 +136,7 @@ CLASS ltcl_report DEFINITION INHERITING FROM z2ui5_cl_cgui_report FINAL.
       IMPORTING
         answer TYPE string.
 
-    METHODS on_f1 FOR EVENT f1 OF z2ui5_cl_cgui_gui_textedit
+    METHODS on_f1 FOR EVENT f1 OF z2ui5_cl_cgui_textedit
       IMPORTING
         sender.
 
@@ -429,9 +429,9 @@ CLASS ltcl_report IMPLEMENTATION.
 
     " the classic PBO: the control once, in the container of the area
     IF mv_gui = abap_true AND mo_edit IS NOT BOUND.
-      mo_edit = NEW #( parent = NEW z2ui5_cl_cgui_gui_container( container_name = 'CC' ) ).
+      mo_edit = NEW #( parent = NEW z2ui5_cl_cgui_container( container_name = 'CC' ) ).
       mo_edit->set_textstream( `first note` ).
-      mo_edit->set_registered_events( VALUE z2ui5_cl_cgui_gui=>ty_t_simple_events( ( eventid = z2ui5_cl_cgui_gui_textedit=>event_f1 ) ) ).
+      mo_edit->set_registered_events( VALUE z2ui5_cl_cgui_gui=>ty_t_simple_events( ( eventid = z2ui5_cl_cgui_textedit=>event_f1 ) ) ).
       mo_edit->set_handler( event   = `F1`
                             method  = `ON_F1`
                             handler = me ).

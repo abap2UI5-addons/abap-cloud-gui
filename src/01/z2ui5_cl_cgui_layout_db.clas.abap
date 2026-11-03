@@ -8,7 +8,7 @@
 CLASS z2ui5_cl_cgui_layout_db DEFINITION PUBLIC FINAL CREATE PRIVATE.
 
   PUBLIC SECTION.
-    INTERFACES z2ui5_if_cgui_layout_store.
+    INTERFACES z2ui5_if_cgui_layouts.
 
     CLASS-METHODS factory
       RETURNING
@@ -59,13 +59,13 @@ CLASS z2ui5_cl_cgui_layout_db IMPLEMENTATION.
 
   ENDMETHOD.
 
-  METHOD z2ui5_if_cgui_layout_store~check_sharing.
+  METHOD z2ui5_if_cgui_layouts~check_sharing.
 
     result = abap_true.
 
   ENDMETHOD.
 
-  METHOD z2ui5_if_cgui_layout_store~load.
+  METHOD z2ui5_if_cgui_layouts~load.
 
     DATA ls_saved TYPE z2ui5_cl_cgui_layout=>ty_s_saved.
     DATA lt_other TYPE z2ui5_cl_cgui_layout=>ty_t_saved.
@@ -106,7 +106,7 @@ CLASS z2ui5_cl_cgui_layout_db IMPLEMENTATION.
 
   ENDMETHOD.
 
-  METHOD z2ui5_if_cgui_layout_store~save.
+  METHOD z2ui5_if_cgui_layouts~save.
 
     DATA ls_db TYPE z2ui5_t_18.
 
@@ -165,7 +165,7 @@ CLASS z2ui5_cl_cgui_layout_db IMPLEMENTATION.
 
   ENDMETHOD.
 
-  METHOD z2ui5_if_cgui_layout_store~delete.
+  METHOD z2ui5_if_cgui_layouts~delete.
 
     DATA(lv_report) = CONV z2ui5_t_18-report( to_upper( report ) ).
     DATA(lv_handle) = CONV z2ui5_t_18-handle( to_upper( handle ) ).

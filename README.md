@@ -86,6 +86,16 @@ COMMIT WORK.
 **Start** - run a sample like any abap2UI5 app, e.g.
 `?app_start=z2ui5_cl_cgui_sample_05` for a complete report.
 
+### Parallel installation (namespace rename)
+
+To run a second copy next to the original in the same system, rename it the
+way abap2UI5 itself is renamed: run the workflow **build-rename** (Actions →
+build-rename → Run workflow) with the name your abap2UI5 installation was
+renamed to - e.g. `ZMYUI5` or `/CA2UI5/`. It pushes the branch `rename_<name>`, in
+which every object and every reference to abap2UI5 and to the addons this one
+needs carries that name; pull it with abapGit. Rename abap2UI5 and every addon
+of the installation with the same name.
+
 ## Quick start
 
 Write your first report:
@@ -194,7 +204,7 @@ The rest of the API a converted report may use, by what it came from -
 | more popups | `popup_to_decide( )`, `popup_to_decide_list( )`, `popup_get_values( )`, `popup_get_values_sval( )`, `popup_transport( )`, `get_transport( )`, `popup_answer( )`, `popup_values( )`, `message_t100( )`, `messages_from_bapiret( )` |
 | other reports and transactions | `submit( )`, `call_selection_screen( )`, `after_call_selection_screen( )`, `call_transaction( )`, `call_intent( )`, `set_catalog( )`, `set_command_field( )`, `okcode_execute( )` |
 | dynpros | `call_screen( )`, `set_screen( )`, `leave_to_screen( )`, `leave_screen( )`, `screen_left( )`, `after_call_screen( )`, `dynpro_screen / _pbo / _pai( )`, `call_subscreen( )`, `call_subscreen_pai( )`, `tablecontrol_begin / _row / _count / _cell( )`, `current_screen( )`, `window( )`, `selection_screen_dynnr( )`, `vrm_set_values( )` |
-| SAP GUI controls | `at_gui_event( )`, the stand-ins `z2ui5_cl_cgui_gui*` |
+| SAP GUI controls | `at_gui_event( )`, the stand-ins `z2ui5_cl_cgui_gui` and its subclasses (`z2ui5_cl_cgui_alv_grid`, `_container`, `_textedit`, ...) |
 | memory and parameters | `set_parameter_id( )`, `get_parameter_id( )`, `set_system_parameters( )`, `authority_check_customizing( )`, `set_prefill_last( )`, `set_draft( )`, `set_variant_store( )`, `set_fresh_start( )`, `at_roundtrip_start( )`, `cgui_statics_keep / _restore( )` |
 | the log, the job, the link | `set_log( )`, `messages_from_log( )`, `log_display( )`, `set_job( )`, `get_link( )` |
 
@@ -412,7 +422,7 @@ The variants are kept in table `Z2UI5_T_19`
 (`z2ui5_cl_cgui_variant_db`), one namespace per report class — nothing to
 set up, on ABAP Cloud as on premise: shared with all users, protected against
 changes of others, one owner each. A store of your own - another table, a
-RAP business object - implements `z2ui5_if_cgui_variant_store` (load, save,
+RAP business object - implements `z2ui5_if_cgui_variants` (load, save,
 delete, check_sharing) and is set with `set_variant_store( store )` in
 `initialization( )`. `set_variant_store( )` without a store keeps the
 variants in the browser's local storage instead - per browser and device,
@@ -470,7 +480,7 @@ columns shown and their order, sort, totals and subtotals. A layout is saved
 under a name, shared with all users or protected when wanted, and one of
 them is the user's default - the report starts with it. They are kept in
 table `Z2UI5_T_18` (`z2ui5_cl_cgui_layout_db`), one namespace per report
-class and ALV. A store of your own implements `z2ui5_if_cgui_layout_store`
+class and ALV. A store of your own implements `z2ui5_if_cgui_layouts`
 and is set with `set_layout_store( store )` in `initialization( )`;
 `set_layout_store( )` without a store keeps the layouts with the selection
 variants.
@@ -837,33 +847,33 @@ Stage 5 - research
       `after_call_screen( )`
 - [x] The SAP GUI controls of a custom control area or a docking container:
       the containers, the text editor and the HTML viewer as stand-ins of the
-      same methods (`z2ui5_cl_cgui_gui*`), in a local class too
+      same methods (the subclasses of `z2ui5_cl_cgui_gui`), in a local class too
 - [x] Their events: the toolbar (`function_selected`, `dropdown_clicked`),
       the SAPEVENT links and forms of the HTML viewer, the close of a dialog box -
       `SET HANDLER` as `set_handler( )` of the stand-in
-- [x] The grid in a local class: the stand-in `z2ui5_cl_cgui_gui_alv_grid`,
+- [x] The grid in a local class: the stand-in `z2ui5_cl_cgui_alv_grid`,
       the ALV of the report in its container, with its toolbar, user
       command, double click and hotspot
 - [x] Controls on the screen itself (`cl_gui_container=>default_screen`):
       toolbar, text editor and HTML viewer above the list of the run, no
       dynpro needed; `cl_abap_browser` as the stand-in
-      `z2ui5_cl_cgui_abap_browser`; the loop over the columns of a SALV
+      `z2ui5_cl_cgui_browser`; the loop over the columns of a SALV
       grid; static event handlers of a local class
 - [x] `cl_demo_output` (in 72 reports of the web corpus): the stand-in
       `z2ui5_cl_cgui_demo_output` writes into the list - values, structures
       and tables as columns, sections as headings
 - [x] `cl_gui_picture` and `cl_gui_simple_tree`: the stand-ins
-      `z2ui5_cl_cgui_gui_picture` and `z2ui5_cl_cgui_gui_simple_tree` - the
+      `z2ui5_cl_cgui_picture` and `z2ui5_cl_cgui_simple_tree` - the
       nodes of `MTREESNODE`, lazy children on the first expand, the click as
       `node_double_click` and `selection_changed`
 - [x] More than one grid: the first one displayed shows, then the one
       refreshed; the container of another one names it with its rows and
       shows it at a click (header and items in a splitter)
-- [x] `cl_gui_column_tree`: the stand-in `z2ui5_cl_cgui_gui_column_tree` -
+- [x] `cl_gui_column_tree`: the stand-in `z2ui5_cl_cgui_column_tree` -
       the tree with its header and columns, the items of `MTREEITM` as
       text, link or checkbox, `item_double_click`, `link_click`,
       `checkbox_change`
-- [x] `cl_gui_list_tree`: the stand-in `z2ui5_cl_cgui_gui_list_tree` - the
+- [x] `cl_gui_list_tree`: the stand-in `z2ui5_cl_cgui_list_tree` - the
       items of a node on its line, the first its text
 - [x] Tabstrips and subscreens on a dynpro: the tabs with their function
       codes, `activetab`, `CALL SUBSCREEN` in PBO and PAI with the number
@@ -903,7 +913,7 @@ Simpler to read, simpler to change - the API stays
 - [x] `z2ui5_cl_cgui_report` split behind its API, the PUBLIC and
       PROTECTED sections byte-identical: `z2ui5_cl_cgui_memory` (variants,
       parameters, draft, history), `z2ui5_cl_cgui_command` (URL, command
-      field, shortcuts), `z2ui5_cl_cgui_gui_view` (the stand-ins rendered),
+      field, shortcuts), `z2ui5_cl_cgui_view` (the stand-ins rendered),
       the grid's table work in `z2ui5_cl_cgui_alv`, and the long methods of
       the report split into steps - `on_event` 221 to 30 lines,
       `view_display` 227 to 58, `gui_render` 233 to a walk; the report

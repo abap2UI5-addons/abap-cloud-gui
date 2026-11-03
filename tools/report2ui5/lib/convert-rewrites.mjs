@@ -98,8 +98,8 @@ export const rewritesMethods = {
         continue;
       }
       // cntb_btype_sep of type pool CNTB - the constant of the toolbar's stand-in
-      if (this.guiVars?.size && /^cntb_btype_\w+$/.test(t) && guiMember("z2ui5_cl_cgui_gui_toolbar", t)) {
-        ov.set(key(toks[i]), `z2ui5_cl_cgui_gui_toolbar=>${t}`);
+      if (this.guiVars?.size && /^cntb_btype_\w+$/.test(t) && guiMember("z2ui5_cl_cgui_toolbar", t)) {
+        ov.set(key(toks[i]), `z2ui5_cl_cgui_toolbar=>${t}`);
         continue;
       }
       // cl_demo_output=>write( ), if_demo_output - the stand-in that writes
@@ -111,7 +111,7 @@ export const rewritesMethods = {
       // cl_abap_browser=>show_html( ) - the stand-in that shows the
       // document in a dialog box or in its container
       if (t === "cl_abap_browser" && toks[i + 1]?.getStr() === "=>" && ABAP_BROWSER.includes(lc(toks[i + 2]?.getStr() ?? ""))) {
-        ov.set(key(toks[i]), "z2ui5_cl_cgui_abap_browser");
+        ov.set(key(toks[i]), "z2ui5_cl_cgui_browser");
         continue;
       }
       // cl_gui_cfw=>compute_metric_from_dynp( ) - the size it computes is

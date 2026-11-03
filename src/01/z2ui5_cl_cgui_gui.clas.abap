@@ -1,6 +1,6 @@
 "! The stand-in of cl_gui_control - the SAP GUI controls of a classic report
-"! as parts of its screen in the browser: z2ui5_cl_cgui_gui_container for
-"! the containers, z2ui5_cl_cgui_gui_textedit, z2ui5_cl_cgui_gui_html_viewer.
+"! as parts of its screen in the browser: z2ui5_cl_cgui_container for
+"! the containers, z2ui5_cl_cgui_textedit, z2ui5_cl_cgui_html_viewer.
 "! The methods keep the classic signatures and EXCEPTIONS, so a converted
 "! call passes what the classic one did. A control holds its id only - its
 "! state is a line of the report it runs in (z2ui5_if_cgui_gui), which the

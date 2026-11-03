@@ -9,7 +9,7 @@
     "check:702": "bash .github/scripts/check-702.sh",
     "check:abap2ui5": "abap2ui5lint",
     "check:regex": "node scripts/check-regex.mjs",
-    "check": "npm run lint && npm run check:regex && npm run check:cloud && npm run check:702 && npm run check:abap2ui5",
+    "check": "npm run lint && npm run check:regex && npm run check:cloud && npm run check:702 && npm run check:abap2ui5 && npm run rename",
     "test": "npm run check",
     "report2ui5": "node tools/report2ui5/cli.mjs",
     "report2ui5:coverage": "node tools/report2ui5/coverage.mjs",
@@ -24,7 +24,8 @@
     "test:report2ui5:browser": "node --test tools/report2ui5/test/browser/*.test.mjs",
     "syfixes": "find src -type f -name '*.abap' -exec sed -i -e 's/ RAISE EXCEPTION TYPE cx_sy_itab_line_not_found/ ASSERT 1 = 0/g' {} +",
     "strip_trailing_ws": "find src -type f -name '*.abap' -exec sed -i 's/[[:space:]]\\+$//' {} +",
-    "auto_downport": "npm run check:702 && rm -rf src && cp -r build/702/src src && npm run syfixes && npm run strip_trailing_ws && cp -f .github/abaplint/abap_702.jsonc abaplint.jsonc && abaplint abaplint.jsonc"
+    "auto_downport": "npm run check:702 && rm -rf src && cp -r build/702/src src && npm run syfixes && npm run strip_trailing_ws && cp -f .github/abaplint/abap_702.jsonc abaplint.jsonc && abaplint abaplint.jsonc",
+    "rename": "node .github/scripts/rename.mjs"
   },
   "repository": {
     "type": "git",

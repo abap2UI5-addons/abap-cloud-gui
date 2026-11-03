@@ -8,7 +8,7 @@ CLASS z2ui5_cl_cgui_r2c_43 DEFINITION PUBLIC
     TYPES ty_line TYPE x LENGTH 8.
 
     " global data of the report
-    DATA go_edit   TYPE REF TO z2ui5_cl_cgui_gui_textedit.
+    DATA go_edit   TYPE REF TO z2ui5_cl_cgui_textedit.
     DATA lv_bytes  TYPE xstring.
     DATA lv_back   TYPE xstring.
     DATA lv_b64    TYPE string.
@@ -73,9 +73,9 @@ CLASS z2ui5_cl_cgui_r2c_43 IMPLEMENTATION.
                                                 IMPORTING  b64data = lv_b64
                                                 EXCEPTIONS OTHERS  = 1 ).
 
-    go_edit = NEW #( parent = z2ui5_cl_cgui_gui_container=>default_screen ).
+    go_edit = NEW #( parent = z2ui5_cl_cgui_container=>default_screen ).
     go_edit->set_textstream( lv_b64 ).
-    go_edit->set_readonly_mode( z2ui5_cl_cgui_gui_textedit=>true ).
+    go_edit->set_readonly_mode( z2ui5_cl_cgui_textedit=>true ).
 
     list( )->new_line(
         )->write( |{ lv_length } bytes in { lines( lt_bin ) } lines| ).

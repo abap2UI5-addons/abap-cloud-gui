@@ -25,7 +25,7 @@ CLASS z2ui5_cl_cgui_memory DEFINITION PUBLIC FINAL CREATE PUBLIC.
       BEGIN OF ty_s_ctx,
         app           TYPE REF TO object,
         client        TYPE REF TO z2ui5_if_client,
-        store         TYPE REF TO z2ui5_if_cgui_variant_store,
+        store         TYPE REF TO z2ui5_if_cgui_variants,
         key           TYPE string,
         batch         TYPE abap_bool,
         fields        TYPE REF TO z2ui5_cl_cgui_selscreen=>ty_t_field,

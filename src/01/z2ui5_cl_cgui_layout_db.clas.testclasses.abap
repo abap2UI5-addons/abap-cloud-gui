@@ -8,7 +8,7 @@ CLASS ltcl_test DEFINITION FINAL FOR TESTING
     CONSTANTS cv_report TYPE string VALUE `ZZ_CGUI_TEST_LAYOUT_DB`.
     CONSTANTS cv_handle TYPE string VALUE `MT_ROW`.
 
-    DATA mo_store TYPE REF TO z2ui5_if_cgui_layout_store.
+    DATA mo_store TYPE REF TO z2ui5_if_cgui_layouts.
 
     METHODS setup.
     METHODS teardown.

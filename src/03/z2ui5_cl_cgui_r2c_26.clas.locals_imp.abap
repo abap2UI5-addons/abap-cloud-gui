@@ -22,14 +22,14 @@ CLASS lcl_app IMPLEMENTATION.
     mo_toolbar = NEW #( parent = mo_split->get_container( row = 1 column = 1 ) ).
     mo_toolbar->add_button( fcode     = 'REFRESH'
                             icon      = `sap-icon://refresh`
-                            butn_type = z2ui5_cl_cgui_gui_toolbar=>cntb_btype_button
+                            butn_type = z2ui5_cl_cgui_toolbar=>cntb_btype_button
                             text      = 'Refresh' ).
     mo_toolbar->add_button( fcode     = 'SEP'
                             icon      = space
-                            butn_type = z2ui5_cl_cgui_gui_toolbar=>cntb_btype_sep ).
+                            butn_type = z2ui5_cl_cgui_toolbar=>cntb_btype_sep ).
     mo_toolbar->add_button( fcode     = 'DETAILS'
                             icon      = `sap-icon://detail-view`
-                            butn_type = z2ui5_cl_cgui_gui_toolbar=>cntb_btype_button
+                            butn_type = z2ui5_cl_cgui_toolbar=>cntb_btype_button
                             text      = 'Details' ).
     mo_toolbar->set_handler( handler = me
                              method  = `ON_FUNCTION`

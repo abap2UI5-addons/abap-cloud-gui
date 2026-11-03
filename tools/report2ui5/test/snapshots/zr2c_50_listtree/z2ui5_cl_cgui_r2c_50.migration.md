@@ -22,7 +22,7 @@ Layout, formatting and behaviour of the classic report that the list, the ALV or
 | 9 | `REPORT zr2c_50_listtree` | the class, `INHERITING FROM z2ui5_cl_cgui_report` |
 | 11 | `CLASS lcl_tree DEFINITION FINAL` | locals_def |
 | 25 | `CLASS lcl_tree IMPLEMENTATION` | locals_imp |
-| 33 | `CREATE OBJECT tree EXPORTING parent = NEW cl_gui_custom_container( ...` | `tree = NEW #( )` - the stand-in z2ui5_cl_cgui_gui_list_tree |
+| 33 | `CREATE OBJECT tree EXPORTING parent = NEW cl_gui_custom_container( ...` | `tree = NEW #( )` - the stand-in z2ui5_cl_cgui_list_tree |
 | 68 | `SET HANDLER on_item_double_click FOR tree` | `tree->set_handler( )` - the stand-in keeps the handler and calls it for the event of the browser |
 | 69 | `SET HANDLER on_link_click FOR tree` | `tree->set_handler( )` - the stand-in keeps the handler and calls it for the event of the browser |
 | 73 | `MESSAGE \|{ node_key } { item_name }\| TYPE 'S'` | `message( )` |

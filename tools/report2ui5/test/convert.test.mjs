@@ -358,7 +358,7 @@ test("no part of the user interface - native SQL, generated programs, background
   assert.match(cls, /SUBMIT zother VIA JOB 'X' NUMBER gv_job AND RETURN\./);
 });
 
-test("cl_gui_simple_tree -> z2ui5_cl_cgui_gui_simple_tree, MTREESNODE its node type, the handler of node_double_click set", () => {
+test("cl_gui_simple_tree -> z2ui5_cl_cgui_simple_tree, MTREESNODE its node type, the handler of node_double_click set", () => {
   const r = convert([
     "REPORT zt.",
     "CLASS lcl_handler DEFINITION.",
@@ -396,10 +396,10 @@ test("cl_gui_simple_tree -> z2ui5_cl_cgui_gui_simple_tree, MTREESNODE its node t
   const all = Object.values(r.draft).join("\n");
   assert.ok(!/cl_gui_simple_tree|TYPE (STANDARD TABLE OF )?mtreesnode/i.test(all), all);
   // the type of a constructor expression too
-  assert.match(all, /CONV z2ui5_cl_cgui_gui_simple_tree=>ty_node_key\( 'ROOT' \)/);
-  assert.match(all, /TYPE REF TO z2ui5_cl_cgui_gui_simple_tree/);
-  assert.match(all, /TYPE STANDARD TABLE OF z2ui5_cl_cgui_gui_simple_tree=>ty_s_node/);
-  assert.match(all, /z2ui5_cl_cgui_gui_simple_tree=>eventid_node_double_click/);
+  assert.match(all, /CONV z2ui5_cl_cgui_simple_tree=>ty_node_key\( 'ROOT' \)/);
+  assert.match(all, /TYPE REF TO z2ui5_cl_cgui_simple_tree/);
+  assert.match(all, /TYPE STANDARD TABLE OF z2ui5_cl_cgui_simple_tree=>ty_s_node/);
+  assert.match(all, /z2ui5_cl_cgui_simple_tree=>eventid_node_double_click/);
   assert.match(all, /set_handler\(/);
 });
 
@@ -453,7 +453,7 @@ test("the HTML viewer's history and the container's visible_true / visible_false
   const cls = r.draft["zcl_t.clas.abap"];
   assert.match(cls, /go_html->go_back\( \)\./);
   assert.match(cls, /go_html->get_current_url\( IMPORTING url = gv_url \)\./);
-  assert.match(cls, /gv_visible = z2ui5_cl_cgui_gui_container=>visible_false\./);
+  assert.match(cls, /gv_visible = z2ui5_cl_cgui_container=>visible_false\./);
   assert.match(cls, /z2ui5_cl_cgui_frontend=>get_gui_version\(/);
   assert.match(cls, /call_selection_screen\( dynnr = `1002`/);
 });
@@ -1182,12 +1182,12 @@ test("SAP GUI controls: the containers, the text editor and the HTML viewer beco
   const cls = classOf("zr2c_25_textedit");
   const { result } = converted.get("zr2c_25_textedit");
   assert.equal(result.ok, true, result.refusals.map((x) => x.message).join("\n"));
-  assert.match(cls, /DATA go_notes\s+TYPE REF TO z2ui5_cl_cgui_gui_container\./);
-  assert.match(cls, /DATA go_editor\s+TYPE REF TO z2ui5_cl_cgui_gui_textedit\./);
-  assert.match(cls, /DATA go_html\s+TYPE REF TO z2ui5_cl_cgui_gui_html_viewer\./);
+  assert.match(cls, /DATA go_notes\s+TYPE REF TO z2ui5_cl_cgui_container\./);
+  assert.match(cls, /DATA go_editor\s+TYPE REF TO z2ui5_cl_cgui_textedit\./);
+  assert.match(cls, /DATA go_html\s+TYPE REF TO z2ui5_cl_cgui_html_viewer\./);
   assert.match(cls, /go_notes = NEW #\( container_name = 'NOTES' \)\./);
-  assert.match(cls, /go_editor = NEW #\( parent {21}= go_notes\n\s+wordwrap_mode {14}= z2ui5_cl_cgui_gui_textedit=>wordwrap_at_fixed_position/);
-  assert.match(cls, /go_editor->set_toolbar_mode\( z2ui5_cl_cgui_gui_textedit=>false \)\./);
+  assert.match(cls, /go_editor = NEW #\( parent {21}= go_notes\n\s+wordwrap_mode {14}= z2ui5_cl_cgui_textedit=>wordwrap_at_fixed_position/);
+  assert.match(cls, /go_editor->set_toolbar_mode\( z2ui5_cl_cgui_textedit=>false \)\./);
   assert.match(cls, /go_html->load_data\( IMPORTING assigned_url = lv_url\n\s+CHANGING {2}data_table {3}= lt_html \)\./);
   // the custom control areas of the screen, after the line of the buttons
   assert.match(cls, /\)->line_end\(\n\s+\)->custom_control\( `NOTES`\n\s+\)->custom_control\( `PREVIEW` \)\./);
@@ -1201,7 +1201,7 @@ test("SAP GUI controls: a member, a parameter or an event the stand-ins do not h
   // NEW #( ) of a control: the constructor of the class it is assigned to
   assert.deepEqual(refused("  go_e = NEW #( parent = go_c wordwrap_mode = cl_gui_textedit=>wordwrap_at_windowborder ).\n"), []);
   assert.deepEqual(refused("  go_e = NEW #( parent = go_c colour = 1 ).\n"), ["SAP GUI controls: colour is no parameter of the method called in the stand-in - port this statement by hand"]);
-  assert.deepEqual(refused("  go_e->set_comments_string( ).\n"), ["SAP GUI controls: go_e->set_comments_string has no counterpart in z2ui5_cl_cgui_gui_textedit - port this statement by hand"]);
+  assert.deepEqual(refused("  go_e->set_comments_string( ).\n"), ["SAP GUI controls: go_e->set_comments_string has no counterpart in z2ui5_cl_cgui_textedit - port this statement by hand"]);
   assert.deepEqual(refused("  go_e->set_textstream( text = 'x' colour = 1 ).\n"), ["SAP GUI controls: colour is no parameter of the method called in the stand-in - port this statement by hand"]);
   assert.deepEqual(refusalOf(`${head}DATA go_p TYPE REF TO cl_gui_calendar.\n`).map((x) => x.replace(/^\d+:\d+ /, "")), ["SAP GUI controls: cl_gui_calendar has no counterpart - the containers, cl_gui_textedit, cl_gui_html_viewer, cl_gui_toolbar, cl_gui_picture, cl_gui_simple_tree, cl_gui_column_tree, cl_gui_list_tree and cl_gui_alv_grid have (z2ui5_cl_cgui_gui*)"]);
 });
@@ -1236,8 +1236,8 @@ START-OF-SELECTION.
   const r = convert(src, { file: "zt.prog.abap", className: "zcl_t" });
   assert.deepEqual(r.refusals.map((x) => x.message), []);
   const text = Object.values(r.files).join("\n");
-  assert.match(text, /FOR EVENT f1 OF z2ui5_cl_cgui_gui_textedit/i);
-  assert.match(text, /z2ui5_cl_cgui_gui_textedit=>event_f1/i);
+  assert.match(text, /FOR EVENT f1 OF z2ui5_cl_cgui_textedit/i);
+  assert.match(text, /z2ui5_cl_cgui_textedit=>event_f1/i);
   assert.match(text, /event {3}= `F1` \)\./);
   assert.doesNotMatch(text, /cl_gui_textedit\b/);
 });
@@ -1252,7 +1252,7 @@ test("SAP GUI controls: SET HANDLER of a local class's method is set_handler( ) 
   assert.match(text, /activation = abap_false \)\./);
   // the handler object is in the session: serializable
   assert.match(text, /CLASS lcl DEFINITION[^.]*\.\n\s+PUBLIC SECTION\.\n\s+INTERFACES if_serializable_object\./);
-  assert.match(text, /METHODS on_f FOR EVENT function_selected OF z2ui5_cl_cgui_gui_toolbar/);
+  assert.match(text, /METHODS on_f FOR EVENT function_selected OF z2ui5_cl_cgui_toolbar/);
 
   const refused = (decl, body) => convert(cls(decl, body), { file: "zt.prog.abap", className: "zcl_t" }).refusals.map((x) => x.message.split(" - ")[0]);
   assert.deepEqual(refused(handler, "    SET HANDLER on_f FOR ALL INSTANCES.\n"), ["SAP GUI controls: SET HANDLER ... FOR ALL INSTANCES"]);
@@ -1289,9 +1289,9 @@ test("SAP GUI controls: a grid in a local class is the grid stand-in - VALUE #( 
   const r = convert(src("sender->refresh_table_display( is_stable = VALUE #( row = abap_true ) )."), { file: "zt.prog.abap", className: "zcl_t" });
   assert.deepEqual(r.refusals.map((x) => x.message), []);
   const text = Object.values(r.files).join("\n");
-  assert.match(text, /mo_grid = NEW z2ui5_cl_cgui_gui_alv_grid\( i_parent = NEW z2ui5_cl_cgui_gui_container\( container_name = 'CC' \) \)\./);
+  assert.match(text, /mo_grid = NEW z2ui5_cl_cgui_alv_grid\( i_parent = NEW z2ui5_cl_cgui_container\( container_name = 'CC' \) \)\./);
   assert.match(text, /is_layout = VALUE lvc_s_layo\( zebra = abap_true \)/);
-  assert.match(text, /it_toolbar_excluding = VALUE ui_functions\( \( z2ui5_cl_cgui_gui_alv_grid=>mc_fc_excl_all \) \)/);
+  assert.match(text, /it_toolbar_excluding = VALUE ui_functions\( \( z2ui5_cl_cgui_alv_grid=>mc_fc_excl_all \) \)/);
   assert.match(text, /sender->refresh_table_display\( EXPORTING is_stable = VALUE lvc_s_stbl\( row = abap_true \) CHANGING it_outtab = mt \)\./);
   assert.match(convert(src("mo_grid->refresh_table_display( )."), { file: "zt.prog.abap", className: "zcl_t" }).files["zcl_t.clas.locals_imp.abap"], /mo_grid->refresh_table_display\( CHANGING it_outtab = mt \)\./);
   // a grid of another object: its table is not in reach here
@@ -1408,8 +1408,8 @@ test("a class of the repository a SAP GUI control is handed to is converted besi
   assert.ok(r.files["zcl_my_view.clas.xml"]);
   // its header as it was, its controls the stand-ins
   assert.match(cls, /^CLASS zcl_my_view DEFINITION PUBLIC FINAL CREATE PUBLIC\./m);
-  assert.match(cls, /io_parent TYPE REF TO z2ui5_cl_cgui_gui_container/);
-  assert.match(cls, /go_text TYPE REF TO z2ui5_cl_cgui_gui_textedit/);
+  assert.match(cls, /io_parent TYPE REF TO z2ui5_cl_cgui_container/);
+  assert.match(cls, /go_text TYPE REF TO z2ui5_cl_cgui_textedit/);
   assert.doesNotMatch(cls, /cl_gui_|lcl_r2c|z2ui5_cl_cgui_r2c_gui_class/i);
   // the report calls it as it did
   assert.match(r.files["zcl_t.clas.abap"], /zcl_my_view=>show\( go_c \)/);
@@ -1513,7 +1513,7 @@ test("an inline declaration of an event block that takes a constant of a class: 
   const src = "REPORT zt.\nPARAMETERS p_left AS CHECKBOX.\nAT SELECTION-SCREEN.\n  IF p_left = abap_true.\n    DATA(side) = cl_gui_docking_container=>dock_at_left.\n  ENDIF.\nSTART-OF-SELECTION.\n  DATA go_dock TYPE REF TO cl_gui_docking_container.\n  CREATE OBJECT go_dock EXPORTING side = side.\n";
   const r = convert(src, { file: "zt.prog.abap", className: "zcl_t" });
   assert.deepEqual(r.refusals.map((x) => x.message), []);
-  assert.match(r.files["zcl_t.clas.abap"], /DATA side +LIKE z2ui5_cl_cgui_gui_container=>dock_at_left\./);
+  assert.match(r.files["zcl_t.clas.abap"], /DATA side +LIKE z2ui5_cl_cgui_container=>dock_at_left\./);
   const own = convert(src.replace("cl_gui_docking_container=>dock_at_left", "zcl_sides=>left").replace(/  DATA go_dock[^]*$/, "  WRITE side.\n"), { file: "zt.prog.abap", className: "zcl_t" });
   assert.match(own.files["zcl_t.clas.abap"], /DATA side LIKE zcl_sides=>left\./);
 });

@@ -7,7 +7,7 @@ CLASS ltcl_test DEFINITION FINAL FOR TESTING
   PRIVATE SECTION.
     CONSTANTS cv_report TYPE string VALUE `ZZ_CGUI_TEST_VARIANT_DB`.
 
-    DATA mo_store TYPE REF TO z2ui5_if_cgui_variant_store.
+    DATA mo_store TYPE REF TO z2ui5_if_cgui_variants.
 
     METHODS setup.
     METHODS teardown.

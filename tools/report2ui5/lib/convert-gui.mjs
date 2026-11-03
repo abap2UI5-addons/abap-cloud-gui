@@ -134,7 +134,7 @@ export const guiMethods = {
 
 
   /** the SAP GUI controls of a report without a grid: name -> the stand-in
-   *  class of z2ui5_cl_cgui_gui* (GUI) */
+   *  class of z2ui5_cl_cgui_gui or a subclass (GUI) */
   findGuiVars(all) {
     this.guiVars = new Map();
     // the attributes and method data of the local classes as well
@@ -154,7 +154,7 @@ export const guiMethods = {
         // is no handover the checks can follow
         for (const p of t.replace(/\breturning\b[\s\S]*$/, "").matchAll(/(?:!|\bvalue\s*\(\s*)?([\w/]+)\s*\)?\s+type\s+ref\s+to\s+(cl_gui_\w+|cl_salv_\w+)\b/g)) {
           // a container (or any control) to put the class's own controls in
-          if (["z2ui5_cl_cgui_gui_container", "z2ui5_cl_cgui_gui"].includes(guiClass(p[2])) && !["type", "ref", "to"].includes(p[1])) this.guiVars.set(p[1], guiClass(p[2]));
+          if (["z2ui5_cl_cgui_container", "z2ui5_cl_cgui_gui"].includes(guiClass(p[2])) && !["type", "ref", "to"].includes(p[1])) this.guiVars.set(p[1], guiClass(p[2]));
         }
         continue;
       }
@@ -166,7 +166,7 @@ export const guiMethods = {
     // screen0 - also the container of cl_abap_browser): the list of the run
     // shows it, no dynpro is needed - "%screen" is no variable of the report
     if ([...all, ...this.locals.flatMap((u) => u.stmts)].some((x) => /\bcl_gui_container\s*=>\s*(default_screen|screen0)\b/.test(lc(renderTokens(stmtTokens(x)))))) {
-      this.guiVars.set("%screen", "z2ui5_cl_cgui_gui_container");
+      this.guiVars.set("%screen", "z2ui5_cl_cgui_container");
     }
   },
 
@@ -278,9 +278,9 @@ export const guiMethods = {
    *  takes the classic type; refresh_table_display( ) is passed the table
    *  set_table_for_first_display( ) showed - the stand-in shows a copy */
   gridRewrites(toks, ov, ctx) {
-    if (!this.guiVars?.size || ![...this.guiVars.values()].includes("z2ui5_cl_cgui_gui_alv_grid")) return;
+    if (!this.guiVars?.size || ![...this.guiVars.values()].includes("z2ui5_cl_cgui_alv_grid")) return;
     const text = toks.map((t) => lc(t.getStr()));
-    const own = GUI.members.z2ui5_cl_cgui_gui_alv_grid.methods;
+    const own = GUI.members.z2ui5_cl_cgui_alv_grid.methods;
     const gridCall = text.some((t, i) => text[i - 1] === "->" && Object.hasOwn(own, t) && t !== "dispatch");
     if (!gridCall) return;
     for (let i = 2; i < text.length; i++) {

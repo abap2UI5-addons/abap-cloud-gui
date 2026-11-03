@@ -16,8 +16,8 @@ CLASS lcl_counter DEFINITION.
   PUBLIC SECTION.
     INTERFACES if_serializable_object.
     CLASS-DATA gv_count TYPE i.
-    CLASS-DATA go_html  TYPE REF TO z2ui5_cl_cgui_gui_html_viewer.
-    CLASS-METHODS on_function FOR EVENT function_selected OF z2ui5_cl_cgui_gui_toolbar
+    CLASS-DATA go_html  TYPE REF TO z2ui5_cl_cgui_html_viewer.
+    CLASS-METHODS on_function FOR EVENT function_selected OF z2ui5_cl_cgui_toolbar
       IMPORTING fcode.
     CLASS-METHODS show.
 ENDCLASS.

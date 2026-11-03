@@ -2,7 +2,7 @@
 "! that keeps its SALV object and uses it after display( ): an attribute of
 "! a local class, its event handlers, get_selections( ) of the rows the user
 "! picked (report2UI5 writes alv( ) for a SALV a report only sets up and
-"! shows). The table shows as a grid (z2ui5_cl_cgui_gui_alv_grid) in
+"! shows). The table shows as a grid (z2ui5_cl_cgui_alv_grid) in
 "! r_container, or on the screen itself: the columns with their texts,
 "! hidden and technical columns and hotspots, the title, the striped rows,
 "! the functions added as buttons. A button raises added_function, a double
@@ -33,7 +33,7 @@ CLASS z2ui5_cl_cgui_salv_table DEFINITION PUBLIC
     CLASS-METHODS factory
       IMPORTING
         list_display   TYPE abap_bool DEFAULT abap_false
-        r_container    TYPE REF TO z2ui5_cl_cgui_gui_container OPTIONAL
+        r_container    TYPE REF TO z2ui5_cl_cgui_container OPTIONAL
         container_name TYPE clike OPTIONAL
       EXPORTING
         r_salv_table   TYPE REF TO z2ui5_cl_cgui_salv_table
@@ -42,7 +42,7 @@ CLASS z2ui5_cl_cgui_salv_table DEFINITION PUBLIC
 
     METHODS constructor
       IMPORTING
-        container TYPE REF TO z2ui5_cl_cgui_gui_container OPTIONAL.
+        container TYPE REF TO z2ui5_cl_cgui_container OPTIONAL.
 
     "! the table shows - a grid with the columns, the settings and the
     "! functions as they are now
@@ -63,43 +63,43 @@ CLASS z2ui5_cl_cgui_salv_table DEFINITION PUBLIC
 
     METHODS get_columns
       RETURNING
-        VALUE(value) TYPE REF TO z2ui5_cl_cgui_salv_columns.
+        VALUE(value) TYPE REF TO z2ui5_cl_cgui_salv_cols.
 
     METHODS get_display_settings
       RETURNING
-        VALUE(value) TYPE REF TO z2ui5_cl_cgui_salv_settings.
+        VALUE(value) TYPE REF TO z2ui5_cl_cgui_salv_config.
 
     METHODS get_functions
       RETURNING
-        VALUE(value) TYPE REF TO z2ui5_cl_cgui_salv_settings.
+        VALUE(value) TYPE REF TO z2ui5_cl_cgui_salv_config.
 
     METHODS get_selections
       RETURNING
-        VALUE(value) TYPE REF TO z2ui5_cl_cgui_salv_settings.
+        VALUE(value) TYPE REF TO z2ui5_cl_cgui_salv_config.
 
     METHODS get_sorts
       RETURNING
-        VALUE(value) TYPE REF TO z2ui5_cl_cgui_salv_settings.
+        VALUE(value) TYPE REF TO z2ui5_cl_cgui_salv_config.
 
     METHODS get_aggregations
       RETURNING
-        VALUE(value) TYPE REF TO z2ui5_cl_cgui_salv_settings.
+        VALUE(value) TYPE REF TO z2ui5_cl_cgui_salv_config.
 
     METHODS get_layout
       RETURNING
-        VALUE(value) TYPE REF TO z2ui5_cl_cgui_salv_settings.
+        VALUE(value) TYPE REF TO z2ui5_cl_cgui_salv_config.
 
     METHODS get_filters
       RETURNING
-        VALUE(value) TYPE REF TO z2ui5_cl_cgui_salv_settings.
+        VALUE(value) TYPE REF TO z2ui5_cl_cgui_salv_config.
 
     METHODS get_print
       RETURNING
-        VALUE(value) TYPE REF TO z2ui5_cl_cgui_salv_settings.
+        VALUE(value) TYPE REF TO z2ui5_cl_cgui_salv_config.
 
     METHODS get_functional_settings
       RETURNING
-        VALUE(value) TYPE REF TO z2ui5_cl_cgui_salv_settings.
+        VALUE(value) TYPE REF TO z2ui5_cl_cgui_salv_config.
 
     "! the events of the table - the table itself
     METHODS get_event
@@ -156,10 +156,10 @@ CLASS z2ui5_cl_cgui_salv_table DEFINITION PUBLIC
       END OF ty_s_layout.
 
     DATA mr_table     TYPE REF TO data.
-    DATA mo_container TYPE REF TO z2ui5_cl_cgui_gui_container.
-    DATA mo_grid      TYPE REF TO z2ui5_cl_cgui_gui_alv_grid.
-    DATA mo_columns   TYPE REF TO z2ui5_cl_cgui_salv_columns.
-    DATA mo_settings  TYPE REF TO z2ui5_cl_cgui_salv_settings.
+    DATA mo_container TYPE REF TO z2ui5_cl_cgui_container.
+    DATA mo_grid      TYPE REF TO z2ui5_cl_cgui_alv_grid.
+    DATA mo_columns   TYPE REF TO z2ui5_cl_cgui_salv_cols.
+    DATA mo_settings  TYPE REF TO z2ui5_cl_cgui_salv_config.
 
     METHODS fieldcat
       RETURNING

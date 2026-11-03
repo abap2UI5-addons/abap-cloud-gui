@@ -225,6 +225,6 @@ INTERFACE z2ui5_if_cgui_gui PUBLIC.
   "! who hears the clicks of that tree besides the report
   METHODS tree_handler
     IMPORTING
-      handler TYPE REF TO z2ui5_if_cgui_tree_handler.
+      handler TYPE REF TO z2ui5_if_cgui_tree_events.
 
 ENDINTERFACE.

@@ -47,11 +47,11 @@
     "omit_parameter_name": true,
     "prefix_is_current_class": true,
     // z2ui5_cl_cgui_frontend keeps the whole signature of
-    // CL_GUI_FRONTEND_SERVICES, z2ui5_cl_cgui_gui* the ones of the SAP GUI
+    // CL_GUI_FRONTEND_SERVICES, z2ui5_cl_cgui_gui and its stand-ins the ones of the SAP GUI
     // controls - a converted call passes what the classic one did, used or
     // not - and its constants
     "unused_variables": {
-      "exclude": ["z2ui5_cl_cgui_frontend", "z2ui5_cl_cgui_gui", "z2ui5_cl_cgui_abap_browser", "z2ui5_cl_cgui_salv"]
+      "exclude": ["z2ui5_cl_cgui_frontend", "z2ui5_cl_cgui_(gui|alv_grid|alv_toolbar|column_tree|container|easy_split|html_viewer|list_tree|picture|simple_tree|textedit|toolbar|view)\\.", "z2ui5_cl_cgui_browser", "z2ui5_cl_cgui_salv"]
     },
     "unused_types": true,
     "unused_methods": true,
@@ -92,7 +92,7 @@
     "classic_exceptions_overlap": true,
     // clipboard_export( ) of CL_GUI_FRONTEND_SERVICES reads its EXPORTING data
     "clear_exporting_parameters": {
-      "exclude": ["z2ui5_cl_cgui_frontend", "z2ui5_cl_cgui_gui", "z2ui5_cl_cgui_list"]
+      "exclude": ["z2ui5_cl_cgui_frontend", "z2ui5_cl_cgui_(gui|alv_grid|alv_toolbar|column_tree|container|easy_split|html_viewer|list_tree|picture|simple_tree|textedit|toolbar|view)\\.", "z2ui5_cl_cgui_list"]
     },
     "cloud_types": true,
     "colon_missing_space": true,
@@ -262,7 +262,7 @@
     // show_html( ) of CL_ABAP_BROWSER its html_errors, the function modules
     // z2ui5_cl_cgui_frontend stands in for (SCMS_*, SSFC_BASE64_*) their result
     "prefer_returning_to_exporting": {
-      "exclude": ["z2ui5_cl_cgui_gui", "z2ui5_cl_cgui_abap_browser", "z2ui5_cl_cgui_frontend", "z2ui5_cl_cgui_salv"]
+      "exclude": ["z2ui5_cl_cgui_(gui|alv_grid|alv_toolbar|column_tree|container|easy_split|html_viewer|list_tree|picture|simple_tree|textedit|toolbar|view)\\.", "z2ui5_cl_cgui_browser", "z2ui5_cl_cgui_frontend", "z2ui5_cl_cgui_salv"]
     },
     "preferred_compare_operator": true,
     "preferred_parameter_ignored": true,
@@ -305,10 +305,10 @@
     "unused_ddic": true,
     "unused_macros": true,
     // z2ui5_cl_cgui_frontend stands in for CL_GUI_FRONTEND_SERVICES and
-    // z2ui5_cl_cgui_gui* for the SAP GUI controls, whose classic exceptions
+    // z2ui5_cl_cgui_gui and its stand-ins for the SAP GUI controls, whose classic exceptions
     // the converted reports catch with EXCEPTIONS
     "use_class_based_exceptions": {
-      "exclude": ["z2ui5_cl_cgui_frontend", "z2ui5_cl_cgui_gui", "z2ui5_cl_cgui_list"]
+      "exclude": ["z2ui5_cl_cgui_frontend", "z2ui5_cl_cgui_(gui|alv_grid|alv_toolbar|column_tree|container|easy_split|html_viewer|list_tree|picture|simple_tree|textedit|toolbar|view)\\.", "z2ui5_cl_cgui_list"]
     },
     "use_message_class": true,
     "when_others_last": true,

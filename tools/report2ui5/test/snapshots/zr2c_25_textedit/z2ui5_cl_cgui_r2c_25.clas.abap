@@ -9,10 +9,10 @@ CLASS z2ui5_cl_cgui_r2c_25 DEFINITION PUBLIC
 
     " global data of the report
     DATA ok_code       TYPE sy-ucomm.
-    DATA go_notes     TYPE REF TO z2ui5_cl_cgui_gui_container.
-    DATA go_editor   TYPE REF TO z2ui5_cl_cgui_gui_textedit.
-    DATA go_preview TYPE REF TO z2ui5_cl_cgui_gui_container.
-    DATA go_html       TYPE REF TO z2ui5_cl_cgui_gui_html_viewer.
+    DATA go_notes     TYPE REF TO z2ui5_cl_cgui_container.
+    DATA go_editor   TYPE REF TO z2ui5_cl_cgui_textedit.
+    DATA go_preview TYPE REF TO z2ui5_cl_cgui_container.
+    DATA go_html       TYPE REF TO z2ui5_cl_cgui_html_viewer.
     DATA gt_notes     TYPE STANDARD TABLE OF ty_line WITH DEFAULT KEY.
     DATA gv_saved     TYPE c LENGTH 1.
 
@@ -138,11 +138,11 @@ CLASS z2ui5_cl_cgui_r2c_25 IMPLEMENTATION.
     IF go_editor IS INITIAL.
       go_notes = NEW #( container_name = 'NOTES' ).
       go_editor = NEW #( parent                     = go_notes
-                         wordwrap_mode              = z2ui5_cl_cgui_gui_textedit=>wordwrap_at_fixed_position
+                         wordwrap_mode              = z2ui5_cl_cgui_textedit=>wordwrap_at_fixed_position
                          wordwrap_position          = 72
-                         wordwrap_to_linebreak_mode = z2ui5_cl_cgui_gui_textedit=>true ).
-      go_editor->set_toolbar_mode( z2ui5_cl_cgui_gui_textedit=>false ).
-      go_editor->set_statusbar_mode( z2ui5_cl_cgui_gui_textedit=>false ).
+                         wordwrap_to_linebreak_mode = z2ui5_cl_cgui_textedit=>true ).
+      go_editor->set_toolbar_mode( z2ui5_cl_cgui_textedit=>false ).
+      go_editor->set_statusbar_mode( z2ui5_cl_cgui_textedit=>false ).
       go_editor->set_text_as_r3table( gt_notes ).
 
       go_preview = NEW #( container_name = 'PREVIEW' ).

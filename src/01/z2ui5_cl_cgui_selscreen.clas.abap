@@ -374,7 +374,7 @@ CLASS z2ui5_cl_cgui_selscreen DEFINITION PUBLIC FINAL CREATE PRIVATE.
         VALUE(result) TYPE REF TO z2ui5_cl_cgui_selscreen.
 
     "! the custom control area name of a dynpro - the SAP GUI controls of
-    "! its container (z2ui5_cl_cgui_gui_container with container_name),
+    "! its container (z2ui5_cl_cgui_container with container_name),
     "! rendered by the report set with set_gui( )
     METHODS custom_control
       IMPORTING

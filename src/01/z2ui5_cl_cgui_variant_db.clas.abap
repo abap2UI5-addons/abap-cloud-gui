@@ -7,7 +7,7 @@
 CLASS z2ui5_cl_cgui_variant_db DEFINITION PUBLIC FINAL CREATE PRIVATE.
 
   PUBLIC SECTION.
-    INTERFACES z2ui5_if_cgui_variant_store.
+    INTERFACES z2ui5_if_cgui_variants.
 
     CLASS-METHODS factory
       RETURNING
@@ -39,13 +39,13 @@ CLASS z2ui5_cl_cgui_variant_db IMPLEMENTATION.
 
   ENDMETHOD.
 
-  METHOD z2ui5_if_cgui_variant_store~check_sharing.
+  METHOD z2ui5_if_cgui_variants~check_sharing.
 
     result = abap_true.
 
   ENDMETHOD.
 
-  METHOD z2ui5_if_cgui_variant_store~load.
+  METHOD z2ui5_if_cgui_variants~load.
 
     DATA ls_variant TYPE z2ui5_cl_cgui_variant=>ty_s_variant.
 
@@ -79,7 +79,7 @@ CLASS z2ui5_cl_cgui_variant_db IMPLEMENTATION.
 
   ENDMETHOD.
 
-  METHOD z2ui5_if_cgui_variant_store~save.
+  METHOD z2ui5_if_cgui_variants~save.
 
     DATA ls_db TYPE z2ui5_t_19.
 
@@ -132,7 +132,7 @@ CLASS z2ui5_cl_cgui_variant_db IMPLEMENTATION.
 
   ENDMETHOD.
 
-  METHOD z2ui5_if_cgui_variant_store~delete.
+  METHOD z2ui5_if_cgui_variants~delete.
 
     DATA(lv_report) = CONV z2ui5_t_19-report( to_upper( report ) ).
     DATA(lv_name) = CONV z2ui5_cgui_var_name( name ).

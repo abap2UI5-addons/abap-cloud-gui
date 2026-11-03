@@ -66,6 +66,11 @@ CLASS z2ui5_cl_cgui_sample_08 DEFINITION PUBLIC
     METHODS mock_data.
 
   PRIVATE SECTION.
+    "! The name of the report SUBMIT starts, read from a typed reference - a
+    "! namespace rename rewrites the reference, never a literal.
+    METHODS sample_05
+      RETURNING
+        VALUE(result) TYPE string.
 ENDCLASS.
 
 
@@ -289,7 +294,7 @@ CLASS z2ui5_cl_cgui_sample_08 IMPLEMENTATION.
         IF p_carrid IS NOT INITIAL.
           lt_values = VALUE #( ( name = `P_CARRID` kind = z2ui5_cl_cgui_variant=>cs_kind-parameter low = p_carrid ) ).
         ENDIF.
-        submit( report = `Z2UI5_CL_CGUI_SAMPLE_05`
+        submit( report = sample_05( )
                 values = lt_values ).
 
     ENDCASE.
@@ -307,6 +312,13 @@ CLASS z2ui5_cl_cgui_sample_08 IMPLEMENTATION.
         ( carrid = `UA` connid = `0941` fldate = `20260505` price = `879.82`  currency = `USD` seatsocc = 150 seatsmax = 330 )
         ( carrid = `JL` connid = `0407` fldate = `20260221` price = `106136`  currency = `JPY` seatsocc = 90  seatsmax = 320 )
         ( carrid = `SQ` connid = `0002` fldate = `20260601` price = `1016.00` currency = `SGD` seatsocc = 320 seatsmax = 400 ) ).
+
+  ENDMETHOD.
+
+  METHOD sample_05.
+
+    DATA lo_report TYPE REF TO z2ui5_cl_cgui_sample_05.
+    result = CAST cl_abap_refdescr( cl_abap_typedescr=>describe_by_data( lo_report ) )->get_referenced_type( )->get_relative_name( ).
 
   ENDMETHOD.
 

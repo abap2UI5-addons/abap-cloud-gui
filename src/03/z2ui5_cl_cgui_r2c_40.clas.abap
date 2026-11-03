@@ -8,7 +8,7 @@ CLASS z2ui5_cl_cgui_r2c_40 DEFINITION PUBLIC
     TYPES ty_line TYPE c LENGTH 255.
 
     " global data of the report
-    DATA go_html  TYPE REF TO z2ui5_cl_cgui_gui_html_viewer.
+    DATA go_html  TYPE REF TO z2ui5_cl_cgui_html_viewer.
     DATA lt_html  TYPE STANDARD TABLE OF ty_line WITH DEFAULT KEY.
     DATA lv_url   TYPE c LENGTH 255.
     DATA lt_event TYPE z2ui5_cl_cgui_gui=>ty_t_simple_events.
@@ -39,8 +39,8 @@ CLASS z2ui5_cl_cgui_r2c_40 IMPLEMENTATION.
 
   METHOD start_of_selection.
 
-    go_html = NEW z2ui5_cl_cgui_gui_html_viewer( parent = z2ui5_cl_cgui_gui_container=>default_screen ).
-    APPEND VALUE #( eventid = z2ui5_cl_cgui_gui_html_viewer=>m_id_sapevent appl_event = abap_true ) TO lt_event.
+    go_html = NEW z2ui5_cl_cgui_html_viewer( parent = z2ui5_cl_cgui_container=>default_screen ).
+    APPEND VALUE #( eventid = z2ui5_cl_cgui_html_viewer=>m_id_sapevent appl_event = abap_true ) TO lt_event.
     go_html->set_registered_events( lt_event ).
     go_menu = NEW lcl_menu( ).
     go_html->set_handler( handler = go_menu

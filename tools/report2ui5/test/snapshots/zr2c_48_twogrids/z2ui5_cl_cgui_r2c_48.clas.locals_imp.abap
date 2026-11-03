@@ -16,11 +16,11 @@ CLASS lcl_view IMPLEMENTATION.
 
   METHOD display.
     SELECT * FROM scarr INTO TABLE @airlines ORDER BY carrid.
-    split = NEW z2ui5_cl_cgui_gui_container( parent  = NEW z2ui5_cl_cgui_gui_container( container_name = 'CC' )
+    split = NEW z2ui5_cl_cgui_container( parent  = NEW z2ui5_cl_cgui_container( container_name = 'CC' )
                                            rows    = 2
                                            columns = 1 ).
-    header = NEW z2ui5_cl_cgui_gui_alv_grid( i_parent = split->get_container( row = 1 column = 1 ) ).
-    items = NEW z2ui5_cl_cgui_gui_alv_grid( i_parent = split->get_container( row = 2 column = 1 ) ).
+    header = NEW z2ui5_cl_cgui_alv_grid( i_parent = split->get_container( row = 1 column = 1 ) ).
+    items = NEW z2ui5_cl_cgui_alv_grid( i_parent = split->get_container( row = 2 column = 1 ) ).
     header->set_handler( handler = me
                          method  = `ON_DOUBLE_CLICK`
                          event   = `DOUBLE_CLICK` ).

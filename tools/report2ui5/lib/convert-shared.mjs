@@ -137,11 +137,11 @@ export const LVC_TYPES = {
   // the lines of POPUP_TO_DECIDE_LIST
   spopli: "z2ui5_cl_cgui_popup=>ty_s_spopli",
   // the nodes of cl_gui_simple_tree
-  mtreesnode: "z2ui5_cl_cgui_gui_simple_tree=>ty_s_node", tv_nodekey: "z2ui5_cl_cgui_gui_simple_tree=>ty_node_key",
+  mtreesnode: "z2ui5_cl_cgui_simple_tree=>ty_s_node", tv_nodekey: "z2ui5_cl_cgui_simple_tree=>ty_node_key",
   // the nodes, items and header of cl_gui_column_tree
-  treev_node: "z2ui5_cl_cgui_gui_simple_tree=>ty_s_node", treev_ntab: "z2ui5_cl_cgui_gui_simple_tree=>ty_t_node",
-  mtreeitm: "z2ui5_cl_cgui_gui_column_tree=>ty_s_item", treev_hhdr: "z2ui5_cl_cgui_gui_column_tree=>ty_s_hhdr",
-  tv_itmname: "z2ui5_cl_cgui_gui_column_tree=>ty_item_name",
+  treev_node: "z2ui5_cl_cgui_simple_tree=>ty_s_node", treev_ntab: "z2ui5_cl_cgui_simple_tree=>ty_t_node",
+  mtreeitm: "z2ui5_cl_cgui_column_tree=>ty_s_item", treev_hhdr: "z2ui5_cl_cgui_column_tree=>ty_s_hhdr",
+  tv_itmname: "z2ui5_cl_cgui_column_tree=>ty_item_name",
 };
 
 // the statements that open and close a block
@@ -227,7 +227,7 @@ export const FRONTEND_FUNCTIONS = { GUI_UPLOAD: "gui_upload", GUI_DOWNLOAD: "gui
 export const FRONTEND_TABLES_OUT = new Set(["GUI_UPLOAD.data_tab", "GUI_DOWNLOAD.data_tab", "SCMS_XSTRING_TO_BINARY.binary_tab"]);
 
 /**
- * The stand-ins of the SAP GUI controls (src/01/z2ui5_cl_cgui_gui*) - the
+ * The stand-ins of the SAP GUI controls (src/01, z2ui5_cl_cgui_gui and its subclasses) - the
  * class of a report's control becomes one of them, a member of the control
  * they do not have is refused. members are their public constants,
  * attributes and methods with parameters and exceptions; a test compares
@@ -236,22 +236,22 @@ export const FRONTEND_TABLES_OUT = new Set(["GUI_UPLOAD.data_tab", "GUI_DOWNLOAD
 export const GUI = {
   classes: {
     cl_gui_control: "z2ui5_cl_cgui_gui",
-    cl_gui_container: "z2ui5_cl_cgui_gui_container",
-    cl_gui_custom_container: "z2ui5_cl_cgui_gui_container",
-    cl_gui_docking_container: "z2ui5_cl_cgui_gui_container",
-    cl_gui_splitter_container: "z2ui5_cl_cgui_gui_container",
-    cl_gui_dialogbox_container: "z2ui5_cl_cgui_gui_container",
-    cl_gui_gos_container: "z2ui5_cl_cgui_gui_container",
-    cl_gui_easy_splitter_container: "z2ui5_cl_cgui_gui_easy_split",
-    cl_gui_textedit: "z2ui5_cl_cgui_gui_textedit",
-    cl_gui_html_viewer: "z2ui5_cl_cgui_gui_html_viewer",
-    cl_gui_toolbar: "z2ui5_cl_cgui_gui_toolbar",
-    cl_gui_picture: "z2ui5_cl_cgui_gui_picture",
-    cl_gui_simple_tree: "z2ui5_cl_cgui_gui_simple_tree",
-    cl_gui_column_tree: "z2ui5_cl_cgui_gui_column_tree",
-    cl_gui_list_tree: "z2ui5_cl_cgui_gui_list_tree",
-    cl_gui_alv_grid: "z2ui5_cl_cgui_gui_alv_grid",
-    cl_alv_event_toolbar_set: "z2ui5_cl_cgui_gui_alv_toolbar",
+    cl_gui_container: "z2ui5_cl_cgui_container",
+    cl_gui_custom_container: "z2ui5_cl_cgui_container",
+    cl_gui_docking_container: "z2ui5_cl_cgui_container",
+    cl_gui_splitter_container: "z2ui5_cl_cgui_container",
+    cl_gui_dialogbox_container: "z2ui5_cl_cgui_container",
+    cl_gui_gos_container: "z2ui5_cl_cgui_container",
+    cl_gui_easy_splitter_container: "z2ui5_cl_cgui_easy_split",
+    cl_gui_textedit: "z2ui5_cl_cgui_textedit",
+    cl_gui_html_viewer: "z2ui5_cl_cgui_html_viewer",
+    cl_gui_toolbar: "z2ui5_cl_cgui_toolbar",
+    cl_gui_picture: "z2ui5_cl_cgui_picture",
+    cl_gui_simple_tree: "z2ui5_cl_cgui_simple_tree",
+    cl_gui_column_tree: "z2ui5_cl_cgui_column_tree",
+    cl_gui_list_tree: "z2ui5_cl_cgui_list_tree",
+    cl_gui_alv_grid: "z2ui5_cl_cgui_alv_grid",
+    cl_alv_event_toolbar_set: "z2ui5_cl_cgui_alv_toolbar",
   },
   members: {
     z2ui5_cl_cgui_gui: {
@@ -281,7 +281,7 @@ export const GUI = {
           exceptions: [] },
       },
     },
-    z2ui5_cl_cgui_gui_container: {
+    z2ui5_cl_cgui_container: {
       parent: "z2ui5_cl_cgui_gui",
       constants: ["dock_at_left", "dock_at_top", "dock_at_right", "dock_at_bottom", "mode_absolute", "mode_relative", "type_movable", "type_sashvisible", "orientation_vertical", "orientation_horizontal", "lifetime_imode", "lifetime_dynpro", "lifetime_default"],
       attributes: ["default_screen", "screen0", "top_left_container", "bottom_right_container"],
@@ -321,8 +321,8 @@ export const GUI = {
           exceptions: ["cntl_error", "cntl_system_error", "lifetime_dynpro_dynpro_link"] },
       },
     },
-    z2ui5_cl_cgui_gui_easy_split: {
-      parent: "z2ui5_cl_cgui_gui_container",
+    z2ui5_cl_cgui_easy_split: {
+      parent: "z2ui5_cl_cgui_container",
       constants: [],
       attributes: [],
       events: [],
@@ -331,7 +331,7 @@ export const GUI = {
           exceptions: ["cntl_error", "cntl_system_error"] },
       },
     },
-    z2ui5_cl_cgui_gui_textedit: {
+    z2ui5_cl_cgui_textedit: {
       parent: "z2ui5_cl_cgui_gui",
       constants: ["wordwrap_off", "wordwrap_at_windowborder", "wordwrap_at_fixed_position", "dropfile_event_off", "dropfile_event_single", "dropfile_event_multiple", "event_double_click", "event_f1", "event_f4"],
       attributes: [],
@@ -375,7 +375,7 @@ export const GUI = {
           exceptions: ["error_cntl_call_method"] },
       },
     },
-    z2ui5_cl_cgui_gui_html_viewer: {
+    z2ui5_cl_cgui_html_viewer: {
       parent: "z2ui5_cl_cgui_gui",
       constants: ["m_id_sapevent"],
       attributes: [],
@@ -461,7 +461,7 @@ export const GUI = {
           exceptions: [] },
       },
     },
-    z2ui5_cl_cgui_salv_columns: {
+    z2ui5_cl_cgui_salv_cols: {
       constants: [],
       attributes: [],
       events: [],
@@ -647,7 +647,7 @@ export const GUI = {
           exceptions: [] },
       },
     },
-    z2ui5_cl_cgui_salv_settings: {
+    z2ui5_cl_cgui_salv_config: {
       constants: [],
       attributes: ["mv_title", "mv_striped", "mv_selection_mode", "mt_function", "mv_header", "mv_hierarchy_header"],
       events: [],
@@ -708,7 +708,7 @@ export const GUI = {
           exceptions: [] },
       },
     },
-    z2ui5_cl_cgui_gui_simple_tree: {
+    z2ui5_cl_cgui_simple_tree: {
       parent: "z2ui5_cl_cgui_gui",
       constants: ["node_sel_mode_single", "node_sel_mode_multiple", "relat_first_sibling", "relat_last_sibling", "relat_prev_sibling", "relat_next_sibling", "relat_first_child", "relat_last_child", "eventid_node_double_click", "eventid_expand_no_children", "eventid_selection_changed", "eventid_node_context_menu_req"],
       attributes: [],
@@ -750,8 +750,8 @@ export const GUI = {
           exceptions: [] },
       },
     },
-    z2ui5_cl_cgui_gui_column_tree: {
-      parent: "z2ui5_cl_cgui_gui_simple_tree",
+    z2ui5_cl_cgui_column_tree: {
+      parent: "z2ui5_cl_cgui_simple_tree",
       constants: ["item_class_text", "item_class_checkbox", "item_class_button", "item_class_link", "item_font_default", "item_font_prop", "item_font_fixed", "align_left", "align_center", "align_right", "align_auto", "eventid_item_double_click", "eventid_link_click", "eventid_checkbox_change"],
       attributes: [],
       events: ["item_double_click", "link_click", "checkbox_change"],
@@ -780,8 +780,8 @@ export const GUI = {
           exceptions: [] },
       },
     },
-    z2ui5_cl_cgui_gui_list_tree: {
-      parent: "z2ui5_cl_cgui_gui_column_tree",
+    z2ui5_cl_cgui_list_tree: {
+      parent: "z2ui5_cl_cgui_column_tree",
       constants: [],
       attributes: [],
       events: [],
@@ -796,7 +796,7 @@ export const GUI = {
           exceptions: [] },
       },
     },
-    z2ui5_cl_cgui_gui_picture: {
+    z2ui5_cl_cgui_picture: {
       parent: "z2ui5_cl_cgui_gui",
       constants: ["display_mode_normal", "display_mode_stretch", "display_mode_fit", "display_mode_normal_center", "display_mode_fit_center", "eventid_picture_click"],
       attributes: [],
@@ -820,7 +820,7 @@ export const GUI = {
           exceptions: [] },
       },
     },
-    z2ui5_cl_cgui_gui_toolbar: {
+    z2ui5_cl_cgui_toolbar: {
       parent: "z2ui5_cl_cgui_gui",
       constants: ["cntb_btype_button", "cntb_btype_dropdown", "cntb_btype_menu", "cntb_btype_sep", "cntb_btype_group", "cntb_btype_check", "m_mode_horizontal", "m_mode_vertical", "m_id_function_selected", "m_id_dropdown_clicked"],
       attributes: [],
@@ -846,7 +846,7 @@ export const GUI = {
           exceptions: [] },
       },
     },
-    z2ui5_cl_cgui_gui_alv_grid: {
+    z2ui5_cl_cgui_alv_grid: {
       parent: "z2ui5_cl_cgui_gui",
       constants: ["mc_fc_excl_all", "mc_fc_detail", "mc_fc_print", "mc_fc_refresh", "mc_fc_loc_cut", "mc_fc_loc_copy", "mc_fc_loc_paste", "mc_fc_loc_undo", "mc_fc_loc_append_row", "mc_fc_loc_insert_row", "mc_fc_loc_delete_row", "mc_fc_loc_copy_row", "mc_fc_sort_asc", "mc_fc_sort_dsc", "mc_fc_find", "mc_fc_filter", "mc_fc_sum", "mc_fc_views", "mc_fc_info", "mc_fc_graph", "mc_mb_export", "mc_mb_variant", "mc_evt_enter", "mc_evt_modified", "mc_style_enabled", "mc_style_disabled", "mc_style_hotspot"],
       attributes: [],
@@ -886,7 +886,7 @@ export const GUI = {
           exceptions: [] },
       },
     },
-    z2ui5_cl_cgui_gui_alv_toolbar: {
+    z2ui5_cl_cgui_alv_toolbar: {
       constants: [],
       attributes: ["mt_toolbar"],
       events: [],
@@ -932,19 +932,19 @@ export const GRID_VALUE_TYPES = {
 export const SALV = {
   classes: {
     cl_salv_table: "z2ui5_cl_cgui_salv_table", cl_salv_events_table: "z2ui5_cl_cgui_salv_table",
-    cl_salv_columns_table: "z2ui5_cl_cgui_salv_columns", cl_salv_columns_list: "z2ui5_cl_cgui_salv_columns",
-    cl_salv_columns: "z2ui5_cl_cgui_salv_columns",
+    cl_salv_columns_table: "z2ui5_cl_cgui_salv_cols", cl_salv_columns_list: "z2ui5_cl_cgui_salv_cols",
+    cl_salv_columns: "z2ui5_cl_cgui_salv_cols",
     cl_salv_column_table: "z2ui5_cl_cgui_salv_column", cl_salv_column_list: "z2ui5_cl_cgui_salv_column",
     cl_salv_column: "z2ui5_cl_cgui_salv_column",
-    cl_salv_display_settings: "z2ui5_cl_cgui_salv_settings", cl_salv_functions_list: "z2ui5_cl_cgui_salv_settings",
-    cl_salv_functions: "z2ui5_cl_cgui_salv_settings", cl_salv_selections: "z2ui5_cl_cgui_salv_settings",
-    cl_salv_sorts: "z2ui5_cl_cgui_salv_settings", cl_salv_aggregations: "z2ui5_cl_cgui_salv_settings",
-    cl_salv_layout: "z2ui5_cl_cgui_salv_settings", cl_salv_filters: "z2ui5_cl_cgui_salv_settings",
-    cl_salv_print: "z2ui5_cl_cgui_salv_settings", cl_salv_functional_settings: "z2ui5_cl_cgui_salv_settings",
+    cl_salv_display_settings: "z2ui5_cl_cgui_salv_config", cl_salv_functions_list: "z2ui5_cl_cgui_salv_config",
+    cl_salv_functions: "z2ui5_cl_cgui_salv_config", cl_salv_selections: "z2ui5_cl_cgui_salv_config",
+    cl_salv_sorts: "z2ui5_cl_cgui_salv_config", cl_salv_aggregations: "z2ui5_cl_cgui_salv_config",
+    cl_salv_layout: "z2ui5_cl_cgui_salv_config", cl_salv_filters: "z2ui5_cl_cgui_salv_config",
+    cl_salv_print: "z2ui5_cl_cgui_salv_config", cl_salv_functional_settings: "z2ui5_cl_cgui_salv_config",
     cl_salv_tree: "z2ui5_cl_cgui_salv_tree", cl_salv_events_tree: "z2ui5_cl_cgui_salv_tree",
     cl_salv_nodes: "z2ui5_cl_cgui_salv_nodes", cl_salv_node: "z2ui5_cl_cgui_salv_node", cl_salv_item: "z2ui5_cl_cgui_salv_node",
-    cl_salv_tree_settings: "z2ui5_cl_cgui_salv_settings", cl_salv_columns_tree: "z2ui5_cl_cgui_salv_columns",
-    cl_salv_column_tree: "z2ui5_cl_cgui_salv_column", cl_salv_functions_tree: "z2ui5_cl_cgui_salv_settings",
+    cl_salv_tree_settings: "z2ui5_cl_cgui_salv_config", cl_salv_columns_tree: "z2ui5_cl_cgui_salv_cols",
+    cl_salv_column_tree: "z2ui5_cl_cgui_salv_column", cl_salv_functions_tree: "z2ui5_cl_cgui_salv_config",
   },
   // if_salv_c_* - the structures of z2ui5_if_cgui_salv_c
   constants: {
@@ -953,8 +953,8 @@ export const SALV = {
     if_salv_c_aggregation: "aggregation", if_salv_c_node_relation: "node_relation", if_salv_c_item_type: "item_type",
   },
   types: {
-    salv_t_row: "z2ui5_cl_cgui_salv_settings=>ty_t_row", salv_s_cell: "z2ui5_cl_cgui_salv_settings=>ty_s_cell",
-    salv_t_column_ref: "z2ui5_cl_cgui_salv_columns=>ty_t_column_ref", salv_s_column_ref: "z2ui5_cl_cgui_salv_columns=>ty_s_column_ref",
+    salv_t_row: "z2ui5_cl_cgui_salv_config=>ty_t_row", salv_s_cell: "z2ui5_cl_cgui_salv_config=>ty_s_cell",
+    salv_t_column_ref: "z2ui5_cl_cgui_salv_cols=>ty_t_column_ref", salv_s_column_ref: "z2ui5_cl_cgui_salv_cols=>ty_s_column_ref",
     salv_de_function: "z2ui5_cl_cgui_salv_table=>ty_function", salv_de_column: "z2ui5_cl_cgui_salv_table=>ty_column",
     salv_de_row: "i",
     salv_de_node_key: "z2ui5_cl_cgui_salv_node=>ty_node_key", lvc_nkey: "z2ui5_cl_cgui_salv_node=>ty_node_key",
@@ -1580,7 +1580,7 @@ export function caseBody(param, entries) {
 }
 
 /** whether z2ui5_cl_cgui_frontend has a constant or method of that name */
-// the members of z2ui5_cl_cgui_abap_browser - the ones of cl_abap_browser it has
+// the members of z2ui5_cl_cgui_browser - the ones of cl_abap_browser it has
 export const ABAP_BROWSER = ["show_html", "show_url", "show_xml", "close_browser", "html_line", "html_table", "small", "medium", "large",
   "xlarge", "landscape", "portrait", "topleft", "topright", "middle", "bottomleft", "bottomright", "navigate_off", "navigate_html"];
 

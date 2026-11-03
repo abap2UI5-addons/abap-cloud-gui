@@ -6,6 +6,26 @@ release.
 
 ## Unreleased
 
+**Breaking: object names of at most 25 characters**
+
+- Fifteen public classes and interfaces were longer than 25 characters, the
+  limit a namespace rename of up to 10 characters needs (30 minus the 5 it
+  adds). For one naming scheme all twelve `z2ui5_cl_cgui_gui_*` lose the
+  `gui_`: `z2ui5_cl_cgui_gui_alv_grid` is `z2ui5_cl_cgui_alv_grid`, and the
+  same for `_alv_toolbar`, `_column_tree`, `_container`, `_easy_split`,
+  `_html_viewer`, `_list_tree`, `_picture`, `_simple_tree`, `_textedit`,
+  `_toolbar` and `_view`. Further: `z2ui5_cl_cgui_salv_columns` ->
+  `z2ui5_cl_cgui_salv_cols`, `z2ui5_cl_cgui_salv_settings` ->
+  `z2ui5_cl_cgui_salv_config`, `z2ui5_cl_cgui_abap_browser` ->
+  `z2ui5_cl_cgui_browser`, `z2ui5_if_cgui_tree_handler` ->
+  `z2ui5_if_cgui_tree_events`, `z2ui5_if_cgui_variant_store` ->
+  `z2ui5_if_cgui_variants`, `z2ui5_if_cgui_layout_store` ->
+  `z2ui5_if_cgui_layouts`. Members are unchanged. report2UI5 writes the new
+  names; a class converted before needs the names replaced (or converting
+  again). Delete the old objects after the pull. A major release.
+- `npm run rename` and the manual workflow `build-rename`: abap2UI5's
+  namespace rename for this addon, references to abap2UI5 renamed along.
+
 **The site is VitePress**
 
 - <https://abap2ui5-addons.github.io/abap-cloud-gui/> is built with VitePress

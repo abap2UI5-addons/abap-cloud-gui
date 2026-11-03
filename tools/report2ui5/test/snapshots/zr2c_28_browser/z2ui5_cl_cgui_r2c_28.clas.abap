@@ -65,9 +65,9 @@ CLASS z2ui5_cl_cgui_r2c_28 IMPLEMENTATION.
                     |<table><tr><th>Item</th><th>Price</th><th>Members</th></tr>{ lv_rows }</table>| &&
                     |</body></html>|.
 
-    z2ui5_cl_cgui_abap_browser=>show_html( title       = p_title
+    z2ui5_cl_cgui_browser=>show_html( title       = p_title
                                 html_string = lv_html
-                                container   = z2ui5_cl_cgui_gui_container=>default_screen ).
+                                container   = z2ui5_cl_cgui_container=>default_screen ).
     write( space ).
 
   ENDMETHOD.
