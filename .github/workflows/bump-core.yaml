@@ -6,9 +6,9 @@
 # CONVENTIONS §9: a pin nobody moves is its own defect.
 name: bump-core
 
+# no schedule: bump-deps.yaml does this once a month, in its one
+# pull request; a dispatch still runs it on its own
 on:
-  schedule:
-    - cron: '17 6 * * 2'   # Tuesdays 06:17 UTC
   workflow_dispatch:
 
 concurrency:

@@ -55,8 +55,9 @@ run against that release and not against the framework's `main`. Three
 configs carry the pin (`abaplint.jsonc`, `.github/abaplint/abap_cloud.jsonc`,
 and the downported `<tag>-702` form in `.github/abaplint/abap_702.jsonc`);
 read and move them only with `scripts/core-pin.mjs` (`get` fails when they
-disagree). `bump-core.yaml` moves the pin weekly to the newest release after
-the three abaplint gates passed on it, and the scheduled `abaplint` run lints
+disagree). `bump-deps.yaml` moves the pin monthly to the newest release, in
+its one pull request whose checks run the three abaplint gates on it
+(`bump-core.yaml` by hand), and the scheduled `abaplint` run lints
 once against the core's `main` as the canary (`core-pin.mjs set main`, never
 committed). Do not drop the key: abaplint then clones `main` silently.
 
