@@ -33,13 +33,13 @@ CLASS lcl_stamp IMPLEMENTATION.
       RETURN.
     ENDIF.
 
-    mo_dock = NEW z2ui5_cl_cgui_gui_container( side = z2ui5_cl_cgui_gui_container=>dock_at_top ).
-    mo_picture = NEW z2ui5_cl_cgui_gui_picture( parent = mo_dock ).
+    mo_dock = NEW z2ui5_cl_cgui_container( side = z2ui5_cl_cgui_container=>dock_at_top ).
+    mo_picture = NEW z2ui5_cl_cgui_picture( parent = mo_dock ).
     IF lcl_r2c=>app->p_fit = abap_true.
-      mo_picture->set_display_mode( z2ui5_cl_cgui_gui_picture=>display_mode_fit ).
+      mo_picture->set_display_mode( z2ui5_cl_cgui_picture=>display_mode_fit ).
     ENDIF.
     mo_picture->load_picture_from_url_async( lv_url ).
-    APPEND VALUE #( eventid = z2ui5_cl_cgui_gui_picture=>eventid_picture_click appl_event = abap_true ) TO lt_event.
+    APPEND VALUE #( eventid = z2ui5_cl_cgui_picture=>eventid_picture_click appl_event = abap_true ) TO lt_event.
     mo_picture->set_registered_events( lt_event ).
     mo_picture->set_handler( handler = me
                              method  = `ON_CLICK`

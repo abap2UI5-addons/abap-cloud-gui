@@ -92,8 +92,8 @@ CLASS z2ui5_cl_cgui_context DEFINITION PUBLIC FINAL CREATE PUBLIC.
         VALUE(result) TYPE REF TO data.
 
     "! the rows of entity - a CDS view entity, or a table or view of the
-    "! DDIC - as the value help of a field: what
-    "! @Consumption.valueHelpDefinition names. On ABAP Cloud as on premise;
+    "! DDIC - as the value help of a field:
+    "! what @Consumption.valueHelpDefinition names. On ABAP Cloud as on premise;
     "! unbound when it cannot be read
     CLASS-METHODS entity_select
       IMPORTING

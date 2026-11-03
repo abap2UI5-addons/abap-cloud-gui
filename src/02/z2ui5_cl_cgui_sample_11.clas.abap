@@ -65,42 +65,40 @@ CLASS z2ui5_cl_cgui_sample_11 IMPLEMENTATION.
 
   METHOD dynpro_screen.
 
-    CASE dynnr.
-      WHEN `0100`.
-        screen->block_begin( `Booking`
-            )->parameter( val       = p_carrid
-                          text      = `Airline`
-                          read_only = abap_true
-            )->parameter( val        = connid
-                          text       = `Connection`
-                          obligatory = abap_true
-            )->line_begin(
-                )->parameter( val      = seats
-                              text     = `Seats`
-                              modif_id = `SEA`
-                )->button( text  = `Check`
-                           event = `CHECK`
-                           icon  = `sap-icon://accept`
-            )->line_end(
-            )->checkbox( val      = window
-                         text     = `Window seat`
-                         modif_id = `SEA`
-            )->block_end( ).
-    ENDCASE.
+    IF dynnr = `0100`.
+      screen->block_begin( `Booking`
+          )->parameter( val       = p_carrid
+                        text      = `Airline`
+                        read_only = abap_true
+          )->parameter( val        = connid
+                        text       = `Connection`
+                        obligatory = abap_true
+          )->line_begin(
+              )->parameter( val      = seats
+                            text     = `Seats`
+                            modif_id = `SEA`
+              )->button( text  = `Check`
+                         event = `CHECK`
+                         icon  = `sap-icon://accept`
+          )->line_end(
+          )->checkbox( val      = window
+                       text     = `Window seat`
+                       modif_id = `SEA`
+          )->block_end( ).
+    ENDIF.
 
   ENDMETHOD.
 
   METHOD dynpro_pbo.
 
-    CASE dynnr.
-      WHEN `0100`.
-        set_title( |Flight Booking { p_carrid }| ).
-        set_pf_status( VALUE #( ( name = `SAVE` text = `Book` icon = `sap-icon://save` ) ) ).
-        LOOP AT current_screen( )->loop_at_screen( ) INTO DATA(ls_screen) WHERE group1 = `SEA`.
-          ls_screen-input = checked.
-          current_screen( )->modify_screen( ls_screen ).
-        ENDLOOP.
-    ENDCASE.
+    IF dynnr = `0100`.
+      set_title( |Flight Booking { p_carrid }| ).
+      set_pf_status( VALUE #( ( name = `SAVE` text = `Book` icon = `sap-icon://save` ) ) ).
+      LOOP AT current_screen( )->loop_at_screen( ) INTO DATA(ls_screen) WHERE group1 = `SEA`.
+        ls_screen-input = checked.
+        current_screen( )->modify_screen( ls_screen ).
+      ENDLOOP.
+    ENDIF.
 
   ENDMETHOD.
 

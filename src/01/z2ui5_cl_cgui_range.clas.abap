@@ -325,11 +325,11 @@ CLASS z2ui5_cl_cgui_range IMPLEMENTATION.
             ls_row-option = `NP`.
           ENDIF.
         WHEN `CP`.
-          IF NOT ls_row-low CA `*+`.
+          IF ls_row-low NA `*+`.
             ls_row-option = `EQ`.
           ENDIF.
         WHEN `NP`.
-          IF NOT ls_row-low CA `*+`.
+          IF ls_row-low NA `*+`.
             ls_row-option = `NE`.
           ENDIF.
         WHEN `BT`.

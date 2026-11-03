@@ -109,12 +109,9 @@ CLASS z2ui5_cl_cgui_sample_06 IMPLEMENTATION.
 
   METHOD at_user_command.
 
-    CASE ucomm.
-      WHEN `MODE`.
-        IF p_create = abap_true.
-          p_plant = `1000`.
-        ENDIF.
-    ENDCASE.
+    IF ucomm = `MODE` AND p_create = abap_true.
+      p_plant = `1000`.
+    ENDIF.
 
   ENDMETHOD.
 
@@ -146,13 +143,10 @@ CLASS z2ui5_cl_cgui_sample_06 IMPLEMENTATION.
 
     " AT SELECTION-SCREEN ON RADIOBUTTON GROUP - an error stops at the
     " first button of the group
-    CASE group.
-      WHEN `MODE`.
-        IF p_create = abap_true AND p_plant <> `1000`.
-          message( text = `New materials are created in plant 1000`
-                   type = `E` ).
-        ENDIF.
-    ENDCASE.
+    IF group = `MODE` AND p_create = abap_true AND p_plant <> `1000`.
+      message( text = `New materials are created in plant 1000`
+               type = `E` ).
+    ENDIF.
 
   ENDMETHOD.
 

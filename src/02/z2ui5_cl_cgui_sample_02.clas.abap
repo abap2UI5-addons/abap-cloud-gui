@@ -40,10 +40,9 @@ CLASS z2ui5_cl_cgui_sample_02 IMPLEMENTATION.
 
   METHOD on_event.
 
-    CASE client->get_event( ).
-      WHEN z2ui5_cl_cgui_list=>cs_event-line_selection.
-        client->message_toast_display( |Line { client->get_event_arg( ) } selected, HIDE value { client->get_event_arg( 2 ) }| ).
-    ENDCASE.
+    IF client->get_event( ) = z2ui5_cl_cgui_list=>cs_event-line_selection.
+      client->message_toast_display( |Line { client->get_event_arg( ) } selected, HIDE value { client->get_event_arg( 2 ) }| ).
+    ENDIF.
 
   ENDMETHOD.
 

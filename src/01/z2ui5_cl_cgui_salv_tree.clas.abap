@@ -10,7 +10,7 @@ CLASS z2ui5_cl_cgui_salv_tree DEFINITION PUBLIC
   CREATE PUBLIC.
 
   PUBLIC SECTION.
-    INTERFACES z2ui5_if_cgui_tree_handler.
+    INTERFACES z2ui5_if_cgui_tree_events.
 
     TYPES ty_node_key TYPE z2ui5_cl_cgui_salv_node=>ty_node_key.
     TYPES ty_column TYPE c LENGTH 30.
@@ -44,7 +44,7 @@ CLASS z2ui5_cl_cgui_salv_tree DEFINITION PUBLIC
     "! the rows are the data_row of add_node( )
     CLASS-METHODS factory
       IMPORTING
-        r_container           TYPE REF TO z2ui5_cl_cgui_gui_container OPTIONAL
+        r_container           TYPE REF TO z2ui5_cl_cgui_container OPTIONAL
         hide_selection_column TYPE abap_bool OPTIONAL
       EXPORTING
         r_salv_tree           TYPE REF TO z2ui5_cl_cgui_salv_tree
@@ -62,31 +62,31 @@ CLASS z2ui5_cl_cgui_salv_tree DEFINITION PUBLIC
 
     METHODS get_columns
       RETURNING
-        VALUE(value) TYPE REF TO z2ui5_cl_cgui_salv_columns.
+        VALUE(value) TYPE REF TO z2ui5_cl_cgui_salv_cols.
 
     METHODS get_tree_settings
       RETURNING
-        VALUE(value) TYPE REF TO z2ui5_cl_cgui_salv_settings.
+        VALUE(value) TYPE REF TO z2ui5_cl_cgui_salv_config.
 
     METHODS get_functions
       RETURNING
-        VALUE(value) TYPE REF TO z2ui5_cl_cgui_salv_settings.
+        VALUE(value) TYPE REF TO z2ui5_cl_cgui_salv_config.
 
     METHODS get_display_settings
       RETURNING
-        VALUE(value) TYPE REF TO z2ui5_cl_cgui_salv_settings.
+        VALUE(value) TYPE REF TO z2ui5_cl_cgui_salv_config.
 
     METHODS get_aggregations
       RETURNING
-        VALUE(value) TYPE REF TO z2ui5_cl_cgui_salv_settings.
+        VALUE(value) TYPE REF TO z2ui5_cl_cgui_salv_config.
 
     METHODS get_layout
       RETURNING
-        VALUE(value) TYPE REF TO z2ui5_cl_cgui_salv_settings.
+        VALUE(value) TYPE REF TO z2ui5_cl_cgui_salv_config.
 
     METHODS get_selections
       RETURNING
-        VALUE(value) TYPE REF TO z2ui5_cl_cgui_salv_settings.
+        VALUE(value) TYPE REF TO z2ui5_cl_cgui_salv_config.
 
     "! the events of the tree - the tree itself
     METHODS get_event
@@ -102,8 +102,8 @@ CLASS z2ui5_cl_cgui_salv_tree DEFINITION PUBLIC
   PRIVATE SECTION.
     DATA mo_tree     TYPE REF TO z2ui5_cl_cgui_tree.
     DATA mo_nodes    TYPE REF TO z2ui5_cl_cgui_salv_nodes.
-    DATA mo_columns  TYPE REF TO z2ui5_cl_cgui_salv_columns.
-    DATA mo_settings TYPE REF TO z2ui5_cl_cgui_salv_settings.
+    DATA mo_columns  TYPE REF TO z2ui5_cl_cgui_salv_cols.
+    DATA mo_settings TYPE REF TO z2ui5_cl_cgui_salv_config.
 ENDCLASS.
 
 
@@ -231,7 +231,7 @@ CLASS z2ui5_cl_cgui_salv_tree IMPLEMENTATION.
 
   ENDMETHOD.
 
-  METHOD z2ui5_if_cgui_tree_handler~on_node.
+  METHOD z2ui5_if_cgui_tree_events~on_node.
 
     DATA lv_column TYPE ty_column.
     DATA(lv_key) = z2ui5_cl_cgui_salv_node=>to_key( key ).
@@ -241,7 +241,7 @@ CLASS z2ui5_cl_cgui_salv_tree IMPLEMENTATION.
 
   ENDMETHOD.
 
-  METHOD z2ui5_if_cgui_tree_handler~on_checkbox.
+  METHOD z2ui5_if_cgui_tree_events~on_checkbox.
 
     DATA lv_column TYPE ty_column.
     DATA(lv_key) = z2ui5_cl_cgui_salv_node=>to_key( key ).

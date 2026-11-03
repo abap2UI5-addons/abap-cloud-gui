@@ -15,13 +15,13 @@ CLASS z2ui5_cl_cgui_r2c_50 DEFINITION LOCAL FRIENDS lcl_tree.
 CLASS lcl_tree IMPLEMENTATION.
 
   METHOD display.
-    DATA lt_node TYPE z2ui5_cl_cgui_gui_simple_tree=>ty_t_node.
-    DATA lt_item TYPE STANDARD TABLE OF z2ui5_cl_cgui_gui_column_tree=>ty_s_item WITH DEFAULT KEY.
+    DATA lt_node TYPE z2ui5_cl_cgui_simple_tree=>ty_t_node.
+    DATA lt_item TYPE STANDARD TABLE OF z2ui5_cl_cgui_column_tree=>ty_s_item WITH DEFAULT KEY.
     DATA lt_carrier TYPE STANDARD TABLE OF scarr WITH DEFAULT KEY.
     DATA lt_connection TYPE STANDARD TABLE OF spfli WITH DEFAULT KEY.
 
-    tree = NEW #( parent              = NEW z2ui5_cl_cgui_gui_container( container_name = 'CC' )
-                  node_selection_mode = z2ui5_cl_cgui_gui_list_tree=>node_sel_mode_single
+    tree = NEW #( parent              = NEW z2ui5_cl_cgui_container( container_name = 'CC' )
+                  node_selection_mode = z2ui5_cl_cgui_list_tree=>node_sel_mode_single
                   item_selection      = abap_true
                   with_headers        = abap_false ).
 
@@ -29,19 +29,19 @@ CLASS lcl_tree IMPLEMENTATION.
     SELECT * FROM spfli INTO TABLE @lt_connection ORDER BY carrid, connid.
     LOOP AT lt_carrier INTO DATA(ls_carrier).
       APPEND VALUE #( node_key = ls_carrier-carrid isfolder = abap_true ) TO lt_node.
-      APPEND VALUE #( node_key = ls_carrier-carrid item_name = '1' class = z2ui5_cl_cgui_gui_list_tree=>item_class_text
+      APPEND VALUE #( node_key = ls_carrier-carrid item_name = '1' class = z2ui5_cl_cgui_list_tree=>item_class_text
                       length = 20 text = ls_carrier-carrname ) TO lt_item.
-      APPEND VALUE #( node_key = ls_carrier-carrid item_name = '2' class = z2ui5_cl_cgui_gui_list_tree=>item_class_link
+      APPEND VALUE #( node_key = ls_carrier-carrid item_name = '2' class = z2ui5_cl_cgui_list_tree=>item_class_link
                       length = 30 text = ls_carrier-url ) TO lt_item.
       LOOP AT lt_connection INTO DATA(ls_connection) WHERE carrid = ls_carrier-carrid.
-        DATA(lv_key) = CONV z2ui5_cl_cgui_gui_simple_tree=>ty_node_key( |{ ls_connection-carrid }{ ls_connection-connid }| ).
+        DATA(lv_key) = CONV z2ui5_cl_cgui_simple_tree=>ty_node_key( |{ ls_connection-carrid }{ ls_connection-connid }| ).
         APPEND VALUE #( node_key = lv_key relatkey = ls_carrier-carrid
-                        relatship = z2ui5_cl_cgui_gui_list_tree=>relat_last_child ) TO lt_node.
-        APPEND VALUE #( node_key = lv_key item_name = '1' class = z2ui5_cl_cgui_gui_list_tree=>item_class_text
+                        relatship = z2ui5_cl_cgui_list_tree=>relat_last_child ) TO lt_node.
+        APPEND VALUE #( node_key = lv_key item_name = '1' class = z2ui5_cl_cgui_list_tree=>item_class_text
                         length = 10 text = ls_connection-connid ) TO lt_item.
-        APPEND VALUE #( node_key = lv_key item_name = '2' class = z2ui5_cl_cgui_gui_list_tree=>item_class_text
+        APPEND VALUE #( node_key = lv_key item_name = '2' class = z2ui5_cl_cgui_list_tree=>item_class_text
                         length = 20 text = ls_connection-cityfrom ) TO lt_item.
-        APPEND VALUE #( node_key = lv_key item_name = '3' class = z2ui5_cl_cgui_gui_list_tree=>item_class_text
+        APPEND VALUE #( node_key = lv_key item_name = '3' class = z2ui5_cl_cgui_list_tree=>item_class_text
                         length = 20 text = ls_connection-cityto ) TO lt_item.
       ENDLOOP.
     ENDLOOP.

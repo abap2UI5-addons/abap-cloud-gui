@@ -15,18 +15,18 @@ CLASS z2ui5_cl_cgui_r2c_49 DEFINITION LOCAL FRIENDS lcl_tree.
 CLASS lcl_tree IMPLEMENTATION.
 
   METHOD display.
-    DATA lt_node TYPE z2ui5_cl_cgui_gui_simple_tree=>ty_t_node.
-    DATA ls_node TYPE z2ui5_cl_cgui_gui_simple_tree=>ty_s_node.
-    DATA lt_item TYPE STANDARD TABLE OF z2ui5_cl_cgui_gui_column_tree=>ty_s_item WITH DEFAULT KEY.
-    DATA ls_item TYPE z2ui5_cl_cgui_gui_column_tree=>ty_s_item.
-    DATA ls_header TYPE z2ui5_cl_cgui_gui_column_tree=>ty_s_hhdr.
+    DATA lt_node TYPE z2ui5_cl_cgui_simple_tree=>ty_t_node.
+    DATA ls_node TYPE z2ui5_cl_cgui_simple_tree=>ty_s_node.
+    DATA lt_item TYPE STANDARD TABLE OF z2ui5_cl_cgui_column_tree=>ty_s_item WITH DEFAULT KEY.
+    DATA ls_item TYPE z2ui5_cl_cgui_column_tree=>ty_s_item.
+    DATA ls_header TYPE z2ui5_cl_cgui_column_tree=>ty_s_hhdr.
     DATA lt_carrier TYPE STANDARD TABLE OF scarr WITH DEFAULT KEY.
     DATA lt_connection TYPE STANDARD TABLE OF spfli WITH DEFAULT KEY.
 
     ls_header-heading = 'Airline'.
     ls_header-width = 30.
-    tree = NEW #( parent                = NEW z2ui5_cl_cgui_gui_container( container_name = 'CC' )
-                  node_selection_mode   = z2ui5_cl_cgui_gui_column_tree=>node_sel_mode_single
+    tree = NEW #( parent                = NEW z2ui5_cl_cgui_container( container_name = 'CC' )
+                  node_selection_mode   = z2ui5_cl_cgui_column_tree=>node_sel_mode_single
                   item_selection        = abap_true
                   hierarchy_column_name = 'TREE'
                   hierarchy_header      = ls_header ).
@@ -43,23 +43,23 @@ CLASS lcl_tree IMPLEMENTATION.
       CLEAR ls_item.
       ls_item-node_key = ls_carrier-carrid.
       ls_item-item_name = 'TREE'.
-      ls_item-class = z2ui5_cl_cgui_gui_column_tree=>item_class_text.
+      ls_item-class = z2ui5_cl_cgui_column_tree=>item_class_text.
       ls_item-text = ls_carrier-carrname.
       APPEND ls_item TO lt_item.
       ls_item-item_name = 'FROM'.
-      ls_item-class = z2ui5_cl_cgui_gui_column_tree=>item_class_link.
+      ls_item-class = z2ui5_cl_cgui_column_tree=>item_class_link.
       ls_item-text = ls_carrier-url.
       APPEND ls_item TO lt_item.
       LOOP AT lt_connection INTO DATA(ls_connection) WHERE carrid = ls_carrier-carrid.
         CLEAR ls_node.
         ls_node-node_key = |{ ls_connection-carrid }{ ls_connection-connid }|.
         ls_node-relatkey = ls_carrier-carrid.
-        ls_node-relatship = z2ui5_cl_cgui_gui_column_tree=>relat_last_child.
+        ls_node-relatship = z2ui5_cl_cgui_column_tree=>relat_last_child.
         APPEND ls_node TO lt_node.
         CLEAR ls_item.
         ls_item-node_key = ls_node-node_key.
         ls_item-item_name = 'TREE'.
-        ls_item-class = z2ui5_cl_cgui_gui_column_tree=>item_class_text.
+        ls_item-class = z2ui5_cl_cgui_column_tree=>item_class_text.
         ls_item-text = |{ ls_connection-carrid } { ls_connection-connid }|.
         APPEND ls_item TO lt_item.
         ls_item-item_name = 'FROM'.

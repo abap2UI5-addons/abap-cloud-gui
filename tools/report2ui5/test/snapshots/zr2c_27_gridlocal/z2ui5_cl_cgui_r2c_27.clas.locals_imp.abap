@@ -19,7 +19,7 @@ CLASS lcl_alv IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD display.
-    grid = NEW z2ui5_cl_cgui_gui_alv_grid( i_parent = NEW z2ui5_cl_cgui_gui_container( container_name = 'CC' ) ).
+    grid = NEW z2ui5_cl_cgui_alv_grid( i_parent = NEW z2ui5_cl_cgui_container( container_name = 'CC' ) ).
     fcat = VALUE #( ( fieldname = 'CARRID'   coltext = 'Airline' )
                     ( fieldname = 'CONNID'   coltext = 'Flight' )
                     ( fieldname = 'CITYFROM' coltext = 'From' hotspot = abap_true )

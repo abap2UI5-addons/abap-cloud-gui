@@ -434,7 +434,7 @@ CLASS z2ui5_cl_cgui_command IMPLEMENTATION.
     " a variable, not the template - a WITH KEY operand on 7.02
     DATA(lv_app_start) = |app_start={ to_lower( ctx-key ) }|.
     IF NOT line_exists( lt_keep[ table_line = lv_app_start ] )
-        AND NOT lv_search CS `app_start`.
+        AND lv_search NS `app_start`.
       INSERT lv_app_start INTO TABLE lt_keep.
     ENDIF.
 

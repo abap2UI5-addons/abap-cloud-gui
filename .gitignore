@@ -5,3 +5,7 @@ build/
 # the site: the bundled converter, the examples and the runtime of the playground (scripts/build-site.mjs)
 site/public/r2u/
 site/.vitepress/cache/
+.github/abaplint/output/
+.github/abaplint/rename-deps/
+.github/abaplint/rename_run.json
+.github/out/

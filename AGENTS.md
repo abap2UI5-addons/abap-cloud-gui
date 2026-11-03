@@ -13,7 +13,7 @@ list, ALV grid, messages. Language of code, comments, commits and docs:
 
 | Path | Content |
 |---|---|
-| `src/01` | the framework: `z2ui5_cl_cgui_report` (report runtime), `_selscreen`, `_list`, `_alv`, `_tree`, `_layout` (the layout dialog of the ALV), `_popup`, `_range`, `_select`, `_variant` (selection variants), `_context` (RTTI and conversion helpers), `z2ui5_cx_cgui_error`; the two stores: `z2ui5_if_cgui_variant_store` with `z2ui5_cl_cgui_variant_db` (table `Z2UI5_CGUI_VAR`, data elements `Z2UI5_CGUI_VAR_*`) and `z2ui5_if_cgui_layout_store` with `z2ui5_cl_cgui_layout_db` (table `Z2UI5_CGUI_LAY`) |
+| `src/01` | the framework: `z2ui5_cl_cgui_report` (report runtime), `_selscreen`, `_list`, `_alv`, `_tree`, `_layout` (the layout dialog of the ALV), `_popup`, `_range`, `_select`, `_variant` (selection variants), `_context` (RTTI and conversion helpers), `z2ui5_cx_cgui_error`; the two stores: `z2ui5_if_cgui_variants` with `z2ui5_cl_cgui_variant_db` (table `Z2UI5_T_19`, data elements `Z2UI5_CGUI_VAR_*`) and `z2ui5_if_cgui_layouts` with `z2ui5_cl_cgui_layout_db` (table `Z2UI5_T_18`) |
 | `src/02` | samples `z2ui5_cl_cgui_sample_01` … `_11` |
 | `src/03` | the test set: the corpus reports of report2UI5 as converted (`z2ui5_cl_cgui_r2c_NN`), generated - never edit by hand, `UPDATE_SNAPSHOTS=1 npm run test:report2ui5` writes it. Only the reports of `CLOUD_READY` in `tools/report2ui5/test/corpus.mjs` - those that read no table and call no API ABAP Cloud lacks, so the package activates there too; the gate test's scratch copy leaves it out and lints the conversion of now under `src/r2c` |
 | `tools/report2ui5` | `report2UI5`, a Node CLI (no ABAP object) that converts a classic report into a report class of this addon - THE generator of this repository, see below |
@@ -24,7 +24,8 @@ list, ALV grid, messages. Language of code, comments, commits and docs:
 | `.github/abaplint` | the Cloud and 7.02 gate configs; `abaplint.jsonc` at the root is the v750 inner loop |
 
 Naming: every class is `Z2UI5_CL_CGUI_*` / `Z2UI5_CX_CGUI_*`, every interface
-`Z2UI5_IF_CGUI_*` (abaplint `object_naming`). Only `CLAS`, `INTF`, `DEVC`,
+`Z2UI5_IF_CGUI_*` (abaplint `object_naming`), at most 25 characters (namespace
+rename, see below). Only `CLAS`, `INTF`, `DEVC`,
 `TABL` and `DTEL` objects (`allowed_object_types`) - no programs, no
 function groups, no tooling that runs on the stack: everything under `src/`
 is ABAP Cloud ready, transpilable to Node and downportable to 7.02. The
@@ -54,8 +55,9 @@ run against that release and not against the framework's `main`. Three
 configs carry the pin (`abaplint.jsonc`, `.github/abaplint/abap_cloud.jsonc`,
 and the downported `<tag>-702` form in `.github/abaplint/abap_702.jsonc`);
 read and move them only with `scripts/core-pin.mjs` (`get` fails when they
-disagree). `bump-core.yaml` moves the pin weekly to the newest release after
-the three abaplint gates passed on it, and the scheduled `abaplint` run lints
+disagree). `bump-deps.yaml` moves the pin monthly to the newest release, in
+its one pull request whose checks run the three abaplint gates on it
+(`bump-core.yaml` by hand), and the scheduled `abaplint` run lints
 once against the core's `main` as the canary (`core-pin.mjs set main`, never
 committed). Do not drop the key: abaplint then clones `main` silently.
 
@@ -86,7 +88,7 @@ that removes or retypes something public is a major release.
 
 ## Frozen stand-ins
 
-`z2ui5_cl_cgui_gui_picture`, `_simple_tree`, `_column_tree` and
+`z2ui5_cl_cgui_picture`, `_simple_tree`, `_column_tree` and
 `_list_tree` are frozen since 1.0.0: kept, tested, bugs fixed, no new
 members. Each stands in for a control one or two reports of the web corpus
 use; a report that needs more of `cl_gui_picture` or the trees ports that
@@ -133,10 +135,10 @@ toolbar and the grid are not frozen.
   to `selected` - so a table that brings a `ZZSELKZ` comes up checked. The
   popup heads a column with the DDIC label of its type, and with `STRING`
   for a string: give value lists character types.
-- **Variants live in table `Z2UI5_CGUI_VAR` by default**
+- **Variants live in table `Z2UI5_T_19` by default**
   (`z2ui5_cl_cgui_variant_db`: shared and protected variants, one owner each,
   set after `initialization( )` unless it chose otherwise);
-  `set_variant_store( store )` plugs in another `z2ui5_if_cgui_variant_store`,
+  `set_variant_store( store )` plugs in another `z2ui5_if_cgui_variants`,
   `set_variant_store( )` without one keeps them in the browser's local
   storage. For the browser's storage, the invisible `z2ui5:Storage` control reads the catalog
   into the PUBLIC `mv_cgui_variants` and fires `finished` while the first
@@ -147,12 +149,12 @@ toolbar and the grid are not frozen.
   empty VALUE deletes the key. Keep bound and stored value equal after a
   write, or the control reports again on the next render. A variant in the
   URL is read after `initialization( )`, so it wins over `set_variant( )`.
-- **ALV layouts live in table `Z2UI5_CGUI_LAY` by default**
+- **ALV layouts live in table `Z2UI5_T_18` by default**
   (`z2ui5_cl_cgui_layout_db`, one namespace per report class and ALV handle -
   the attribute `alv( )` shows): shared and protected like the variants, and
   the default layout is personal - the store keeps one per user and counts
   the flag for its owner only. `set_layout_store( store )` plugs in another
-  `z2ui5_if_cgui_layout_store`; `set_layout_store( )` without one keeps the
+  `z2ui5_if_cgui_layouts`; `set_layout_store( )` without one keeps the
   layouts with the selection variants (`#L#` names). The report tests plug in
   an in-memory store, so only the store's own DANGEROUS test writes the table.
 - **ABAP Cloud has no `WRITE ... TO`, no spool, no SAP memory, no background
@@ -308,3 +310,21 @@ interfaces only - no tables - hence the script.
 Where the UI5 CDN (`sdk.openui5.org`) is not reachable, serve the
 `@openui5/*/src` packages the linter installs in `node_modules` through a
 Playwright `page.route( )`, with `bypassCSP: true` for the source bootstrap.
+
+## Namespace rename
+
+`npm run rename` (CI: `check-rename`) and the manual `build-rename` workflow
+are abap2UI5's namespace rename for this addon - `.github/scripts/rename.mjs`,
+the same file in every addon that has one. Every `z2ui5_` object becomes
+`<name>_...`, for a customer name such as `ZMYUI5` or a registered namespace
+such as `/CA2UI5/` (at most 10 characters), and so does every reference to
+abap2UI5: the branch `rename_<name>` runs on an abap2UI5 renamed with
+the same name by its own `build-rename`. What follows from it:
+
+- Every object name has at most 25 characters (a transparent table 11, an
+  ICF node 10) - 30 minus what the longest new name adds.
+- No literal names a `z2ui5_` object: the rename rewrites references, never a
+  literal. Derive the name - from a typed reference, or behind the prefix of
+  the class's own name.
+- A change that spans several repositories: `RENAME_DEPS_FROM=<dir> npm run
+  rename` takes the dependencies from the clones in `<dir>`.

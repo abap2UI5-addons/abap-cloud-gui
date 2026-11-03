@@ -29,7 +29,7 @@
 "!                         authorization, no report
 "! The runtime shows the selection screen, runs the blocks on Execute (F8),
 "! shows the output and goes back on Back (F3). The values of the selection
-"! screen can be saved as variants, kept in table Z2UI5_CGUI_VAR per report,
+"! screen can be saved as variants, kept in table Z2UI5_T_19 per report,
 "! in a store of your own or in the browser's local storage
 "! (set_variant_store( )) - start with one by
 "! set_variant( ) in initialization( ) or with the URL parameter
@@ -280,7 +280,7 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
     "! wherever the app is restored from its serialized form
     DATA mt_cgui_handler TYPE ty_t_cgui_handler.
     DATA mt_cgui_handler_obj TYPE STANDARD TABLE OF REF TO object WITH EMPTY KEY.
-    "! the grids (z2ui5_cl_cgui_gui_alv_grid) and the one the ALV shows
+    "! the grids (z2ui5_cl_cgui_alv_grid) and the one the ALV shows
     DATA mt_cgui_grid TYPE z2ui5_if_cgui_gui=>ty_t_grid.
     DATA mv_cgui_grid TYPE i.
     "! the field catalog and the layout of the grid shown - attributes of
@@ -1114,19 +1114,19 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
       IMPORTING
         name TYPE clike.
 
-    "! keep the selection variants in store instead of table Z2UI5_CGUI_VAR
+    "! keep the selection variants in store instead of table Z2UI5_T_19
     "! (z2ui5_cl_cgui_variant_db, the default) - set it in initialization( ).
     "! Without a store the variants are kept in the browser's local storage
     METHODS set_variant_store
       IMPORTING
-        store TYPE REF TO z2ui5_if_cgui_variant_store OPTIONAL.
+        store TYPE REF TO z2ui5_if_cgui_variants OPTIONAL.
 
-    "! keep the ALV layouts in store instead of table Z2UI5_CGUI_LAY
+    "! keep the ALV layouts in store instead of table Z2UI5_T_18
     "! (z2ui5_cl_cgui_layout_db, the default) - set it in initialization( ).
     "! Without a store the layouts are kept with the selection variants
     METHODS set_layout_store
       IMPORTING
-        store TYPE REF TO z2ui5_if_cgui_layout_store OPTIONAL.
+        store TYPE REF TO z2ui5_if_cgui_layouts OPTIONAL.
 
     "! the URL that starts the report with the values of the selection screen
     "! - run straight away with skip_screen
@@ -1166,7 +1166,7 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
     DATA mv_cgui_spa_cust   TYPE string.
     DATA mt_cgui_spa_system TYPE z2ui5_if_client=>ty_t_name_value.
     DATA mo_cgui_app_log TYPE REF TO z2ui5_if_cgui_log.
-    DATA mo_cgui_tree_handler TYPE REF TO z2ui5_if_cgui_tree_handler.
+    DATA mo_cgui_tree_handler TYPE REF TO z2ui5_if_cgui_tree_events.
     DATA mv_cgui_fresh_off TYPE abap_bool.
     TYPES:
       BEGIN OF ty_s_cgui_fresh,
@@ -1220,11 +1220,11 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
     " the store of the selection variants - z2ui5_cl_cgui_variant_db unless
     " set_variant_store( ) named another one or none (mv_cgui_store_none:
     " the browser's local storage)
-    DATA mo_cgui_store         TYPE REF TO z2ui5_if_cgui_variant_store.
+    DATA mo_cgui_store         TYPE REF TO z2ui5_if_cgui_variants.
     DATA mv_cgui_store_none    TYPE abap_bool.
     " the store of the ALV layouts - z2ui5_cl_cgui_layout_db unless
     " set_layout_store( ) named another one or none (mv_cgui_lay_none)
-    DATA mo_cgui_lay_store     TYPE REF TO z2ui5_if_cgui_layout_store.
+    DATA mo_cgui_lay_store     TYPE REF TO z2ui5_if_cgui_layouts.
     DATA mv_cgui_lay_none      TYPE abap_bool.
     DATA mt_cgui_vrm           TYPE ty_t_cgui_vrm.
     DATA mt_cgui_url           TYPE z2ui5_cl_cgui_variant=>ty_t_value.
@@ -1352,7 +1352,7 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
     "! what the view of the controls reads of the report, by reference
     METHODS gui_ctx
       RETURNING
-        VALUE(result) TYPE z2ui5_cl_cgui_gui_view=>ty_s_ctx.
+        VALUE(result) TYPE z2ui5_cl_cgui_view=>ty_s_ctx.
 
 
     CONSTANTS:
@@ -1762,7 +1762,7 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
     "! selection variants
     METHODS layout_store
       RETURNING
-        VALUE(result) TYPE REF TO z2ui5_if_cgui_layout_store.
+        VALUE(result) TYPE REF TO z2ui5_if_cgui_layouts.
 
     "! the ALV the layouts belong to - the attribute alv( ) shows
     METHODS layout_handle
@@ -2137,7 +2137,7 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
     " a docking container sits on the screen it is created for, and so
     " does a control on the screen itself (cl_gui_container=>default_screen)
     IF ls_control-parent IS INITIAL AND ls_control-name IS INITIAL AND ls_control-dynnr IS INITIAL.
-      ls_control-dynnr = z2ui5_cl_cgui_gui_view=>screen( gui_ctx( ) ).
+      ls_control-dynnr = z2ui5_cl_cgui_view=>screen( gui_ctx( ) ).
     ELSEIF ls_control-dynnr IS NOT INITIAL AND ls_control-dynnr CO `0123456789`.
       ls_control-dynnr = dynnr_norm( ls_control-dynnr ).
     ENDIF.
@@ -2310,7 +2310,7 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
     IF sy-subrc <> 0 OR gui_alive( id ) = abap_false.
       RETURN.
     ENDIF.
-    DATA(lo_grid) = CAST z2ui5_cl_cgui_gui_alv_grid( lo_object ).
+    DATA(lo_grid) = CAST z2ui5_cl_cgui_alv_grid( lo_object ).
     " the grid shown so far no longer is - this one takes its place
     CLEAR mv_cgui_grid.
     lo_grid->show( ).
@@ -2359,7 +2359,9 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
 
   METHOD call_subscreen_pai.
 
-    READ TABLE mt_cgui_subscreen INTO DATA(ls_sub) WITH KEY area = to_upper( condense( CONV string( area ) ) ).
+    " the key in a variable: a built-in function is no READ TABLE key operand before 7.40
+    DATA(lv_key) = to_upper( condense( CONV string( area ) ) ).
+    READ TABLE mt_cgui_subscreen INTO DATA(ls_sub) WITH KEY area = lv_key.
     IF sy-subrc = 0.
       dynpro_pai( dynnr = ls_sub-dynnr
                   ucomm = ucomm ).
@@ -2415,7 +2417,7 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
 
   METHOD z2ui5_if_cgui_gui~tablecontrol_render.
 
-    z2ui5_cl_cgui_gui_view=>tablecontrol( ctx     = gui_ctx( )
+    z2ui5_cl_cgui_view=>tablecontrol( ctx     = gui_ctx( )
                                           name    = name
                                           title   = title
                                           columns = columns
@@ -2425,7 +2427,9 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
 
   METHOD z2ui5_if_cgui_gui~subscreen_render.
 
-    READ TABLE mt_cgui_subscreen INTO DATA(ls_sub) WITH KEY area = to_upper( area ).
+    " the key in a variable: a built-in function is no READ TABLE key operand before 7.40
+    DATA(lv_key) = to_upper( area ).
+    READ TABLE mt_cgui_subscreen INTO DATA(ls_sub) WITH KEY area = lv_key.
     IF sy-subrc <> 0.
       RETURN.
     ENDIF.
@@ -2497,10 +2501,10 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
 
     CASE ls_control-kind.
       WHEN z2ui5_if_cgui_gui=>cs_kind-container.
-        DATA(lo_box) = z2ui5_cl_cgui_gui_view=>container( ctx  = gui_ctx( )
+        DATA(lo_box) = z2ui5_cl_cgui_view=>container( ctx  = gui_ctx( )
                                                           id   = id
                                                           node = node ).
-        DATA(lt_child) = z2ui5_cl_cgui_gui_view=>children( ctx = gui_ctx( )
+        DATA(lt_child) = z2ui5_cl_cgui_view=>children( ctx = gui_ctx( )
                                                            id  = id ).
         LOOP AT lt_child INTO DATA(ls_child).
           gui_render( id   = ls_child-id
@@ -2511,12 +2515,12 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
         IF mv_cgui_grid = id AND mo_cgui_alv IS BOUND.
           alv_render( node ).
         ELSE.
-          z2ui5_cl_cgui_gui_view=>render( ctx  = gui_ctx( )
+          z2ui5_cl_cgui_view=>render( ctx  = gui_ctx( )
                                           id   = id
                                           node = node ).
         ENDIF.
       WHEN OTHERS.
-        z2ui5_cl_cgui_gui_view=>render( ctx  = gui_ctx( )
+        z2ui5_cl_cgui_view=>render( ctx  = gui_ctx( )
                                         id   = id
                                         node = node ).
     ENDCASE.
@@ -3125,7 +3129,9 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
 
     FIELD-SYMBOLS <tab> TYPE STANDARD TABLE.
 
-    READ TABLE mt_cgui_field REFERENCE INTO DATA(lr_mc) WITH KEY name = to_upper( field ).
+    " the key in a variable: a built-in function is no READ TABLE key operand before 7.40
+    DATA(lv_key) = to_upper( field ).
+    READ TABLE mt_cgui_field REFERENCE INTO DATA(lr_mc) WITH KEY name = lv_key.
     " a CDS entity named as the value help comes first - its rows, the
     " element named the value (else its first column)
     IF sy-subrc <> 0 OR lr_mc->entity IS INITIAL.
@@ -3159,7 +3165,9 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
     FIELD-SYMBOLS <tab> TYPE STANDARD TABLE.
 
     " MATCHCODE OBJECT - the search help named at the field
-    READ TABLE mt_cgui_field REFERENCE INTO DATA(lr_mc) WITH KEY name = to_upper( field ).
+    " the key in a variable: a built-in function is no READ TABLE key operand before 7.40
+    DATA(lv_key) = to_upper( field ).
+    READ TABLE mt_cgui_field REFERENCE INTO DATA(lr_mc) WITH KEY name = lv_key.
     IF sy-subrc = 0 AND lr_mc->matchcode IS NOT INITIAL.
       DATA(ls_mc) = VALUE z2ui5_cl_cgui_context=>ty_s_search_help( name  = lr_mc->matchcode
                                                                   field = matchcode_field( lr_mc->matchcode ) ).
@@ -3251,8 +3259,7 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
         DATA(lo_table) = CAST cl_abap_tabledescr( cl_abap_typedescr=>describe_by_data( tab ) ).
         DATA(lo_line) = CAST cl_abap_structdescr( lo_table->get_table_line_type( ) ).
         lt_comp = lo_line->get_components( ).
-        READ TABLE lt_comp WITH KEY name = `ZZSELKZ` TRANSPORTING NO FIELDS.
-        IF sy-subrc = 0.
+        IF line_exists( lt_comp[ name = `ZZSELKZ` ] ).
           RETURN.
         ENDIF.
         INSERT VALUE #( name = `ZZSELKZ`
@@ -3572,7 +3579,7 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
 
       WHEN cs_ucomm-gui_f1 OR cs_ucomm-gui_f4.
         DATA(lv_key) = COND string( WHEN event = cs_ucomm-gui_f1 THEN `F1` ELSE `F4` ).
-        DATA(lv_editor) = z2ui5_cl_cgui_gui_view=>key_target( ctx = gui_ctx( )
+        DATA(lv_editor) = z2ui5_cl_cgui_view=>key_target( ctx = gui_ctx( )
                                                               key = lv_key ).
         IF lv_editor > 0.
           gui_event( id    = lv_editor
@@ -3583,7 +3590,7 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
       WHEN cs_ucomm-gui.
         " an event of a SAP GUI control: id, event, value - or the switch to
         " a grid that does not show
-        IF client->get_event_arg( 2 ) = z2ui5_cl_cgui_gui_view=>cv_show.
+        IF client->get_event_arg( 2 ) = z2ui5_cl_cgui_view=>cv_show.
           grid_show( CONV #( client->get_event_arg( 1 ) ) ).
         ELSE.
           " the SAPEVENT of an HTMLFrame: action, query and posted fields
@@ -4092,7 +4099,7 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
         ASSIGN COMPONENT `HIGH` OF STRUCTURE <line> TO <high>.
         IF <sign> <> `I` OR ( <opt> <> `EQ` AND <opt> <> `BT` AND <opt> <> `CP` )
             OR ( <low> IS INITIAL AND <high> IS INITIAL )
-            OR ( <opt> = `CP` AND NOT |{ <low> }| CA `*+` )
+            OR ( <opt> = `CP` AND |{ <low> }| NA `*+` )
             OR ( <opt> = `EQ` AND |{ <low> }| CA `*+` ).
           CONTINUE.
         ENDIF.
@@ -4345,7 +4352,7 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
   METHOD run_answer_output.
 
     IF mv_cgui_nav = abap_false
-        AND ( mo_cgui_alv IS BOUND OR mo_cgui_tree IS BOUND OR z2ui5_cl_cgui_gui_view=>on_list( gui_ctx( ) ) = abap_true
+        AND ( mo_cgui_alv IS BOUND OR mo_cgui_tree IS BOUND OR z2ui5_cl_cgui_view=>on_list( gui_ctx( ) ) = abap_true
            OR ( mo_cgui_list IS BOUND AND mo_cgui_list->has_content( ) = abap_true ) ).
       mv_cgui_screen = cs_screen-output.
     ENDIF.
@@ -4595,6 +4602,9 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
 
     DATA lr_copy TYPE REF TO data.
     DATA lo_me   TYPE REF TO object.
+    " unbound - only its type is read: a namespace rename rewrites the
+    " reference, never a literal naming the class
+    DATA lo_report TYPE REF TO z2ui5_cl_cgui_report.
     FIELD-SYMBOLS <attri> TYPE any.
     FIELD-SYMBOLS <copy>  TYPE any.
 
@@ -4603,7 +4613,8 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
       RETURN.
     ENDIF.
     " the attributes of the runtime are not the report's data
-    DATA(lo_base) = CAST cl_abap_classdescr( cl_abap_typedescr=>describe_by_name( `Z2UI5_CL_CGUI_REPORT` ) ).
+    DATA(lo_base) = CAST cl_abap_classdescr(
+      CAST cl_abap_refdescr( cl_abap_typedescr=>describe_by_data( lo_report ) )->get_referenced_type( ) ).
     DATA(lo_class) = CAST cl_abap_classdescr( cl_abap_typedescr=>describe_by_object_ref( me ) ).
     lo_me = me.
     LOOP AT lo_class->attributes REFERENCE INTO DATA(lr_attri)
@@ -5191,7 +5202,7 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
       mo_cgui_list->footer_end( ).
     ENDIF.
 
-    IF mo_cgui_alv IS NOT BOUND AND mo_cgui_tree IS NOT BOUND AND z2ui5_cl_cgui_gui_view=>on_list( gui_ctx( ) ) = abap_false
+    IF mo_cgui_alv IS NOT BOUND AND mo_cgui_tree IS NOT BOUND AND z2ui5_cl_cgui_view=>on_list( gui_ctx( ) ) = abap_false
         AND ( mo_cgui_list IS NOT BOUND OR mo_cgui_list->has_content( ) = abap_false ).
       message( 'List contains no data'(020) ).
       RETURN.
@@ -5724,7 +5735,9 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
     " empty - the transpiled runtime copies the rows along with LIKE
     CLEAR <keep>.
     LOOP AT <range> ASSIGNING <line>.
+      UNASSIGN <sign>.
       ASSIGN COMPONENT `SIGN` OF STRUCTURE <line> TO <sign>.
+      UNASSIGN <opt>.
       ASSIGN COMPONENT `OPTION` OF STRUCTURE <line> TO <opt>.
       IF <sign> IS ASSIGNED AND <opt> IS ASSIGNED AND <sign> = `I` AND <opt> = `EQ`.
         CONTINUE.
@@ -6320,6 +6333,7 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
     FIELD-SYMBOLS <comp> TYPE any.
 
     LOOP AT list ASSIGNING <line>.
+      UNASSIGN <comp>.
       ASSIGN COMPONENT `VAROPTION` OF STRUCTURE <line> TO <comp>.
       IF <comp> IS NOT ASSIGNED.
         ASSIGN <line> TO <comp>.
@@ -6344,6 +6358,7 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
 
     LOOP AT sval ASSIGNING <line>.
       DATA(ls_field) = VALUE z2ui5_cl_cgui_popup=>ty_s_field( ).
+      UNASSIGN <comp>.
       ASSIGN COMPONENT `FIELDNAME` OF STRUCTURE <line> TO <comp>.
       IF <comp> IS ASSIGNED.
         ls_field-name = to_upper( <comp> ).
@@ -6388,6 +6403,7 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
       LOOP AT mt_cgui_popup_values REFERENCE INTO DATA(lr_field).
         CREATE DATA lr_line LIKE LINE OF sval.
         ASSIGN lr_line->* TO <line>.
+        UNASSIGN <comp>.
         ASSIGN COMPONENT `FIELDNAME` OF STRUCTURE <line> TO <comp>.
         IF <comp> IS ASSIGNED.
           <comp> = lr_field->name.
@@ -6409,6 +6425,7 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
     ENDIF.
 
     LOOP AT sval ASSIGNING <line>.
+      UNASSIGN <comp>.
       ASSIGN COMPONENT `FIELDNAME` OF STRUCTURE <line> TO <comp>.
       IF <comp> IS NOT ASSIGNED.
         RETURN.
@@ -7728,8 +7745,7 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
 
     DATA(lv_icon) = `sap-icon://message-information`.
     DATA(lv_type) = `Transparent`.
-    READ TABLE mt_cgui_log WITH KEY type = `W` TRANSPORTING NO FIELDS.
-    IF sy-subrc = 0.
+    IF line_exists( mt_cgui_log[ type = `W` ] ).
       lv_icon = `sap-icon://message-warning`.
       lv_type = `Default`.
     ENDIF.

@@ -3,7 +3,7 @@
 "! are sorted, which columns are summed and which give subtotals. A layout
 "! can be saved under a name, one of them as the default, shared with all
 "! users and protected when the store keeps that; the caller keeps them -
-"! in a layout store (z2ui5_if_cgui_layout_store) or as selection variants
+"! in a layout store (z2ui5_if_cgui_layouts) or as selection variants
 "! whose name starts with cv_prefix, see to_variant( ) / from_variants( ).
 "! The popup leaves with result-action:
 "!   apply  - take over result-layout

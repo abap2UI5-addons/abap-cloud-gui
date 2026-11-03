@@ -53,14 +53,13 @@ CLASS z2ui5_cl_cgui_sample_03 IMPLEMENTATION.
 
   METHOD on_event.
 
-    CASE client->get_event( ).
-      WHEN z2ui5_cl_cgui_alv=>cs_event-line_selection.
-        DATA(lv_row) = z2ui5_cl_cgui_alv=>get_row_by_event( client ).
-        READ TABLE mt_row INTO DATA(ls_row) INDEX lv_row.
-        IF sy-subrc = 0.
-          client->message_toast_display( |{ ls_row-product } selected| ).
-        ENDIF.
-    ENDCASE.
+    IF client->get_event( ) = z2ui5_cl_cgui_alv=>cs_event-line_selection.
+      DATA(lv_row) = z2ui5_cl_cgui_alv=>get_row_by_event( client ).
+      READ TABLE mt_row INTO DATA(ls_row) INDEX lv_row.
+      IF sy-subrc = 0.
+        client->message_toast_display( |{ ls_row-product } selected| ).
+      ENDIF.
+    ENDIF.
 
   ENDMETHOD.
 

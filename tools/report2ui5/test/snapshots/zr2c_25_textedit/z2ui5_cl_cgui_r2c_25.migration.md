@@ -20,10 +20,10 @@
 | 30 | `WRITE / lv_note` | `write( )` |
 | 33 | `WRITE / 'Nothing saved'` | `write( )` |
 | 36 | `MODULE status_0100 OUTPUT` | private method `status_0100( )` - the module, called by dynpro_pbo( ) as the flow logic of the screen did |
-| 38 | `CREATE OBJECT go_notes EXPORTING container_name = 'NOTES'` | `go_notes = NEW #( )` - the stand-in z2ui5_cl_cgui_gui_container |
-| 41 | `CREATE OBJECT go_editor EXPORTING parent = go_notes wordwrap_mode =...` | `go_editor = NEW #( )` - the stand-in z2ui5_cl_cgui_gui_textedit |
-| 51 | `CREATE OBJECT go_preview EXPORTING container_name = 'PREVIEW'` | `go_preview = NEW #( )` - the stand-in z2ui5_cl_cgui_gui_container |
-| 54 | `CREATE OBJECT go_html EXPORTING parent = go_preview` | `go_html = NEW #( )` - the stand-in z2ui5_cl_cgui_gui_html_viewer |
+| 38 | `CREATE OBJECT go_notes EXPORTING container_name = 'NOTES'` | `go_notes = NEW #( )` - the stand-in z2ui5_cl_cgui_container |
+| 41 | `CREATE OBJECT go_editor EXPORTING parent = go_notes wordwrap_mode =...` | `go_editor = NEW #( )` - the stand-in z2ui5_cl_cgui_textedit |
+| 51 | `CREATE OBJECT go_preview EXPORTING container_name = 'PREVIEW'` | `go_preview = NEW #( )` - the stand-in z2ui5_cl_cgui_container |
+| 54 | `CREATE OBJECT go_html EXPORTING parent = go_preview` | `go_html = NEW #( )` - the stand-in z2ui5_cl_cgui_html_viewer |
 | 57 | `PERFORM preview` | `preview( )` |
 | 61 | `MODULE user_command_0100 INPUT` | private method `user_command_0100( )` - the module, called by dynpro_pai( ) as the flow logic of the screen did |
 | 66 | `LEAVE TO SCREEN 0` | `leave_to_screen( dynnr )` and `RETURN` - the modules after it do not run; screen 0 goes back to where CALL SCREEN stood |

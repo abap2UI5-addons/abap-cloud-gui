@@ -1423,7 +1423,7 @@ class Converter {
       // refresh_table_display( ) of the grid stand-in needs the table
       const refresh = /(?:([\w/]+)\s*->\s*)?([\w/]+)\s*->\s*refresh_table_display\b/.exec(t);
       const foreign = refresh?.[1] && refresh[1] !== "me";
-      if (refresh && (this.guiVars.get(refresh[2]) === "z2ui5_cl_cgui_gui_alv_grid" || refresh[2] === "sender") && (foreign || !this.gridOuttab(refresh[2], b.ctx))) {
+      if (refresh && (this.guiVars.get(refresh[2]) === "z2ui5_cl_cgui_alv_grid" || refresh[2] === "sender") && (foreign || !this.gridOuttab(refresh[2], b.ctx))) {
         this.refuse(s, `SAP GUI controls: ${refresh[2]}->refresh_table_display( ) - the grid shows a copy of its table, and the table set_table_for_first_display( ) gave it is not in reach here; pass it: CHANGING it_outtab = ...`);
         return;
       }

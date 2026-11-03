@@ -22,13 +22,13 @@ Layout, formatting and behaviour of the classic report that the list, the ALV or
 | 9 | `REPORT zr2c_26_events` | the class, `INHERITING FROM z2ui5_cl_cgui_report` |
 | 13 | `CLASS lcl_app DEFINITION` | locals_def |
 | 34 | `CLASS lcl_app IMPLEMENTATION` | locals_imp |
-| 37 | `CREATE OBJECT mo_cont EXPORTING container_name = 'CC'` | `mo_cont = NEW #( )` - the stand-in z2ui5_cl_cgui_gui_container |
-| 40 | `CREATE OBJECT mo_split EXPORTING parent = mo_cont rows = 2 columns = 1` | `mo_split = NEW #( )` - the stand-in z2ui5_cl_cgui_gui_container |
-| 45 | `CREATE OBJECT mo_toolbar EXPORTING parent = mo_split->get_container...` | `mo_toolbar = NEW #( )` - the stand-in z2ui5_cl_cgui_gui_toolbar |
+| 37 | `CREATE OBJECT mo_cont EXPORTING container_name = 'CC'` | `mo_cont = NEW #( )` - the stand-in z2ui5_cl_cgui_container |
+| 40 | `CREATE OBJECT mo_split EXPORTING parent = mo_cont rows = 2 columns = 1` | `mo_split = NEW #( )` - the stand-in z2ui5_cl_cgui_container |
+| 45 | `CREATE OBJECT mo_toolbar EXPORTING parent = mo_split->get_container...` | `mo_toolbar = NEW #( )` - the stand-in z2ui5_cl_cgui_toolbar |
 | 59 | `SET HANDLER me->on_function FOR mo_toolbar` | `mo_toolbar->set_handler( )` - the stand-in keeps the handler and calls it for the event of the browser |
-| 61 | `CREATE OBJECT mo_html EXPORTING parent = mo_split->get_container( r...` | `mo_html = NEW #( )` - the stand-in z2ui5_cl_cgui_gui_html_viewer |
+| 61 | `CREATE OBJECT mo_html EXPORTING parent = mo_split->get_container( r...` | `mo_html = NEW #( )` - the stand-in z2ui5_cl_cgui_html_viewer |
 | 64 | `SET HANDLER me->on_sapevent FOR mo_html` | `mo_html->set_handler( )` - the stand-in keeps the handler and calls it for the event of the browser |
-| 86 | `CREATE OBJECT mo_box EXPORTING caption = 'Details' width = 400 heig...` | `mo_box = NEW #( )` - the stand-in z2ui5_cl_cgui_gui_container |
+| 86 | `CREATE OBJECT mo_box EXPORTING caption = 'Details' width = 400 heig...` | `mo_box = NEW #( )` - the stand-in z2ui5_cl_cgui_container |
 | 91 | `SET HANDLER me->on_close FOR mo_box` | `mo_box->set_handler( )` - the stand-in keeps the handler and calls it for the event of the browser |
 | 98 | `MESSAGE \|{ action } { ls_query-value }\| TYPE 'S'` | `message( )` |
 | 108 | `START-OF-SELECTION` | `start_of_selection( )` |

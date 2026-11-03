@@ -61,7 +61,7 @@ CLASS z2ui5_cl_cgui_r2c_42 IMPLEMENTATION.
     z2ui5_cl_cgui_demo_output=>begin_section( 'Cellar' ).
     z2ui5_cl_cgui_demo_output=>write( lt_shelf ).
     DATA(lv_page) = z2ui5_cl_cgui_demo_output=>get( ).
-    z2ui5_cl_cgui_abap_browser=>show_html( title       = 'Cellar'
+    z2ui5_cl_cgui_browser=>show_html( title       = 'Cellar'
                                 html_string = lv_page ).
 
     list( )->new_line(

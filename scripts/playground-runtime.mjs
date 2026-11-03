@@ -7,7 +7,7 @@
 // elements. So a data element of the runtime is written into the table that
 // uses it as the built-in type it stands for, and a source naming it names
 // that table's field instead (`CONV z2ui5_cgui_var_owner( )` becomes
-// `CONV z2ui5_cgui_var-owner( )`, the same type). Anything else the
+// `CONV z2ui5_t_19-owner( )`, the same type). Anything else the
 // playground could not take fails here, by name, rather than on the page.
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";

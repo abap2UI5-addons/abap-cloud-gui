@@ -191,6 +191,7 @@ CLASS z2ui5_cl_cgui_variant IMPLEMENTATION.
       CLEAR ls_value.
       ls_value-name = name.
       ls_value-kind = cs_kind-select_option.
+      UNASSIGN <comp>.
       ASSIGN COMPONENT `SIGN` OF STRUCTURE <line> TO <comp>.
       IF <comp> IS ASSIGNED.
         ls_value-sign = <comp>.
@@ -300,6 +301,7 @@ CLASS z2ui5_cl_cgui_variant IMPLEMENTATION.
 
     LOOP AT table ASSIGNING <line>.
       CLEAR ls_value.
+      UNASSIGN <comp>.
       ASSIGN COMPONENT `SELNAME` OF STRUCTURE <line> TO <comp>.
       IF <comp> IS NOT ASSIGNED OR <comp> IS INITIAL.
         UNASSIGN <comp>.

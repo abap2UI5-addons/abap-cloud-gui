@@ -343,16 +343,15 @@ CLASS z2ui5_cl_cgui_sample_10 IMPLEMENTATION.
 
   METHOD at_user_command.
 
-    CASE ucomm.
-      WHEN `FREE`.
-        DATA(lv_flights) = free_seats( ).
-        IF lv_flights = 0.
-          message( text = `Tick the flights first`
-                   type = `W` ).
-          RETURN.
-        ENDIF.
-        message( |{ mv_free } free seats on { lv_flights } flights| ).
-    ENDCASE.
+    IF ucomm = `FREE`.
+      DATA(lv_flights) = free_seats( ).
+      IF lv_flights = 0.
+        message( text = `Tick the flights first`
+                 type = `W` ).
+        RETURN.
+      ENDIF.
+      message( |{ mv_free } free seats on { lv_flights } flights| ).
+    ENDIF.
 
   ENDMETHOD.
 
