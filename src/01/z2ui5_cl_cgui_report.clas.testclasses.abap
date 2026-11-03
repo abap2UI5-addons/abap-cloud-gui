@@ -794,6 +794,7 @@ CLASS ltcl_client IMPLEMENTATION.
          WHERE visibility = cl_abap_classdescr=>public
            AND is_constant = abap_false
            AND type_kind = cl_abap_typedescr=>typekind_dref.
+      UNASSIGN <ref>.
       ASSIGN mo_app->(lr_descr->name) TO <ref>.
       IF <ref> IS NOT ASSIGNED OR <ref> IS NOT BOUND.
         CONTINUE.

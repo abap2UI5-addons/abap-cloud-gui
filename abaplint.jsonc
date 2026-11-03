@@ -392,6 +392,9 @@
         "src/03/",
         "src/r2c/"
       ]
-    }
+    },
+    // added 2026-11 with its findings fixed: UNASSIGN before an ASSIGN in a loop,
+    // so a failed ASSIGN does not leave the previous row bound
+    "is_assigned_in_loop": true
   }
 }

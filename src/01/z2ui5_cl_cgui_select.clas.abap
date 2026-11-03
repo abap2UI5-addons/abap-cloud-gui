@@ -208,6 +208,7 @@ CLASS z2ui5_cl_cgui_select IMPLEMENTATION.
         IF mv_table_line = abap_true.
           ASSIGN <src> TO <value>.
         ELSE.
+          UNASSIGN <value>.
           ASSIGN COMPONENT ls_column-name OF STRUCTURE <src> TO <value>.
         ENDIF.
         IF <value> IS ASSIGNED.

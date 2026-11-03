@@ -5731,7 +5731,9 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
     " empty - the transpiled runtime copies the rows along with LIKE
     CLEAR <keep>.
     LOOP AT <range> ASSIGNING <line>.
+      UNASSIGN <sign>.
       ASSIGN COMPONENT `SIGN` OF STRUCTURE <line> TO <sign>.
+      UNASSIGN <opt>.
       ASSIGN COMPONENT `OPTION` OF STRUCTURE <line> TO <opt>.
       IF <sign> IS ASSIGNED AND <opt> IS ASSIGNED AND <sign> = `I` AND <opt> = `EQ`.
         CONTINUE.
@@ -6327,6 +6329,7 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
     FIELD-SYMBOLS <comp> TYPE any.
 
     LOOP AT list ASSIGNING <line>.
+      UNASSIGN <comp>.
       ASSIGN COMPONENT `VAROPTION` OF STRUCTURE <line> TO <comp>.
       IF <comp> IS NOT ASSIGNED.
         ASSIGN <line> TO <comp>.
@@ -6351,6 +6354,7 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
 
     LOOP AT sval ASSIGNING <line>.
       DATA(ls_field) = VALUE z2ui5_cl_cgui_popup=>ty_s_field( ).
+      UNASSIGN <comp>.
       ASSIGN COMPONENT `FIELDNAME` OF STRUCTURE <line> TO <comp>.
       IF <comp> IS ASSIGNED.
         ls_field-name = to_upper( <comp> ).
@@ -6395,6 +6399,7 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
       LOOP AT mt_cgui_popup_values REFERENCE INTO DATA(lr_field).
         CREATE DATA lr_line LIKE LINE OF sval.
         ASSIGN lr_line->* TO <line>.
+        UNASSIGN <comp>.
         ASSIGN COMPONENT `FIELDNAME` OF STRUCTURE <line> TO <comp>.
         IF <comp> IS ASSIGNED.
           <comp> = lr_field->name.
@@ -6416,6 +6421,7 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
     ENDIF.
 
     LOOP AT sval ASSIGNING <line>.
+      UNASSIGN <comp>.
       ASSIGN COMPONENT `FIELDNAME` OF STRUCTURE <line> TO <comp>.
       IF <comp> IS NOT ASSIGNED.
         RETURN.
