@@ -528,6 +528,9 @@ lo_report->cgui_run_in_background( EXPORTING values   = values
 | `z2ui5_cl_cgui_sample_05` | a complete report — select-option, F4 help, radio buttons for ALV or list, drilldown, reset with a confirmation popup, starts with the variant `DEFAULT` |
 | `z2ui5_cl_cgui_sample_06` | a dynamic selection screen — `MODIF ID`, `USER-COMMAND`, `LOOP AT SCREEN`, read-only and password fields, `NO-DISPLAY`, `AT SELECTION-SCREEN ON field` |
 | `z2ui5_cl_cgui_sample_07` | value helps — standard F4 from domain fixed values and value table, own F4 for a parameter and a select-option |
+| `z2ui5_cl_cgui_sample_08` | a flight cockpit — tabs, listbox, `MEMORY ID`; ALV with selection column, own function, hotspot, totals and export; a secondary list with `TOP-OF-PAGE DURING LINE-SELECTION`; popups, a selection screen as popup, `SUBMIT` of sample 05, variants on the server; starts without the screen with `&p_carrid=LH&skip_screen=X` |
+| `z2ui5_cl_cgui_sample_09` | the classic SAP demo report `DEMO_SEL_SCREEN_WITH_TABSTRIP` as a report class — a tabbed block with the subscreens 100 and 200 |
+| `z2ui5_cl_cgui_sample_10` | a flight network — F4 on both limits of a select-option, an ALV tree with checkboxes, lazy loading and a secondary list, an editable ALV with F4 in a cell and a check of the changed cell |
 | `z2ui5_cl_cgui_sample_11` | a dynpro — `CALL SCREEN`, PBO with status and `LOOP AT SCREEN`, PAI with a push button, `LEAVE TO SCREEN 0` and the list after the screen |
 
 
