@@ -17,7 +17,7 @@ screen, `WRITE` list, ALV grid, `START-OF-SELECTION`, `AT LINE-SELECTION`,
 `MESSAGE` - the same concepts, running as a UI5 app in the browser. On ABAP
 Cloud as well as on NetWeaver down to 7.02.
 
-> Part of [abap2UI5-addons](https://github.com/abap2UI5-addons) - addons and apps for [abap2UI5](https://github.com/abap2UI5/abap2UI5), installed with [abapGit](https://abapgit.org).
+> Part of [abap2UI5-addons](https://github.com/abap2UI5-addons) - addons and apps for [abap2UI5](https://github.com/abap2UI5/abap2UI5), installed with [abapGit](https://abapgit.org). Documentation: [abap2ui5-addons.github.io/abap-cloud-gui](https://abap2ui5-addons.github.io/abap-cloud-gui/).
 
 ## Why
 
@@ -81,7 +81,7 @@ COMMIT WORK.
    tag, or import the zip of its
    [GitHub release](https://github.com/abap2UI5-addons/abap-cloud-gui/releases)
    - `abap-cloud-gui-X.Y.Z-702.zip` is the copy downported to 7.02.
-   Branch `main` is the newest state the CI proved
+   Branch `main` is the newest state the CI proved.
 
 **Start** - run a sample like any abap2UI5 app, e.g.
 `?app_start=z2ui5_cl_cgui_sample_05` for a complete report.
@@ -91,8 +91,8 @@ COMMIT WORK.
 To run a second copy next to the original in the same system, rename it the
 way abap2UI5 itself is renamed: run the workflow **build-rename** (Actions →
 build-rename → Run workflow) with the name your abap2UI5 installation was
-renamed to - e.g. `ZMYUI5` or `/CA2UI5/`. It pushes the branch `rename_<name>`, in
-which every object and every reference to abap2UI5 and to the addons this one
+renamed to - e.g. `ZMYUI5` or `/CA2UI5/`. It pushes the branch
+`rename_<name>`, in which every object and every reference to abap2UI5 and to the addons this one
 needs carries that name; pull it with abapGit. Rename abap2UI5 and every addon
 of the installation with the same name.
 
@@ -1000,7 +1000,9 @@ npm run check:702       # downport a scratch copy to 7.02 and check it
 npm run check:abap2ui5  # abap2UI5-linter over apps and views
 npm run check:regex     # no regular expressions in src/
 npm run unit            # ABAP Unit in the transpiled backend (needs ../mcp-server)
-npm run test:report2ui5  # the report converter: snapshots and abaplint over its output
+npm run rename          # the namespace rename still lints
+npm run check           # lint, check:regex, check:cloud, check:702, check:abap2ui5, rename
+npm run test:report2ui5 # the report converter: snapshots and abaplint over its output
 npm run site            # the GitHub Pages site (VitePress) with the converter playground into build/site (-- --serve: on :4173)
 npm run site:dev        # the same with the VitePress dev server
 ```
@@ -1012,8 +1014,10 @@ the tables of the two stores in SQLite.
 
 ## Contributing
 
-Issues and pull requests are welcome. Read [AGENTS.md](AGENTS.md) first - it
-holds the layout, the release targets and the rules of this repository.
+Issues and pull requests are welcome - see [CONTRIBUTING.md](CONTRIBUTING.md)
+and read [AGENTS.md](AGENTS.md) first: it holds the layout, the release
+targets and the rules of this repository. Security issues:
+[SECURITY.md](SECURITY.md).
 
 ## License
 

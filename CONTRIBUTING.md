@@ -21,7 +21,7 @@ green run locally is a green run there.
 | `npm run lint` | abaplint for Standard ABAP 7.50 |
 | `npm run check:cloud`, `npm run check:702` | abaplint for ABAP Cloud and the 7.02 downport |
 | `npm run check:abap2ui5` | the [abap2UI5-linter](https://github.com/abap2UI5/linter) over the classes and their views |
-| `npm run check:regex` | the regular expressions of the converter |
+| `npm run check:regex` | no regular expression in `src/` - POSIX is deprecated from 7.55 on, PCRE does not exist on 7.02 |
 | `npm run rename` | the namespace rename still works |
 | `npm run test:report2ui5` | the report2UI5 converter tests (`:runtime` and `:browser` run the converted reports) |
 | `npm run unit` | the ABAP Unit tests in the transpiled backend (needs abap2UI5/mcp-server beside this repository) |
