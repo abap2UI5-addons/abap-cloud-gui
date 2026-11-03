@@ -327,7 +327,12 @@
     "copy_of_initial_variable": true,
     "delete_index_in_loop": true,
     "final_newline": true,
-    "forbidden_kernel_write": true,
+    // an allow list matching no object: the default, empty, allows every one
+    "forbidden_kernel_write": {
+      "allow": [
+        "^$"
+      ]
+    },
     // not in the classes report2UI5 generates (src/03, and src/r2c of its lint
     // test): the converter copies a report's SQL and messages as written
     "message_exists": {
@@ -395,6 +400,10 @@
     },
     // added 2026-11 with its findings fixed: UNASSIGN before an ASSIGN in a loop,
     // so a failed ASSIGN does not leave the previous row bound
-    "is_assigned_in_loop": true
+    "is_assigned_in_loop": true,
+    // added 2026-11: newer abaplint rules that report nothing here
+    "abapdoc_short_link": true,
+    "boolean_flag_via_if": true,
+    "cast_via_generic_reference": true
   }
 }
