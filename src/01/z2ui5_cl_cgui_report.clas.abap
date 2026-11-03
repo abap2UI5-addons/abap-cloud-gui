@@ -6912,11 +6912,37 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
 
   METHOD alv_row.
 
+    FIELD-SYMBOLS <bound> TYPE STANDARD TABLE.
+    DATA lv_bound_row TYPE i.
+
     result = row.
-    IF mr_cgui_alv_page IS BOUND AND row > 0.
-      READ TABLE mt_cgui_alv_index INTO result INDEX row.
+    IF row <= 0 OR mo_cgui_alv IS NOT BOUND.
+      RETURN.
+    ENDIF.
+
+    " a large table (set_paging) is bound with _bind_tab( ): the browser
+    " shows it in the order the server sorted and filtered it, so row is a
+    " position in that order - the bound table's row is what the framework
+    " answers
+    lv_bound_row = row.
+    IF mo_cgui_alv->get_page_size( ) > 0.
+      DATA(lr_bound) = COND #( WHEN mr_cgui_alv_page IS BOUND THEN mr_cgui_alv_page ELSE alv_shown( ) ).
+      IF lr_bound IS BOUND AND client IS BOUND.
+        ASSIGN lr_bound->* TO <bound>.
+        lv_bound_row = client->_bind_tab_row( val = <bound>
+                                              row = row ).
+        IF lv_bound_row = 0.
+          lv_bound_row = row.
+        ENDIF.
+      ENDIF.
+    ENDIF.
+    result = lv_bound_row.
+
+    " filtered: the bound table is the copy, its rows lead back to the table
+    IF mr_cgui_alv_page IS BOUND.
+      READ TABLE mt_cgui_alv_index INTO result INDEX lv_bound_row.
       IF sy-subrc <> 0.
-        result = row.
+        result = lv_bound_row.
       ENDIF.
     ENDIF.
 
@@ -7541,28 +7567,20 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
         IF mv_cgui_layout_done = abap_false.
           layout_default_apply( <tab> ).
         ENDIF.
-        " filtered or large: the browser gets a copy of the rows it shows,
-        " mt_cgui_alv_index leads back to the rows of the table
+        " filtered: the browser gets a copy of the rows the filter lets
+        " through, mt_cgui_alv_index leads back to the rows of the table.
+        " A large table is not cut into pages here - the grid binds it with
+        " _bind_tab( ), and the browser gets a window of it (set_paging)
         DATA(lv_all) = lines( <tab> ).
         DATA(lt_index) = mo_cgui_alv->filter_index( <tab> ).
         DATA(lv_total) = lines( lt_index ).
-        DATA(lv_size) = mo_cgui_alv->get_page_size( ).
-        DATA(lv_paged) = xsdbool( lv_size > 0 AND lv_total > lv_size ).
         CLEAR: mr_cgui_alv_page, mt_cgui_alv_index.
-        IF lv_paged = abap_true OR mo_cgui_alv->is_filtered( ) = abap_true.
-          DATA(lv_from) = 1.
-          DATA(lv_to) = lv_total.
-          IF lv_paged = abap_true.
-            mo_cgui_alv->page_turn( direction = ``
-                                    lines     = lv_total ).
-            lv_from = mo_cgui_alv->get_page_offset( ) + 1.
-            lv_to = lv_from + lv_size - 1.
-          ENDIF.
+        IF mo_cgui_alv->is_filtered( ) = abap_true.
           CREATE DATA mr_cgui_alv_page LIKE <tab>.
           ASSIGN mr_cgui_alv_page->* TO <page>.
           " empty - the transpiled runtime copies the rows along with LIKE
           CLEAR <page>.
-          LOOP AT lt_index INTO DATA(lv_row) FROM lv_from TO lv_to.
+          LOOP AT lt_index INTO DATA(lv_row).
             READ TABLE <tab> ASSIGNING FIELD-SYMBOL(<page_row>) INDEX lv_row.
             IF sy-subrc = 0.
               INSERT <page_row> INTO TABLE <page>.
