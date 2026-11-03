@@ -373,7 +373,9 @@ CLASS z2ui5_cl_cgui_select IMPLEMENTATION.
                                sep   = `/`
                                index = -1 ).
       IF lv_last CO `0123456789`.
-        lv_index = lv_last + 1.
+        " the position in the window's order - the row of the view behind it
+        lv_index = client->_bind_tab_row( val = <view>
+                                          row = lv_last + 1 ).
         READ TABLE <view> ASSIGNING <row> INDEX lv_index.
         IF sy-subrc = 0.
           ASSIGN COMPONENT cv_row OF STRUCTURE <row> TO <comp>.
@@ -438,11 +440,13 @@ CLASS z2ui5_cl_cgui_select IMPLEMENTATION.
         )->a( n = `xmlns:core` v = `sap.ui.core`
         )->ele( `TableSelectDialog`
         )->a( n = `title`            t = mv_title
-        )->a( n = `items`            v = |\{path:'{ client->_bind( val  = <view>
-                                                                    path = abap_true ) }'\}|
+        " a hit list can be long: the browser gets 100 rows at a time and the
+        " next ones as the dialog grows (_bind_tab( )); the search filters the
+        " view table on the server and the response sends its first window
+        )->a( n = `items`            v = client->_bind_tab( val    = <view>
+                                                            window = 100 )
         )->a( n = `multiSelect`      b = mv_multi
         )->a( n = `growing`          b = abap_true
-        )->a( n = `growingThreshold` v = `100`
         )->a( n = `contentWidth`     v = COND #( WHEN lines( mt_column ) > 3 THEN `60rem` ELSE `40rem` )
         )->a( n = `search`           v = client->_event( val   = cs_event-search
                                                          arg   = `${$parameters>/value}` )

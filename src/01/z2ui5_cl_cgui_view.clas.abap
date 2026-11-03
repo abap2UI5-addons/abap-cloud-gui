@@ -522,10 +522,13 @@ CLASS z2ui5_cl_cgui_view IMPLEMENTATION.
       RETURN.
     ENDIF.
     ASSIGN ctx-tc_row->* TO <rows>.
+    " the lines of a table control can be many: the browser gets 50 at a time
+    " and the next ones as the table grows (_bind_tab( )); an input lands in
+    " the line it was made in
     DATA(lo_table) = node->ele( `Table`
-        )->a( n = `items`      v = ctx-client->_bind( <rows> )
+        )->a( n = `items`      v = ctx-client->_bind_tab( val    = <rows>
+                                                          window = 50 )
         )->a( n = `growing`    b = abap_true
-        )->a( n = `growingThreshold` v = `50`
         )->a( n = `class`      v = `sapUiSmallMarginBottom` ).
     IF title IS NOT INITIAL.
       lo_table->ele( `headerToolbar`
