@@ -6,6 +6,16 @@ release.
 
 ## Unreleased
 
+**The value help and table controls in windows too**
+
+- The hit list of `z2ui5_cl_cgui_select` (F4, the variant catalog) and the
+  table control of a dynpro bind with `_bind_tab( )` like a large ALV: the
+  browser gets 100 hits / 50 lines at a time and the next ones as the list
+  grows, instead of every row at once. A single pick maps the row the browser
+  shows to the hit through `_bind_tab_row( )`; the search still filters on
+  the server, and a mark or an input lands in its own row. Needs abap2UI5
+  with `_bind_tab( )`, as the ALV does.
+
 **Breaking: object names of at most 25 characters**
 
 - Fifteen public classes and interfaces were longer than 25 characters, the
