@@ -26,7 +26,15 @@ export default defineConfig({
           { text: "Releases", link: `${REPO}/releases` },
           { text: "Changelog", link: `${REPO}/blob/main/CHANGELOG.md` },
           { text: "report2UI5", link: `${REPO}/blob/main/tools/report2ui5/README.md` },
+        ],
+      },
+      // the same menu as on every other addon site
+      {
+        text: "abap2UI5",
+        items: [
+          { text: "All addons", link: "https://abap2ui5-addons.github.io/" },
           { text: "abap2UI5", link: "https://abap2ui5.github.io/" },
+          { text: "Documentation", link: "https://abap2ui5.github.io/docs/" },
         ],
       },
     ],
@@ -34,7 +42,7 @@ export default defineConfig({
     editLink: { pattern: `${REPO}/edit/main/site/:path`, text: "Edit this page on GitHub" },
     search: { provider: "local" },
     footer: {
-      message: "MIT licensed - part of <a href=\"https://github.com/abap2UI5-addons\">abap2UI5-addons</a>",
+      message: "MIT licensed - part of <a href=\"https://abap2ui5-addons.github.io/\">abap2UI5-addons</a>",
       copyright: "<a href=\"https://github.com/abap2UI5/abap2UI5\">abap2UI5</a>",
     },
   },
