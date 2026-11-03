@@ -608,7 +608,10 @@ Known limitations:
 - A large table costs every roundtrip: 10,000 rows in an ALV are 1.1 MB to
   the browser each time, and two seconds of serializing the app in the
   transpiled runtime. `set_paging( 500 )` on the ALV brings the payload down
-  to a page; the serialization stays
+  to a window of 500 rows: the grid binds the table with abap2UI5's
+  `_bind_tab( )`, scrolling fetches the next rows, and a sort or a filter
+  from a column menu runs on the server over all rows - the sort of the
+  layout is the order the server starts from. The serialization stays
   ([abap2UI5#2962](https://github.com/abap2UI5/abap2UI5/issues/2962)).
 
 ## Roadmap

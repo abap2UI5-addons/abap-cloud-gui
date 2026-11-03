@@ -6,6 +6,20 @@ release.
 
 ## Unreleased
 
+**A large ALV in windows instead of pages**
+
+- `set_paging( n )` binds the table with abap2UI5's `_bind_tab( )`
+  (abap2UI5/abap2UI5#2980, #2981) instead of cutting a page out of it: the
+  browser gets n rows and the next ones as the grid scrolls, a sort or a
+  filter from a column menu runs on the server over all rows instead of
+  over the page shown, and the sort of the layout is the order the server
+  starts from. The page buttons are gone; hotspots, line selection, cell
+  clicks and F4 map the row the browser shows to the table's row through
+  `_bind_tab_row( )`. The filter of the ALV still binds a copy of the rows
+  it lets through. `get_page( )`, `get_page_offset( )` and `page_turn( )`
+  stay and do nothing the grid shows. Needs abap2UI5 with `_bind_tab( )` -
+  the core pin moves with the release that has it.
+
 **report2UI5: a SALV with a GUI status of its own**
 
 - `x->set_screen_status( pfstatus = 'S' ... )` of a SALV the stand-ins
