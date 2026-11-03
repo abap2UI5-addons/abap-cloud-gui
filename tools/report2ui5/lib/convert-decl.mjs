@@ -8,7 +8,7 @@ import {
 } from "./abap.mjs";
 import {
   GUI, LVC_TYPES, REFUSED, RESERVED_METHODS, alignData, declName, dropWords, hasHeaderLine,
-  renderScreenChain, sameColon, selectTargetType, tokenParents,
+  renderScreenChain, salvTokens, sameColon, selectTargetType, tokenParents,
 } from "./convert-shared.mjs";
 
 export const declMethods = {
@@ -764,6 +764,9 @@ export const declMethods = {
         toks.forEach((t, i) => {
           if (i > 0 && LVC_TYPES[lc(t.getStr())]) ov.set(key(t), LVC_TYPES[lc(t.getStr())]);
         });
+        // the SALV types of the stand-in mode - a FORM an event handler of
+        // the SALV passes its e_salv_function or row to
+        for (const [i, text] of salvTokens(toks)) if (text) ov.set(key(toks[i]), text);
         type = renderTokens(toks, ov).replace(/\s+/g, " ");
         // TABLES p TYPE ty_t names a table type of the report already - TYPE
         // structure or LIKE itab needs a table type of its own

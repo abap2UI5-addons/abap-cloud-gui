@@ -3810,34 +3810,11 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
 
   METHOD cell_binding.
 
-    IF column-currency IS NOT INITIAL.
-      result = |\{parts: [\{path: '{ comp-name }'\}, \{path: '{ column-currency }'\}], type: 'CurrType', formatOptions: \{showMeasure: false\}\}|.
-      RETURN.
-    ENDIF.
-    IF column-quantity IS NOT INITIAL.
-      result = |\{parts: [\{path: '{ comp-name }'\}, \{path: '{ column-quantity }'\}], type: 'UnitType', formatOptions: \{showMeasure: false\}\}|.
-      RETURN.
-    ENDIF.
-
-    CASE comp-type_kind.
-      WHEN cl_abap_typedescr=>typekind_date.
-        result = |\{path: '{ comp-name }', type: 'DateType', formatOptions: \{source: \{pattern: 'yyyy-MM-dd'\}\}\}|.
-      WHEN cl_abap_typedescr=>typekind_time.
-        result = |\{path: '{ comp-name }', type: 'TimeType', formatOptions: \{source: \{pattern: 'HH:mm:ss'\}\}\}|.
-      WHEN cl_abap_typedescr=>typekind_int
-          OR cl_abap_typedescr=>typekind_int1
-          OR cl_abap_typedescr=>typekind_int2
-          OR cl_abap_typedescr=>typekind_int8.
-        result = |\{path: '{ comp-name }', type: 'IntType', formatOptions: \{groupingEnabled: true\}\}|.
-      WHEN cl_abap_typedescr=>typekind_packed.
-        result = |\{path: '{ comp-name }', type: 'FloatType', formatOptions: \{minFractionDigits: { comp-decimals }, maxFractionDigits: { comp-decimals }, groupingEnabled: true\}\}|.
-      WHEN cl_abap_typedescr=>typekind_float
-          OR cl_abap_typedescr=>typekind_decfloat16
-          OR cl_abap_typedescr=>typekind_decfloat34.
-        result = |\{path: '{ comp-name }', type: 'FloatType', formatOptions: \{groupingEnabled: true\}\}|.
-      WHEN OTHERS.
-        result = |\{{ comp-name }\}|.
-    ENDCASE.
+    result = z2ui5_cl_cgui_context=>ui5_binding_by_kind( path          = comp-name
+                                                        type_kind     = comp-type_kind
+                                                        decimals      = comp-decimals
+                                                        currency_path = column-currency
+                                                        unit_path     = column-quantity ).
 
   ENDMETHOD.
 
@@ -4023,9 +4000,7 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
 
   METHOD type_require.
 
-    result = `{DateType: 'sap/ui/model/type/Date', TimeType: 'sap/ui/model/type/Time', `
-          && `FloatType: 'sap/ui/model/type/Float', IntType: 'sap/ui/model/type/Integer', `
-          && `CurrType: 'sap/ui/model/type/Currency', UnitType: 'sap/ui/model/type/Unit'}`.
+    result = z2ui5_cl_cgui_context=>ui5_get_type_require( ).
 
   ENDMETHOD.
 
