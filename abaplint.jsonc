@@ -328,13 +328,27 @@
     "delete_index_in_loop": true,
     "final_newline": true,
     "forbidden_kernel_write": true,
-    "message_exists": true,
+    // not in the classes report2UI5 generates (src/03, and src/r2c of its lint
+    // test): the converter copies a report's SQL and messages as written
+    "message_exists": {
+      "exclude": [
+        "src/03/",
+        "src/r2c/"
+      ]
+    },
     "no_mandt_in_database_operations": true,
     "range_row_values": true,
     "redundant_cast": true,
     "smim_consistency": true,
     "sort_empty_key": true,
-    "strict_sql": true,
+    // not in the classes report2UI5 generates (src/03, and src/r2c of its lint
+    // test): the converter copies a report's SQL and messages as written
+    "strict_sql": {
+      "exclude": [
+        "src/03/",
+        "src/r2c/"
+      ]
+    },
     // added 2026-11 with their findings fixed.
     // clear_after_declaration, inline_packed_computation, short_case,
     // unnecessary_return and use_bool_expression exclude src/03 and src/r2c
