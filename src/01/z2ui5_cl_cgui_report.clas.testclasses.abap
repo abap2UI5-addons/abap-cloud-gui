@@ -22,6 +22,7 @@ CLASS ltcl_layout_store IMPLEMENTATION.
   METHOD z2ui5_if_cgui_layout_store~load.
     result = mt_layout.
   ENDMETHOD.
+
   METHOD z2ui5_if_cgui_layout_store~save.
     IF layout-is_default = abap_true.
       LOOP AT mt_layout REFERENCE INTO DATA(lr_layout).
@@ -31,9 +32,11 @@ CLASS ltcl_layout_store IMPLEMENTATION.
     DELETE mt_layout WHERE name = layout-name.
     INSERT layout INTO TABLE mt_layout.
   ENDMETHOD.
+
   METHOD z2ui5_if_cgui_layout_store~delete.
     DELETE mt_layout WHERE name = name.
   ENDMETHOD.
+
   METHOD z2ui5_if_cgui_layout_store~check_sharing.
     result = abap_true.
   ENDMETHOD.
@@ -43,13 +46,16 @@ CLASS ltcl_variant_store IMPLEMENTATION.
   METHOD z2ui5_if_cgui_variant_store~load.
     result = mt_variant.
   ENDMETHOD.
+
   METHOD z2ui5_if_cgui_variant_store~save.
     DELETE mt_variant WHERE name = variant-name.
     INSERT variant INTO TABLE mt_variant.
   ENDMETHOD.
+
   METHOD z2ui5_if_cgui_variant_store~delete.
     DELETE mt_variant WHERE name = name.
   ENDMETHOD.
+
   METHOD z2ui5_if_cgui_variant_store~check_sharing.
     result = abap_false.
   ENDMETHOD.

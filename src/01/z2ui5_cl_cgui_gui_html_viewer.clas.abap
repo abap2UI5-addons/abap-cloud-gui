@@ -155,7 +155,7 @@ CLASS z2ui5_cl_cgui_gui_html_viewer DEFINITION PUBLIC
 
     METHODS dispatch REDEFINITION.
 
-    "! the SAPEVENT links of a document - href="sapevent:action">text</a>,
+    "! the SAPEVENT links of a document - href="sapevent:action">text&lt;/a&gt;,
     "! found with string operations
     CLASS-METHODS sapevent_links
       IMPORTING

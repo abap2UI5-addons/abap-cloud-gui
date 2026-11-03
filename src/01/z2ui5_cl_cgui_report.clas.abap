@@ -3259,8 +3259,7 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
         DATA(lo_table) = CAST cl_abap_tabledescr( cl_abap_typedescr=>describe_by_data( tab ) ).
         DATA(lo_line) = CAST cl_abap_structdescr( lo_table->get_table_line_type( ) ).
         lt_comp = lo_line->get_components( ).
-        READ TABLE lt_comp WITH KEY name = `ZZSELKZ` TRANSPORTING NO FIELDS.
-        IF sy-subrc = 0.
+        IF line_exists( lt_comp[ name = `ZZSELKZ` ] ).
           RETURN.
         ENDIF.
         INSERT VALUE #( name = `ZZSELKZ`
@@ -4100,7 +4099,7 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
         ASSIGN COMPONENT `HIGH` OF STRUCTURE <line> TO <high>.
         IF <sign> <> `I` OR ( <opt> <> `EQ` AND <opt> <> `BT` AND <opt> <> `CP` )
             OR ( <low> IS INITIAL AND <high> IS INITIAL )
-            OR ( <opt> = `CP` AND NOT |{ <low> }| CA `*+` )
+            OR ( <opt> = `CP` AND |{ <low> }| NA `*+` )
             OR ( <opt> = `EQ` AND |{ <low> }| CA `*+` ).
           CONTINUE.
         ENDIF.
@@ -7718,8 +7717,7 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
 
     DATA(lv_icon) = `sap-icon://message-information`.
     DATA(lv_type) = `Transparent`.
-    READ TABLE mt_cgui_log WITH KEY type = `W` TRANSPORTING NO FIELDS.
-    IF sy-subrc = 0.
+    IF line_exists( mt_cgui_log[ type = `W` ] ).
       lv_icon = `sap-icon://message-warning`.
       lv_type = `Default`.
     ENDIF.

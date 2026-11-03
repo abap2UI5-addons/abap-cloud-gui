@@ -287,7 +287,7 @@ CLASS z2ui5_cl_cgui_gui_alv_grid IMPLEMENTATION.
     ASSIGN mr_outtab->* TO <tab>.
     IF mr_layout IS BOUND.
       ASSIGN mr_layout->('GRID_TITLE') TO <title>.
-      IF sy-subrc = 0 AND <title> IS NOT INITIAL.
+      IF <title> IS ASSIGNED AND <title> IS NOT INITIAL.
         result = |{ condense( CONV string( <title> ) ) } |.
       ENDIF.
     ENDIF.

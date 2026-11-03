@@ -122,30 +122,28 @@ CLASS z2ui5_cl_cgui_sample_08 IMPLEMENTATION.
   METHOD selection_screen_dynnr.
 
     " SELECTION-SCREEN BEGIN OF SCREEN 100 AS WINDOW
-    CASE dynnr.
-      WHEN `0100`.
-        screen->block_begin( `Booking`
-            )->parameter( val        = p_name
-                          text       = `Passenger`
-                          obligatory = abap_true
-            )->parameter( val  = p_seats
-                          text = `Seats`
-            )->block_end( ).
-    ENDCASE.
+    IF dynnr = `0100`.
+      screen->block_begin( `Booking`
+          )->parameter( val        = p_name
+                        text       = `Passenger`
+                        obligatory = abap_true
+          )->parameter( val  = p_seats
+                        text = `Seats`
+          )->block_end( ).
+    ENDIF.
 
   ENDMETHOD.
 
   METHOD after_call_selection_screen.
 
-    CASE dynnr.
-      WHEN `0100`.
-        IF subrc = 0.
-          message( |Booking for { p_name } with { p_seats } seats noted| ).
-        ELSE.
-          message( text = `Booking cancelled`
-                   type = `W` ).
-        ENDIF.
-    ENDCASE.
+    IF dynnr = `0100`.
+      IF subrc = 0.
+        message( |Booking for { p_name } with { p_seats } seats noted| ).
+      ELSE.
+        message( text = `Booking cancelled`
+                 type = `W` ).
+      ENDIF.
+    ENDIF.
 
   ENDMETHOD.
 
@@ -153,13 +151,10 @@ CLASS z2ui5_cl_cgui_sample_08 IMPLEMENTATION.
 
     " AT SELECTION-SCREEN ON END OF s_fldate - the multiple selection left
     " with OK; an error opens it again
-    CASE field.
-      WHEN `S_FLDATE`.
-        IF lines( s_fldate ) > 10.
-          message( text = `At most 10 date ranges`
-                   type = `E` ).
-        ENDIF.
-    ENDCASE.
+    IF field = `S_FLDATE` AND lines( s_fldate ) > 10.
+      message( text = `At most 10 date ranges`
+               type = `E` ).
+    ENDIF.
 
   ENDMETHOD.
 

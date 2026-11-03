@@ -225,15 +225,14 @@ CLASS z2ui5_cl_cgui_sample_05 IMPLEMENTATION.
 
   METHOD at_value_request.
 
-    CASE field.
-      WHEN `P_CARRID`.
-        value_help_popup( tab   = VALUE ty_t_carrier( ( carrid = `AA` name = `American Airlines` )
-                                                      ( carrid = `LH` name = `Lufthansa` )
-                                                      ( carrid = `SQ` name = `Singapore Airlines` )
-                                                      ( carrid = `UA` name = `United Airlines` ) )
-                          col   = `CARRID`
-                          title = `Airlines` ).
-    ENDCASE.
+    IF field = `P_CARRID`.
+      value_help_popup( tab   = VALUE ty_t_carrier( ( carrid = `AA` name = `American Airlines` )
+                                                    ( carrid = `LH` name = `Lufthansa` )
+                                                    ( carrid = `SQ` name = `Singapore Airlines` )
+                                                    ( carrid = `UA` name = `United Airlines` ) )
+                        col   = `CARRID`
+                        title = `Airlines` ).
+    ENDIF.
 
   ENDMETHOD.
 

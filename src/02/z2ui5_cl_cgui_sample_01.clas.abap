@@ -69,12 +69,11 @@ CLASS z2ui5_cl_cgui_sample_01 IMPLEMENTATION.
 
   METHOD on_event.
 
-    CASE client->get_event( ).
-      WHEN `SHOW`.
-        client->message_box_display( |Text: { p_text }, material: { p_matnr }, date: { p_date }, time: { p_time }, | &&
-                                     |count: { p_count }, flag: { p_flag }, A: { p_rb_a }, B: { p_rb_b }, | &&
-                                     |interval: { p_from } - { p_to }| ).
-    ENDCASE.
+    IF client->get_event( ) = `SHOW`.
+      client->message_box_display( |Text: { p_text }, material: { p_matnr }, date: { p_date }, time: { p_time }, | &&
+                                   |count: { p_count }, flag: { p_flag }, A: { p_rb_a }, B: { p_rb_b }, | &&
+                                   |interval: { p_from } - { p_to }| ).
+    ENDIF.
 
   ENDMETHOD.
 

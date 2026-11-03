@@ -2989,7 +2989,6 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
     ENDLOOP.
 
     " header, rule, rows, rule and totals
-    CLEAR lv_line.
     LOOP AT lt_comp INTO ls_comp.
       lv_index = sy-tabix.
       DATA(lv_width) = lt_width[ lv_index ]-width.

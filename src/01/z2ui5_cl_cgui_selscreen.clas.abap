@@ -915,7 +915,7 @@ CLASS z2ui5_cl_cgui_selscreen IMPLEMENTATION.
       RETURN.
     ENDIF.
     ASSIGN mo_app->(item-name) TO <field_val>.
-    IF sy-subrc <> 0.
+    IF <field_val> IS NOT ASSIGNED.
       RETURN.
     ENDIF.
     LOOP AT z2ui5_cl_cgui_context=>rtti_get_fixed_values( cl_abap_typedescr=>describe_by_data( <field_val> ) ) REFERENCE INTO DATA(lr_fix).
