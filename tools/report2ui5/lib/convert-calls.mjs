@@ -364,17 +364,7 @@ export const callsMethods = {
       this.map(s, "dropped - SET PF-STATUS");
       return;
     }
-    const fnLines = status.functions.map((f) => {
-      const parts = [`name = ${literal(f.code)}`];
-      if (f.text) parts.push(`text = ${literal(f.text)}`);
-      const icon = f.icon ? ICONS[lc(f.icon)] : undefined;
-      if (icon) parts.push(`icon = ${literal(icon)}`);
-      const tip = [f.tooltip ?? (f.text || f.code), f.key ? `(${f.key})` : ""].filter(Boolean).join(" ");
-      if (tip) parts.push(`tooltip = ${literal(tip)}`);
-      if (f.icon && !icon) this.note(`SET PF-STATUS: the icon ${uc(f.icon)} has no UI5 icon in the converter's table - the button shows its text${f.text ? "" : " (the function code)"}`);
-      if (f.icon && !icon && !f.text) parts.splice(1, 0, `text = ${literal(f.code)}`);
-      return `( ${parts.join(" ")} )`;
-    });
+    const fnLines = status.functions.map((f) => `( ${this.cuaFunctionParams(f, "SET PF-STATUS").join(" ")} )`);
     const params = [{ name: "functions", lines: fnLines }];
     if (status.shortcuts.length) params.push({ name: "shortcuts", lines: status.shortcuts.map((k) => `( key = ${literal(k.key)} ucomm = ${literal(k.code)} )`) });
     if (excl !== undefined) params.push({ name: "excluding", lines: [/^'[^']*'$/.test(excl) ? `VALUE string_table( ( ${literal(uc(unquote(excl)))} ) )` : excl], raw: true });
@@ -382,6 +372,55 @@ export const callsMethods = {
     if (w.includes("IMMEDIATELY")) this.note("SET PF-STATUS ... IMMEDIATELY - the toolbar shows with the next roundtrip either way");
     this.map(s, `\`set_pf_status( )\` - ${status.functions.length} function(s) of status ${code} on the toolbar, ${status.shortcuts.length} function key(s) as shortcuts; each arrives in \`at_user_command( )\``);
     this.statusSet = true;
+  },
+
+
+  /** the parameters of a button for a function of a GUI status: name,
+   *  text, the UI5 icon, the tooltip with its function key */
+  cuaFunctionParams(f, what) {
+    const parts = [`name = ${literal(f.code)}`];
+    if (f.text) parts.push(`text = ${literal(f.text)}`);
+    const icon = f.icon ? ICONS[lc(f.icon)] : undefined;
+    if (icon) parts.push(`icon = ${literal(icon)}`);
+    const tip = [f.tooltip ?? (f.text || f.code), f.key ? `(${f.key})` : ""].filter(Boolean).join(" ");
+    if (tip) parts.push(`tooltip = ${literal(tip)}`);
+    if (f.icon && !icon) this.note(`${what}: the icon ${uc(f.icon)} has no UI5 icon in the converter's table - the button shows its text${f.text ? "" : " (the function code)"}`);
+    if (f.icon && !icon && !f.text) parts.splice(1, 0, `text = ${literal(f.code)}`);
+    return parts;
+  },
+
+
+  /**
+   * x->set_screen_status( pfstatus = 'S' ... ) of a SALV stand-in: the
+   * stand-in cannot read the GUI status on the system, so the report's own
+   * functions of status S follow as x->get_functions( )->add_function( )
+   * - buttons of the grid, each raising added_function as the classic
+   * toolbar did. The SALV functions of the status (&ALL, &ILT, &OL0, ...)
+   * are the grid's business and stay out. Called after the statement went
+   * out as it is written; text is that statement, rendered.
+   */
+  salvScreenStatus(s, text, out) {
+    const m = /^([\w/]+(?:\s*(?:->|=>)\s*[\w/]+)*)\s*->\s*set_screen_status\s*\(/i.exec(text.trim());
+    if (!m) return;
+    const target = m[1].replace(/\s+/g, "");
+    const last = lc(target.replace(/^.*(->|=>)/, ""));
+    if (this.guiVars.get(last) !== "z2ui5_cl_cgui_salv_table") return;
+    const pf = /\bpfstatus\s*=\s*'([^']*)'/i.exec(text);
+    if (!pf) {
+      if (/\bpfstatus\s*=/i.test(text)) this.todo(s, "set_screen_status( ): the status is named at runtime - add its functions with get_functions( )->add_function( ) by hand");
+      return;
+    }
+    const code = uc(pf[1]);
+    const status = this.pool.cua?.statuses.get(code);
+    if (!status) {
+      this.todo(s, this.pool.cua
+        ? `set_screen_status( ): the .prog.xml has no status ${code} - add its functions with get_functions( )->add_function( ), each raises added_function`
+        : `set_screen_status( ): the GUI status ${code} is in the .prog.xml (--texts), which was not passed - add its functions with get_functions( )->add_function( ), each raises added_function`);
+      return;
+    }
+    const own = status.functions.filter((f) => !f.code.startsWith("&"));
+    for (const f of own) out.push(`${target}->get_functions( )->add_function( ${this.cuaFunctionParams(f, "set_screen_status( )").join(" ")} ).`);
+    this.map(s, `\`${target}->get_functions( )->add_function( )\` - ${own.length} function(s) of status ${code} as buttons of the grid, each raises added_function; the SALV functions of the status are the grid's own`);
   },
 
 

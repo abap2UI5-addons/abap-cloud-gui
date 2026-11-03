@@ -413,7 +413,7 @@ export const GUI = {
     },
     z2ui5_cl_cgui_salv_table: {
       parent: "z2ui5_cl_cgui_gui",
-      constants: [],
+      constants: ["c_functions_none", "c_functions_default", "c_functions_all"],
       attributes: [],
       events: ["added_function", "double_click", "link_click"],
       methods: {
@@ -932,6 +932,9 @@ export const GRID_VALUE_TYPES = {
 export const SALV = {
   classes: {
     cl_salv_table: "z2ui5_cl_cgui_salv_table", cl_salv_events_table: "z2ui5_cl_cgui_salv_table",
+    // the class added_function is declared in - of the table only, a handler
+    // of the tree's is refused (guiSetHandler( ))
+    cl_salv_events: "z2ui5_cl_cgui_salv_table",
     cl_salv_columns_table: "z2ui5_cl_cgui_salv_columns", cl_salv_columns_list: "z2ui5_cl_cgui_salv_columns",
     cl_salv_columns: "z2ui5_cl_cgui_salv_columns",
     cl_salv_column_table: "z2ui5_cl_cgui_salv_column", cl_salv_column_list: "z2ui5_cl_cgui_salv_column",

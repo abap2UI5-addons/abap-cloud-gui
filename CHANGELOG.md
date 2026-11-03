@@ -6,6 +6,22 @@ release.
 
 ## Unreleased
 
+**report2UI5: a SALV with a GUI status of its own**
+
+- `x->set_screen_status( pfstatus = 'S' ... )` of a SALV the stand-ins
+  take over adds the report's functions of status S (from the `.prog.xml`)
+  as buttons of the grid - each raises `added_function` as the classic
+  toolbar did; the SALV functions of the status (`&ALL`, `&ILT`, ...) stay
+  the grid's. Before, the call was kept and did nothing: the buttons were
+  gone.
+- A handler `FOR EVENT added_function OF cl_salv_events` - the class that
+  declares the event - is taken over like one of `cl_salv_events_table`
+  (refused for a SALV tree); `c_functions_none` / `_default` / `_all` are
+  constants of `z2ui5_cl_cgui_salv_table`; a `FORM` parameter typed with a
+  SALV type (`salv_de_function`, ...) gets the type of the stand-ins.
+- The corpus report `zr2c_53_salvstatus` (test set `src/03`) covers the
+  three. Found on `ZAFL_VIEWER` of abap-fm-logger, which converts now.
+
 **Typed UI5 bindings from the ABAP type (`z2ui5_cl_cgui_context`)**
 
 - `ui5_binding_typed( path val )` writes the binding of a field with the
