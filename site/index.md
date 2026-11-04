@@ -6,8 +6,8 @@ hero:
   text: Classic ABAP reports, as UI5 apps
   tagline: Selection screen, WRITE list, ALV grid, START-OF-SELECTION, AT LINE-SELECTION, MESSAGE - write a class that reads like a report and get an app in the browser. On ABAP Cloud and down to 7.02.
   image:
-    src: /favicon.png
-    alt: abap2UI5
+    src: /logo.svg
+    alt: abap2UI5 addons
   actions:
     - theme: brand
       text: See the samples

@@ -13,9 +13,14 @@ export default defineConfig({
   outDir: "../build/site",
   cleanUrls: true,
   lastUpdated: false,
-  head: [["link", { rel: "icon", type: "image/png", href: "/abap-cloud-gui/favicon.png" }]],
+  // the addons logo: SVG where the browser takes it, PNG otherwise
+  head: [
+    ["link", { rel: "icon", type: "image/svg+xml", href: "/abap-cloud-gui/logo.svg" }],
+    ["link", { rel: "icon", type: "image/png", href: "/abap-cloud-gui/favicon.png" }],
+  ],
   themeConfig: {
-    logo: "/favicon.png",
+    // the navbar carries abap2UI5's logo, the hero and the favicon the addons logo
+    logo: { src: "/abap2ui5.svg", alt: "abap2UI5" },
     nav: [
       { text: "Guide", link: "/guide" },
       { text: "Samples", link: "/samples" },
