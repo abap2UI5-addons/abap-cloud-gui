@@ -6,6 +6,20 @@ release.
 
 ## Unreleased
 
+**Fixes**
+
+- A link to the selection screen (`z2ui5_cl_cgui_command=>url_from_range( )`)
+  wrote a select-option line with NB or NP as its low value only, and the
+  link read it back as EQ or CP - the opposite selection. NB is written as
+  the negated interval (`!A..B`), NP as the negated pattern (`!A*`).
+- A tabstrip of a dynpro without an active tab selected the first tab
+  found from a stale `sy-tabix` (the builder's last append), not the first
+  tab of that tabstrip.
+- The site showed the `.clas.xml` of a conversion with broken markup: the
+  attribute highlighting matched the class of the tag highlighting.
+- The pages workflow builds the site for a pull request that changes the
+  corpus of report2UI5, whose reports are the site's examples.
+
 **The value help and table controls in windows too**
 
 - The hit list of `z2ui5_cl_cgui_select` (F4, the variant catalog) and the

@@ -1491,6 +1491,13 @@ CLASS ltcl_test IMPLEMENTATION.
     cl_abap_unit_assert=>assert_equals( act = z2ui5_cl_cgui_command=>url_from_range( lt_value )
                                         exp = `A,B..C,!D,>=E,F*` ).
 
+    " NB and NP have no form of their own - I NB is E BT, I NP is E CP
+    cl_abap_unit_assert=>assert_equals(
+        act = z2ui5_cl_cgui_command=>url_from_range( VALUE #( ( sign = `I` option = `NB` low = `A` high = `B` )
+                                                               ( sign = `I` option = `NP` low = `C*` )
+                                                               ( sign = `E` option = `NB` low = `D` high = `E` ) ) )
+        exp = `!A..B,!C*,D..E` ).
+
   ENDMETHOD.
 
   METHOD variant_screen_only.

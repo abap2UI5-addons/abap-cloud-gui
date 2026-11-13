@@ -337,11 +337,20 @@ CLASS z2ui5_cl_cgui_command IMPLEMENTATION.
   METHOD url_from_range.
 
     DATA lv_part TYPE string.
+    DATA lv_sign TYPE string.
 
     LOOP AT values REFERENCE INTO DATA(lr_value) WHERE sign IS NOT INITIAL.
+      lv_sign = lr_value->sign.
       CASE lr_value->option.
         WHEN `BT`.
           lv_part = |{ lr_value->low }..{ lr_value->high }|.
+        " the URL has no NB or NP - I NB is E BT, I NP is E CP
+        WHEN `NB`.
+          lv_part = |{ lr_value->low }..{ lr_value->high }|.
+          lv_sign = COND #( WHEN lv_sign = `E` THEN `I` ELSE `E` ).
+        WHEN `NP`.
+          lv_part = lr_value->low.
+          lv_sign = COND #( WHEN lv_sign = `E` THEN `I` ELSE `E` ).
         WHEN `GE`.
           lv_part = |>={ lr_value->low }|.
         WHEN `LE`.
@@ -355,7 +364,7 @@ CLASS z2ui5_cl_cgui_command IMPLEMENTATION.
         WHEN OTHERS.
           lv_part = lr_value->low.
       ENDCASE.
-      IF lr_value->sign = `E`.
+      IF lv_sign = `E`.
         lv_part = |!{ lv_part }|.
       ENDIF.
       IF result IS INITIAL.

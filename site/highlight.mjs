@@ -104,8 +104,10 @@ export function highlightAbap(source) {
 
 /** XML as HTML - the tags and the attribute values set apart */
 export function highlightXml(source) {
-  return esc(source).replace(/(&lt;\/?)([\w:.-]+)/g, `$1<span class="hl-kw">$2</span>`)
-    .replace(/("[^"]*")/g, `<span class="hl-str">$1</span>`);
+  // one pass: a second replace over the first one's output would take the
+  // quotes of its class="hl-kw" for an attribute value
+  return esc(source).replace(/(&lt;\/?)([\w:.-]+)|("[^"]*")/g, (m, open, tag, value) =>
+    (value ? `<span class="hl-str">${value}</span>` : `${open}<span class="hl-kw">${tag}</span>`));
 }
 
 /** a file by its name: ABAP, XML or plain */
