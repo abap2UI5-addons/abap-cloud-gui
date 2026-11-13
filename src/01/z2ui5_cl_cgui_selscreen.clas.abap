@@ -1288,6 +1288,8 @@ CLASS z2ui5_cl_cgui_selscreen IMPLEMENTATION.
     lo_container = node.
 
     LOOP AT mt_item REFERENCE INTO DATA(lr_item).
+      " read first - every ele( ) of the builder below appends and moves sy-tabix
+      DATA(lv_item_index) = sy-tabix.
       CASE lr_item->kind.
 
         WHEN cs_kind-block_begin.
@@ -1319,7 +1321,7 @@ CLASS z2ui5_cl_cgui_selscreen IMPLEMENTATION.
               lv_active = to_upper( mi_gui->tabstrip_active( lr_item->name ) ).
             ENDIF.
             IF lv_active IS INITIAL.
-              LOOP AT mt_item INTO DATA(ls_first) FROM sy-tabix WHERE kind = cs_kind-tab.
+              LOOP AT mt_item INTO DATA(ls_first) FROM lv_item_index WHERE kind = cs_kind-tab.
                 lv_active = ls_first-event.
                 EXIT.
               ENDLOOP.
