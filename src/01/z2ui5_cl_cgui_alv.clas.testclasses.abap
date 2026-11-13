@@ -38,7 +38,7 @@ CLASS ltcl_client DEFINITION FINAL FOR TESTING.
     DATA mv_action TYPE string.
     DATA mt_action TYPE string_table.
     DATA mv_popup  TYPE string.
-    " what the last _bind_tab( ) was asked for
+    " what the last window_bind_tab( ) was asked for
     DATA mv_window TYPE i.
     DATA mt_window_sort TYPE z2ui5_if_client=>ty_t_bind_tab_sort.
 
@@ -108,7 +108,7 @@ CLASS ltcl_client IMPLEMENTATION.
 
   ENDMETHOD.
 
-  METHOD z2ui5_if_client~_bind_tab.
+  METHOD z2ui5_if_client~window_bind_tab.
 
     mv_window      = window.
     mt_window_sort = t_sort.
@@ -490,7 +490,7 @@ CLASS ltcl_test IMPLEMENTATION.
     cl_abap_unit_assert=>assert_equals( act = lo_alv->get_page( )
                                         exp = 3 ).
 
-    " a large table is bound with _bind_tab( ): the browser gets a window
+    " a large table is bound with window_bind_tab( ): the browser gets a window
     " of page_size rows, the title counts the whole table, no page buttons
     DATA(lo_view) = z2ui5_cl_ui5_view_builder=>factory( )->ele( `VBox` ).
     lo_alv->set_title( `Flights` )->set_sort( name       = `PRICE`

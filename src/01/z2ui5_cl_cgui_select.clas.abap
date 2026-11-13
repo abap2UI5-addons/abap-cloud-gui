@@ -374,7 +374,7 @@ CLASS z2ui5_cl_cgui_select IMPLEMENTATION.
                                index = -1 ).
       IF lv_last CO `0123456789`.
         " the position in the window's order - the row of the view behind it
-        lv_index = client->_bind_tab_row( val = <view>
+        lv_index = client->window_get_row( val = <view>
                                           row = lv_last + 1 ).
         READ TABLE <view> ASSIGNING <row> INDEX lv_index.
         IF sy-subrc = 0.
@@ -441,9 +441,9 @@ CLASS z2ui5_cl_cgui_select IMPLEMENTATION.
         )->ele( `TableSelectDialog`
         )->a( n = `title`            t = mv_title
         " a hit list can be long: the browser gets 100 rows at a time and the
-        " next ones as the dialog grows (_bind_tab( )); the search filters the
+        " next ones as the dialog grows (window_bind_tab( )); the search filters the
         " view table on the server and the response sends its first window
-        )->a( n = `items`            v = client->_bind_tab( val    = <view>
+        )->a( n = `items`            v = client->window_bind_tab( val    = <view>
                                                             window = 100 )
         )->a( n = `multiSelect`      b = mv_multi
         )->a( n = `growing`          b = abap_true

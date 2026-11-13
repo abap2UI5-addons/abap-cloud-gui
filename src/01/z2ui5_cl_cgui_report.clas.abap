@@ -6937,7 +6937,7 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
       RETURN.
     ENDIF.
 
-    " a large table (set_paging) is bound with _bind_tab( ): the browser
+    " a large table (set_paging) is bound with window_bind_tab( ): the browser
     " shows it in the order the server sorted and filtered it, so row is a
     " position in that order - the bound table's row is what the framework
     " answers
@@ -6946,7 +6946,7 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
       DATA(lr_bound) = COND #( WHEN mr_cgui_alv_page IS BOUND THEN mr_cgui_alv_page ELSE alv_shown( ) ).
       IF lr_bound IS BOUND AND client IS BOUND.
         ASSIGN lr_bound->* TO <bound>.
-        lv_bound_row = client->_bind_tab_row( val = <bound>
+        lv_bound_row = client->window_get_row( val = <bound>
                                               row = row ).
         IF lv_bound_row = 0.
           lv_bound_row = row.
@@ -7587,7 +7587,7 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
         " filtered: the browser gets a copy of the rows the filter lets
         " through, mt_cgui_alv_index leads back to the rows of the table.
         " A large table is not cut into pages here - the grid binds it with
-        " _bind_tab( ), and the browser gets a window of it (set_paging)
+        " window_bind_tab( ), and the browser gets a window of it (set_paging)
         DATA(lv_all) = lines( <tab> ).
         DATA(lt_index) = mo_cgui_alv->filter_index( <tab> ).
         DATA(lv_total) = lines( lt_index ).
