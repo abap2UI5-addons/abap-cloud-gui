@@ -214,8 +214,8 @@ CLASS ltcl_client DEFINITION FINAL FOR TESTING.
     DATA mv_left      TYPE abap_bool.
     DATA mv_box       TYPE string.
     DATA mv_box_type  TYPE string.
-    " _bind_tab( ): the window asked for, and the order the server would
-    " show the rows in - _bind_tab_row( ) answers from it (the position
+    " window_bind_tab( ): the window asked for, and the order the server would
+    " show the rows in - window_get_row( ) answers from it (the position
     " itself when it is empty)
     DATA mv_window       TYPE i.
     DATA mt_window_order TYPE STANDARD TABLE OF i WITH EMPTY KEY.
@@ -815,14 +815,14 @@ CLASS ltcl_client IMPLEMENTATION.
 
   ENDMETHOD.
 
-  METHOD z2ui5_if_client~_bind_tab.
+  METHOD z2ui5_if_client~window_bind_tab.
 
     mv_window = window.
     result = z2ui5_if_client~_bind( val ).
 
   ENDMETHOD.
 
-  METHOD z2ui5_if_client~_bind_tab_row.
+  METHOD z2ui5_if_client~window_get_row.
 
     result = row.
     IF mt_window_order IS NOT INITIAL.
@@ -2612,7 +2612,7 @@ CLASS ltcl_test IMPLEMENTATION.
     DATA(lv_rows) = lines( mo_report->mt_row ).
     cl_abap_unit_assert=>assert_true( xsdbool( lv_rows >= 2 ) ).
 
-    " one row a window: the grid binds the table itself with _bind_tab( ) -
+    " one row a window: the grid binds the table itself with window_bind_tab( ) -
     " no copy of a page, the title counts all rows
     mo_cut->mo_cgui_alv->set_paging( 1 ).
     event( name = z2ui5_cl_cgui_alv=>cs_event-search
@@ -2643,7 +2643,7 @@ CLASS ltcl_test IMPLEMENTATION.
     event( z2ui5_cl_cgui_report=>cs_ucomm-execute ).
 
     " filtered and large: the copy of the rows the filter lets through is
-    " bound with _bind_tab( ) - a position leads to the copy's row first,
+    " bound with window_bind_tab( ) - a position leads to the copy's row first,
     " the copy's row to the table's
     mo_cut->mo_cgui_alv->set_paging( 1 ).
     event( name = z2ui5_cl_cgui_alv=>cs_event-search

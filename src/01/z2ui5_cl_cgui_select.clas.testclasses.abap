@@ -49,14 +49,14 @@ CLASS ltcl_client IMPLEMENTATION.
 
   ENDMETHOD.
 
-  METHOD z2ui5_if_client~_bind_tab.
+  METHOD z2ui5_if_client~window_bind_tab.
 
     result = `{/MR_VIEW}`.
 
   ENDMETHOD.
 
   " the double keeps the rows in the order of the table
-  METHOD z2ui5_if_client~_bind_tab_row.
+  METHOD z2ui5_if_client~window_get_row.
 
     result = row.
 

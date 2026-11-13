@@ -455,7 +455,7 @@ CLASS z2ui5_cl_cgui_alv DEFINITION PUBLIC FINAL CREATE PUBLIC.
         VALUE(result) TYPE REF TO z2ui5_cl_cgui_alv.
 
     "! large tables: the browser gets page_size rows at a time and the next
-    "! ones as the grid scrolls - the rows are bound with _bind_tab( ), so a
+    "! ones as the grid scrolls - the rows are bound with window_bind_tab( ), so a
     "! sort or a filter in a column menu runs on the server over all rows,
     "! and selection, input and events land in the rows they were made in.
     "! 0 switches it off
@@ -3295,7 +3295,7 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
 
     DATA(lv_multi) = xsdbool( has_selection( ) = abap_true AND has_box_field( tab ) = abap_true ).
     DATA(lv_sorter) = sorter( tab ).
-    " a large table (set_paging) is bound with _bind_tab( ): the browser
+    " a large table (set_paging) is bound with window_bind_tab( ): the browser
     " holds a window of the rows and the server sorts and filters them - a
     " sorter in the binding would order the window alone. The sort of the
     " layout is the order the app passes; a click in a column menu sorts
@@ -3311,7 +3311,7 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
         )->a( n = `xmlns:core`         v = `sap.ui.core`
         )->a( n = `core:require`       v = type_require( )
         )->a( n = `rows`               v = COND #( WHEN mv_page_size > 0
-                                                   THEN client->_bind_tab( val    = tab
+                                                   THEN client->window_bind_tab( val    = tab
                                                                            window = mv_page_size
                                                                            t_sort = lt_window_sort )
                                                    WHEN lv_sorter IS INITIAL

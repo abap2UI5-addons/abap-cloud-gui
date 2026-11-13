@@ -23,12 +23,12 @@ release.
 **The value help and table controls in windows too**
 
 - The hit list of `z2ui5_cl_cgui_select` (F4, the variant catalog) and the
-  table control of a dynpro bind with `_bind_tab( )` like a large ALV: the
+  table control of a dynpro bind with `window_bind_tab( )` like a large ALV: the
   browser gets 100 hits / 50 lines at a time and the next ones as the list
   grows, instead of every row at once. A single pick maps the row the browser
-  shows to the hit through `_bind_tab_row( )`; the search still filters on
+  shows to the hit through `window_get_row( )`; the search still filters on
   the server, and a mark or an input lands in its own row. Needs abap2UI5
-  with `_bind_tab( )`, as the ALV does.
+  with `window_bind_tab( )`, as the ALV does.
 
 **Breaking: object names of at most 25 characters**
 
@@ -51,17 +51,18 @@ release.
   namespace rename for this addon, references to abap2UI5 renamed along.
 **A large ALV in windows instead of pages**
 
-- `set_paging( n )` binds the table with abap2UI5's `_bind_tab( )`
+- `set_paging( n )` binds the table with abap2UI5's `window_bind_tab( )`
   (abap2UI5/abap2UI5#2980, #2981) instead of cutting a page out of it: the
   browser gets n rows and the next ones as the grid scrolls, a sort or a
   filter from a column menu runs on the server over all rows instead of
   over the page shown, and the sort of the layout is the order the server
   starts from. The page buttons are gone; hotspots, line selection, cell
   clicks and F4 map the row the browser shows to the table's row through
-  `_bind_tab_row( )`. The filter of the ALV still binds a copy of the rows
+  `window_get_row( )`. The filter of the ALV still binds a copy of the rows
   it lets through. `get_page( )`, `get_page_offset( )` and `page_turn( )`
-  stay and do nothing the grid shows. Needs abap2UI5 with `_bind_tab( )` -
-  the core pin moves with the release that has it.
+  stay and do nothing the grid shows. Needs abap2UI5 with `window_bind_tab( )`
+  (named `_bind_tab( )` until abap2UI5/abap2UI5#3009) - the core pin moves
+  with the release that has it.
 
 **report2UI5: a SALV with a GUI status of its own**
 
