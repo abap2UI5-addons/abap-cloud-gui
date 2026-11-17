@@ -5,10 +5,8 @@
 [![abap2UI5](https://img.shields.io/badge/requires-abap2UI5-blue)](https://github.com/abap2UI5/abap2UI5)
 [![License](https://img.shields.io/github/license/abap2UI5-addons/abap-cloud-gui)](LICENSE)
 <br>
-[![abaplint](https://img.shields.io/github/actions/workflow/status/abap2UI5-addons/abap-cloud-gui/abaplint.yaml?branch=main&label=abaplint)](https://github.com/abap2UI5-addons/abap-cloud-gui/actions/workflows/abaplint.yaml)
-[![ABAP Unit](https://img.shields.io/github/actions/workflow/status/abap2UI5-addons/abap-cloud-gui/unit.yaml?branch=main&label=ABAP%20Unit)](https://github.com/abap2UI5-addons/abap-cloud-gui/actions/workflows/unit.yaml)
-[![check-abap2UI5](https://img.shields.io/github/actions/workflow/status/abap2UI5-addons/abap-cloud-gui/check-abap2ui5.yaml?branch=main&label=check-abap2UI5)](https://github.com/abap2UI5-addons/abap-cloud-gui/actions/workflows/check-abap2ui5.yaml)
-[![report2UI5](https://img.shields.io/github/actions/workflow/status/abap2UI5-addons/abap-cloud-gui/report2ui5.yaml?branch=main&label=report2UI5)](https://github.com/abap2UI5-addons/abap-cloud-gui/actions/workflows/report2ui5.yaml)
+[![CI](https://img.shields.io/github/actions/workflow/status/abap2UI5-addons/abap-cloud-gui/ci.yaml?branch=main&label=CI)](https://github.com/abap2UI5-addons/abap-cloud-gui/actions/workflows/ci.yaml)
+[![ABAP 7.02](https://img.shields.io/github/actions/workflow/status/abap2UI5-addons/abap-cloud-gui/ci-702.yaml?branch=main&label=ABAP%207.02)](https://github.com/abap2UI5-addons/abap-cloud-gui/actions/workflows/ci-702.yaml)
 
 **[See converted samples](https://abap2ui5-addons.github.io/abap-cloud-gui/samples) · [Convert your own report in the browser](https://abap2ui5-addons.github.io/abap-cloud-gui/playground)** - pasted or imported from GitHub
 
@@ -999,7 +997,7 @@ npm run site:dev        # the same with the VitePress dev server
 ```
 
 The ABAP Unit tests run in CI in the transpiled abap2UI5 backend
-(`.github/workflows/unit.yaml`, `scripts/unit.mjs` with
+(the `unit` job of `.github/workflows/ci.yaml`, `scripts/unit.mjs` with
 [abap2UI5/mcp-server](https://github.com/abap2UI5/mcp-server) as a library),
 the tables of the two stores in SQLite.
 
