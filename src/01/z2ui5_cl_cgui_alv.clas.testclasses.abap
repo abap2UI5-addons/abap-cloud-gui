@@ -108,6 +108,13 @@ CLASS ltcl_client IMPLEMENTATION.
 
   ENDMETHOD.
 
+  METHOD z2ui5_if_client~_bind_path.
+
+    result = |/{ z2ui5_cl_cgui_context=>attri_name_by_ref( app = mo_app
+                                                          val = val ) }|.
+
+  ENDMETHOD.
+
   METHOD z2ui5_if_client~window_bind_tab.
 
     mv_window      = window.

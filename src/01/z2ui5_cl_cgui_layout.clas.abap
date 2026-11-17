@@ -431,12 +431,13 @@ CLASS z2ui5_cl_cgui_layout IMPLEMENTATION.
           )->a( n = `key`  v = ``
           )->a( n = `text` t = CONV #( 'Current layout'(003) ) ).
       LOOP AT mt_saved INTO DATA(ls_saved).
+        DATA(lv_owner) = COND string( WHEN ls_saved-shared = abap_true AND ls_saved-owner IS NOT INITIAL
+                                      THEN | - { ls_saved-owner }| ).
         lo_items->tag( n = `Item` ns = `core`
             )->a( n = `key`  t = ls_saved-name
             )->a( n = `text` t = |{ ls_saved-name }|
                               && |{ COND #( WHEN ls_saved-is_default = abap_true THEN | ({ 'Default'(004) })| ) }|
-                              && |{ COND #( WHEN ls_saved-shared = abap_true AND ls_saved-owner IS NOT INITIAL
-                                            THEN | - { ls_saved-owner }| ) }| ).
+                              && lv_owner ).
       ENDLOOP.
       lo_saved->tag( `Button`
           )->a( n = `icon`    v = `sap-icon://delete`

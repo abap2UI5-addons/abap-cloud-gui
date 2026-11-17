@@ -2052,10 +2052,11 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
         )->a( n = `icon`    v = `sap-icon://pie-chart`
         )->a( n = `tooltip` t = CONV #( 'Pie'(027) ) ).
 
+    DATA(lv_svg) = z2ui5_cl_cgui_chart=>chart_svg( points = lt_point
+                                                   names  = lt_name
+                                                   kind   = mv_chart_kind ).
     lo_box->tag( n = `HTML` ns = `core`
-        )->a( n = `content` t = |<div>{ z2ui5_cl_cgui_chart=>chart_svg( points = lt_point
-                                                                       names  = lt_name
-                                                                       kind   = mv_chart_kind ) }</div>| ).
+        )->a( n = `content` t = |<div>{ lv_svg }</div>| ).
 
     lo_dialog->ele( `buttons`
         )->tag( `Button`
@@ -3026,9 +3027,10 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
           lv_text = substring( val = lv_text len = ls_width-width ).
         ENDIF.
         IF ls_width-right = abap_true.
-          lv_line = |{ lv_line }{ z2ui5_cl_cgui_context=>text_align( val   = lv_text
-                                                                       width = ls_width-width
-                                                                       align = `RIGHT` ) } |.
+          lv_text = z2ui5_cl_cgui_context=>text_align( val   = lv_text
+                                                       width = ls_width-width
+                                                       align = `RIGHT` ).
+          lv_line = |{ lv_line }{ lv_text } |.
         ELSE.
           lv_line = |{ lv_line }{ lv_text WIDTH = ls_width-width } |.
         ENDIF.
@@ -3089,9 +3091,9 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
               OR cl_abap_typedescr=>typekind_decfloat16 OR cl_abap_typedescr=>typekind_decfloat34.
             INSERT |<c><v>{ <cell> }</v></c>| INTO TABLE lt_cell.
           WHEN OTHERS.
-            INSERT |<c t="inlineStr"><is><t>{ xlsx_escape( cell_to_text( val  = <cell>
-                                                                       comp = ls_visible ) ) }</t></is></c>|
-                   INTO TABLE lt_cell.
+            DATA(lv_cell) = xlsx_escape( cell_to_text( val  = <cell>
+                                                       comp = ls_visible ) ).
+            INSERT |<c t="inlineStr"><is><t>{ lv_cell }</t></is></c>| INTO TABLE lt_cell.
         ENDCASE.
       ENDLOOP.
       INSERT |<row>{ concat_lines_of( lt_cell ) }</row>| INTO TABLE lt_xml.
@@ -3316,8 +3318,7 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
                                                                            t_sort = lt_window_sort )
                                                    WHEN lv_sorter IS INITIAL
                                                    THEN client->_bind( tab )
-                                                   ELSE |\{path: '{ client->_bind( val  = tab
-                                                                                   path = abap_true ) }', sorter: { lv_sorter }\}| )
+                                                   ELSE |\{path: '{ client->_bind_path( tab ) }', sorter: { lv_sorter }\}| )
         )->a( n = `selectionMode`      v = `None`
         )->a( n = `alternateRowColors` b = xsdbool( mv_no_stripes = abap_false )
         )->a( n = `visibleRowCount`    v = |{ lv_rows }|
@@ -3562,7 +3563,7 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
         node->tag( `CheckBox`
             )->a( n = `selected` v = |\{{ comp-name }\}|
             )->a( n = `select`   v = client->_event( val   = cs_event-hotspot
-                                                     t_arg = VALUE #( ( `$event.oSource.getBindingContext().getPath()` )
+                                                     t_arg = VALUE #( ( `$event.getSource().getBindingContext().getPath()` )
                                                                       ( comp-name ) ) ) ).
         RETURN.
       WHEN cs_cell_type-button.
@@ -3570,7 +3571,7 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
             )->a( n = `text`  v = cell_binding( comp   = comp
                                                 column = column )
             )->a( n = `press` v = client->_event( val   = cs_event-hotspot
-                                                  t_arg = VALUE #( ( `$event.oSource.getBindingContext().getPath()` )
+                                                  t_arg = VALUE #( ( `$event.getSource().getBindingContext().getPath()` )
                                                                    ( comp-name ) ) ) ).
         RETURN.
       WHEN cs_cell_type-dropdown.
@@ -3604,7 +3605,7 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
           )->a( n = `text`  v = cell_binding( comp   = comp
                                               column = column )
           )->a( n = `press` v = client->_event( val   = cs_event-hotspot
-                                                t_arg = VALUE #( ( `$event.oSource.getBindingContext().getPath()` )
+                                                t_arg = VALUE #( ( `$event.getSource().getBindingContext().getPath()` )
                                                                  ( comp-name ) ) ) ).
       RETURN.
     ENDIF.
@@ -3642,7 +3643,7 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
           )->a( n = `selectedKey`    v = |\{{ comp-name }\}|
           )->a( n = `forceSelection` b = abap_false
           )->a( n = `change`         v = client->_event( val   = cs_event-data_changed
-                                                         t_arg = VALUE #( ( `$event.oSource.getBindingContext().getPath()` )
+                                                         t_arg = VALUE #( ( `$event.getSource().getBindingContext().getPath()` )
                                                                           ( comp-name ) ) ) ).
       IF lv_editable IS NOT INITIAL.
         lo_select->a( n = `enabled` v = lv_editable ).
@@ -3663,7 +3664,7 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
       node->tag( `CheckBox`
           )->a( n = `selected` v = |\{{ comp-name }\}|
           )->a( n = `select`   v = client->_event( val   = cs_event-data_changed
-                                                   t_arg = VALUE #( ( `$event.oSource.getBindingContext().getPath()` )
+                                                   t_arg = VALUE #( ( `$event.getSource().getBindingContext().getPath()` )
                                                                     ( comp-name ) ) ) ).
       IF lv_editable IS NOT INITIAL.
         node->a( n = `editable` v = lv_editable ).
@@ -3678,7 +3679,7 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
             )->a( n = `valueFormat`   v = `yyyy-MM-dd`
             )->a( n = `displayFormat` v = `medium`
             )->a( n = `change`        v = client->_event( val   = cs_event-data_changed
-                                                          t_arg = VALUE #( ( `$event.oSource.getBindingContext().getPath()` )
+                                                          t_arg = VALUE #( ( `$event.getSource().getBindingContext().getPath()` )
                                                                            ( comp-name ) ) ) ).
         IF lv_editable IS NOT INITIAL.
           node->a( n = `editable` v = lv_editable ).
@@ -3689,7 +3690,7 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
             )->a( n = `valueFormat`   v = `HH:mm:ss`
             )->a( n = `displayFormat` v = `HH:mm:ss`
             )->a( n = `change`        v = client->_event( val   = cs_event-data_changed
-                                                          t_arg = VALUE #( ( `$event.oSource.getBindingContext().getPath()` )
+                                                          t_arg = VALUE #( ( `$event.getSource().getBindingContext().getPath()` )
                                                                            ( comp-name ) ) ) ).
         IF lv_editable IS NOT INITIAL.
           node->a( n = `editable` v = lv_editable ).
@@ -3701,12 +3702,12 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
                                                       column = column )
               )->a( n = `textAlign` v = `End`
               )->a( n = `change`    v = client->_event( val   = cs_event-data_changed
-                                                        t_arg = VALUE #( ( `$event.oSource.getBindingContext().getPath()` )
+                                                        t_arg = VALUE #( ( `$event.getSource().getBindingContext().getPath()` )
                                                                          ( comp-name ) ) ) ).
           IF column-f4 = abap_true.
             node->a( n = `showValueHelp`    b = abap_true
                 )->a( n = `valueHelpRequest` v = client->_event( val   = cs_event-f4
-                                                                 t_arg = VALUE #( ( `$event.oSource.getBindingContext().getPath()` )
+                                                                 t_arg = VALUE #( ( `$event.getSource().getBindingContext().getPath()` )
                                                                                   ( comp-name ) ) ) ).
           ENDIF.
           IF lv_editable IS NOT INITIAL.
@@ -3716,12 +3717,12 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
           node->tag( `Input`
               )->a( n = `value`  v = |\{{ comp-name }\}|
               )->a( n = `change` v = client->_event( val   = cs_event-data_changed
-                                                     t_arg = VALUE #( ( `$event.oSource.getBindingContext().getPath()` )
+                                                     t_arg = VALUE #( ( `$event.getSource().getBindingContext().getPath()` )
                                                                       ( comp-name ) ) ) ).
           IF column-f4 = abap_true.
             node->a( n = `showValueHelp`    b = abap_true
                 )->a( n = `valueHelpRequest` v = client->_event( val   = cs_event-f4
-                                                                 t_arg = VALUE #( ( `$event.oSource.getBindingContext().getPath()` )
+                                                                 t_arg = VALUE #( ( `$event.getSource().getBindingContext().getPath()` )
                                                                                   ( comp-name ) ) ) ).
           ENDIF.
           IF lv_editable IS NOT INITIAL.
