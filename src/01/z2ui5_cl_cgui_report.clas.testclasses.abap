@@ -2654,11 +2654,14 @@ CLASS ltcl_test IMPLEMENTATION.
     DATA(lv_copy) = lines( mo_cut->mt_cgui_alv_index ).
     cl_abap_unit_assert=>assert_true( xsdbool( lv_copy >= 1 ) ).
 
+    " read before the event: the line selection leaves the grid, which
+    " clears the copy and its index
+    DATA(lv_row) = mo_cut->mt_cgui_alv_index[ lv_copy ].
     mo_client->mt_window_order = VALUE #( ( lv_copy ) ).
     event( name = z2ui5_cl_cgui_alv=>cs_event-line_selection
            args = VALUE #( ( `/XX/MR_CGUI_ALV_PAGE/0` ) ) ).
     cl_abap_unit_assert=>assert_equals( act = mo_report->mv_lsel_row
-                                        exp = mo_cut->mt_cgui_alv_index[ lv_copy ] ).
+                                        exp = lv_row ).
 
   ENDMETHOD.
 

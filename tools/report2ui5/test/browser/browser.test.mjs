@@ -95,6 +95,41 @@ test("the input history - a value run once is offered as a suggestion on the nex
   assert.deepEqual(rows.filter((r) => !r.ok).map((r) => `${r.cls}: ${r.errors.join("; ")}`), []);
 });
 
+test("the value help - a search and a click on a row of the dialog put the row's value into the field", { skip, timeout: 10 * 60_000 }, async (t) => {
+  // z2ui5_cl_cgui_select over a data reference, bound with window_bind_tab( ):
+  // the confirm hands over the path of the row clicked - the edit of the row's
+  // selection field alone did not reach the backend for a windowed table
+  const dynamic = classes.filter((c) => /_r2c_06$/.test(c));
+  const rows = await browserRun(dynamic, {
+    url: backend.url,
+    execute: false,
+    onLine: (l) => t.diagnostic(l),
+    check: async (page, errors) => {
+      const settle = async () => {
+        await page.waitForLoadState("networkidle", { timeout: 10_000 }).catch(() => {});
+        await page.waitForTimeout(500);
+      };
+      // the expert checkbox shows the plant, with its own F4
+      await page.locator('.sapMCb[id$="cgui_f_p_expert"]').click({ timeout: 10_000 });
+      await settle();
+      const plant = page.locator('input[id$="cgui_f_p_plant-inner"]');
+      await plant.waitFor({ timeout: 30_000 });
+      // F4 - the value help icon has no size where the theme is not loaded
+      await plant.press("F4");
+      const dialog = page.locator(".sapMTableSelectDialog");
+      await dialog.waitFor({ timeout: 30_000 });
+      await dialog.locator("input[type='search']").fill("Ber");
+      await dialog.locator("input[type='search']").press("Enter");
+      await settle();
+      await dialog.locator(".sapMListTblRow").filter({ hasText: "Berlin" }).first().click();
+      await settle();
+      const value = await plant.inputValue();
+      if (value !== "3000") errors.push(`the plant after the pick of Berlin: ${JSON.stringify(value)}`);
+    },
+  });
+  assert.deepEqual(rows.filter((r) => !r.ok).map((r) => `${r.cls}: ${r.errors.join("; ")}`), []);
+});
+
 test("Print hands the output to the browser as a PDF - a document a PDF reader opens, with the lines of the list", { skip, timeout: 10 * 60_000 }, async (t) => {
   const hello = classes.filter((c) => /_r2c_01$/.test(c));
   const rows = await browserRun(hello, {

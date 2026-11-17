@@ -20,7 +20,10 @@ process.stdout.write = (chunk) => {
   return true;
 };
 try {
-  await import(pathToFileURL(join(apps, program)).href);
+  // transpiler 2.14 on runs a program on import only when it is the script
+  // node was started with - otherwise it exports the run as $main
+  const mod = await import(pathToFileURL(join(apps, program)).href);
+  if (typeof mod.$main === "function") await mod.$main();
   list += globalThis.abap.console.get?.() ?? "";
   result = { ok: true, list };
 } catch (e) {
