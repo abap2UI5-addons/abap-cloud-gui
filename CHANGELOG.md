@@ -8,6 +8,20 @@ release.
 
 **Fixes**
 
+- The value help (`z2ui5_cl_cgui_select`) picked nothing in the browser on
+  abap2UI5 1.149.0: its confirm read `selectedContexts[0]/sPath`, which a UI5
+  event parameter cannot index, and the selection mark it fell back on never
+  reached the backend for a windowed table. The confirm now hands over the
+  path of the item picked.
+- The HTML viewer asked for abap2UI5's HTMLFrame by a literal class name,
+  which the namespace rename does not rewrite - the name is derived from the
+  view builder's now (`npm run rename` was red).
+- Tests: the unit tests, the runtime and the browser test of report2UI5
+  build again on the 1.149.0 runtime (transpiler 2.14 - the host's
+  `_ddic.mjs` and a program's `$main`), the HTML viewer tests follow the
+  HTMLFrame that 1.149.0 brings, and a browser test picks a row of the value
+  help.
+
 - A link to the selection screen (`z2ui5_cl_cgui_command=>url_from_range( )`)
   wrote a select-option line with NB or NP as its low value only, and the
   link read it back as EQ or CP - the opposite selection. NB is written as

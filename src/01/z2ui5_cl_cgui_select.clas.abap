@@ -450,8 +450,10 @@ CLASS z2ui5_cl_cgui_select IMPLEMENTATION.
         )->a( n = `contentWidth`     v = COND #( WHEN lines( mt_column ) > 3 THEN `60rem` ELSE `40rem` )
         )->a( n = `search`           v = client->_event( val   = cs_event-search
                                                          arg   = `${$parameters>/value}` )
+        " the path of the row picked - selectedContexts[0] cannot be read in
+        " the browser (a binding path has no index syntax), the item can
         )->a( n = `confirm`          v = client->_event( val   = cs_event-confirm
-                                                         arg   = `${$parameters>/selectedContexts[0]/sPath}` )
+                                                         arg   = `${$parameters>/selectedItem} ? ${$parameters>/selectedItem}.getBindingContext().getPath() : ''` )
         )->a( n = `cancel`           v = client->_event( cs_event-cancel ) ).
 
     DATA(lo_cells) = lo_dialog->ele( `ColumnListItem`

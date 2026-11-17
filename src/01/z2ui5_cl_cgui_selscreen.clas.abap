@@ -1649,10 +1649,10 @@ CLASS z2ui5_cl_cgui_selscreen IMPLEMENTATION.
                    item = item ).
         render_state( node = node
                       item = item ).
-        IF item-control = cs_control-number.
-          node->a( n = `type` v = `Number` ).
-        ELSEIF item-invisible = abap_true.
-          node->a( n = `type` v = `Password` ).
+        DATA(lv_type) = COND string( WHEN item-control = cs_control-number THEN `Number`
+                                     WHEN item-invisible = abap_true THEN `Password` ).
+        IF lv_type IS NOT INITIAL.
+          node->a( n = `type` v = lv_type ).
         ENDIF.
         IF item-max_length > 0.
           node->a( n = `maxLength` v = |{ item-max_length }| ).

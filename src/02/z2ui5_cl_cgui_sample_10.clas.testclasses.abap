@@ -119,6 +119,13 @@ CLASS ltcl_client IMPLEMENTATION.
 
   ENDMETHOD.
 
+  " the double keeps the rows in the order of the table
+  METHOD z2ui5_if_client~window_get_row.
+
+    result = row.
+
+  ENDMETHOD.
+
   METHOD z2ui5_if_client~popup_display.
 
     mv_popup = val.

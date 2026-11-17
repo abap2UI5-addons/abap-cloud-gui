@@ -67,6 +67,18 @@ const valueStates = (s) => s.messages.filter((m) => m.source === "field").map((m
 const rowsOf = (t) => t.rows.map((r) => `${r.WERKS} ${r.NAME}`);
 const actionsOf = (s, event) => s.actions.filter((a) => a.event === event);
 
+/** a click on <a href="sapevent:<href>"> in the document of an HTML viewer
+ *  (the n-th on the screen): abap2UI5's HTMLFrame (1.149.0 on) hands its
+ *  sapevent the action, the query and the posted fields - computed in the
+ *  browser, so they are given here; the viewer's id and SAPEVENT are the
+ *  action's own */
+const sapevent = (s, href, n = 0) => {
+  const a = actionsOf(s, "CGUI_GUI").filter((x) => x.args.includes("SAPEVENT"))[n];
+  assert.ok(a, `an HTML viewer: ${JSON.stringify(actionsOf(s, "CGUI_GUI").map((x) => x.args))}`);
+  const q = href.indexOf("?");
+  return d.act(s.session, { event: a.id, args: [null, null, q < 0 ? href : href.slice(0, q), q < 0 ? "" : href.slice(q + 1), ""] });
+};
+
 test("zr2c_01_hello: parameters, OBLIGATORY, a DO loop of WRITEs", { skip }, async () => {
   let s = await d.start("z2ui5_cl_cgui_r2c_01");
   assert.equal(s.title, "Hello World");
@@ -277,7 +289,8 @@ test("zr2c_25_textedit: a text editor and an HTML viewer in the custom control a
   assert.equal(editor.value, "First line of the notes\nSecond line");
   assert.equal(editor.editable, true);
   assert.match(html(), /<h3>Notes of LH<\/h3>\n<p>First line of the notes<\/p>/);
-  assert.match(d.state().slots.MAIN.xml, /<core:HTML [^>]*sanitizeContent="true"/);
+  // the document in abap2UI5's HTMLFrame, its SAPEVENT the event
+  assert.match(d.state().slots.MAIN.xml, /<z2ui5:HTMLFrame [^>]*sapevent="/);
 
   // typed and checked: the PAI reads the editor, the preview follows
   s = await d.act(s.session, { values: { [editor.name]: "Alpha\nBeta" }, event: "CHECK" });
@@ -314,7 +327,8 @@ test("zr2c_26_events: a toolbar, the links of an HTML viewer and a dialog box - 
   s = await press(s, "REFRESH");
   assert.match(html(), /Shown 2 time\(s\)/);
   // SAPEVENT: the action and the query table of the link
-  s = await press(s, "SHOW?CONNID=0402");
+  assert.match(html(), /href="SAPEVENT:SHOW\?CONNID=0402"/);
+  s = await sapevent(s, "SHOW?CONNID=0402");
   assert.deepEqual(toasts(s), ["SHOW 0402"]);
   // Details opens the dialog box once; its CLOSE frees it, a new one after that
   s = await press(s, "DETAILS");
@@ -680,8 +694,9 @@ test("zr2c_22_files: GUI_UPLOAD of a path typed in - the upload dialog opens for
   assert.deepEqual(fieldsOf(s), ['P_FILE="C:\\\\data\\\\seats.txt"*', "P_SAVE=false"]);
 });
 
-/** the content of the core:HTML controls of the main view */
-const htmlOf = () => [...(d.state().slots.MAIN?.xml ?? "").matchAll(/<core:HTML[^>]*content="([^"]*)"/g)].map((m) => {
+/** the content of the HTML viewers of the main view - abap2UI5's HTMLFrame
+ *  (1.149.0 on), or the sanitized core:HTML of a release without it */
+const htmlOf = () => [...(d.state().slots.MAIN?.xml ?? "").matchAll(/<(?:core:HTML|z2ui5:HTMLFrame)[^>]*content="([^"]*)"/g)].map((m) => {
   // a binding {/MT_CGUI_GUI/1/HTML}: its value in the model of the view
   const path = /^\{\/(.*)\}$/.exec(m[1]);
   if (!path) return m[1];
@@ -693,7 +708,7 @@ test("zr2c_28_browser: cl_abap_browser=>show_html( ) on cl_gui_container=>defaul
   let s = await d.start("z2ui5_cl_cgui_r2c_28");
   s = await d.act(s.session, { values: { P_DISC: 20 }, event: "CGUI_EXECUTE" });
   assert.equal(s.layer, "main");
-  assert.equal((d.state().slots.MAIN.xml.match(/<core:HTML/g) ?? []).length, 1, "one document on the screen");
+  assert.equal(htmlOf().length, 1, "one document on the screen");
   assert.deepEqual(boxes(s), [], "no dialog box - the container is the screen");
 });
 
@@ -794,8 +809,8 @@ test("zr2c_39_textedit: a text editor and a toolbar on the screen - the handler 
 
 test("zr2c_40_sapevent: the SAPEVENT links of an HTML page reach the handler of a local class", { skip }, async () => {
   let s = await d.start("z2ui5_cl_cgui_r2c_40");
-  assert.deepEqual(s.actions.filter((a) => a.control === "sap.m.Link").map((a) => a.label), ["Soup of the day", "Pasta"]);
-  s = await d.act(s.session, { event: guiAction(s, "Pasta").id });
+  assert.match(htmlOf().join(), /"sapevent:SOUP">Soup of the day<\/a>[\s\S]*"sapevent:PASTA">Pasta<\/a>/);
+  s = await sapevent(s, "PASTA");
   assert.deepEqual(toasts(s), ["You picked PASTA"]);
 });
 

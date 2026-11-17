@@ -599,8 +599,17 @@ CLASS z2ui5_cl_cgui_view IMPLEMENTATION.
 
   METHOD html_frame.
 
+    DATA lo_builder TYPE REF TO z2ui5_cl_ui5_view_builder.
+
     IF ctx-html_frame->* IS INITIAL.
-      cl_abap_typedescr=>describe_by_name( EXPORTING  p_name         = `Z2UI5_CL_UI5F_HTMLFRM_JS`
+      " the mirror class is named like the view builder of the same release,
+      " z2ui5_cl_ui5f_htmlfrm_js - its name is derived from the builder's, so
+      " it follows the namespace rename (a literal would not)
+      DATA(lv_builder) = CAST cl_abap_refdescr( cl_abap_typedescr=>describe_by_data( lo_builder )
+                                                )->get_referenced_type( )->get_relative_name( ).
+      cl_abap_typedescr=>describe_by_name( EXPORTING  p_name         = replace( val  = lv_builder
+                                                                                 sub  = `CL_UI5_VIEW_BUILDER`
+                                                                                 with = `CL_UI5F_HTMLFRM_JS` )
                                            EXCEPTIONS type_not_found = 1
                                                       OTHERS         = 2 ).
       ctx-html_frame->* = COND #( WHEN sy-subrc = 0 THEN abap_true ELSE `-` ).
