@@ -57,9 +57,17 @@ and the downported `<tag>-702` form in `.github/abaplint/abap_702.jsonc`);
 read and move them only with `scripts/core-pin.mjs` (`get` fails when they
 disagree). `bump-deps.yaml` moves the pin monthly to the newest release, in
 its one pull request whose checks run the three abaplint gates on it
-(`bump-core.yaml` by hand), and the scheduled `abaplint` run lints
+(`bump-core.yaml` by hand), and the scheduled `ci` run lints
 once against the core's `main` as the canary (`core-pin.mjs set main`, never
 committed). Do not drop the key: abaplint then clones `main` silently.
+
+CI comes from the shared CI template of abap2UI5-addons (reusable workflows in
+[rap-ext](https://github.com/abap2UI5-addons/rap-ext/blob/main/.github/ci/README.md),
+pinned by commit, moved by `bump-deps`): `ci` (abaplint Standard and Cloud,
+`check:regex`, `check:702`, unit, rename, the abap2UI5-linter - one job
+each), `ci-702` (writes and lints the branch `702`), `build-rename` and
+`bump-deps`. `release`, `pages`, `bump-core` and the report2UI5 workflows
+are this repository's own.
 
 ## Targets
 
@@ -303,7 +311,7 @@ The views can be driven without an SAP system: transpile `src` against
 `@abap2ui5/node-runtime` (the mcp-server's
 `lib/npm-backend.mjs` `buildNpm`), start `lib/npm-host.mjs`, and drive the
 app with Playwright. The unit tests run the same way, in CI
-(`.github/workflows/unit.yaml`) and locally: `npm run unit`
+(the `unit` job of `.github/workflows/ci.yaml`) and locally: `npm run unit`
 (`scripts/unit.mjs`, the build of the report2UI5 runtime test with the test
 includes; mcp-server at `MCP_SERVER_HOME` or `../mcp-server`). The MCP server's own unit action deploys classes and
 interfaces only - no tables - hence the script.
@@ -313,7 +321,7 @@ Playwright `page.route( )`, with `bypassCSP: true` for the source bootstrap.
 
 ## Namespace rename
 
-`npm run rename` (CI: `check-rename`) and the manual `build-rename` workflow
+`npm run rename` (CI: the `rename` job of `ci`) and the manual `build-rename` workflow
 are abap2UI5's namespace rename for this addon - `.github/scripts/rename.mjs`,
 the same file in every addon that has one. Every `z2ui5_` object becomes
 `<name>_...`, for a customer name such as `ZMYUI5` or a registered namespace
