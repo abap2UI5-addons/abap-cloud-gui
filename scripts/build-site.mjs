@@ -3,7 +3,7 @@
 // present the addon and the report2UI5 playground, the converter bundled for
 // the browser - into build/site, which the Pages workflow
 // (.github/workflows/pages.yaml) deploys. A converted report runs in the
-// abap2UI5 playground itself (https://abap2ui5.github.io/playground/), handed
+// abap2UI5 playground itself (https://abap2ui5.github.io/browser-playground/), handed
 // the class, the report runtime and the demo tables in its URL - runtime.json
 // below.
 //

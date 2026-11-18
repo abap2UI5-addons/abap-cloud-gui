@@ -13,7 +13,7 @@
 //   mapped, the migration report, the summary of a package.
 //
 // The converter is tools/report2ui5, bundled for the browser. A class runs
-// in the abap2UI5 playground itself (https://abap2ui5.github.io/playground/),
+// in the abap2UI5 playground itself (https://abap2ui5.github.io/browser-playground/),
 // framed in its app-only view (?embed=1&view=app) - no editor, no bar, only
 // the app. It is handed the class the converter wrote, the report runtime of
 // src/01 and the demo tables with their rows, in the fragment of its URL, as
@@ -160,7 +160,7 @@ function stepsOf(name, text, textpool, result) {
   };
 }
 
-const PLAYGROUND = "https://abap2ui5.github.io/playground/";
+const PLAYGROUND = "https://abap2ui5.github.io/browser-playground/";
 const FROM_PLAYGROUND = "abap2ui5-playground";
 
 /** the .abap files of a conversion, the class first - the playground takes
