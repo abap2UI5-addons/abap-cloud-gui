@@ -170,7 +170,7 @@ const walk = (dir) => readdirSync(dir).flatMap((n) => {
   const p = join(dir, n);
   return statSync(p).isDirectory() ? walk(p) : [p];
 });
-// an object two sources define (abap2UI5-ext took classes over from the core
+// an object two sources define (abap2UI5-obsolet took classes over from the core
 // releases before it) is kept from the first - src/, then the clones in
 // order - and deleted from the later clones: abaplint renames nothing while
 // any issue is open, a duplicate definition included

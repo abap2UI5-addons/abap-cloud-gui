@@ -78,7 +78,7 @@ onBeforeUnmount(() => {
         </div>
         <div class="pane">
           <div class="pane-head"><span><span class="step-no">3</span> Preview - abap2UI5 in your browser</span>
-            <span><a id="s-open" class="link" href="https://abap2ui5.github.io/playground/" target="_blank" rel="noopener" hidden>Open in the playground ↗</a>
+            <span><a id="s-open" class="link" href="https://abap2ui5.github.io/browser-playground/" target="_blank" rel="noopener" hidden>Open in the playground ↗</a>
             <button id="s-restart" class="link" type="button">Start again</button></span>
           </div>
           <div class="app">
@@ -204,7 +204,7 @@ onBeforeUnmount(() => {
         <h2><span class="step-no">3</span> Preview - abap2UI5 in your browser</h2>
         <span class="head-actions">
           <span id="app-state" class="muted"></span>
-          <a id="own-app-open" class="link" href="https://abap2ui5.github.io/playground/" target="_blank" rel="noopener" hidden>Open in the playground ↗</a>
+          <a id="own-app-open" class="link" href="https://abap2ui5.github.io/browser-playground/" target="_blank" rel="noopener" hidden>Open in the playground ↗</a>
           <button id="run" class="button primary" type="button">Run</button>
         </span>
       </div>
