@@ -1327,8 +1327,8 @@ CLASS z2ui5_cl_cgui_selscreen IMPLEMENTATION.
               ENDLOOP.
             ENDIF.
             lo_bar->a( n = `selectedKey` t = lv_active
-                )->a( n = `select`      v = client->_event( val   = cs_event-tab
-                                                            t_arg = VALUE #( ( `${$source>/selectedKey}` ) ) ) ).
+                )->a( n = `select`      v = client->_event( val = cs_event-tab
+                                                            arg = `${$source>/selectedKey}` ) ).
           ELSE.
             READ TABLE mt_tab_bind REFERENCE INTO DATA(lr_tab_bind) WITH KEY index = lv_tabbed.
             IF sy-subrc = 0.
@@ -1649,10 +1649,10 @@ CLASS z2ui5_cl_cgui_selscreen IMPLEMENTATION.
                    item = item ).
         render_state( node = node
                       item = item ).
-        DATA(lv_type) = COND string( WHEN item-control = cs_control-number THEN `Number`
-                                     WHEN item-invisible = abap_true THEN `Password` ).
-        IF lv_type IS NOT INITIAL.
-          node->a( n = `type` v = lv_type ).
+        IF item-control = cs_control-number.
+          node->a( n = `type` v = `Number` ).
+        ELSEIF item-invisible = abap_true.
+          node->a( n = `type` v = `Password` ).
         ENDIF.
         IF item-max_length > 0.
           node->a( n = `maxLength` v = |{ item-max_length }| ).
@@ -1690,8 +1690,9 @@ CLASS z2ui5_cl_cgui_selscreen IMPLEMENTATION.
         )->a( n = `xmlns:core`     v = `sap.ui.core`
         )->a( n = `selectedKey`    v = item-bind
         )->a( n = `forceSelection` b = abap_false
-        )->a( n = `required`       b = item-required
         )->a( n = `editable`       b = xsdbool( item-read_only = abap_false ) ).
+    " no required: Select has it from UI5 1.74 on, the floor is 1.71 - the
+    " label marks an obligatory list box, the backend checks it
     render_id( node = lo_select
                item = item ).
     render_state( node = lo_select

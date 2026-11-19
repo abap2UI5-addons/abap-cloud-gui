@@ -8,6 +8,19 @@ release.
 
 **Fixes**
 
+- An obligatory list box (`AS LISTBOX` of the selection screen) no longer
+  sets `required` on its `sap.m.Select`: the property exists from UI5 1.74
+  on, and the floor is 1.71. The label still marks the field, and the
+  obligatory check of the backend is unchanged.
+- The abap2UI5-linter is 0.11.2 (`@abap2ui5/linter`,
+  `@abap2ui5/linter-render`). It fixed the false positives 0.11.0 was
+  written around, so the workarounds are gone: two string templates with a
+  line-breaking expression are inline again (the right-aligned list text of
+  the ALV, the owner of a saved layout), the input type of a parameter is
+  an IF/ELSEIF again, and the selection screen is rendered by the gate
+  again (no longer excluded from `render-error`). The tab bar of the
+  selection screen hands its key over with `arg` instead of a one-row
+  `t_arg`.
 - The value help (`z2ui5_cl_cgui_select`) picked nothing in the browser on
   abap2UI5 1.149.0: its confirm read `selectedContexts[0]/sPath`, which a UI5
   event parameter cannot index, and the selection mark it fell back on never

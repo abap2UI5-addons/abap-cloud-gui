@@ -22,14 +22,10 @@
       ]
     },
     // The list builds its lines in a LOOP over what was written, so there is
-    // no view to reconstruct statically - it renders at runtime only. The
-    // selection screen renders into a node of the caller's view (render( ))
-    // from the items declared at runtime; the linter skipped it up to 0.9
-    // and reconstructs no view of it from 0.10 on.
+    // no view to reconstruct statically - it renders at runtime only.
     "render-error": {
       "exclude": [
-        "z2ui5_cl_cgui_list\\.",
-        "z2ui5_cl_cgui_selscreen\\."
+        "z2ui5_cl_cgui_list\\."
       ]
     },
     // The report binds its GUI controls (mt_cgui_gui) and the rows of a
