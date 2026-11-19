@@ -3027,10 +3027,9 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
           lv_text = substring( val = lv_text len = ls_width-width ).
         ENDIF.
         IF ls_width-right = abap_true.
-          lv_text = z2ui5_cl_cgui_context=>text_align( val   = lv_text
-                                                       width = ls_width-width
-                                                       align = `RIGHT` ).
-          lv_line = |{ lv_line }{ lv_text } |.
+          lv_line = |{ lv_line }{ z2ui5_cl_cgui_context=>text_align( val   = lv_text
+                                                                       width = ls_width-width
+                                                                       align = `RIGHT` ) } |.
         ELSE.
           lv_line = |{ lv_line }{ lv_text WIDTH = ls_width-width } |.
         ENDIF.
