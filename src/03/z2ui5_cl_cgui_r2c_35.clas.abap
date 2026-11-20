@@ -54,8 +54,25 @@ CLASS z2ui5_cl_cgui_r2c_35 IMPLEMENTATION.
 
   METHOD start_of_selection.
 
-    lt_weekday = VALUE #( ( `Monday` ) ( `Tuesday` ) ( `Wednesday` ) ( `Thursday` )
-                          ( `Friday` ) ( `Saturday` ) ( `Sunday` ) ).
+    DATA temp1 LIKE lt_weekday.
+    DATA lv_day LIKE p_start.
+    DATA lv_left LIKE p_days.
+    DATA lv_first LIKE p_start.
+    FIELD-SYMBOLS <temp3> LIKE LINE OF lt_weekday.
+    DATA temp4 LIKE sy-tabix.
+    FIELD-SYMBOLS <temp5> LIKE LINE OF lt_weekday.
+    DATA temp6 LIKE sy-tabix.
+    FIELD-SYMBOLS <temp7> LIKE LINE OF lt_weekday.
+    DATA temp8 LIKE sy-tabix.
+    CLEAR temp1.
+    INSERT `Monday` INTO TABLE temp1.
+    INSERT `Tuesday` INTO TABLE temp1.
+    INSERT `Wednesday` INTO TABLE temp1.
+    INSERT `Thursday` INTO TABLE temp1.
+    INSERT `Friday` INTO TABLE temp1.
+    INSERT `Saturday` INTO TABLE temp1.
+    INSERT `Sunday` INTO TABLE temp1.
+    lt_weekday = temp1.
 
     IF p_end < p_start.
       message( text = 'The end is before the start'
@@ -68,8 +85,10 @@ CLASS z2ui5_cl_cgui_r2c_35 IMPLEMENTATION.
         )->write( 'Days between start and end:'
         )->write( lv_between ).
 
-    DATA(lv_day) = p_start.
-    DATA(lv_left) = p_days.
+
+    lv_day = p_start.
+
+    lv_left = p_days.
     WHILE lv_left > 0.
       lv_day = lv_day + 1.
       IF ( lv_day - lc_monday ) MOD 7 < 5.
@@ -80,24 +99,49 @@ CLASS z2ui5_cl_cgui_r2c_35 IMPLEMENTATION.
         )->write( |After { p_days } working days:|
         )->write( lv_day ).
 
-    DATA(lv_first) = p_start.
+
+    lv_first = p_start.
     lv_first+6(2) = '01'.
     lv_next = lv_first + 31.
     lv_next+6(2) = '01'.
     lv_last = lv_next - 1.
     list( )->uline( ).
+
+
+    temp4 = sy-tabix.
+    READ TABLE lt_weekday INDEX ( lv_first - lc_monday ) MOD 7 + 1 ASSIGNING <temp3>.
+    sy-tabix = temp4.
+    IF sy-subrc <> 0.
+      ASSERT 1 = 0.
+    ENDIF.
     list( )->new_line(
         )->write( 'First of the month:'
         )->write( lv_first
-        )->write( lt_weekday[ ( lv_first - lc_monday ) MOD 7 + 1 ] ).
+        )->write( <temp3> ).
+
+
+    temp6 = sy-tabix.
+    READ TABLE lt_weekday INDEX ( lv_last - lc_monday ) MOD 7 + 1 ASSIGNING <temp5>.
+    sy-tabix = temp6.
+    IF sy-subrc <> 0.
+      ASSERT 1 = 0.
+    ENDIF.
     list( )->new_line(
         )->write( 'Last of the month:'
         )->write( lv_last
-        )->write( lt_weekday[ ( lv_last - lc_monday ) MOD 7 + 1 ] ).
+        )->write( <temp5> ).
+
+
+    temp8 = sy-tabix.
+    READ TABLE lt_weekday INDEX ( p_start - lc_monday ) MOD 7 + 1 ASSIGNING <temp7>.
+    sy-tabix = temp8.
+    IF sy-subrc <> 0.
+      ASSERT 1 = 0.
+    ENDIF.
     list( )->new_line(
         )->write( 'Start:'
         )->write( p_start
-        )->write( lt_weekday[ ( p_start - lc_monday ) MOD 7 + 1 ] ).
+        )->write( <temp7> ).
 
   ENDMETHOD.
 

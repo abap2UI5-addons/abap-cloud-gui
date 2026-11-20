@@ -45,7 +45,8 @@ CLASS z2ui5_cl_cgui_r2c_09 IMPLEMENTATION.
 
   METHOD start_of_selection.
 
-    DATA(lo_calc) = NEW lcl_calculator( p_dec ).
+    DATA lo_calc TYPE REF TO lcl_calculator.
+    CREATE OBJECT lo_calc TYPE lcl_calculator EXPORTING IV_DECIMALS = p_dec.
     go_calc = lo_calc.
     list( )->new_line(
         )->write( 'Sum:'

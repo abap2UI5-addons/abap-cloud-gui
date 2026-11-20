@@ -52,7 +52,7 @@ CLASS z2ui5_cl_cgui_simple_tree DEFINITION PUBLIC
         text  TYPE string,
         width TYPE i,
       END OF ty_s_column,
-      ty_t_column TYPE STANDARD TABLE OF ty_s_column WITH EMPTY KEY,
+      ty_t_column TYPE STANDARD TABLE OF ty_s_column WITH DEFAULT KEY,
       "! what a node shows in a column - kind is text, link or checkbox;
       "! width in characters where no column gives it
       BEGIN OF ty_s_cell,
@@ -62,7 +62,7 @@ CLASS z2ui5_cl_cgui_simple_tree DEFINITION PUBLIC
         checked TYPE abap_bool,
         width   TYPE i,
       END OF ty_s_cell,
-      ty_t_cell TYPE STANDARD TABLE OF ty_s_cell WITH EMPTY KEY.
+      ty_t_cell TYPE STANDARD TABLE OF ty_s_cell WITH DEFAULT KEY.
 
     "! a click on a node
     EVENTS node_double_click
@@ -227,7 +227,8 @@ CLASS z2ui5_cl_cgui_simple_tree DEFINITION PUBLIC
       END OF ty_s_key.
 
     DATA mo_tree     TYPE REF TO z2ui5_cl_cgui_tree.
-    DATA mt_key      TYPE STANDARD TABLE OF ty_s_key WITH EMPTY KEY.
+    TYPES temp1_9dd0047348 TYPE STANDARD TABLE OF ty_s_key WITH DEFAULT KEY.
+DATA mt_key      TYPE temp1_9dd0047348.
     DATA mv_selected TYPE i.
 
     "! the key in the tree of a node key - 0 when there is none
@@ -256,11 +257,15 @@ ENDCLASS.
 CLASS z2ui5_cl_cgui_simple_tree IMPLEMENTATION.
 
   METHOD constructor.
+    DATA temp1 TYPE z2ui5_if_cgui_gui=>ty_s_control.
 
     super->constructor( ).
     mo_tree = z2ui5_cl_cgui_tree=>factory( ).
-    IF add( VALUE #( kind   = z2ui5_if_cgui_gui=>cs_kind-simple_tree
-                     parent = id_of( parent ) ) ) = abap_false.
+
+    CLEAR temp1.
+    temp1-kind = z2ui5_if_cgui_gui=>cs_kind-simple_tree.
+    temp1-parent = id_of( parent ).
+    IF add( temp1 ) = abap_false.
       RAISE failed.
     ENDIF.
 
@@ -270,13 +275,20 @@ CLASS z2ui5_cl_cgui_simple_tree IMPLEMENTATION.
 
     DATA ls_node TYPE ty_s_node.
 
-    LOOP AT node_table ASSIGNING FIELD-SYMBOL(<line>).
+    FIELD-SYMBOLS <line> TYPE ANY.
+      DATA lv_parent TYPE i.
+      DATA temp2 TYPE z2ui5_cl_cgui_simple_tree=>ty_s_node-n_image.
+      DATA lv_key TYPE i.
+      DATA temp1 TYPE xsdboolean.
+      DATA temp3 TYPE z2ui5_cl_cgui_simple_tree=>ty_s_key.
+    LOOP AT node_table ASSIGNING <line>.
       MOVE-CORRESPONDING <line> TO ls_node.
       IF ls_node-node_key IS INITIAL OR ls_node-hidden = abap_true.
         CONTINUE.
       ENDIF.
       " a child below its relatkey, a sibling beside it
-      DATA(lv_parent) = key_of( ls_node-relatkey ).
+
+      lv_parent = key_of( ls_node-relatkey ).
       IF lv_parent <> 0 AND ls_node-relatship <> relat_first_child AND ls_node-relatship <> relat_last_child
           AND ls_node-relatship <> 0.
         lv_parent = mo_tree->get_parent( lv_parent ).
@@ -284,14 +296,26 @@ CLASS z2ui5_cl_cgui_simple_tree IMPLEMENTATION.
       IF lv_parent <> 0 AND mo_tree->get_node( lv_parent )-lazy = abap_true.
         mo_tree->set_loaded( lv_parent ).
       ENDIF.
-      DATA(lv_key) = mo_tree->add_node( parent = lv_parent
+
+      IF ls_node-n_image CP `sap-icon://*`.
+        temp2 = ls_node-n_image.
+      ELSE.
+        CLEAR temp2.
+      ENDIF.
+
+
+      temp1 = boolc( ls_node-isfolder = abap_true OR ls_node-expander = abap_true ).
+      lv_key = mo_tree->add_node( parent = lv_parent
                                         text   = condense( ls_node-text )
-                                        icon   = COND #( WHEN ls_node-n_image CP `sap-icon://*` THEN ls_node-n_image )
-                                        folder = xsdbool( ls_node-isfolder = abap_true OR ls_node-expander = abap_true )
+                                        icon   = temp2
+                                        folder = temp1
                                         lazy   = ls_node-expander ).
       DELETE mt_key WHERE node_key = ls_node-node_key.
-      INSERT VALUE #( key      = lv_key
-                      node_key = ls_node-node_key ) INTO TABLE mt_key.
+
+      CLEAR temp3.
+      temp3-key = lv_key.
+      temp3-node_key = ls_node-node_key.
+      INSERT temp3 INTO TABLE mt_key.
     ENDLOOP.
 
   ENDMETHOD.
@@ -305,7 +329,9 @@ CLASS z2ui5_cl_cgui_simple_tree IMPLEMENTATION.
 
   METHOD delete_node.
 
-    DATA(lv_key) = key_of( node_key ).
+    DATA lv_key TYPE i.
+    DATA ls_key LIKE LINE OF mt_key.
+    lv_key = key_of( node_key ).
     IF lv_key = 0.
       RAISE node_not_found.
     ENDIF.
@@ -314,7 +340,8 @@ CLASS z2ui5_cl_cgui_simple_tree IMPLEMENTATION.
       CLEAR mv_selected.
     ENDIF.
     " the keys of the nodes gone with the branch
-    LOOP AT mt_key INTO DATA(ls_key).
+
+    LOOP AT mt_key INTO ls_key.
       IF mo_tree->get_node( ls_key-key ) IS INITIAL.
         DELETE mt_key WHERE key = ls_key-key.
       ENDIF.
@@ -324,14 +351,17 @@ CLASS z2ui5_cl_cgui_simple_tree IMPLEMENTATION.
 
   METHOD expand_node.
 
-    DATA(lv_key) = key_of( node_key ).
+    DATA lv_key TYPE i.
+      DATA lv_parent TYPE i.
+    lv_key = key_of( node_key ).
     IF lv_key = 0.
       RAISE node_not_found.
     ENDIF.
     mo_tree->expand( key = lv_key
                      all = expand_subtree ).
     IF expand_predecessors = abap_true.
-      DATA(lv_parent) = mo_tree->get_parent( lv_key ).
+
+      lv_parent = mo_tree->get_parent( lv_key ).
       WHILE lv_parent <> 0.
         mo_tree->expand( lv_parent ).
         lv_parent = mo_tree->get_parent( lv_parent ).
@@ -342,7 +372,11 @@ CLASS z2ui5_cl_cgui_simple_tree IMPLEMENTATION.
 
   METHOD expand_root_nodes.
 
-    LOOP AT mo_tree->get_children( 0 ) INTO DATA(ls_root).
+    DATA temp4 TYPE z2ui5_cl_cgui_tree=>ty_t_node.
+    DATA ls_root LIKE LINE OF temp4.
+    temp4 = mo_tree->get_children( 0 ).
+
+    LOOP AT temp4 INTO ls_root.
       mo_tree->expand( key = ls_root-key
                        all = expand_subtree ).
     ENDLOOP.
@@ -351,7 +385,8 @@ CLASS z2ui5_cl_cgui_simple_tree IMPLEMENTATION.
 
   METHOD collapse_node.
 
-    DATA(lv_key) = key_of( node_key ).
+    DATA lv_key TYPE i.
+    lv_key = key_of( node_key ).
     IF lv_key = 0.
       RAISE node_not_found.
     ENDIF.
@@ -376,7 +411,8 @@ CLASS z2ui5_cl_cgui_simple_tree IMPLEMENTATION.
 
   METHOD set_selected_node.
 
-    DATA(lv_key) = key_of( node_key ).
+    DATA lv_key TYPE i.
+    lv_key = key_of( node_key ).
     IF lv_key = 0.
       RAISE node_not_found.
     ENDIF.
@@ -386,7 +422,8 @@ CLASS z2ui5_cl_cgui_simple_tree IMPLEMENTATION.
 
   METHOD node_set_text.
 
-    DATA(lv_key) = key_of( node_key ).
+    DATA lv_key TYPE i.
+    lv_key = key_of( node_key ).
     IF lv_key = 0.
       RAISE node_not_found.
     ENDIF.
@@ -418,18 +455,28 @@ CLASS z2ui5_cl_cgui_simple_tree IMPLEMENTATION.
 
   METHOD dispatch.
 
-    DATA(lv_value) = condense( value ).
+    DATA lv_value TYPE string.
+    DATA temp5 TYPE i.
+    DATA lv_key LIKE temp5.
+    DATA lv_event TYPE string.
+        DATA ls_node TYPE z2ui5_cl_cgui_tree=>ty_s_node.
+    lv_value = condense( value ).
     IF lv_value IS INITIAL OR lv_value CN `0123456789`.
       super->dispatch( event = event
                        value = value ).
       RETURN.
     ENDIF.
-    DATA(lv_key) = CONV i( lv_value ).
-    DATA(lv_event) = to_upper( event ).
+
+    temp5 = lv_value.
+
+    lv_key = temp5.
+
+    lv_event = to_upper( event ).
 
     CASE lv_event.
       WHEN `EXPAND`.
-        DATA(ls_node) = mo_tree->get_node( lv_key ).
+
+        ls_node = mo_tree->get_node( lv_key ).
         IF ls_node-expanded = abap_true AND mo_tree->has_children( lv_key ) = abap_true.
           mo_tree->collapse( lv_key ).
         ELSE.
@@ -457,9 +504,11 @@ CLASS z2ui5_cl_cgui_simple_tree IMPLEMENTATION.
   METHOD key_of.
 
     DATA lv_node_key TYPE ty_node_key.
+    DATA ls_key TYPE z2ui5_cl_cgui_simple_tree=>ty_s_key.
 
     lv_node_key = node_key.
-    READ TABLE mt_key INTO DATA(ls_key) WITH KEY node_key = lv_node_key.
+
+    READ TABLE mt_key INTO ls_key WITH KEY node_key = lv_node_key.
     IF sy-subrc = 0.
       result = ls_key-key.
     ENDIF.
@@ -468,7 +517,8 @@ CLASS z2ui5_cl_cgui_simple_tree IMPLEMENTATION.
 
   METHOD node_key_of.
 
-    READ TABLE mt_key INTO DATA(ls_key) WITH KEY key = key.
+    DATA ls_key TYPE z2ui5_cl_cgui_simple_tree=>ty_s_key.
+    READ TABLE mt_key INTO ls_key WITH KEY key = key.
     IF sy-subrc = 0.
       result = ls_key-node_key.
     ENDIF.
@@ -477,11 +527,22 @@ CLASS z2ui5_cl_cgui_simple_tree IMPLEMENTATION.
 
   METHOD raise_node_event.
 
-    DATA(lv_node_key) = node_key_of( key ).
-    raise_event( event  = event
-                 params = VALUE #( ( name  = `NODE_KEY`
-                                     kind  = cl_abap_objectdescr=>exporting
-                                     value = REF #( lv_node_key ) ) ) ).
+    DATA lv_node_key TYPE z2ui5_cl_cgui_simple_tree=>ty_node_key.
+    DATA temp6 LIKE REF TO lv_node_key.
+DATA temp1 TYPE abap_parmbind_tab.
+DATA temp2 LIKE LINE OF temp1.
+    lv_node_key = node_key_of( key ).
+
+    GET REFERENCE OF lv_node_key INTO temp6.
+
+CLEAR temp1.
+
+temp2-name = `NODE_KEY`.
+temp2-kind = cl_abap_objectdescr=>exporting.
+temp2-value = temp6.
+INSERT temp2 INTO TABLE temp1.
+raise_event( event  = event
+                 params = temp1 ).
 
   ENDMETHOD.
 

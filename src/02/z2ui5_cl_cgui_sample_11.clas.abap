@@ -90,11 +90,25 @@ CLASS z2ui5_cl_cgui_sample_11 IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD dynpro_pbo.
+      DATA temp1 TYPE z2ui5_cl_cgui_alv=>ty_t_function.
+      DATA temp2 LIKE LINE OF temp1.
+      DATA temp3 TYPE z2ui5_cl_cgui_selscreen=>ty_t_screen.
+      DATA ls_screen LIKE LINE OF temp3.
 
     IF dynnr = `0100`.
       set_title( |Flight Booking { p_carrid }| ).
-      set_pf_status( VALUE #( ( name = `SAVE` text = `Book` icon = `sap-icon://save` ) ) ).
-      LOOP AT current_screen( )->loop_at_screen( ) INTO DATA(ls_screen) WHERE group1 = `SEA`.
+
+      CLEAR temp1.
+
+      temp2-name = `SAVE`.
+      temp2-text = `Book`.
+      temp2-icon = `sap-icon://save`.
+      INSERT temp2 INTO TABLE temp1.
+      set_pf_status( temp1 ).
+
+      temp3 = current_screen( )->loop_at_screen( ).
+
+      LOOP AT temp3 INTO ls_screen WHERE group1 = `SEA`.
         ls_screen-input = checked.
         current_screen( )->modify_screen( ls_screen ).
       ENDLOOP.
@@ -126,13 +140,20 @@ CLASS z2ui5_cl_cgui_sample_11 IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD after_call_screen.
+      DATA temp4 TYPE string.
 
     IF dynnr <> `0100`.
       RETURN.
     ENDIF.
     IF booked = abap_true.
+
+      IF window = abap_true.
+        temp4 = ` (window)`.
+      ELSE.
+        CLEAR temp4.
+      ENDIF.
       list( )->new_line(
-          )->write( |Booked: { seats } seat(s) on { p_carrid } { connid }{ COND #( WHEN window = abap_true THEN ` (window)` ) }| ).
+          )->write( |Booked: { seats } seat(s) on { p_carrid } { connid }{ temp4 }| ).
     ELSE.
       list( )->new_line(
           )->write( `Nothing booked` ).

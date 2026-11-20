@@ -35,7 +35,7 @@ CLASS z2ui5_cl_cgui_tree DEFINITION PUBLIC FINAL CREATE PUBLIC.
         value    TYPE string,
         cells    TYPE string_table,
       END OF ty_s_node.
-    TYPES ty_t_node TYPE STANDARD TABLE OF ty_s_node WITH EMPTY KEY.
+    TYPES ty_t_node TYPE STANDARD TABLE OF ty_s_node WITH DEFAULT KEY.
 
     TYPES:
       BEGIN OF ty_s_column,
@@ -44,7 +44,7 @@ CLASS z2ui5_cl_cgui_tree DEFINITION PUBLIC FINAL CREATE PUBLIC.
         align  TYPE string,
         hidden TYPE abap_bool,
       END OF ty_s_column.
-    TYPES ty_t_column TYPE STANDARD TABLE OF ty_s_column WITH EMPTY KEY.
+    TYPES ty_t_column TYPE STANDARD TABLE OF ty_s_column WITH DEFAULT KEY.
 
     TYPES:
       "! a row the browser shows - the nodes of the expanded branches
@@ -69,9 +69,9 @@ CLASS z2ui5_cl_cgui_tree DEFINITION PUBLIC FINAL CREATE PUBLIC.
         c11      TYPE string,
         c12      TYPE string,
       END OF ty_s_view.
-    TYPES ty_t_view TYPE STANDARD TABLE OF ty_s_view WITH EMPTY KEY.
+    TYPES ty_t_view TYPE STANDARD TABLE OF ty_s_view WITH DEFAULT KEY.
 
-    TYPES ty_t_key TYPE STANDARD TABLE OF i WITH EMPTY KEY.
+    TYPES ty_t_key TYPE STANDARD TABLE OF i WITH DEFAULT KEY.
 
     CLASS-METHODS factory
       RETURNING
@@ -351,21 +351,27 @@ CLASS z2ui5_cl_cgui_tree IMPLEMENTATION.
 
   METHOD factory.
 
-    result = NEW #( ).
+    CREATE OBJECT result.
 
   ENDMETHOD.
 
   METHOD add_node.
+    DATA temp55 TYPE ty_s_node.
+    DATA ls_node LIKE temp55.
 
     mv_next = mv_next + 1.
-    DATA(ls_node) = VALUE ty_s_node( key      = mv_next
-                                     parent   = parent
-                                     text     = text
-                                     icon     = icon
-                                     folder   = folder
-                                     expanded = expanded
-                                     value    = value
-                                     lazy     = lazy ).
+
+    CLEAR temp55.
+    temp55-key = mv_next.
+    temp55-parent = parent.
+    temp55-text = text.
+    temp55-icon = icon.
+    temp55-folder = folder.
+    temp55-expanded = expanded.
+    temp55-value = value.
+    temp55-lazy = lazy.
+
+    ls_node = temp55.
     IF data IS SUPPLIED.
       IF mt_column IS INITIAL.
         columns_from( data ).
@@ -380,8 +386,11 @@ CLASS z2ui5_cl_cgui_tree IMPLEMENTATION.
   METHOD delete_node.
 
     " the children first - collected, the table changes while they go
-    DATA(lt_child) = get_children( key ).
-    LOOP AT lt_child INTO DATA(ls_child).
+    DATA lt_child TYPE z2ui5_cl_cgui_tree=>ty_t_node.
+    DATA ls_child LIKE LINE OF lt_child.
+    lt_child = get_children( key ).
+
+    LOOP AT lt_child INTO ls_child.
       delete_node( ls_child-key ).
     ENDLOOP.
     DELETE mt_node WHERE key = key.
@@ -391,7 +400,8 @@ CLASS z2ui5_cl_cgui_tree IMPLEMENTATION.
 
   METHOD set_node_text.
 
-    READ TABLE mt_node REFERENCE INTO DATA(lr_node) WITH KEY key = key.
+    DATA lr_node TYPE REF TO z2ui5_cl_cgui_tree=>ty_s_node.
+    READ TABLE mt_node REFERENCE INTO lr_node WITH KEY key = key.
     IF sy-subrc = 0.
       lr_node->text = text.
     ENDIF.
@@ -401,7 +411,8 @@ CLASS z2ui5_cl_cgui_tree IMPLEMENTATION.
 
   METHOD set_node_icon.
 
-    READ TABLE mt_node REFERENCE INTO DATA(lr_node) WITH KEY key = key.
+    DATA lr_node TYPE REF TO z2ui5_cl_cgui_tree=>ty_s_node.
+    READ TABLE mt_node REFERENCE INTO lr_node WITH KEY key = key.
     IF sy-subrc = 0.
       lr_node->icon = icon.
     ENDIF.
@@ -411,7 +422,15 @@ CLASS z2ui5_cl_cgui_tree IMPLEMENTATION.
 
   METHOD get_parent.
 
-    result = VALUE #( mt_node[ key = key ]-parent OPTIONAL ).
+    DATA temp56 TYPE i.
+    DATA temp57 TYPE z2ui5_cl_cgui_tree=>ty_s_node.
+    CLEAR temp56.
+
+    READ TABLE mt_node INTO temp57 WITH KEY key = key.
+    IF sy-subrc = 0.
+      temp56 = temp57-parent.
+    ENDIF.
+    result = temp56.
 
   ENDMETHOD.
 
@@ -424,7 +443,8 @@ CLASS z2ui5_cl_cgui_tree IMPLEMENTATION.
 
   METHOD get_lazy_nodes.
 
-    LOOP AT mt_node INTO DATA(ls_node) WHERE lazy = abap_true.
+    DATA ls_node LIKE LINE OF mt_node.
+    LOOP AT mt_node INTO ls_node WHERE lazy = abap_true.
       IF has_children( ls_node-key ) = abap_false.
         INSERT ls_node-key INTO TABLE result.
       ENDIF.
@@ -434,7 +454,8 @@ CLASS z2ui5_cl_cgui_tree IMPLEMENTATION.
 
   METHOD set_loaded.
 
-    READ TABLE mt_node REFERENCE INTO DATA(lr_node) WITH KEY key = key.
+    DATA lr_node TYPE REF TO z2ui5_cl_cgui_tree=>ty_s_node.
+    READ TABLE mt_node REFERENCE INTO lr_node WITH KEY key = key.
     IF sy-subrc = 0.
       lr_node->lazy = abap_false.
       lr_node->folder = abap_true.
@@ -444,7 +465,9 @@ CLASS z2ui5_cl_cgui_tree IMPLEMENTATION.
 
   METHOD expandable.
 
-    result = xsdbool( has_children( node-key ) = abap_true OR node-lazy = abap_true ).
+    DATA temp1 TYPE xsdboolean.
+    temp1 = boolc( has_children( node-key ) = abap_true OR node-lazy = abap_true ).
+    result = temp1.
 
   ENDMETHOD.
 
@@ -462,7 +485,8 @@ CLASS z2ui5_cl_cgui_tree IMPLEMENTATION.
 
   METHOD get_children.
 
-    LOOP AT mt_node INTO DATA(ls_node) WHERE parent = key.
+    DATA ls_node LIKE LINE OF mt_node.
+    LOOP AT mt_node INTO ls_node WHERE parent = key.
       INSERT ls_node INTO TABLE result.
     ENDLOOP.
 
@@ -470,17 +494,25 @@ CLASS z2ui5_cl_cgui_tree IMPLEMENTATION.
 
   METHOD has_children.
 
-    result = xsdbool( line_exists( mt_node[ parent = key ] ) ).
+    DATA temp58 LIKE sy-subrc.
+    DATA temp2 TYPE xsdboolean.
+    READ TABLE mt_node WITH KEY parent = key TRANSPORTING NO FIELDS.
+    temp58 = sy-subrc.
+
+    temp2 = boolc( temp58 = 0 ).
+    result = temp2.
 
   ENDMETHOD.
 
   METHOD expand.
+      DATA lr_node TYPE REF TO z2ui5_cl_cgui_tree=>ty_s_node.
 
     IF all = abap_true.
       expand_branch( key = key
                      val = abap_true ).
     ELSE.
-      READ TABLE mt_node REFERENCE INTO DATA(lr_node) WITH KEY key = key.
+
+      READ TABLE mt_node REFERENCE INTO lr_node WITH KEY key = key.
       IF sy-subrc = 0.
         lr_node->expanded = abap_true.
       ENDIF.
@@ -491,7 +523,8 @@ CLASS z2ui5_cl_cgui_tree IMPLEMENTATION.
 
   METHOD collapse.
 
-    READ TABLE mt_node REFERENCE INTO DATA(lr_node) WITH KEY key = key.
+    DATA lr_node TYPE REF TO z2ui5_cl_cgui_tree=>ty_s_node.
+    READ TABLE mt_node REFERENCE INTO lr_node WITH KEY key = key.
     IF sy-subrc = 0.
       lr_node->expanded = abap_false.
     ENDIF.
@@ -501,7 +534,9 @@ CLASS z2ui5_cl_cgui_tree IMPLEMENTATION.
 
   METHOD expand_all.
 
-    LOOP AT mt_node REFERENCE INTO DATA(lr_node).
+    DATA temp59 LIKE LINE OF mt_node.
+    DATA lr_node LIKE REF TO temp59.
+    LOOP AT mt_node REFERENCE INTO lr_node.
       lr_node->expanded = abap_true.
     ENDLOOP.
     result = me.
@@ -510,7 +545,9 @@ CLASS z2ui5_cl_cgui_tree IMPLEMENTATION.
 
   METHOD collapse_all.
 
-    LOOP AT mt_node REFERENCE INTO DATA(lr_node).
+    DATA temp60 LIKE LINE OF mt_node.
+    DATA lr_node LIKE REF TO temp60.
+    LOOP AT mt_node REFERENCE INTO lr_node.
       lr_node->expanded = abap_false.
     ENDLOOP.
     result = me.
@@ -519,11 +556,14 @@ CLASS z2ui5_cl_cgui_tree IMPLEMENTATION.
 
   METHOD expand_branch.
 
-    READ TABLE mt_node REFERENCE INTO DATA(lr_node) WITH KEY key = key.
+    DATA lr_node TYPE REF TO z2ui5_cl_cgui_tree=>ty_s_node.
+    DATA ls_child LIKE LINE OF mt_node.
+    READ TABLE mt_node REFERENCE INTO lr_node WITH KEY key = key.
     IF sy-subrc = 0.
       lr_node->expanded = val.
     ENDIF.
-    LOOP AT mt_node INTO DATA(ls_child) WHERE parent = key.
+
+    LOOP AT mt_node INTO ls_child WHERE parent = key.
       expand_branch( key = ls_child-key
                      val = val ).
     ENDLOOP.
@@ -540,12 +580,14 @@ CLASS z2ui5_cl_cgui_tree IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD set_checked.
+      DATA lr_node TYPE REF TO z2ui5_cl_cgui_tree=>ty_s_node.
 
     IF all = abap_true.
       check_branch( key = key
                     val = val ).
     ELSE.
-      READ TABLE mt_node REFERENCE INTO DATA(lr_node) WITH KEY key = key.
+
+      READ TABLE mt_node REFERENCE INTO lr_node WITH KEY key = key.
       IF sy-subrc = 0.
         lr_node->checked = val.
       ENDIF.
@@ -556,11 +598,14 @@ CLASS z2ui5_cl_cgui_tree IMPLEMENTATION.
 
   METHOD check_branch.
 
-    READ TABLE mt_node REFERENCE INTO DATA(lr_node) WITH KEY key = key.
+    DATA lr_node TYPE REF TO z2ui5_cl_cgui_tree=>ty_s_node.
+    DATA ls_child LIKE LINE OF mt_node.
+    READ TABLE mt_node REFERENCE INTO lr_node WITH KEY key = key.
     IF sy-subrc = 0.
       lr_node->checked = val.
     ENDIF.
-    LOOP AT mt_node INTO DATA(ls_child) WHERE parent = key.
+
+    LOOP AT mt_node INTO ls_child WHERE parent = key.
       check_branch( key = ls_child-key
                     val = val ).
     ENDLOOP.
@@ -569,7 +614,8 @@ CLASS z2ui5_cl_cgui_tree IMPLEMENTATION.
 
   METHOD get_checked.
 
-    LOOP AT mt_node INTO DATA(ls_node) WHERE checked = abap_true.
+    DATA ls_node LIKE LINE OF mt_node.
+    LOOP AT mt_node INTO ls_node WHERE checked = abap_true.
       INSERT ls_node-key INTO TABLE result.
     ENDLOOP.
 
@@ -577,22 +623,29 @@ CLASS z2ui5_cl_cgui_tree IMPLEMENTATION.
 
   METHOD add_function.
 
-    INSERT VALUE #( name    = name
-                    text    = text
-                    icon    = icon
-                    tooltip = tooltip ) INTO TABLE mt_function.
+    DATA temp61 TYPE z2ui5_cl_cgui_alv=>ty_s_function.
+    CLEAR temp61.
+    temp61-name = name.
+    temp61-text = text.
+    temp61-icon = icon.
+    temp61-tooltip = tooltip.
+    INSERT temp61 INTO TABLE mt_function.
     result = me.
 
   ENDMETHOD.
 
   METHOD sync.
+    DATA ls_row LIKE LINE OF view.
+      DATA lr_node TYPE REF TO z2ui5_cl_cgui_tree=>ty_s_node.
 
     IF mv_checkbox = abap_false.
       RETURN.
     ENDIF.
     " only the nodes shown - a collapsed branch keeps its ticks
-    LOOP AT view INTO DATA(ls_row).
-      READ TABLE mt_node REFERENCE INTO DATA(lr_node) WITH KEY key = ls_row-key.
+
+    LOOP AT view INTO ls_row.
+
+      READ TABLE mt_node REFERENCE INTO lr_node WITH KEY key = ls_row-key.
       IF sy-subrc = 0.
         lr_node->checked = ls_row-checked.
       ENDIF.
@@ -617,8 +670,11 @@ CLASS z2ui5_cl_cgui_tree IMPLEMENTATION.
   METHOD set_column_text.
 
     " the key in a variable: a built-in function is no READ TABLE key operand before 7.40
-    DATA(lv_key) = to_upper( name ).
-    READ TABLE mt_column REFERENCE INTO DATA(lr_column) WITH KEY name = lv_key.
+    DATA lv_key TYPE string.
+    DATA lr_column TYPE REF TO z2ui5_cl_cgui_tree=>ty_s_column.
+    lv_key = to_upper( name ).
+
+    READ TABLE mt_column REFERENCE INTO lr_column WITH KEY name = lv_key.
     IF sy-subrc = 0.
       lr_column->text = text.
     ENDIF.
@@ -629,8 +685,11 @@ CLASS z2ui5_cl_cgui_tree IMPLEMENTATION.
   METHOD set_column_hidden.
 
     " the key in a variable: a built-in function is no READ TABLE key operand before 7.40
-    DATA(lv_key) = to_upper( name ).
-    READ TABLE mt_column REFERENCE INTO DATA(lr_column) WITH KEY name = lv_key.
+    DATA lv_key TYPE string.
+    DATA lr_column TYPE REF TO z2ui5_cl_cgui_tree=>ty_s_column.
+    lv_key = to_upper( name ).
+
+    READ TABLE mt_column REFERENCE INTO lr_column WITH KEY name = lv_key.
     IF sy-subrc = 0.
       lr_column->hidden = val.
     ENDIF.
@@ -647,37 +706,58 @@ CLASS z2ui5_cl_cgui_tree IMPLEMENTATION.
   METHOD columns_from.
 
     DATA lo_struct TYPE REF TO cl_abap_structdescr.
+        DATA temp62 TYPE z2ui5_cl_cgui_tree=>ty_s_column.
+    DATA temp63 TYPE abap_component_view_tab.
+    DATA ls_comp LIKE LINE OF temp63.
+      DATA lv_text TYPE string.
+      DATA temp64 TYPE z2ui5_cl_cgui_tree=>ty_s_column.
+      DATA temp5 TYPE z2ui5_cl_cgui_tree=>ty_s_column-text.
+      DATA temp6 TYPE z2ui5_cl_cgui_tree=>ty_s_column-align.
 
     TRY.
         lo_struct ?= cl_abap_typedescr=>describe_by_data( data ).
       CATCH cx_sy_move_cast_error.
         " a single value - one column
-        INSERT VALUE #( name = `VALUE`
-                        text = z2ui5_cl_cgui_context=>rtti_get_label( data ) ) INTO TABLE mt_column.
+
+        CLEAR temp62.
+        temp62-name = `VALUE`.
+        temp62-text = z2ui5_cl_cgui_context=>rtti_get_label( data ).
+        INSERT temp62 INTO TABLE mt_column.
         RETURN.
     ENDTRY.
 
     " the components of includes as fields of their own
-    LOOP AT lo_struct->get_included_view( ) INTO DATA(ls_comp).
+
+    temp63 = lo_struct->get_included_view( ).
+
+    LOOP AT temp63 INTO ls_comp.
       IF lines( mt_column ) >= cv_max_columns.
         EXIT.
       ENDIF.
       IF ls_comp-type->kind <> cl_abap_typedescr=>kind_elem.
         CONTINUE.
       ENDIF.
-      DATA(lv_text) = z2ui5_cl_cgui_context=>rtti_get_label_by_descr( ls_comp-type ).
-      INSERT VALUE #( name  = ls_comp-name
-                      text  = COND #( WHEN lv_text IS NOT INITIAL THEN lv_text ELSE ls_comp-name )
-                      align = SWITCH #( ls_comp-type->type_kind
-                                        WHEN cl_abap_typedescr=>typekind_int
-                                          OR cl_abap_typedescr=>typekind_int1
-                                          OR cl_abap_typedescr=>typekind_int2
-                                          OR cl_abap_typedescr=>typekind_int8
-                                          OR cl_abap_typedescr=>typekind_packed
-                                          OR cl_abap_typedescr=>typekind_float
-                                          OR cl_abap_typedescr=>typekind_decfloat16
-                                          OR cl_abap_typedescr=>typekind_decfloat34 THEN `End`
-                                        ELSE `Begin` ) ) INTO TABLE mt_column.
+
+      lv_text = z2ui5_cl_cgui_context=>rtti_get_label_by_descr( ls_comp-type ).
+
+      CLEAR temp64.
+      temp64-name = ls_comp-name.
+
+      IF lv_text IS NOT INITIAL.
+        temp5 = lv_text.
+      ELSE.
+        temp5 = ls_comp-name.
+      ENDIF.
+      temp64-text = temp5.
+
+      CASE ls_comp-type->type_kind.
+        WHEN cl_abap_typedescr=>typekind_int OR cl_abap_typedescr=>typekind_int1 OR cl_abap_typedescr=>typekind_int2 OR cl_abap_typedescr=>typekind_int8 OR cl_abap_typedescr=>typekind_packed OR cl_abap_typedescr=>typekind_float OR cl_abap_typedescr=>typekind_decfloat16 OR cl_abap_typedescr=>typekind_decfloat34.
+          temp6 = `End`.
+        WHEN OTHERS.
+          temp6 = `Begin`.
+      ENDCASE.
+      temp64-align = temp6.
+      INSERT temp64 INTO TABLE mt_column.
     ENDLOOP.
 
   ENDMETHOD.
@@ -686,7 +766,9 @@ CLASS z2ui5_cl_cgui_tree IMPLEMENTATION.
 
     FIELD-SYMBOLS <value> TYPE any.
 
-    LOOP AT mt_column INTO DATA(ls_column).
+    DATA ls_column LIKE LINE OF mt_column.
+      DATA temp65 TYPE string.
+    LOOP AT mt_column INTO ls_column.
       UNASSIGN <value>.
       IF ls_column-name = `VALUE`.
         ASSIGN COMPONENT `VALUE` OF STRUCTURE data TO <value>.
@@ -698,8 +780,13 @@ CLASS z2ui5_cl_cgui_tree IMPLEMENTATION.
       ENDIF.
       " an initial value stays empty - the sums of a parent leave the fields
       " of the leaves blank instead of 0000 and 0.00
-      INSERT COND string( WHEN <value> IS ASSIGNED AND <value> IS NOT INITIAL
-                          THEN z2ui5_cl_cgui_context=>conv_to_text( <value> ) )
+
+      IF <value> IS ASSIGNED AND <value> IS NOT INITIAL.
+        temp65 = z2ui5_cl_cgui_context=>conv_to_text( <value> ).
+      ELSE.
+        CLEAR temp65.
+      ENDIF.
+      INSERT temp65
              INTO TABLE result.
     ENDLOOP.
 
@@ -718,30 +805,71 @@ CLASS z2ui5_cl_cgui_tree IMPLEMENTATION.
     DATA lv_cell_no TYPE ty_cell_no.
     FIELD-SYMBOLS <cell> TYPE string.
 
-    LOOP AT mt_node INTO DATA(ls_node) WHERE parent = parent.
-      DATA(lv_children) = has_children( ls_node-key ).
-      DATA(lv_expandable) = expandable( ls_node ).
+    DATA ls_node LIKE LINE OF mt_node.
+      DATA lv_children TYPE abap_bool.
+      DATA lv_expandable TYPE abap_bool.
+      DATA lv_open TYPE abap_bool.
+      DATA temp3 TYPE xsdboolean.
+      DATA temp66 TYPE ty_s_view.
+      DATA temp7 TYPE i.
+      DATA temp8 TYPE z2ui5_cl_cgui_tree=>ty_s_view-expander.
+      DATA temp9 TYPE z2ui5_cl_cgui_tree=>ty_s_view-icon.
+      DATA ls_row LIKE temp66.
+      DATA lv_cell LIKE LINE OF ls_node-cells.
+        DATA temp67 TYPE string.
+    LOOP AT mt_node INTO ls_node WHERE parent = parent.
+
+      lv_children = has_children( ls_node-key ).
+
+      lv_expandable = expandable( ls_node ).
       " open: expanded with children - a lazy node waits for its first expand
-      DATA(lv_open) = xsdbool( lv_children = abap_true AND ls_node-expanded = abap_true ).
-      DATA(ls_row) = VALUE ty_s_view(
-          key      = ls_node-key
-          level    = level
-          " a leaf has no expander - its text starts where the others do
-          indent   = |{ level * 24 + COND i( WHEN lv_expandable = abap_true THEN 0 ELSE 32 ) }px|
-          expander = COND #( WHEN lv_expandable = abap_false THEN ``
-                             WHEN lv_open = abap_true THEN `sap-icon://navigation-down-arrow`
-                             ELSE `sap-icon://navigation-right-arrow` )
-          text     = ls_node-text
-          checked  = ls_node-checked
-          icon     = COND #( WHEN ls_node-icon IS NOT INITIAL THEN ls_node-icon
-                             WHEN lv_open = abap_true THEN `sap-icon://open-folder`
-                             WHEN lv_expandable = abap_true OR ls_node-folder = abap_true THEN `sap-icon://folder-blank`
-                             ELSE `` ) ).
-      LOOP AT ls_node-cells INTO DATA(lv_cell).
+
+
+      temp3 = boolc( lv_children = abap_true AND ls_node-expanded = abap_true ).
+      lv_open = temp3.
+
+      CLEAR temp66.
+      temp66-key = ls_node-key.
+      temp66-level = level.
+
+      IF lv_expandable = abap_true.
+        temp7 = 0.
+      ELSE.
+        temp7 = 32.
+      ENDIF.
+      temp66-indent = |{ level * 24 + temp7 }px|.
+
+      IF lv_expandable = abap_false.
+        temp8 = ``.
+      ELSEIF lv_open = abap_true.
+        temp8 = `sap-icon://navigation-down-arrow`.
+      ELSE.
+        temp8 = `sap-icon://navigation-right-arrow`.
+      ENDIF.
+      temp66-expander = temp8.
+      temp66-text = ls_node-text.
+      temp66-checked = ls_node-checked.
+
+      IF ls_node-icon IS NOT INITIAL.
+        temp9 = ls_node-icon.
+      ELSEIF lv_open = abap_true.
+        temp9 = `sap-icon://open-folder`.
+      ELSEIF lv_expandable = abap_true OR ls_node-folder = abap_true.
+        temp9 = `sap-icon://folder-blank`.
+      ELSE.
+        temp9 = ``.
+      ENDIF.
+      temp66-icon = temp9.
+
+      ls_row = temp66.
+
+      LOOP AT ls_node-cells INTO lv_cell.
         " C01, C02, ... - NUMC rather than ALIGN and PAD, which the
         " transpiled runtime does not apply
         lv_cell_no = sy-tabix.
-        ASSIGN COMPONENT |C{ lv_cell_no }| OF STRUCTURE ls_row TO <cell>.
+
+        temp67 = |C{ lv_cell_no }|.
+ASSIGN COMPONENT temp67 OF STRUCTURE ls_row TO <cell>.
         IF sy-subrc = 0.
           <cell> = lv_cell.
         ENDIF.
@@ -759,72 +887,125 @@ CLASS z2ui5_cl_cgui_tree IMPLEMENTATION.
 
   METHOD render.
 
-    DATA(lv_rows) = lines( view ).
+    DATA lv_rows TYPE i.
+    DATA temp68 TYPE string.
+    DATA lo_table TYPE REF TO z2ui5_cl_ui5_view_builder.
+    DATA lo_bar TYPE REF TO z2ui5_cl_ui5_view_builder.
+    DATA temp69 LIKE LINE OF mt_function.
+    DATA lr_function LIKE REF TO temp69.
+    DATA temp70 TYPE string.
+    DATA temp71 TYPE string.
+    DATA lo_columns TYPE REF TO z2ui5_cl_ui5_view_builder.
+    DATA lo_hier TYPE REF TO z2ui5_cl_ui5_view_builder.
+    DATA temp72 TYPE string.
+    DATA temp10 TYPE string.
+    DATA lo_cell TYPE REF TO z2ui5_cl_ui5_view_builder.
+    DATA temp73 TYPE string_table.
+        DATA temp75 TYPE string_table.
+    DATA temp77 TYPE string_table.
+    DATA ls_column LIKE LINE OF mt_column.
+      DATA lv_index LIKE sy-tabix.
+      DATA lo_column TYPE REF TO z2ui5_cl_ui5_view_builder.
+      DATA temp79 TYPE ty_cell_no.
+    lv_rows = lines( view ).
     IF lv_rows > 20.
       lv_rows = 20.
     ELSEIF lv_rows < 3.
       lv_rows = 3.
     ENDIF.
 
-    DATA(lo_table) = node->ele( n = `Table` ns = `table`
+
+    IF rows_bind IS NOT INITIAL.
+      temp68 = rows_bind.
+    ELSE.
+      temp68 = client->_bind( view ).
+    ENDIF.
+
+    lo_table = node->ele( n = `Table` ns = `table`
         )->a( n = `xmlns:table`        v = `sap.ui.table`
         )->a( n = `xmlns:core`         v = `sap.ui.core`
-        )->a( n = `rows`               v = COND #( WHEN rows_bind IS NOT INITIAL THEN rows_bind
-                                                   ELSE client->_bind( view ) )
+        )->a( n = `rows`               v = temp68
         )->a( n = `selectionMode`      v = `None`
         )->a( n = `visibleRowCount`    v = |{ lv_rows }|
         )->a( n = `class`              v = `sapUiSmallMargin` ).
 
-    DATA(lo_bar) = lo_table->ele( n = `extension` ns = `table`
+
+    lo_bar = lo_table->ele( n = `extension` ns = `table`
         )->ele( `OverflowToolbar` ).
     lo_bar->tag( `Title`
         )->a( n = `text` t = mv_title ).
     lo_bar->tag( `ToolbarSpacer` ).
-    LOOP AT mt_function REFERENCE INTO DATA(lr_function).
+
+
+    LOOP AT mt_function REFERENCE INTO lr_function.
       lo_bar->tag( `Button`
           )->a( n = `text`    t = lr_function->text
           )->a( n = `icon`    v = lr_function->icon
           )->a( n = `tooltip` t = lr_function->tooltip
           )->a( n = `press`   v = client->_event( lr_function->name ) ).
     ENDLOOP.
+
+    temp70 = 'Expand all'(001).
     lo_bar->tag( `Button`
         )->a( n = `icon`    v = `sap-icon://expand-group`
-        )->a( n = `tooltip` t = CONV #( 'Expand all'(001) )
+        )->a( n = `tooltip` t = temp70
         )->a( n = `press`   v = client->_event( cs_event-expand_all ) ).
+
+    temp71 = 'Collapse all'(002).
     lo_bar->tag( `Button`
         )->a( n = `icon`    v = `sap-icon://collapse-group`
-        )->a( n = `tooltip` t = CONV #( 'Collapse all'(002) )
+        )->a( n = `tooltip` t = temp71
         )->a( n = `press`   v = client->_event( cs_event-collapse_all ) ).
 
-    DATA(lo_columns) = lo_table->ele( n = `columns` ns = `table` ).
+
+    lo_columns = lo_table->ele( n = `columns` ns = `table` ).
 
     " the hierarchy: indentation, expander, icon and the text of the node
-    DATA(lo_hier) = lo_columns->ele( n = `Column` ns = `table`
+
+    lo_hier = lo_columns->ele( n = `Column` ns = `table`
         )->a( n = `width` v = `22rem` ).
+
+    temp72 = 'Hierarchy'(003).
+
+    IF mv_header IS NOT INITIAL.
+      temp10 = mv_header.
+    ELSE.
+      temp10 = temp72.
+    ENDIF.
     lo_hier->ele( n = `label` ns = `table`
         )->tag( `Label`
-        )->a( n = `text`   t = COND #( WHEN mv_header IS NOT INITIAL THEN mv_header ELSE CONV #( 'Hierarchy'(003) ) )
+        )->a( n = `text`   t = temp10
         )->a( n = `design` v = `Bold` ).
-    DATA(lo_cell) = lo_hier->ele( n = `template` ns = `table`
+
+    lo_cell = lo_hier->ele( n = `template` ns = `table`
         )->ele( `HBox`
         )->a( n = `alignItems` v = `Center` ).
     lo_cell->tag( `Text`
         )->a( n = `text`  v = ``
         )->a( n = `width` v = `{INDENT}` ).
+
+    CLEAR temp73.
+    INSERT `${KEY}` INTO TABLE temp73.
     lo_cell->tag( `Button`
         )->a( n = `icon`    v = `{EXPANDER}`
         )->a( n = `type`    v = `Transparent`
         )->a( n = `visible` v = `{= ${EXPANDER} !== '' }`
         )->a( n = `press`   v = client->_event( val   = cs_event-toggle
-                                                t_arg = VALUE #( ( `${KEY}` ) ) ) ).
+                                                t_arg = temp73 ) ).
     IF mv_checkbox = abap_true.
       lo_cell->tag( `CheckBox`
           )->a( n = `selected` v = `{CHECKED}` ).
       IF mv_check_event = abap_true OR mv_check_branch = abap_true.
+
+        CLEAR temp75.
+        INSERT `${KEY}` INTO TABLE temp75.
         lo_cell->a( n = `select` v = client->_event( val   = cs_event-checkbox
-                                                     t_arg = VALUE #( ( `${KEY}` ) ) ) ).
+                                                     t_arg = temp75 ) ).
       ENDIF.
     ENDIF.
+
+    CLEAR temp77.
+    INSERT `${KEY}` INTO TABLE temp77.
     lo_cell->tag( n = `Icon` ns = `core`
             )->a( n = `src`     v = `{ICON}`
             )->a( n = `visible` v = `{= ${ICON} !== '' }`
@@ -832,33 +1013,42 @@ CLASS z2ui5_cl_cgui_tree IMPLEMENTATION.
             )->tag( `Link`
             )->a( n = `text`  v = `{TEXT}`
             )->a( n = `press` v = client->_event( val   = cs_event-node
-                                                  t_arg = VALUE #( ( `${KEY}` ) ) ) ).
+                                                  t_arg = temp77 ) ).
 
-    LOOP AT mt_column INTO DATA(ls_column).
-      DATA(lv_index) = sy-tabix.
+
+    LOOP AT mt_column INTO ls_column.
+
+      lv_index = sy-tabix.
       IF ls_column-hidden = abap_true.
         CONTINUE.
       ENDIF.
-      DATA(lo_column) = lo_columns->ele( n = `Column` ns = `table`
+
+      lo_column = lo_columns->ele( n = `Column` ns = `table`
           )->a( n = `hAlign` v = ls_column-align ).
       lo_column->ele( n = `label` ns = `table`
           )->tag( `Label`
           )->a( n = `text` t = ls_column-text ).
+
+      temp79 = lv_index.
       lo_column->ele( n = `template` ns = `table`
           )->tag( `Text`
-          )->a( n = `text`     v = |\{C{ CONV ty_cell_no( lv_index ) }\}|
+          )->a( n = `text`     v = |\{C{ temp79 }\}|
           )->a( n = `wrapping` b = abap_false ).
     ENDLOOP.
 
   ENDMETHOD.
 
   METHOD handle_event.
+        DATA lv_key TYPE i.
+        DATA ls_node TYPE z2ui5_cl_cgui_tree=>ty_s_node.
 
     result = abap_true.
     CASE client->get_event( ).
       WHEN cs_event-toggle.
-        DATA(lv_key) = get_node_by_event( client ).
-        DATA(ls_node) = get_node( lv_key ).
+
+        lv_key = get_node_by_event( client ).
+
+        ls_node = get_node( lv_key ).
         IF ls_node-expanded = abap_true AND has_children( lv_key ) = abap_true.
           collapse( lv_key ).
         ELSE.
@@ -891,7 +1081,8 @@ CLASS z2ui5_cl_cgui_tree IMPLEMENTATION.
 
   METHOD get_node_by_event.
 
-    DATA(lv_arg) = condense( client->get_event_arg( ) ).
+    DATA lv_arg TYPE string.
+    lv_arg = condense( client->get_event_arg( ) ).
     IF lv_arg IS NOT INITIAL AND lv_arg CO `0123456789`.
       result = lv_arg.
     ENDIF.
@@ -901,18 +1092,45 @@ CLASS z2ui5_cl_cgui_tree IMPLEMENTATION.
   METHOD to_text.
 
     FIELD-SYMBOLS <cell> TYPE string.
+    DATA temp80 TYPE z2ui5_cl_cgui_tree=>ty_t_view.
+    DATA ls_row LIKE LINE OF temp80.
+      DATA temp81 TYPE string.
+      DATA temp11 TYPE string.
+      DATA lv_line TYPE string.
+      DATA ls_column LIKE LINE OF mt_column.
+        DATA temp82 TYPE string.
 
     IF mv_title IS NOT INITIAL.
       INSERT mv_title INTO TABLE result.
     ENDIF.
-    LOOP AT view( ) INTO DATA(ls_row).
-      DATA(lv_line) = |{ repeat( val = `  ` occ = ls_row-level ) }{ SWITCH string( ls_row-expander
-                                                                      WHEN `` THEN `  `
-                                                                      WHEN `sap-icon://navigation-down-arrow` THEN `- `
-                                                                      ELSE `+ ` ) }{ COND #( WHEN mv_checkbox = abap_true AND ls_row-checked = abap_true THEN `[x] `
-                                                                                             WHEN mv_checkbox = abap_true THEN `[ ] ` ) }{ ls_row-text }|.
-      LOOP AT mt_column INTO DATA(ls_column) WHERE hidden = abap_false.
-        ASSIGN COMPONENT |C{ sy-tabix WIDTH = 2 ALIGN = RIGHT PAD = '0' }| OF STRUCTURE ls_row TO <cell>.
+
+    temp80 = view( ).
+
+    LOOP AT temp80 INTO ls_row.
+
+      CASE ls_row-expander.
+        WHEN ``.
+          temp81 = `  `.
+        WHEN `sap-icon://navigation-down-arrow`.
+          temp81 = `- `.
+        WHEN OTHERS.
+          temp81 = `+ `.
+      ENDCASE.
+
+      IF mv_checkbox = abap_true AND ls_row-checked = abap_true.
+        temp11 = `[x] `.
+      ELSEIF mv_checkbox = abap_true.
+        temp11 = `[ ] `.
+      ELSE.
+        CLEAR temp11.
+      ENDIF.
+
+      lv_line = |{ repeat( val = `  ` occ = ls_row-level ) }{ temp81 }{ temp11 }{ ls_row-text }|.
+
+      LOOP AT mt_column INTO ls_column WHERE hidden = abap_false.
+
+        temp82 = |C{ sy-tabix WIDTH = 2 ALIGN = RIGHT PAD = '0' }|.
+ASSIGN COMPONENT temp82 OF STRUCTURE ls_row TO <cell>.
         IF sy-subrc = 0 AND ls_column-name IS NOT INITIAL.
           lv_line = |{ lv_line } \| { <cell> }|.
         ENDIF.

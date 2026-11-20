@@ -9,7 +9,7 @@ CLASS z2ui5_cl_cgui_sample_07 DEFINITION PUBLIC
         carrid TYPE c LENGTH 3,
         name   TYPE c LENGTH 30,
       END OF ty_s_carrier.
-    TYPES ty_t_carrier TYPE STANDARD TABLE OF ty_s_carrier WITH EMPTY KEY.
+    TYPES ty_t_carrier TYPE STANDARD TABLE OF ty_s_carrier WITH DEFAULT KEY.
 
     " standard F4 from the DDIC: domain fixed values, a value table
     DATA p_option TYPE ddoption.
@@ -63,13 +63,27 @@ CLASS z2ui5_cl_cgui_sample_07 IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD at_value_request.
+        DATA temp1 TYPE ty_t_carrier.
+        DATA temp2 LIKE LINE OF temp1.
 
     CASE field.
       WHEN `P_CARRID` OR `S_CARRID`.
-        value_help_popup( tab   = VALUE ty_t_carrier( ( carrid = `AA` name = `American Airlines` )
-                                                      ( carrid = `LH` name = `Lufthansa` )
-                                                      ( carrid = `SQ` name = `Singapore Airlines` )
-                                                      ( carrid = `UA` name = `United Airlines` ) )
+
+        CLEAR temp1.
+
+        temp2-carrid = `AA`.
+        temp2-name = `American Airlines`.
+        INSERT temp2 INTO TABLE temp1.
+        temp2-carrid = `LH`.
+        temp2-name = `Lufthansa`.
+        INSERT temp2 INTO TABLE temp1.
+        temp2-carrid = `SQ`.
+        temp2-name = `Singapore Airlines`.
+        INSERT temp2 INTO TABLE temp1.
+        temp2-carrid = `UA`.
+        temp2-name = `United Airlines`.
+        INSERT temp2 INTO TABLE temp1.
+        value_help_popup( tab   = temp1
                           col   = `CARRID`
                           title = `Airlines` ).
       WHEN OTHERS.

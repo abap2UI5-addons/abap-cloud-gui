@@ -1,12 +1,132 @@
 CLASS ltcl_client DEFINITION FINAL FOR TESTING.
 
   PUBLIC SECTION.
-    INTERFACES z2ui5_if_client PARTIALLY IMPLEMENTED.
+    INTERFACES z2ui5_if_client .
 
 ENDCLASS.
 
 
 CLASS ltcl_client IMPLEMENTATION.
+  METHOD z2ui5_if_client~get_app_prev.
+    RETURN. " todo, implement method
+  ENDMETHOD.
+  METHOD z2ui5_if_client~check_on_navigated.
+    RETURN. " todo, implement method
+  ENDMETHOD.
+  METHOD z2ui5_if_client~check_app_prev_stack.
+    RETURN. " todo, implement method
+  ENDMETHOD.
+  METHOD z2ui5_if_client~check_on_init.
+    RETURN. " todo, implement method
+  ENDMETHOD.
+  METHOD z2ui5_if_client~check_on_event.
+    RETURN. " todo, implement method
+  ENDMETHOD.
+  METHOD z2ui5_if_client~follow_up_action.
+    RETURN. " todo, implement method
+  ENDMETHOD.
+  METHOD z2ui5_if_client~window_get_row.
+    RETURN. " todo, implement method
+  ENDMETHOD.
+  METHOD z2ui5_if_client~window_bind_tab.
+    RETURN. " todo, implement method
+  ENDMETHOD.
+  METHOD z2ui5_if_client~_bind_path.
+    RETURN. " todo, implement method
+  ENDMETHOD.
+  METHOD z2ui5_if_client~_bind_edit.
+    RETURN. " todo, implement method
+  ENDMETHOD.
+  METHOD z2ui5_if_client~_event_client.
+    RETURN. " todo, implement method
+  ENDMETHOD.
+  METHOD z2ui5_if_client~message_toast_display.
+    RETURN. " todo, implement method
+  ENDMETHOD.
+  METHOD z2ui5_if_client~message_box_display.
+    RETURN. " todo, implement method
+  ENDMETHOD.
+  METHOD z2ui5_if_client~nav_app_call.
+    RETURN. " todo, implement method
+  ENDMETHOD.
+  METHOD z2ui5_if_client~nav_app_leave.
+    RETURN. " todo, implement method
+  ENDMETHOD.
+  METHOD z2ui5_if_client~_event_nav_app_leave.
+    RETURN. " todo, implement method
+  ENDMETHOD.
+  METHOD z2ui5_if_client~get_app.
+    RETURN. " todo, implement method
+  ENDMETHOD.
+  METHOD z2ui5_if_client~get_event_arg.
+    RETURN. " todo, implement method
+  ENDMETHOD.
+  METHOD z2ui5_if_client~get_event.
+    RETURN. " todo, implement method
+  ENDMETHOD.
+  METHOD z2ui5_if_client~get.
+    RETURN. " todo, implement method
+  ENDMETHOD.
+  METHOD z2ui5_if_client~popover_destroy.
+    RETURN. " todo, implement method
+  ENDMETHOD.
+  METHOD z2ui5_if_client~popover_display.
+    RETURN. " todo, implement method
+  ENDMETHOD.
+  METHOD z2ui5_if_client~popover_model_update.
+    RETURN. " todo, implement method
+  ENDMETHOD.
+  METHOD z2ui5_if_client~popup_destroy.
+    RETURN. " todo, implement method
+  ENDMETHOD.
+  METHOD z2ui5_if_client~popup_model_update.
+    RETURN. " todo, implement method
+  ENDMETHOD.
+  METHOD z2ui5_if_client~popup_display.
+    RETURN. " todo, implement method
+  ENDMETHOD.
+  METHOD z2ui5_if_client~nest2_view_model_update.
+    RETURN. " todo, implement method
+  ENDMETHOD.
+  METHOD z2ui5_if_client~nest2_view_destroy.
+    RETURN. " todo, implement method
+  ENDMETHOD.
+  METHOD z2ui5_if_client~nest2_view_display.
+    RETURN. " todo, implement method
+  ENDMETHOD.
+  METHOD z2ui5_if_client~nest_view_model_update.
+    RETURN. " todo, implement method
+  ENDMETHOD.
+  METHOD z2ui5_if_client~nest_view_destroy.
+    RETURN. " todo, implement method
+  ENDMETHOD.
+  METHOD z2ui5_if_client~nest_view_display.
+    RETURN. " todo, implement method
+  ENDMETHOD.
+  METHOD z2ui5_if_client~hash_replace.
+    RETURN. " todo, implement method
+  ENDMETHOD.
+  METHOD z2ui5_if_client~hash_set.
+    RETURN. " todo, implement method
+  ENDMETHOD.
+  METHOD z2ui5_if_client~app_state_get_href.
+    RETURN. " todo, implement method
+  ENDMETHOD.
+  METHOD z2ui5_if_client~app_state_set_active.
+    RETURN. " todo, implement method
+  ENDMETHOD.
+  METHOD z2ui5_if_client~set_session_stateful.
+    RETURN. " todo, implement method
+  ENDMETHOD.
+  METHOD z2ui5_if_client~view_model_update.
+    RETURN. " todo, implement method
+  ENDMETHOD.
+  METHOD z2ui5_if_client~view_display.
+    RETURN. " todo, implement method
+  ENDMETHOD.
+  METHOD z2ui5_if_client~view_destroy.
+    RETURN. " todo, implement method
+  ENDMETHOD.
 
   METHOD z2ui5_if_client~_event.
 
@@ -50,7 +170,14 @@ CLASS ltcl_test IMPLEMENTATION.
 
   METHOD write_lines.
 
-    DATA(lo_list) = z2ui5_cl_cgui_list=>factory( ).
+    DATA lo_list TYPE REF TO z2ui5_cl_cgui_list.
+    DATA lt_item TYPE z2ui5_cl_cgui_list=>ty_t_item.
+    FIELD-SYMBOLS <temp1> LIKE LINE OF lt_item.
+    DATA temp2 LIKE sy-tabix.
+    FIELD-SYMBOLS <temp3> LIKE LINE OF lt_item.
+    DATA temp4 LIKE sy-tabix.
+    DATA ls_item TYPE z2ui5_cl_cgui_list=>ty_s_item.
+    lo_list = z2ui5_cl_cgui_list=>factory( ).
     lo_list->write( `a`
         )->write( `b`
         )->new_line(
@@ -58,15 +185,33 @@ CLASS ltcl_test IMPLEMENTATION.
                   hotspot = abap_true
                   hide    = `K1` ).
 
-    DATA(lt_item) = lo_list->get_items( ).
+
+    lt_item = lo_list->get_items( ).
     cl_abap_unit_assert=>assert_equals( exp = 3
                                         act = lines( lt_item ) ).
-    cl_abap_unit_assert=>assert_equals( exp = 1
-                                        act = lt_item[ 2 ]-line ).
-    cl_abap_unit_assert=>assert_equals( exp = 2
-                                        act = lt_item[ 3 ]-line ).
 
-    DATA(ls_item) = lo_list->get_item_by_line( 2 ).
+
+    temp2 = sy-tabix.
+    READ TABLE lt_item INDEX 2 ASSIGNING <temp1>.
+    sy-tabix = temp2.
+    IF sy-subrc <> 0.
+      ASSERT 1 = 0.
+    ENDIF.
+    cl_abap_unit_assert=>assert_equals( exp = 1
+                                        act = <temp1>-line ).
+
+
+    temp4 = sy-tabix.
+    READ TABLE lt_item INDEX 3 ASSIGNING <temp3>.
+    sy-tabix = temp4.
+    IF sy-subrc <> 0.
+      ASSERT 1 = 0.
+    ENDIF.
+    cl_abap_unit_assert=>assert_equals( exp = 2
+                                        act = <temp3>-line ).
+
+
+    ls_item = lo_list->get_item_by_line( 2 ).
     cl_abap_unit_assert=>assert_equals( exp = `c`
                                         act = ls_item-text ).
     cl_abap_unit_assert=>assert_equals( exp = `K1`
@@ -78,10 +223,19 @@ CLASS ltcl_test IMPLEMENTATION.
 
     DATA lt_text TYPE string_table.
 
-    DATA(lo_list) = z2ui5_cl_cgui_list=>factory( ).
-    lt_text = VALUE #( ( `x` ) ( `y` ) ( `z` ) ).
+    DATA lo_list TYPE REF TO z2ui5_cl_cgui_list.
+    DATA temp5 TYPE string_table.
+    DATA lv_text LIKE LINE OF lt_text.
+    lo_list = z2ui5_cl_cgui_list=>factory( ).
 
-    LOOP AT lt_text INTO DATA(lv_text).
+    CLEAR temp5.
+    INSERT `x` INTO TABLE temp5.
+    INSERT `y` INTO TABLE temp5.
+    INSERT `z` INTO TABLE temp5.
+    lt_text = temp5.
+
+
+    LOOP AT lt_text INTO lv_text.
       lo_list->write( val     = lv_text
                       hotspot = abap_true
                       hide    = sy-tabix
@@ -95,7 +249,8 @@ CLASS ltcl_test IMPLEMENTATION.
 
   METHOD clear.
 
-    DATA(lo_list) = z2ui5_cl_cgui_list=>factory( ).
+    DATA lo_list TYPE REF TO z2ui5_cl_cgui_list.
+    lo_list = z2ui5_cl_cgui_list=>factory( ).
     lo_list->write( `a` )->uline( ).
     lo_list->clear( ).
 
@@ -105,7 +260,10 @@ CLASS ltcl_test IMPLEMENTATION.
 
   METHOD header_repeats.
 
-    DATA(lo_list) = z2ui5_cl_cgui_list=>factory( ).
+    DATA lo_list TYPE REF TO z2ui5_cl_cgui_list.
+    DATA lv_view TYPE string.
+    DATA temp1 TYPE REF TO ltcl_client.
+    lo_list = z2ui5_cl_cgui_list=>factory( ).
     lo_list->header_begin( ).
     lo_list->write( `HEAD` ).
     lo_list->header_end( ).
@@ -114,7 +272,10 @@ CLASS ltcl_test IMPLEMENTATION.
     lo_list->write( `one` )->new_page( `Page 2` )->write( `two` ).
     cl_abap_unit_assert=>assert_true( lo_list->has_content( ) ).
 
-    DATA(lv_view) = lo_list->stringify( NEW ltcl_client( ) ).
+
+
+    CREATE OBJECT temp1 TYPE ltcl_client.
+    lv_view = lo_list->stringify( temp1 ).
     " the header above the list and again after the page break
     cl_abap_unit_assert=>assert_char_cp( act = lv_view
                                          exp = `*HEAD*one*Page 2*HEAD*two*` ).
@@ -133,10 +294,16 @@ CLASS ltcl_test IMPLEMENTATION.
     DATA ls_flight TYPE ty_s_flight.
     DATA ls_back   TYPE ty_s_flight.
     DATA lv_number TYPE i.
+    DATA lv_text TYPE string.
 
     " a structure that is no character-like one: component by component
-    ls_flight = VALUE #( carrid = 'LH' seats = 120 price = '420.50' fldate = '20260105' ).
-    DATA(lv_text) = z2ui5_cl_cgui_list=>hide_text( ls_flight ).
+    CLEAR ls_flight.
+    ls_flight-carrid = 'LH'.
+    ls_flight-seats = 120.
+    ls_flight-price = '420.50'.
+    ls_flight-fldate = '20260105'.
+
+    lv_text = z2ui5_cl_cgui_list=>hide_text( ls_flight ).
     cl_abap_unit_assert=>assert_equals( act = lv_text
                                         exp = |LH\t120\t420.50\t20260105| ).
     z2ui5_cl_cgui_list=>hide_restore( EXPORTING hide = lv_text
@@ -154,18 +321,36 @@ CLASS ltcl_test IMPLEMENTATION.
 
   METHOD write_at_position.
 
-    DATA(lo_list) = z2ui5_cl_cgui_list=>factory( ).
+    DATA lo_list TYPE REF TO z2ui5_cl_cgui_list.
+    DATA lt_text TYPE string_table.
+    FIELD-SYMBOLS <temp7> LIKE LINE OF lt_text.
+    DATA temp8 LIKE sy-tabix.
+    DATA lv_view TYPE string.
+    DATA temp2 TYPE REF TO ltcl_client.
+    lo_list = z2ui5_cl_cgui_list=>factory( ).
     lo_list->write( val = `AB` pos = 1 len = 5
         )->write( val = `CD` pos = 10 ).
 
-    DATA(lt_text) = lo_list->to_text( ).
-    cl_abap_unit_assert=>assert_equals( act = lt_text[ 1 ]
+
+    lt_text = lo_list->to_text( ).
+
+
+    temp8 = sy-tabix.
+    READ TABLE lt_text INDEX 1 ASSIGNING <temp7>.
+    sy-tabix = temp8.
+    IF sy-subrc <> 0.
+      ASSERT 1 = 0.
+    ENDIF.
+    cl_abap_unit_assert=>assert_equals( act = <temp7>
                                         exp = `AB       CD` ).
 
     " the items of a line with a position stand in boxes of their width, so
     " the columns line up whatever the font; a line without one flows
     lo_list->new_line( )->write( `free` ).
-    DATA(lv_view) = lo_list->stringify( NEW ltcl_client( ) ).
+
+
+    CREATE OBJECT temp2 TYPE ltcl_client.
+    lv_view = lo_list->stringify( temp2 ).
     cl_abap_unit_assert=>assert_char_cp( act = lv_view
                                          exp = `*width="3.0em"*AB*width="2.4em"*width="1.8em"*CD*` ).
     " the two boxes, the spacer and the width of AB itself - the free line
@@ -182,7 +367,25 @@ CLASS ltcl_test IMPLEMENTATION.
     DATA lv_amount TYPE p LENGTH 8 DECIMALS 2 VALUE '-12.50'.
     DATA lv_count  TYPE i.
 
-    DATA(lo_list) = z2ui5_cl_cgui_list=>factory( ).
+    DATA lo_list TYPE REF TO z2ui5_cl_cgui_list.
+    DATA lt_item TYPE z2ui5_cl_cgui_list=>ty_t_item.
+    FIELD-SYMBOLS <temp9> LIKE LINE OF lt_item.
+    DATA temp10 LIKE sy-tabix.
+    FIELD-SYMBOLS <temp11> LIKE LINE OF lt_item.
+    DATA temp12 LIKE sy-tabix.
+    FIELD-SYMBOLS <temp13> LIKE LINE OF lt_item.
+    DATA temp14 LIKE sy-tabix.
+    DATA temp2 TYPE xsdboolean.
+    DATA temp15 TYPE string_table.
+    FIELD-SYMBOLS <temp3> LIKE LINE OF lt_item.
+    DATA temp4 LIKE sy-tabix.
+    DATA temp1 LIKE LINE OF temp15.
+    DATA lv_view TYPE string.
+    DATA temp5 TYPE REF TO ltcl_client.
+    DATA temp3 TYPE xsdboolean.
+    DATA temp6 TYPE xsdboolean.
+    DATA temp7 TYPE xsdboolean.
+    lo_list = z2ui5_cl_cgui_list=>factory( ).
     lo_list->write( val     = lv_zero
                     no_zero = abap_true
         )->write( val     = lv_count
@@ -197,18 +400,67 @@ CLASS ltcl_test IMPLEMENTATION.
                   len     = 3
                   justify = z2ui5_cl_cgui_list=>cs_justify-right ).
 
-    DATA(lt_item) = lo_list->get_items( ).
-    cl_abap_unit_assert=>assert_equals( act = lt_item[ 1 ]-text
-                                        exp = `42` ).
-    cl_abap_unit_assert=>assert_initial( lt_item[ 2 ]-text ).
-    cl_abap_unit_assert=>assert_false( xsdbool( lt_item[ 3 ]-text CS `-` ) ).
-    cl_abap_unit_assert=>assert_equals( act = lo_list->to_text( )
-                                        exp = VALUE string_table( ( |42  { lt_item[ 3 ]-text } bold inv   R| ) ) ).
 
-    DATA(lv_view) = lo_list->stringify( NEW ltcl_client( ) ).
-    cl_abap_unit_assert=>assert_true( xsdbool( lv_view CS `design="Bold"` ) ).
-    cl_abap_unit_assert=>assert_true( xsdbool( lv_view CS `inverted="true"` ) ).
-    cl_abap_unit_assert=>assert_true( xsdbool( lv_view CS `textAlign="End"` ) ).
+    lt_item = lo_list->get_items( ).
+
+
+    temp10 = sy-tabix.
+    READ TABLE lt_item INDEX 1 ASSIGNING <temp9>.
+    sy-tabix = temp10.
+    IF sy-subrc <> 0.
+      ASSERT 1 = 0.
+    ENDIF.
+    cl_abap_unit_assert=>assert_equals( act = <temp9>-text
+                                        exp = `42` ).
+
+
+    temp12 = sy-tabix.
+    READ TABLE lt_item INDEX 2 ASSIGNING <temp11>.
+    sy-tabix = temp12.
+    IF sy-subrc <> 0.
+      ASSERT 1 = 0.
+    ENDIF.
+    cl_abap_unit_assert=>assert_initial( <temp11>-text ).
+
+
+    temp14 = sy-tabix.
+    READ TABLE lt_item INDEX 3 ASSIGNING <temp13>.
+    sy-tabix = temp14.
+    IF sy-subrc <> 0.
+      ASSERT 1 = 0.
+    ENDIF.
+
+    temp2 = boolc( <temp13>-text CS `-` ).
+    cl_abap_unit_assert=>assert_false( temp2 ).
+
+    CLEAR temp15.
+
+
+    temp4 = sy-tabix.
+    READ TABLE lt_item INDEX 3 ASSIGNING <temp3>.
+    sy-tabix = temp4.
+    IF sy-subrc <> 0.
+      ASSERT 1 = 0.
+    ENDIF.
+
+    temp1 = |42  { <temp3>-text } bold inv   R|.
+    INSERT temp1 INTO TABLE temp15.
+    cl_abap_unit_assert=>assert_equals( act = lo_list->to_text( )
+                                        exp = temp15 ).
+
+
+
+    CREATE OBJECT temp5 TYPE ltcl_client.
+    lv_view = lo_list->stringify( temp5 ).
+
+    temp3 = boolc( lv_view CS `design="Bold"` ).
+    cl_abap_unit_assert=>assert_true( temp3 ).
+
+    temp6 = boolc( lv_view CS `inverted="true"` ).
+    cl_abap_unit_assert=>assert_true( temp6 ).
+
+    temp7 = boolc( lv_view CS `textAlign="End"` ).
+    cl_abap_unit_assert=>assert_true( temp7 ).
 
   ENDMETHOD.
 
@@ -218,14 +470,27 @@ CLASS ltcl_test IMPLEMENTATION.
     DATA lv_carrid TYPE c LENGTH 3 VALUE `XX`.
 
     " READ LINE n FIELD VALUE: the fields written with their names
-    DATA(lo_list) = z2ui5_cl_cgui_list=>factory( ).
+    DATA lo_list TYPE REF TO z2ui5_cl_cgui_list.
+    DATA lt_input TYPE z2ui5_cl_cgui_list=>ty_t_input.
+    FIELD-SYMBOLS <temp17> LIKE LINE OF lt_input.
+    DATA temp18 LIKE sy-tabix.
+    lo_list = z2ui5_cl_cgui_list=>factory( ).
     lo_list->write_as_checkbox( val   = abap_false
                                 input = abap_true
                                 name  = `gv_check`
         )->write( val  = `LH`
                   name = `GS-CARRID` ).
-    DATA(lt_input) = lo_list->get_inputs( ).
-    lt_input[ 1 ]-flag = abap_true.
+
+    lt_input = lo_list->get_inputs( ).
+
+
+    temp18 = sy-tabix.
+    READ TABLE lt_input INDEX 1 ASSIGNING <temp17>.
+    sy-tabix = temp18.
+    IF sy-subrc <> 0.
+      ASSERT 1 = 0.
+    ENDIF.
+    <temp17>-flag = abap_true.
     lo_list->set_inputs( lt_input ).
 
     lo_list->read_field( EXPORTING  line    = 1
@@ -263,7 +528,18 @@ CLASS ltcl_test IMPLEMENTATION.
 
   METHOD input_read_modify.
 
-    DATA(lo_list) = z2ui5_cl_cgui_list=>factory( ).
+    DATA lo_list TYPE REF TO z2ui5_cl_cgui_list.
+    DATA lt_input TYPE z2ui5_cl_cgui_list=>ty_t_input.
+    FIELD-SYMBOLS <temp19> LIKE LINE OF lt_input.
+    DATA temp20 LIKE sy-tabix.
+    FIELD-SYMBOLS <temp21> LIKE LINE OF lt_input.
+    DATA temp22 LIKE sy-tabix.
+    DATA lo_view TYPE REF TO z2ui5_cl_ui5_view_builder.
+    DATA temp23 TYPE REF TO ltcl_client.
+    DATA lv_view TYPE string.
+    DATA temp8 TYPE xsdboolean.
+    DATA temp9 TYPE xsdboolean.
+    lo_list = z2ui5_cl_cgui_list=>factory( ).
     lo_list->write( `Qty`
         )->write( val   = `5`
                   input = abap_true
@@ -272,11 +548,28 @@ CLASS ltcl_test IMPLEMENTATION.
         )->new_line(
         )->write( `fix` ).
 
-    DATA(lt_input) = lo_list->get_inputs( ).
+
+    lt_input = lo_list->get_inputs( ).
     cl_abap_unit_assert=>assert_equals( act = lines( lt_input )
                                         exp = 2 ).
-    lt_input[ 1 ]-value = `7`.
-    lt_input[ 2 ]-flag = abap_true.
+
+
+    temp20 = sy-tabix.
+    READ TABLE lt_input INDEX 1 ASSIGNING <temp19>.
+    sy-tabix = temp20.
+    IF sy-subrc <> 0.
+      ASSERT 1 = 0.
+    ENDIF.
+    <temp19>-value = `7`.
+
+
+    temp22 = sy-tabix.
+    READ TABLE lt_input INDEX 2 ASSIGNING <temp21>.
+    sy-tabix = temp22.
+    IF sy-subrc <> 0.
+      ASSERT 1 = 0.
+    ENDIF.
+    <temp21>-flag = abap_true.
     lo_list->set_inputs( lt_input ).
 
     cl_abap_unit_assert=>assert_equals( act = lo_list->read_value( line = 1 index = 2 )
@@ -290,19 +583,30 @@ CLASS ltcl_test IMPLEMENTATION.
     cl_abap_unit_assert=>assert_equals( act = lo_list->read_value( 2 )
                                         exp = `changed` ).
 
-    DATA(lo_view) = z2ui5_cl_ui5_view_builder=>factory( )->ele( `VBox` ).
+
+    lo_view = z2ui5_cl_ui5_view_builder=>factory( )->ele( `VBox` ).
+
+    CREATE OBJECT temp23 TYPE ltcl_client.
     lo_list->render( node   = lo_view
-                     client = NEW ltcl_client( )
+                     client = temp23
                      inputs = lt_input ).
-    DATA(lv_view) = lo_view->stringify( ).
-    cl_abap_unit_assert=>assert_true( xsdbool( lv_view CS `<Input value="{/INPUTS/0}"` ) ).
-    cl_abap_unit_assert=>assert_true( xsdbool( lv_view CS `<CheckBox selected="{/INPUTS/1}"` ) ).
+
+    lv_view = lo_view->stringify( ).
+
+    temp8 = boolc( lv_view CS `<Input value="{/INPUTS/0}"` ).
+    cl_abap_unit_assert=>assert_true( temp8 ).
+
+    temp9 = boolc( lv_view CS `<CheckBox selected="{/INPUTS/1}"` ).
+    cl_abap_unit_assert=>assert_true( temp9 ).
 
   ENDMETHOD.
 
   METHOD line_count_and_footer.
 
-    DATA(lo_list) = z2ui5_cl_cgui_list=>factory( ).
+    DATA lo_list TYPE REF TO z2ui5_cl_cgui_list.
+    DATA lt_text TYPE string_table.
+    DATA temp24 TYPE string_table.
+    lo_list = z2ui5_cl_cgui_list=>factory( ).
     lo_list->set_line_count( 2 ).
     lo_list->header_begin( ).
     lo_list->write( `Head` ).
@@ -316,18 +620,46 @@ CLASS ltcl_test IMPLEMENTATION.
 
     cl_abap_unit_assert=>assert_equals( act = lo_list->get_page_count( )
                                         exp = 3 ).
-    DATA(lt_text) = lo_list->to_text( ).
+
+    lt_text = lo_list->to_text( ).
     DELETE lt_text WHERE table_line IS INITIAL.
+
+    CLEAR temp24.
+    INSERT `Head` INTO TABLE temp24.
+    INSERT `row1` INTO TABLE temp24.
+    INSERT `row2` INTO TABLE temp24.
+    INSERT `Page 1` INTO TABLE temp24.
+    INSERT `Head` INTO TABLE temp24.
+    INSERT `row3` INTO TABLE temp24.
+    INSERT `row4` INTO TABLE temp24.
+    INSERT `Page 2` INTO TABLE temp24.
+    INSERT `Head` INTO TABLE temp24.
+    INSERT `row5` INTO TABLE temp24.
+    INSERT `Page 3` INTO TABLE temp24.
     cl_abap_unit_assert=>assert_equals( act = lt_text
-                                        exp = VALUE string_table( ( `Head` ) ( `row1` ) ( `row2` ) ( `Page 1` )
-                                                                  ( `Head` ) ( `row3` ) ( `row4` ) ( `Page 2` )
-                                                                  ( `Head` ) ( `row5` ) ( `Page 3` ) ) ).
+                                        exp = temp24 ).
 
   ENDMETHOD.
 
   METHOD format_and_columns.
 
-    DATA(lo_list) = z2ui5_cl_cgui_list=>factory( ).
+    DATA lo_list TYPE REF TO z2ui5_cl_cgui_list.
+    DATA lt_item TYPE z2ui5_cl_cgui_list=>ty_t_item.
+    FIELD-SYMBOLS <temp26> LIKE LINE OF lt_item.
+    DATA temp27 LIKE sy-tabix.
+    FIELD-SYMBOLS <temp28> LIKE LINE OF lt_item.
+    DATA temp29 LIKE sy-tabix.
+    FIELD-SYMBOLS <temp30> LIKE LINE OF lt_item.
+    DATA temp31 LIKE sy-tabix.
+    FIELD-SYMBOLS <temp32> LIKE LINE OF lt_item.
+    DATA temp33 LIKE sy-tabix.
+    FIELD-SYMBOLS <temp34> LIKE LINE OF lt_item.
+    DATA temp35 LIKE sy-tabix.
+    FIELD-SYMBOLS <temp36> LIKE LINE OF lt_item.
+    DATA temp37 LIKE sy-tabix.
+    FIELD-SYMBOLS <temp38> LIKE LINE OF lt_item.
+    DATA temp39 LIKE sy-tabix.
+    lo_list = z2ui5_cl_cgui_list=>factory( ).
 
     " FORMAT holds for the WRITEs after it, a WRITE option wins
     lo_list->format( color       = z2ui5_cl_cgui_list=>cs_color-positive
@@ -338,16 +670,57 @@ CLASS ltcl_test IMPLEMENTATION.
                     color = z2ui5_cl_cgui_list=>cs_color-negative ).
     lo_list->format( reset = abap_true ).
     lo_list->write( `plain` ).
-    DATA(lt_item) = lo_list->get_items( ).
-    cl_abap_unit_assert=>assert_equals( act = lt_item[ 1 ]-color
+
+    lt_item = lo_list->get_items( ).
+
+
+    temp27 = sy-tabix.
+    READ TABLE lt_item INDEX 1 ASSIGNING <temp26>.
+    sy-tabix = temp27.
+    IF sy-subrc <> 0.
+      ASSERT 1 = 0.
+    ENDIF.
+    cl_abap_unit_assert=>assert_equals( act = <temp26>-color
                                         exp = z2ui5_cl_cgui_list=>cs_color-positive ).
-    cl_abap_unit_assert=>assert_true( lt_item[ 1 ]-intensified ).
-    cl_abap_unit_assert=>assert_equals( act = lt_item[ 2 ]-color
+
+
+    temp29 = sy-tabix.
+    READ TABLE lt_item INDEX 1 ASSIGNING <temp28>.
+    sy-tabix = temp29.
+    IF sy-subrc <> 0.
+      ASSERT 1 = 0.
+    ENDIF.
+    cl_abap_unit_assert=>assert_true( <temp28>-intensified ).
+
+
+    temp31 = sy-tabix.
+    READ TABLE lt_item INDEX 2 ASSIGNING <temp30>.
+    sy-tabix = temp31.
+    IF sy-subrc <> 0.
+      ASSERT 1 = 0.
+    ENDIF.
+    cl_abap_unit_assert=>assert_equals( act = <temp30>-color
                                         exp = z2ui5_cl_cgui_list=>cs_color-negative ).
-    cl_abap_unit_assert=>assert_initial( lt_item[ 3 ]-color ).
+
+
+    temp33 = sy-tabix.
+    READ TABLE lt_item INDEX 3 ASSIGNING <temp32>.
+    sy-tabix = temp33.
+    IF sy-subrc <> 0.
+      ASSERT 1 = 0.
+    ENDIF.
+    cl_abap_unit_assert=>assert_initial( <temp32>-color ).
 
     " columns: Carrier at 1, x at 9, plain at 11 - SY-COLNO
-    cl_abap_unit_assert=>assert_equals( act = lt_item[ 2 ]-col
+
+
+    temp35 = sy-tabix.
+    READ TABLE lt_item INDEX 2 ASSIGNING <temp34>.
+    sy-tabix = temp35.
+    IF sy-subrc <> 0.
+      ASSERT 1 = 0.
+    ENDIF.
+    cl_abap_unit_assert=>assert_equals( act = <temp34>-col
                                         exp = 9 ).
     cl_abap_unit_assert=>assert_equals( act = lo_list->current_column( )
                                         exp = 17 ).
@@ -359,9 +732,25 @@ CLASS ltcl_test IMPLEMENTATION.
     lo_list->position( 20 ).
     lo_list->write( `at20` ).
     lt_item = lo_list->get_items( ).
-    cl_abap_unit_assert=>assert_equals( act = lt_item[ 4 ]-pos
+
+
+    temp37 = sy-tabix.
+    READ TABLE lt_item INDEX 4 ASSIGNING <temp36>.
+    sy-tabix = temp37.
+    IF sy-subrc <> 0.
+      ASSERT 1 = 0.
+    ENDIF.
+    cl_abap_unit_assert=>assert_equals( act = <temp36>-pos
                                         exp = 1 ).
-    cl_abap_unit_assert=>assert_equals( act = lt_item[ 5 ]-col
+
+
+    temp39 = sy-tabix.
+    READ TABLE lt_item INDEX 5 ASSIGNING <temp38>.
+    sy-tabix = temp39.
+    IF sy-subrc <> 0.
+      ASSERT 1 = 0.
+    ENDIF.
+    cl_abap_unit_assert=>assert_equals( act = <temp38>-col
                                         exp = 20 ).
     cl_abap_unit_assert=>assert_equals( act = lo_list->line_text( 2 )
                                         exp = `LH                 at20` ).
@@ -374,7 +763,31 @@ CLASS ltcl_test IMPLEMENTATION.
     DATA lv_amount TYPE p LENGTH 10 DECIMALS 2 VALUE '1234567.89'.
     DATA lv_time TYPE t VALUE '134500'.
 
-    DATA(lo_list) = z2ui5_cl_cgui_list=>factory( ).
+    DATA lo_list TYPE REF TO z2ui5_cl_cgui_list.
+    DATA lt_item TYPE z2ui5_cl_cgui_list=>ty_t_item.
+    FIELD-SYMBOLS <temp40> LIKE LINE OF lt_item.
+    DATA temp41 LIKE sy-tabix.
+    FIELD-SYMBOLS <temp42> LIKE LINE OF lt_item.
+    DATA temp43 LIKE sy-tabix.
+    FIELD-SYMBOLS <temp44> LIKE LINE OF lt_item.
+    DATA temp45 LIKE sy-tabix.
+    DATA temp10 TYPE xsdboolean.
+    FIELD-SYMBOLS <temp46> LIKE LINE OF lt_item.
+    DATA temp47 LIKE sy-tabix.
+    FIELD-SYMBOLS <temp48> LIKE LINE OF lt_item.
+    DATA temp49 LIKE sy-tabix.
+    DATA temp11 TYPE xsdboolean.
+    FIELD-SYMBOLS <temp50> LIKE LINE OF lt_item.
+    DATA temp51 LIKE sy-tabix.
+    DATA temp12 TYPE xsdboolean.
+    DATA lt_text TYPE string_table.
+    FIELD-SYMBOLS <temp52> LIKE LINE OF lt_text.
+    DATA temp53 LIKE sy-tabix.
+    DATA temp13 TYPE xsdboolean.
+    DATA lv_view TYPE string.
+    DATA temp6 TYPE REF TO ltcl_client.
+    DATA temp14 TYPE xsdboolean.
+    lo_list = z2ui5_cl_cgui_list=>factory( ).
     lo_list->write( val       = lv_time
                     edit_mask = `__:__`
         )->write( val         = lv_date
@@ -388,29 +801,105 @@ CLASS ltcl_test IMPLEMENTATION.
                   round = 3
         )->write( val       = `tip`
                   quickinfo = `the tip` ).
-    DATA(lt_item) = lo_list->get_items( ).
-    cl_abap_unit_assert=>assert_equals( act = lt_item[ 1 ]-text
+
+    lt_item = lo_list->get_items( ).
+
+
+    temp41 = sy-tabix.
+    READ TABLE lt_item INDEX 1 ASSIGNING <temp40>.
+    sy-tabix = temp41.
+    IF sy-subrc <> 0.
+      ASSERT 1 = 0.
+    ENDIF.
+    cl_abap_unit_assert=>assert_equals( act = <temp40>-text
                                         exp = `13:45` ).
-    cl_abap_unit_assert=>assert_equals( act = lt_item[ 2 ]-text
+
+
+    temp43 = sy-tabix.
+    READ TABLE lt_item INDEX 2 ASSIGNING <temp42>.
+    sy-tabix = temp43.
+    IF sy-subrc <> 0.
+      ASSERT 1 = 0.
+    ENDIF.
+    cl_abap_unit_assert=>assert_equals( act = <temp42>-text
                                         exp = `261002` ).
-    cl_abap_unit_assert=>assert_false( xsdbool( lt_item[ 3 ]-text CA ` ` ) ).
-    cl_abap_unit_assert=>assert_equals( act = strlen( lt_item[ 3 ]-text )
+
+
+    temp45 = sy-tabix.
+    READ TABLE lt_item INDEX 3 ASSIGNING <temp44>.
+    sy-tabix = temp45.
+    IF sy-subrc <> 0.
+      ASSERT 1 = 0.
+    ENDIF.
+
+    temp10 = boolc( <temp44>-text CA ` ` ).
+    cl_abap_unit_assert=>assert_false( temp10 ).
+
+
+    temp47 = sy-tabix.
+    READ TABLE lt_item INDEX 3 ASSIGNING <temp46>.
+    sy-tabix = temp47.
+    IF sy-subrc <> 0.
+      ASSERT 1 = 0.
+    ENDIF.
+    cl_abap_unit_assert=>assert_equals( act = strlen( <temp46>-text )
                                         exp = 10 ).
     " ROUND 3: 1234500 / 1000, rounded to the decimals of the type - 1,235
-    cl_abap_unit_assert=>assert_true( xsdbool( lt_item[ 6 ]-text CS `235` ) ).
-    cl_abap_unit_assert=>assert_true( xsdbool( strlen( lt_item[ 6 ]-text ) < 7 ) ).
 
-    DATA(lt_text) = lo_list->to_text( ).
-    cl_abap_unit_assert=>assert_true( xsdbool( lt_text[ 1 ] CS ` AB ` ) ).
 
-    DATA(lv_view) = lo_list->stringify( NEW ltcl_client( ) ).
-    cl_abap_unit_assert=>assert_true( xsdbool( lv_view CS `the tip` ) ).
+    temp49 = sy-tabix.
+    READ TABLE lt_item INDEX 6 ASSIGNING <temp48>.
+    sy-tabix = temp49.
+    IF sy-subrc <> 0.
+      ASSERT 1 = 0.
+    ENDIF.
+
+    temp11 = boolc( <temp48>-text CS `235` ).
+    cl_abap_unit_assert=>assert_true( temp11 ).
+
+
+    temp51 = sy-tabix.
+    READ TABLE lt_item INDEX 6 ASSIGNING <temp50>.
+    sy-tabix = temp51.
+    IF sy-subrc <> 0.
+      ASSERT 1 = 0.
+    ENDIF.
+
+    temp12 = boolc( strlen( <temp50>-text ) < 7 ).
+    cl_abap_unit_assert=>assert_true( temp12 ).
+
+
+    lt_text = lo_list->to_text( ).
+
+
+    temp53 = sy-tabix.
+    READ TABLE lt_text INDEX 1 ASSIGNING <temp52>.
+    sy-tabix = temp53.
+    IF sy-subrc <> 0.
+      ASSERT 1 = 0.
+    ENDIF.
+
+    temp13 = boolc( <temp52> CS ` AB ` ).
+    cl_abap_unit_assert=>assert_true( temp13 ).
+
+
+
+    CREATE OBJECT temp6 TYPE ltcl_client.
+    lv_view = lo_list->stringify( temp6 ).
+
+    temp14 = boolc( lv_view CS `the tip` ).
+    cl_abap_unit_assert=>assert_true( temp14 ).
 
   ENDMETHOD.
 
   METHOD pages_and_lines.
 
-    DATA(lo_list) = z2ui5_cl_cgui_list=>factory( ).
+    DATA lo_list TYPE REF TO z2ui5_cl_cgui_list.
+    DATA lt_text TYPE string_table.
+    DATA lv_heads TYPE i.
+    DATA temp15 TYPE xsdboolean.
+    DATA temp1 LIKE sy-subrc.
+    lo_list = z2ui5_cl_cgui_list=>factory( ).
     lo_list->set_line_size( 20 ).
     lo_list->header_begin( ).
     lo_list->write( `HEAD` ).
@@ -427,15 +916,21 @@ CLASS ltcl_test IMPLEMENTATION.
     lo_list->uline( pos = 3
                     len = 5 ).
 
-    DATA(lt_text) = lo_list->to_text( ).
-    DATA lv_heads TYPE i.
+
+    lt_text = lo_list->to_text( ).
+
     LOOP AT lt_text TRANSPORTING NO FIELDS WHERE table_line = `HEAD`.
       lv_heads = lv_heads + 1.
     ENDLOOP.
     " page 1 and 2 with the header, page 3 NO-HEADING
     cl_abap_unit_assert=>assert_equals( act = lv_heads
                                         exp = 2 ).
-    cl_abap_unit_assert=>assert_true( xsdbool( line_exists( lt_text[ table_line = `  -----` ] ) ) ).
+
+
+    READ TABLE lt_text WITH KEY table_line = `  -----` TRANSPORTING NO FIELDS.
+    temp1 = sy-subrc.
+    temp15 = boolc( temp1 = 0 ).
+    cl_abap_unit_assert=>assert_true( temp15 ).
     cl_abap_unit_assert=>assert_equals( act = lo_list->describe_lines( )
                                         exp = 7 ).
 
@@ -443,19 +938,32 @@ CLASS ltcl_test IMPLEMENTATION.
 
   METHOD cut_from_a_line.
 
-    DATA(lo_list) = z2ui5_cl_cgui_list=>factory( ).
+    DATA lo_list TYPE REF TO z2ui5_cl_cgui_list.
+    DATA lv_from TYPE i.
+    DATA temp54 TYPE string_table.
+    DATA temp56 TYPE string_table.
+    lo_list = z2ui5_cl_cgui_list=>factory( ).
     lo_list->write( `one` ).
     lo_list->new_line( ).
-    DATA(lv_from) = lo_list->current_line( ).
+
+    lv_from = lo_list->current_line( ).
     lo_list->write( `two` ).
     lo_list->new_line( ).
     lo_list->write( `three` ).
 
-    cl_abap_unit_assert=>assert_equals( exp = VALUE string_table( ( `two` ) ( `three` ) )
+
+    CLEAR temp54.
+    INSERT `two` INTO TABLE temp54.
+    INSERT `three` INTO TABLE temp54.
+    cl_abap_unit_assert=>assert_equals( exp = temp54
                                         act = lo_list->cut( lv_from ) ).
     " the list goes on where the cut started
     lo_list->write( `four` ).
-    cl_abap_unit_assert=>assert_equals( exp = VALUE string_table( ( `one` ) ( `four` ) )
+
+    CLEAR temp56.
+    INSERT `one` INTO TABLE temp56.
+    INSERT `four` INTO TABLE temp56.
+    cl_abap_unit_assert=>assert_equals( exp = temp56
                                         act = lo_list->to_text( ) ).
 
   ENDMETHOD.

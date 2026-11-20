@@ -13,14 +13,14 @@ CLASS z2ui5_cl_cgui_sample_05 DEFINITION PUBLIC
         currency TYPE c LENGTH 5,
         seatsocc TYPE i,
       END OF ty_s_flight.
-    TYPES ty_t_flight TYPE STANDARD TABLE OF ty_s_flight WITH EMPTY KEY.
+    TYPES ty_t_flight TYPE STANDARD TABLE OF ty_s_flight WITH DEFAULT KEY.
 
     TYPES:
       BEGIN OF ty_s_carrier,
         carrid TYPE c LENGTH 3,
         name   TYPE string,
       END OF ty_s_carrier.
-    TYPES ty_t_carrier TYPE STANDARD TABLE OF ty_s_carrier WITH EMPTY KEY.
+    TYPES ty_t_carrier TYPE STANDARD TABLE OF ty_s_carrier WITH DEFAULT KEY.
 
     DATA p_carrid TYPE c LENGTH 3.
     DATA s_fldate TYPE RANGE OF d.
@@ -52,11 +52,21 @@ ENDCLASS.
 CLASS z2ui5_cl_cgui_sample_05 IMPLEMENTATION.
 
   METHOD initialization.
+    DATA temp1 LIKE s_fldate.
+    DATA temp2 LIKE LINE OF temp1.
 
     set_title( `abap-cloud-gui - Flight Report` ).
     p_max = 50.
     p_alv = abap_true.
-    s_fldate = VALUE #( ( sign = `I` option = `BT` low = `20260101` high = `20260331` ) ).
+
+    CLEAR temp1.
+
+    temp2-sign = `I`.
+    temp2-option = `BT`.
+    temp2-low = `20260101`.
+    temp2-high = `20260331`.
+    INSERT temp2 INTO TABLE temp1.
+    s_fldate = temp1.
     mock_data( ).
     " save a variant named DEFAULT and the report starts with it
     set_variant( `DEFAULT` ).
@@ -104,11 +114,13 @@ CLASS z2ui5_cl_cgui_sample_05 IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD start_of_selection.
+    DATA ls_flight LIKE LINE OF mt_flight.
 
     CLEAR mt_result.
     " on an SAP system: SELECT ... WHERE fldate IN @s_fldate - range_check( )
     " is the same test for an internal table, and runs everywhere
-    LOOP AT mt_flight INTO DATA(ls_flight).
+
+    LOOP AT mt_flight INTO ls_flight.
       IF z2ui5_cl_cgui_context=>range_check( val   = ls_flight-fldate
                                              range = s_fldate ) = abap_false.
         CONTINUE.
@@ -156,6 +168,9 @@ CLASS z2ui5_cl_cgui_sample_05 IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD output_list.
+    DATA ls_flight LIKE LINE OF mt_result.
+      DATA temp3 TYPE string.
+      DATA lv_color LIKE temp3.
 
     " REPORT ... LINE-COUNT 30 - a new page after 30 lines
     set_line_count( 30 ).
@@ -163,9 +178,16 @@ CLASS z2ui5_cl_cgui_sample_05 IMPLEMENTATION.
 
            color = z2ui5_cl_cgui_list=>cs_color-key )->uline( ).
 
-    LOOP AT mt_result INTO DATA(ls_flight).
-      DATA(lv_color) = COND string( WHEN ls_flight-seatsocc > 200 THEN z2ui5_cl_cgui_list=>cs_color-negative
-                                    ELSE z2ui5_cl_cgui_list=>cs_color-positive ).
+
+    LOOP AT mt_result INTO ls_flight.
+
+      IF ls_flight-seatsocc > 200.
+        temp3 = z2ui5_cl_cgui_list=>cs_color-negative.
+      ELSE.
+        temp3 = z2ui5_cl_cgui_list=>cs_color-positive.
+      ENDIF.
+
+      lv_color = temp3.
       write( val     = ls_flight-carrid
              hotspot = abap_true
              hide    = sy-tabix
@@ -183,13 +205,15 @@ CLASS z2ui5_cl_cgui_sample_05 IMPLEMENTATION.
   METHOD at_line_selection.
 
     DATA lv_index TYPE i.
+    DATA ls_flight TYPE z2ui5_cl_cgui_sample_05=>ty_s_flight.
 
     lv_index = row.
     IF hide IS NOT INITIAL.
       lv_index = hide.
     ENDIF.
 
-    READ TABLE mt_result INTO DATA(ls_flight) INDEX lv_index.
+
+    READ TABLE mt_result INTO ls_flight INDEX lv_index.
     IF sy-subrc <> 0.
       RETURN.
     ENDIF.
@@ -201,6 +225,8 @@ CLASS z2ui5_cl_cgui_sample_05 IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD at_user_command.
+        DATA temp4 TYPE z2ui5_cl_cgui_variant=>ty_t_value.
+        DATA temp5 LIKE LINE OF temp4.
 
     CASE ucomm.
       WHEN `RESET_ASK`.
@@ -215,21 +241,40 @@ CLASS z2ui5_cl_cgui_sample_05 IMPLEMENTATION.
       WHEN `AIRLINE`.
         " the app of the airline in the Fiori launchpad, the airline as its
         " startup parameter
+
+        CLEAR temp4.
+
+        temp5-name = `CARRID`.
+        temp5-kind = z2ui5_cl_cgui_variant=>cs_kind-parameter.
+        temp5-low = p_carrid.
+        INSERT temp5 INTO TABLE temp4.
         call_intent( semantic_object = `Airline`
-                     values          = VALUE #( ( name = `CARRID`
-                                                  kind = z2ui5_cl_cgui_variant=>cs_kind-parameter
-                                                  low  = p_carrid ) ) ).
+                     values          = temp4 ).
     ENDCASE.
 
   ENDMETHOD.
 
   METHOD at_value_request.
+      DATA temp6 TYPE ty_t_carrier.
+      DATA temp7 LIKE LINE OF temp6.
 
     IF field = `P_CARRID`.
-      value_help_popup( tab   = VALUE ty_t_carrier( ( carrid = `AA` name = `American Airlines` )
-                                                    ( carrid = `LH` name = `Lufthansa` )
-                                                    ( carrid = `SQ` name = `Singapore Airlines` )
-                                                    ( carrid = `UA` name = `United Airlines` ) )
+
+      CLEAR temp6.
+
+      temp7-carrid = `AA`.
+      temp7-name = `American Airlines`.
+      INSERT temp7 INTO TABLE temp6.
+      temp7-carrid = `LH`.
+      temp7-name = `Lufthansa`.
+      INSERT temp7 INTO TABLE temp6.
+      temp7-carrid = `SQ`.
+      temp7-name = `Singapore Airlines`.
+      INSERT temp7 INTO TABLE temp6.
+      temp7-carrid = `UA`.
+      temp7-name = `United Airlines`.
+      INSERT temp7 INTO TABLE temp6.
+      value_help_popup( tab   = temp6
                         col   = `CARRID`
                         title = `Airlines` ).
     ENDIF.
@@ -241,16 +286,38 @@ CLASS z2ui5_cl_cgui_sample_05 IMPLEMENTATION.
     DATA lv_date TYPE d VALUE `20260101`.
     DATA lt_carrid TYPE string_table.
 
-    lt_carrid = VALUE #( ( `AA` ) ( `LH` ) ( `SQ` ) ( `UA` ) ).
+    DATA temp8 TYPE string_table.
+      DATA lv_carrid LIKE LINE OF lt_carrid.
+      FIELD-SYMBOLS <temp1> LIKE LINE OF lt_carrid.
+      DATA temp2 LIKE sy-tabix.
+      DATA temp10 TYPE z2ui5_cl_cgui_sample_05=>ty_s_flight.
+    CLEAR temp8.
+    INSERT `AA` INTO TABLE temp8.
+    INSERT `LH` INTO TABLE temp8.
+    INSERT `SQ` INTO TABLE temp8.
+    INSERT `UA` INTO TABLE temp8.
+    lt_carrid = temp8.
 
     DO 60 TIMES.
-      DATA(lv_carrid) = lt_carrid[ ( sy-index MOD 4 ) + 1 ].
-      INSERT VALUE #( carrid   = lv_carrid
-                      connid   = 400 + sy-index MOD 7
-                      fldate   = lv_date + sy-index * 3
-                      price    = 250 + ( sy-index MOD 9 ) * 45
-                      currency = `EUR`
-                      seatsocc = 90 + ( sy-index * 37 ) MOD 250 ) INTO TABLE mt_flight.
+
+
+
+      temp2 = sy-tabix.
+      READ TABLE lt_carrid INDEX ( sy-index MOD 4 ) + 1 ASSIGNING <temp1>.
+      sy-tabix = temp2.
+      IF sy-subrc <> 0.
+        ASSERT 1 = 0.
+      ENDIF.
+      lv_carrid = <temp1>.
+
+      CLEAR temp10.
+      temp10-carrid = lv_carrid.
+      temp10-connid = 400 + sy-index MOD 7.
+      temp10-fldate = lv_date + sy-index * 3.
+      temp10-price = 250 + ( sy-index MOD 9 ) * 45.
+      temp10-currency = `EUR`.
+      temp10-seatsocc = 90 + ( sy-index * 37 ) MOD 250.
+      INSERT temp10 INTO TABLE mt_flight.
     ENDDO.
 
   ENDMETHOD.

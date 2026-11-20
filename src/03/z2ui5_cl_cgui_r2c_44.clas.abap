@@ -40,9 +40,20 @@ CLASS z2ui5_cl_cgui_r2c_44 IMPLEMENTATION.
 
   METHOD start_of_selection.
 
-    gt_peak = VALUE #( ( name = 'Zugspitze'  height = 2962 )
-                       ( name = 'Watzmann'   height = 2713 )
-                       ( name = 'Feldberg'   height = 1493 ) ).
+    DATA temp1 LIKE gt_peak.
+    DATA temp2 LIKE LINE OF temp1.
+    CLEAR temp1.
+
+    temp2-name = 'Zugspitze'.
+    temp2-height = 2962.
+    INSERT temp2 INTO TABLE temp1.
+    temp2-name = 'Watzmann'.
+    temp2-height = 2713.
+    INSERT temp2 INTO TABLE temp1.
+    temp2-name = 'Feldberg'.
+    temp2-height = 1493.
+    INSERT temp2 INTO TABLE temp1.
+    gt_peak = temp1.
     LOOP AT gt_peak INTO gs_peak.
       list( )->new_line(
           )->write( val     = gs_peak-name

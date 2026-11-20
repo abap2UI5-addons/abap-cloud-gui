@@ -13,7 +13,7 @@
 CLASS z2ui5_cl_cgui_view DEFINITION PUBLIC FINAL CREATE PUBLIC.
 
   PUBLIC SECTION.
-    TYPES ty_t_object TYPE STANDARD TABLE OF REF TO object WITH EMPTY KEY.
+    TYPES ty_t_object TYPE STANDARD TABLE OF REF TO object WITH DEFAULT KEY.
     TYPES ty_flag TYPE c LENGTH 1.
 
     TYPES:
@@ -190,7 +190,9 @@ CLASS z2ui5_cl_cgui_view IMPLEMENTATION.
 
     DATA lt_arg TYPE string_table.
 
-    INSERT |{ id }| INTO TABLE lt_arg.
+    DATA temp1 LIKE LINE OF lt_arg.
+    temp1 = |{ id }|.
+    INSERT temp1 INTO TABLE lt_arg.
     INSERT name INTO TABLE lt_arg.
     IF arg1 IS SUPPLIED.
       INSERT arg1 INTO TABLE lt_arg.
@@ -208,16 +210,24 @@ CLASS z2ui5_cl_cgui_view IMPLEMENTATION.
 
   METHOD width.
 
-    result = COND #( WHEN val > 0 THEN |{ val * 2 / 3 }rem| ELSE `12rem` ).
+    DATA temp2 TYPE string.
+    IF val > 0.
+      temp2 = |{ val * 2 / 3 }rem|.
+    ELSE.
+      temp2 = `12rem`.
+    ENDIF.
+    result = temp2.
 
   ENDMETHOD.
 
   METHOD render.
 
     FIELD-SYMBOLS <gui> TYPE z2ui5_if_cgui_gui=>ty_t_control.
+    DATA ls_control TYPE z2ui5_if_cgui_gui=>ty_s_control.
 
     ASSIGN ctx-gui->* TO <gui>.
-    READ TABLE <gui> INTO DATA(ls_control) INDEX id.
+
+    READ TABLE <gui> INTO ls_control INDEX id.
     IF sy-subrc <> 0 OR ls_control-freed = abap_true OR ls_control-hidden = abap_true.
       RETURN.
     ENDIF.
@@ -242,9 +252,12 @@ CLASS z2ui5_cl_cgui_view IMPLEMENTATION.
   METHOD container.
 
     FIELD-SYMBOLS <gui> TYPE z2ui5_if_cgui_gui=>ty_t_control.
+    DATA ls_control TYPE z2ui5_if_cgui_gui=>ty_s_control.
+      DATA temp3 TYPE string.
 
     ASSIGN ctx-gui->* TO <gui>.
-    READ TABLE <gui> INTO DATA(ls_control) INDEX id.
+
+    READ TABLE <gui> INTO ls_control INDEX id.
     IF sy-subrc <> 0.
       RETURN.
     ENDIF.
@@ -252,13 +265,15 @@ CLASS z2ui5_cl_cgui_view IMPLEMENTATION.
         )->a( n = `width` v = `100%` ).
     IF ls_control-dialog = abap_true.
       " a dialog box container: its caption and Close (the event close)
+
+      temp3 = 'Close'(001).
       result->ele( `Toolbar`
           )->tag( `Title`
               )->a( n = `text` t = ls_control-caption
           )->tag( `ToolbarSpacer`
           )->tag( `Button`
               )->a( n = `icon`    v = `sap-icon://decline`
-              )->a( n = `tooltip` t = CONV string( 'Close'(001) )
+              )->a( n = `tooltip` t = temp3
               )->a( n = `press`   v = event( ctx = ctx id = id name = `CLOSE` ) ).
     ELSEIF ls_control-caption IS NOT INITIAL.
       result->tag( `Title`
@@ -270,9 +285,11 @@ CLASS z2ui5_cl_cgui_view IMPLEMENTATION.
   METHOD children.
 
     FIELD-SYMBOLS <gui> TYPE z2ui5_if_cgui_gui=>ty_t_control.
+    DATA ls_child LIKE LINE OF <gui>.
 
     ASSIGN ctx-gui->* TO <gui>.
-    LOOP AT <gui> INTO DATA(ls_child) WHERE parent = id.
+
+    LOOP AT <gui> INTO ls_child WHERE parent = id.
       INSERT ls_child INTO TABLE result.
     ENDLOOP.
     SORT result BY row column id.
@@ -282,17 +299,22 @@ CLASS z2ui5_cl_cgui_view IMPLEMENTATION.
   METHOD render_textedit.
 
     FIELD-SYMBOLS <gui> TYPE z2ui5_if_cgui_gui=>ty_t_control.
+    FIELD-SYMBOLS <control> TYPE z2ui5_if_cgui_gui=>ty_s_control.
+    DATA temp1 TYPE xsdboolean.
 
     ASSIGN ctx-gui->* TO <gui>.
     " the row of the report's table itself - a binding is found by the
     " reference of the value, a copy of the row has none
-    ASSIGN <gui>[ id ] TO FIELD-SYMBOL(<control>).
+
+    READ TABLE <gui> INDEX id ASSIGNING <control>.
+
+    temp1 = boolc( <control>-readonly = abap_false ).
     node->tag( `TextArea`
         )->a( n = `id`       t = |{ z2ui5_cl_cgui_report=>cv_cgui_textedit_id }{ id }|
         )->a( n = `value`    v = ctx-client->_bind( val       = <control>-text
                                                     tab       = <gui>
                                                     tab_index = id )
-        )->a( n = `editable` b = xsdbool( <control>-readonly = abap_false )
+        )->a( n = `editable` b = temp1
         )->a( n = `width`    v = `100%`
         )->a( n = `rows`     v = `12`
         )->a( n = `growing`  b = abap_true
@@ -303,11 +325,17 @@ CLASS z2ui5_cl_cgui_view IMPLEMENTATION.
   METHOD render_html.
 
     FIELD-SYMBOLS <gui> TYPE z2ui5_if_cgui_gui=>ty_t_control.
+    FIELD-SYMBOLS <control> TYPE z2ui5_if_cgui_gui=>ty_s_control.
+      DATA lo_links TYPE REF TO z2ui5_cl_ui5_view_builder.
+      DATA temp4 TYPE z2ui5_cl_cgui_html_viewer=>ty_t_link.
+      DATA ls_link LIKE LINE OF temp4.
+        DATA temp5 TYPE string.
 
     ASSIGN ctx-gui->* TO <gui>.
     " the row of the report's table itself - a binding is found by the
     " reference of the value, a copy of the row has none
-    ASSIGN <gui>[ id ] TO FIELD-SYMBOL(<control>).
+
+    READ TABLE <gui> INDEX id ASSIGNING <control>.
     IF <control>-html IS NOT INITIAL AND html_frame( ctx ) = abap_true.
       " the document as it is, in a frame under the page's policy: its
       " styles apply, no script of it runs; a SAPEVENT link or a form
@@ -337,12 +365,22 @@ CLASS z2ui5_cl_cgui_view IMPLEMENTATION.
           )->a( n = `sanitizeContent` b = abap_true
           )->a( n = `preferDOM`       b = abap_false ).
       " the SAPEVENT links of the document - the sanitized HTML has none
-      DATA(lo_links) = node->ele( `HBox`
+
+      lo_links = node->ele( `HBox`
           )->a( n = `wrap`  v = `Wrap`
           )->a( n = `class` v = `sapUiTinyMarginTop` ).
-      LOOP AT z2ui5_cl_cgui_html_viewer=>sapevent_links( <control>-html ) INTO DATA(ls_link).
+
+      temp4 = z2ui5_cl_cgui_html_viewer=>sapevent_links( <control>-html ).
+
+      LOOP AT temp4 INTO ls_link.
+
+        IF ls_link-text IS NOT INITIAL.
+          temp5 = ls_link-text.
+        ELSE.
+          temp5 = ls_link-action.
+        ENDIF.
         lo_links->tag( `Link`
-            )->a( n = `text`  t = COND #( WHEN ls_link-text IS NOT INITIAL THEN ls_link-text ELSE ls_link-action )
+            )->a( n = `text`  t = temp5
             )->a( n = `class` v = `sapUiSmallMarginEnd`
             )->a( n = `press` v = event( ctx  = ctx
                                          id   = id
@@ -361,11 +399,14 @@ CLASS z2ui5_cl_cgui_view IMPLEMENTATION.
   METHOD render_picture.
 
     FIELD-SYMBOLS <gui> TYPE z2ui5_if_cgui_gui=>ty_t_control.
+    FIELD-SYMBOLS <control> TYPE z2ui5_if_cgui_gui=>ty_s_control.
+      DATA temp6 TYPE string.
 
     ASSIGN ctx-gui->* TO <gui>.
     " the row of the report's table itself - a binding is found by the
     " reference of the value, a copy of the row has none
-    ASSIGN <gui>[ id ] TO FIELD-SYMBOL(<control>).
+
+    READ TABLE <gui> INDEX id ASSIGNING <control>.
     IF <control>-url CP `sap-icon://*`.
       node->tag( n = `Icon` ns = `core`
           )->a( n = `xmlns:core` v = `sap.ui.core`
@@ -374,11 +415,17 @@ CLASS z2ui5_cl_cgui_view IMPLEMENTATION.
           )->a( n = `press`      v = event( ctx = ctx id = id name = `PICTURE_CLICK` ) ).
     ELSEIF <control>-url IS NOT INITIAL.
       " stretch and fit fill the width of the container
+
+      IF <control>-mode = 1 OR <control>-mode = 2 OR <control>-mode = 4.
+        temp6 = `100%`.
+      ELSE.
+        CLEAR temp6.
+      ENDIF.
       node->tag( `Image`
           )->a( n = `src`   v = ctx-client->_bind( val       = <control>-url
                                                    tab       = <gui>
                                                    tab_index = id )
-          )->a( n = `width` v = COND #( WHEN <control>-mode = 1 OR <control>-mode = 2 OR <control>-mode = 4 THEN `100%` )
+          )->a( n = `width` v = temp6
           )->a( n = `press` v = event( ctx = ctx id = id name = `PICTURE_CLICK` ) ).
     ENDIF.
 
@@ -387,28 +434,68 @@ CLASS z2ui5_cl_cgui_view IMPLEMENTATION.
   METHOD render_simple_tree.
 
     " the rows of the expanded branches: expander, icon, the text a link
-    DATA(lo_stree) = CAST z2ui5_cl_cgui_simple_tree( ctx-objects[ id ] ).
-    DATA(lo_nodes) = node->ele( `VBox`
+    DATA temp7 TYPE REF TO z2ui5_cl_cgui_simple_tree.
+    FIELD-SYMBOLS <temp1> LIKE LINE OF ctx-objects.
+    DATA temp2 LIKE sy-tabix.
+    DATA lo_stree LIKE temp7.
+    DATA lo_nodes TYPE REF TO z2ui5_cl_ui5_view_builder.
+    DATA lt_tcol TYPE z2ui5_cl_cgui_simple_tree=>ty_t_column.
+      DATA lo_head TYPE REF TO z2ui5_cl_ui5_view_builder.
+      DATA ls_tcol LIKE LINE OF lt_tcol.
+    DATA temp8 TYPE z2ui5_cl_cgui_tree=>ty_t_view.
+    DATA ls_row LIKE LINE OF temp8.
+      DATA lo_line TYPE REF TO z2ui5_cl_ui5_view_builder.
+      DATA lo_row LIKE lo_line.
+        FIELD-SYMBOLS <temp9> LIKE LINE OF lt_tcol.
+        DATA temp10 LIKE sy-tabix.
+      DATA temp3 TYPE xsdboolean.
+    temp2 = sy-tabix.
+    READ TABLE ctx-objects INDEX id ASSIGNING <temp1>.
+    sy-tabix = temp2.
+    IF sy-subrc <> 0.
+      ASSERT 1 = 0.
+    ENDIF.
+    temp7 ?= <temp1>.
+
+    lo_stree = temp7.
+
+    lo_nodes = node->ele( `VBox`
         )->a( n = `class` v = `sapUiTinyMarginTopBottom` ).
     " a column tree: the headers, the tree in the first column of its
     " width, the cells of a node after it
-    DATA(lt_tcol) = lo_stree->columns( ).
+
+    lt_tcol = lo_stree->columns( ).
     IF lt_tcol IS NOT INITIAL.
-      DATA(lo_head) = lo_nodes->ele( `HBox`
+
+      lo_head = lo_nodes->ele( `HBox`
           )->a( n = `class` v = `sapUiTinyMarginBottom` ).
-      LOOP AT lt_tcol INTO DATA(ls_tcol).
+
+      LOOP AT lt_tcol INTO ls_tcol.
         lo_head->tag( `Label`
             )->a( n = `text`   t = ls_tcol-text
             )->a( n = `design` v = `Bold`
             )->a( n = `width`  v = width( ls_tcol-width ) ).
       ENDLOOP.
     ENDIF.
-    LOOP AT lo_stree->view( ) INTO DATA(ls_row).
-      DATA(lo_line) = lo_nodes->ele( `HBox`
+
+    temp8 = lo_stree->view( ).
+
+    LOOP AT temp8 INTO ls_row.
+
+      lo_line = lo_nodes->ele( `HBox`
           )->a( n = `alignItems` v = `Center` ).
-      DATA(lo_row) = lo_line.
+
+      lo_row = lo_line.
       IF lt_tcol IS NOT INITIAL.
-        ls_tcol = lt_tcol[ 1 ].
+
+
+        temp10 = sy-tabix.
+        READ TABLE lt_tcol INDEX 1 ASSIGNING <temp9>.
+        sy-tabix = temp10.
+        IF sy-subrc <> 0.
+          ASSERT 1 = 0.
+        ENDIF.
+        ls_tcol = <temp9>.
         lo_row = lo_line->ele( `HBox`
             )->a( n = `alignItems` v = `Center`
             )->a( n = `width`      v = width( ls_tcol-width ) ).
@@ -428,9 +515,11 @@ CLASS z2ui5_cl_cgui_view IMPLEMENTATION.
             )->a( n = `src`        v = ls_row-icon
             )->a( n = `class`      v = `sapUiTinyMarginEnd` ).
       ENDIF.
+
+      temp3 = boolc( ls_row-key = lo_stree->selected( ) ).
       lo_row->tag( `Link`
           )->a( n = `text`       t = ls_row-text
-          )->a( n = `emphasized` b = xsdbool( ls_row-key = lo_stree->selected( ) )
+          )->a( n = `emphasized` b = temp3
           )->a( n = `press`      v = event( ctx = ctx id = id name = `CLICK` arg1 = |{ ls_row-key }| ) ).
       render_tree_cells( ctx     = ctx
                          id      = id
@@ -444,13 +533,32 @@ CLASS z2ui5_cl_cgui_view IMPLEMENTATION.
 
   METHOD render_tree_cells.
 
-    LOOP AT tree->cells( key ) INTO DATA(ls_cell).
-      DATA(ls_tcol) = VALUE #( columns[ name = ls_cell-name ] OPTIONAL ).
+    DATA temp11 TYPE z2ui5_cl_cgui_simple_tree=>ty_t_cell.
+    DATA ls_cell LIKE LINE OF temp11.
+      DATA temp12 TYPE z2ui5_cl_cgui_simple_tree=>ty_s_column.
+      DATA temp13 TYPE z2ui5_cl_cgui_simple_tree=>ty_s_column.
+      DATA ls_tcol LIKE temp12.
+      DATA lv_cell_width TYPE string.
+      DATA lv_cell_arg TYPE string.
+    temp11 = tree->cells( key ).
+
+    LOOP AT temp11 INTO ls_cell.
+
+      CLEAR temp12.
+
+      READ TABLE columns INTO temp13 WITH KEY name = ls_cell-name.
+      IF sy-subrc = 0.
+        temp12 = temp13.
+      ENDIF.
+
+      ls_tcol = temp12.
       IF ls_tcol-width = 0.
         ls_tcol-width = ls_cell-width.
       ENDIF.
-      DATA(lv_cell_width) = width( ls_tcol-width ).
-      DATA(lv_cell_arg) = |{ key } { ls_cell-name }|.
+
+      lv_cell_width = width( ls_tcol-width ).
+
+      lv_cell_arg = |{ key } { ls_cell-name }|.
       CASE ls_cell-kind.
         WHEN `LINK`.
           node->tag( `Link`
@@ -475,16 +583,31 @@ CLASS z2ui5_cl_cgui_view IMPLEMENTATION.
   METHOD render_grid.
 
     " a grid the ALV does not show - its caption offers to show it
-    DATA(lv_caption) = CAST z2ui5_cl_cgui_alv_grid( ctx-objects[ id ] )->caption( ).
+    DATA temp14 TYPE REF TO z2ui5_cl_cgui_alv_grid.
+    FIELD-SYMBOLS <temp3> LIKE LINE OF ctx-objects.
+    DATA temp4 LIKE sy-tabix.
+    DATA lv_caption TYPE string.
+    DATA temp15 TYPE string.
+    temp4 = sy-tabix.
+    READ TABLE ctx-objects INDEX id ASSIGNING <temp3>.
+    sy-tabix = temp4.
+    IF sy-subrc <> 0.
+      ASSERT 1 = 0.
+    ENDIF.
+    temp14 ?= <temp3>.
+
+    lv_caption = temp14->caption( ).
     IF lv_caption IS INITIAL.
       RETURN.
     ENDIF.
+
+    temp15 = 'Show'(002).
     node->ele( `Toolbar`
         )->tag( `Title`
         )->a( n = `text` t = lv_caption
         )->tag( `ToolbarSpacer`
         )->tag( `Button`
-        )->a( n = `text`  t = CONV #( 'Show'(002) )
+        )->a( n = `text`  t = temp15
         )->a( n = `icon`  v = `sap-icon://table-view`
         )->a( n = `press` v = event( ctx = ctx id = id name = cv_show ) ).
 
@@ -492,23 +615,49 @@ CLASS z2ui5_cl_cgui_view IMPLEMENTATION.
 
   METHOD render_toolbar.
 
-    DATA(lo_bar) = node->ele( `OverflowToolbar` ).
-    LOOP AT control-buttons INTO DATA(ls_button).
+    DATA lo_bar TYPE REF TO z2ui5_cl_ui5_view_builder.
+    DATA ls_button LIKE LINE OF control-buttons.
+      DATA temp16 TYPE string.
+      DATA temp5 TYPE string.
+      DATA temp1 TYPE string.
+      DATA temp4 TYPE xsdboolean.
+    lo_bar = node->ele( `OverflowToolbar` ).
+
+    LOOP AT control-buttons INTO ls_button.
       IF ls_button-type = 3.
         lo_bar->tag( `ToolbarSeparator` ).
         CONTINUE.
       ENDIF.
       " a dropdown and a menu button raise dropdown_clicked, the others function_selected
+
+      IF ls_button-icon CP `sap-icon://*`.
+        temp16 = ls_button-icon.
+      ELSE.
+        CLEAR temp16.
+      ENDIF.
+
+      IF ls_button-checked = abap_true.
+        temp5 = `Emphasized`.
+      ELSE.
+        temp5 = `Default`.
+      ENDIF.
+
+      IF ls_button-type = 1 OR ls_button-type = 2.
+        temp1 = `DROPDOWN_CLICKED`.
+      ELSE.
+        temp1 = `FUNCTION_SELECTED`.
+      ENDIF.
+
+      temp4 = boolc( ls_button-disabled = abap_false ).
       lo_bar->tag( `Button`
           )->a( n = `text`    t = ls_button-text
-          )->a( n = `icon`    v = COND #( WHEN ls_button-icon CP `sap-icon://*` THEN ls_button-icon )
+          )->a( n = `icon`    v = temp16
           )->a( n = `tooltip` t = ls_button-quickinfo
-          )->a( n = `enabled` b = xsdbool( ls_button-disabled = abap_false )
-          )->a( n = `type`    v = COND #( WHEN ls_button-checked = abap_true THEN `Emphasized` ELSE `Default` )
+          )->a( n = `enabled` b = temp4
+          )->a( n = `type`    v = temp5
           )->a( n = `press`   v = event( ctx  = ctx
                                          id   = id
-                                         name = COND #( WHEN ls_button-type = 1 OR ls_button-type = 2
-                                                        THEN `DROPDOWN_CLICKED` ELSE `FUNCTION_SELECTED` )
+                                         name = temp1
                                          arg1 = ls_button-fcode ) ).
     ENDLOOP.
 
@@ -517,6 +666,12 @@ CLASS z2ui5_cl_cgui_view IMPLEMENTATION.
   METHOD tablecontrol.
 
     FIELD-SYMBOLS <rows> TYPE STANDARD TABLE.
+    DATA lo_table TYPE REF TO z2ui5_cl_ui5_view_builder.
+    DATA lo_columns TYPE REF TO z2ui5_cl_ui5_view_builder.
+    DATA ls_column LIKE LINE OF columns.
+      DATA temp17 TYPE string.
+    DATA lo_cells TYPE REF TO z2ui5_cl_ui5_view_builder.
+      DATA lv_cell TYPE string.
 
     IF to_upper( name ) <> ctx-tc OR ctx-tc_row IS NOT BOUND.
       RETURN.
@@ -525,7 +680,8 @@ CLASS z2ui5_cl_cgui_view IMPLEMENTATION.
     " the lines of a table control can be many: the browser gets 50 at a time
     " and the next ones as the table grows (window_bind_tab( )); an input lands in
     " the line it was made in
-    DATA(lo_table) = node->ele( `Table`
+
+    lo_table = node->ele( `Table`
         )->a( n = `items`      v = ctx-client->window_bind_tab( val    = <rows>
                                                           window = 50 )
         )->a( n = `growing`    b = abap_true
@@ -536,24 +692,34 @@ CLASS z2ui5_cl_cgui_view IMPLEMENTATION.
           )->tag( `Title`
           )->a( n = `text` t = title ).
     ENDIF.
-    DATA(lo_columns) = lo_table->ele( `columns` ).
-    LOOP AT columns INTO DATA(ls_column).
+
+    lo_columns = lo_table->ele( `columns` ).
+
+    LOOP AT columns INTO ls_column.
       IF sy-tabix > z2ui5_cl_cgui_report=>cv_cgui_tc_columns.
         EXIT.
       ENDIF.
+
+      IF ls_column-width > 0.
+        temp17 = |{ ls_column-width * 2 / 3 + 2 }rem|.
+      ELSE.
+        CLEAR temp17.
+      ENDIF.
       lo_columns->ele( `Column`
-          )->a( n = `width` v = COND #( WHEN ls_column-width > 0 THEN |{ ls_column-width * 2 / 3 + 2 }rem| )
+          )->a( n = `width` v = temp17
           )->tag( `Text`
           )->a( n = `text` t = ls_column-text ).
     ENDLOOP.
-    DATA(lo_cells) = lo_table->ele( `items`
+
+    lo_cells = lo_table->ele( `items`
         )->ele( `ColumnListItem`
         )->ele( `cells` ).
     LOOP AT columns INTO ls_column.
       IF sy-tabix > z2ui5_cl_cgui_report=>cv_cgui_tc_columns.
         EXIT.
       ENDIF.
-      DATA(lv_cell) = |\{C{ sy-tabix WIDTH = 2 ALIGN = RIGHT PAD = '0' }\}|.
+
+      lv_cell = |\{C{ sy-tabix WIDTH = 2 ALIGN = RIGHT PAD = '0' }\}|.
       IF ls_column-input = abap_true.
         lo_cells->tag( `Input`
             )->a( n = `value` v = lv_cell ).
@@ -568,23 +734,45 @@ CLASS z2ui5_cl_cgui_view IMPLEMENTATION.
   METHOD key_target.
 
     FIELD-SYMBOLS <gui> TYPE z2ui5_if_cgui_gui=>ty_t_control.
+    DATA ls_focus TYPE z2ui5_if_client=>ty_s_get-s_focus.
+    DATA lv_id TYPE i.
+      DATA temp18 TYPE i.
+    FIELD-SYMBOLS <control> LIKE LINE OF <gui>.
+      DATA lv_index LIKE sy-tabix.
+      TYPES temp1 TYPE STANDARD TABLE OF string WITH DEFAULT KEY.
+DATA lt_key TYPE temp1.
+      DATA temp19 LIKE sy-subrc.
+      DATA temp20 LIKE sy-tabix.
 
     ASSIGN ctx-gui->* TO <gui>.
     " the editor with the focus, else the first that registered the key
-    DATA(ls_focus) = ctx-client->get( )-s_focus.
-    DATA(lv_id) = 0.
+
+    ls_focus = ctx-client->get( )-s_focus.
+
+    lv_id = 0.
     IF ls_focus-id CP |{ z2ui5_cl_cgui_report=>cv_cgui_textedit_id }*|.
-      lv_id = CONV i( substring( val = ls_focus-id
-                                 off = strlen( z2ui5_cl_cgui_report=>cv_cgui_textedit_id ) ) ).
+
+      temp18 = substring( val = ls_focus-id off = strlen( z2ui5_cl_cgui_report=>cv_cgui_textedit_id ) ).
+      lv_id = temp18.
     ENDIF.
-    LOOP AT <gui> ASSIGNING FIELD-SYMBOL(<control>)
+
+    LOOP AT <gui> ASSIGNING <control>
          WHERE kind = z2ui5_if_cgui_gui=>cs_kind-textedit AND freed = abap_false.
-      DATA(lv_index) = sy-tabix.
+
+      lv_index = sy-tabix.
       IF NOT ( lv_id = 0 OR lv_index = lv_id ).
         CONTINUE.
       ENDIF.
-      SPLIT <control>-keys AT `,` INTO TABLE DATA(lt_key).
-      IF NOT line_exists( lt_key[ table_line = key ] ).
+
+
+      SPLIT <control>-keys AT `,` INTO TABLE lt_key.
+
+
+      temp20 = sy-tabix.
+      READ TABLE lt_key WITH KEY table_line = key TRANSPORTING NO FIELDS.
+      temp19 = sy-subrc.
+      sy-tabix = temp20.
+      IF NOT temp19 = 0.
         CONTINUE.
       ENDIF.
       IF lv_index = lv_id.
@@ -600,30 +788,50 @@ CLASS z2ui5_cl_cgui_view IMPLEMENTATION.
   METHOD html_frame.
 
     DATA lo_builder TYPE REF TO z2ui5_cl_ui5_view_builder.
+      DATA temp21 TYPE REF TO cl_abap_refdescr.
+      DATA lv_builder TYPE string.
+      DATA temp22 TYPE z2ui5_cl_cgui_view=>ty_flag.
+    DATA temp5 TYPE xsdboolean.
 
     IF ctx-html_frame->* IS INITIAL.
       " the mirror class is named like the view builder of the same release,
       " z2ui5_cl_ui5f_htmlfrm_js - its name is derived from the builder's, so
       " it follows the namespace rename (a literal would not)
-      DATA(lv_builder) = CAST cl_abap_refdescr( cl_abap_typedescr=>describe_by_data( lo_builder )
-                                                )->get_referenced_type( )->get_relative_name( ).
+
+      temp21 ?= cl_abap_typedescr=>describe_by_data( lo_builder ).
+
+      lv_builder = temp21->get_referenced_type( )->get_relative_name( ).
       cl_abap_typedescr=>describe_by_name( EXPORTING  p_name         = replace( val  = lv_builder
                                                                                  sub  = `CL_UI5_VIEW_BUILDER`
                                                                                  with = `CL_UI5F_HTMLFRM_JS` )
                                            EXCEPTIONS type_not_found = 1
                                                       OTHERS         = 2 ).
-      ctx-html_frame->* = COND #( WHEN sy-subrc = 0 THEN abap_true ELSE `-` ).
+
+      IF sy-subrc = 0.
+        temp22 = abap_true.
+      ELSE.
+        temp22 = `-`.
+      ENDIF.
+      ctx-html_frame->* = temp22.
     ENDIF.
-    result = xsdbool( ctx-html_frame->* = abap_true ).
+
+    temp5 = boolc( ctx-html_frame->* = abap_true ).
+    result = temp5.
 
   ENDMETHOD.
 
   METHOD screen.
 
     " during the run the controls are created for the list it writes
-    result = COND #( WHEN ctx-screen = `DYNPRO` THEN ctx-dynpro
-                     WHEN ctx-screen = `SELECTION` AND ctx-in_run = abap_false THEN `1000`
-                     ELSE `LIST` ).
+    DATA temp23 TYPE string.
+    IF ctx-screen = `DYNPRO`.
+      temp23 = ctx-dynpro.
+    ELSEIF ctx-screen = `SELECTION` AND ctx-in_run = abap_false.
+      temp23 = `1000`.
+    ELSE.
+      temp23 = `LIST`.
+    ENDIF.
+    result = temp23.
 
   ENDMETHOD.
 

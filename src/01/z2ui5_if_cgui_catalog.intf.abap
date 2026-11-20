@@ -17,7 +17,7 @@ INTERFACE z2ui5_if_cgui_catalog PUBLIC.
       semantic_object TYPE string,
       action          TYPE string,
     END OF ty_s_transaction.
-  TYPES ty_t_transaction TYPE STANDARD TABLE OF ty_s_transaction WITH EMPTY KEY.
+  TYPES ty_t_transaction TYPE STANDARD TABLE OF ty_s_transaction WITH DEFAULT KEY.
 
   METHODS get
     RETURNING

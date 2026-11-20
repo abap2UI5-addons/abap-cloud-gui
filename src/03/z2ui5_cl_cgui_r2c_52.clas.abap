@@ -49,26 +49,53 @@ CLASS z2ui5_cl_cgui_r2c_52 IMPLEMENTATION.
 
   METHOD start_of_selection.
 
-    gt_seat = VALUE #( ( connid = '0400' seats = 10 )
-                       ( connid = '0402' seats = 20 )
-                       ( connid = '2402' seats = 30 ) ).
+    DATA temp1 LIKE gt_seat.
+    DATA temp2 LIKE LINE OF temp1.
+    CLEAR temp1.
+
+    temp2-connid = '0400'.
+    temp2-seats = 10.
+    INSERT temp2 INTO TABLE temp1.
+    temp2-connid = '0402'.
+    temp2-seats = 20.
+    INSERT temp2 INTO TABLE temp1.
+    temp2-connid = '2402'.
+    temp2-seats = 30.
+    INSERT temp2 INTO TABLE temp1.
+    gt_seat = temp1.
     call_screen( `0100` ).
 
   ENDMETHOD.
 
   METHOD dynpro_screen.
+        DATA temp3 TYPE z2ui5_if_cgui_gui=>ty_t_tc_column.
+        DATA temp4 LIKE LINE OF temp3.
 
     CASE dynnr.
       WHEN `0100`.
+
+        CLEAR temp3.
+
+        CLEAR temp4.
+        temp4-text = `Flight`.
+        temp4-width = 4.
+        INSERT temp4 INTO TABLE temp3.
+        CLEAR temp4.
+        temp4-text = `Seats`.
+        temp4-input = abap_true.
+        temp4-width = 10.
+        INSERT temp4 INTO TABLE temp3.
         screen->table_control( name    = `TC_SEATS`
                                title   = `Seats per connection`
-                               columns = VALUE #( ( text = `Flight` width = 4 )
-                                                  ( text = `Seats` input = abap_true width = 10 ) ) ).
+                               columns = temp3 ).
     ENDCASE.
 
   ENDMETHOD.
 
   METHOD dynpro_pbo.
+          DATA temp5 TYPE string_table.
+          DATA temp1 LIKE LINE OF temp5.
+          DATA temp2 LIKE LINE OF temp5.
 
     CASE dynnr.
       WHEN `0100`.
@@ -78,8 +105,16 @@ CLASS z2ui5_cl_cgui_r2c_52 IMPLEMENTATION.
         DO tc_seats-lines TIMES.
           tc_seats-current_line = sy-index.
           fill_0100( ).
+
+          CLEAR temp5.
+
+          temp1 = |{ gs_seat-connid }|.
+          INSERT temp1 INTO TABLE temp5.
+
+          temp2 = |{ gs_seat-seats }|.
+          INSERT temp2 INTO TABLE temp5.
           tablecontrol_row( name   = `TC_SEATS`
-                            values = VALUE #( ( |{ gs_seat-connid }| ) ( |{ gs_seat-seats }| ) ) ).
+                            values = temp5 ).
         ENDDO.
     ENDCASE.
 

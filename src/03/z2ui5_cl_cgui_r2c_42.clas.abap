@@ -49,18 +49,38 @@ CLASS z2ui5_cl_cgui_r2c_42 IMPLEMENTATION.
 
   METHOD start_of_selection.
 
-    DATA(lt_shelf) = VALUE ty_t_shelf( ( wine = 'Riesling' vintage = '2019' bottles = 12 )
-                                       ( wine = 'Merlot'   vintage = '2016' bottles = 4 )
-                                       ( wine = 'Rose'     vintage = '2021' bottles = 9 ) ).
+    DATA temp1 TYPE ty_t_shelf.
+    DATA temp2 LIKE LINE OF temp1.
+    DATA lt_shelf LIKE temp1.
+    DATA ls_shelf LIKE LINE OF lt_shelf.
+    DATA lv_page TYPE string.
+    CLEAR temp1.
 
-    LOOP AT lt_shelf INTO DATA(ls_shelf).
+    temp2-wine = 'Riesling'.
+    temp2-vintage = '2019'.
+    temp2-bottles = 12.
+    INSERT temp2 INTO TABLE temp1.
+    temp2-wine = 'Merlot'.
+    temp2-vintage = '2016'.
+    temp2-bottles = 4.
+    INSERT temp2 INTO TABLE temp1.
+    temp2-wine = 'Rose'.
+    temp2-vintage = '2021'.
+    temp2-bottles = 9.
+    INSERT temp2 INTO TABLE temp1.
+
+    lt_shelf = temp1.
+
+
+    LOOP AT lt_shelf INTO ls_shelf.
       lv_total = lv_total + ls_shelf-bottles.
     ENDLOOP.
     DELETE lt_shelf WHERE bottles < p_min.
 
     z2ui5_cl_cgui_demo_output=>begin_section( 'Cellar' ).
     z2ui5_cl_cgui_demo_output=>write( lt_shelf ).
-    DATA(lv_page) = z2ui5_cl_cgui_demo_output=>get( ).
+
+    lv_page = z2ui5_cl_cgui_demo_output=>get( ).
     z2ui5_cl_cgui_browser=>show_html( title       = 'Cellar'
                                 html_string = lv_page ).
 

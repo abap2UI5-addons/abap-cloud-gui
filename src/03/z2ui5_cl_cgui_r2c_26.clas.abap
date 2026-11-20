@@ -83,7 +83,7 @@ CLASS z2ui5_cl_cgui_r2c_26 IMPLEMENTATION.
   METHOD status_0100.
 
     IF go_app IS INITIAL.
-      go_app = NEW #( ).
+      CREATE OBJECT go_app.
       go_app->create( ).
     ENDIF.
 

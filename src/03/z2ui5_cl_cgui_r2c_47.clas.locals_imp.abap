@@ -22,7 +22,8 @@ ENDCLASS.
 
 CLASS lcl_handler IMPLEMENTATION.
   METHOD on_double_click.
-    DATA(lo_node) = lcl_r2c=>app->go_tree->get_nodes( )->get_node( node_key ).
+    DATA lo_node TYPE REF TO z2ui5_cl_cgui_salv_node.
+    lo_node = lcl_r2c=>app->go_tree->get_nodes( )->get_node( node_key ).
     lcl_r2c=>app->message( |{ lo_node->get_text( ) } picked| ).
   ENDMETHOD.
 ENDCLASS.

@@ -223,19 +223,41 @@ CLASS z2ui5_cl_cgui_column_tree IMPLEMENTATION.
 
   METHOD add_column.
 
-    DATA(lv_name) = to_upper( condense( CONV string( name ) ) ).
+    DATA temp1 TYPE string.
+    DATA lv_name TYPE string.
+    DATA temp2 LIKE sy-subrc.
+    DATA temp3 TYPE z2ui5_cl_cgui_simple_tree=>ty_s_column.
+    DATA temp4 TYPE string.
+    DATA temp5 TYPE z2ui5_cl_cgui_simple_tree=>ty_s_column-width.
+    temp1 = name.
+
+    lv_name = to_upper( condense( temp1 ) ).
     IF lv_name IS INITIAL.
       RAISE illegal_column_name.
     ENDIF.
-    IF lv_name = mv_hierarchy OR line_exists( mt_column[ name = lv_name ] ).
+
+    READ TABLE mt_column WITH KEY name = lv_name TRANSPORTING NO FIELDS.
+    temp2 = sy-subrc.
+    IF lv_name = mv_hierarchy OR temp2 = 0.
       RAISE column_exists.
     ENDIF.
     IF hidden = abap_true.
       RETURN.
     ENDIF.
-    INSERT VALUE #( name  = lv_name
-                    text  = condense( CONV string( header_text ) )
-                    width = COND #( WHEN width_pix = abap_true THEN width / 8 ELSE width ) ) INTO TABLE mt_column.
+
+    CLEAR temp3.
+    temp3-name = lv_name.
+
+    temp4 = header_text.
+    temp3-text = condense( temp4 ).
+
+    IF width_pix = abap_true.
+      temp5 = width / 8.
+    ELSE.
+      temp5 = width.
+    ENDIF.
+    temp3-width = temp5.
+    INSERT temp3 INTO TABLE mt_column.
 
   ENDMETHOD.
 
@@ -245,12 +267,16 @@ CLASS z2ui5_cl_cgui_column_tree IMPLEMENTATION.
     DATA ls_node TYPE ty_s_node.
     DATA ls_item TYPE ty_s_item.
 
-    LOOP AT node_table ASSIGNING FIELD-SYMBOL(<node_line>).
+    FIELD-SYMBOLS <node_line> TYPE ANY.
+    FIELD-SYMBOLS <line> TYPE ANY.
+        FIELD-SYMBOLS <node> TYPE z2ui5_cl_cgui_simple_tree=>ty_s_node.
+    LOOP AT node_table ASSIGNING <node_line>.
       CLEAR ls_node.
       MOVE-CORRESPONDING <node_line> TO ls_node.
       INSERT ls_node INTO TABLE lt_node.
     ENDLOOP.
-    LOOP AT item_table ASSIGNING FIELD-SYMBOL(<line>).
+
+    LOOP AT item_table ASSIGNING <line>.
       CLEAR ls_item.
       MOVE-CORRESPONDING <line> TO ls_item.
       ls_item-item_name = to_upper( ls_item-item_name ).
@@ -259,7 +285,8 @@ CLASS z2ui5_cl_cgui_column_tree IMPLEMENTATION.
       ENDIF.
       " the item of the hierarchy column is the text of its node
       IF ls_item-item_name = mv_hierarchy.
-        READ TABLE lt_node ASSIGNING FIELD-SYMBOL(<node>) WITH KEY node_key = ls_item-node_key.
+
+        READ TABLE lt_node ASSIGNING <node> WITH KEY node_key = ls_item-node_key.
         IF sy-subrc = 0.
           <node>-text = ls_item-text.
           CONTINUE.
@@ -274,17 +301,25 @@ CLASS z2ui5_cl_cgui_column_tree IMPLEMENTATION.
 
   METHOD item_set_text.
 
-    DATA(lv_key) = key_of( node_key ).
+    DATA lv_key TYPE i.
+    DATA temp4 TYPE ty_item_name.
+    DATA lv_item LIKE temp4.
+    FIELD-SYMBOLS <item> TYPE z2ui5_cl_cgui_column_tree=>ty_s_item.
+    lv_key = key_of( node_key ).
     IF lv_key = 0.
       RAISE node_not_found.
     ENDIF.
-    DATA(lv_item) = CONV ty_item_name( to_upper( item_name ) ).
+
+    temp4 = to_upper( item_name ).
+
+    lv_item = temp4.
     IF lv_item = mv_hierarchy.
       node_set_text( node_key = node_key
                      text     = text ).
       RETURN.
     ENDIF.
-    READ TABLE mt_item ASSIGNING FIELD-SYMBOL(<item>) WITH KEY node_key = node_key_of( lv_key ) item_name = lv_item.
+
+    READ TABLE mt_item ASSIGNING <item> WITH KEY node_key = node_key_of( lv_key ) item_name = lv_item.
     IF sy-subrc <> 0.
       RAISE item_not_found.
     ENDIF.
@@ -294,12 +329,18 @@ CLASS z2ui5_cl_cgui_column_tree IMPLEMENTATION.
 
   METHOD item_set_chosen.
 
-    DATA(lv_key) = key_of( node_key ).
+    DATA lv_key TYPE i.
+    DATA temp5 TYPE ty_item_name.
+    FIELD-SYMBOLS <item> TYPE z2ui5_cl_cgui_column_tree=>ty_s_item.
+    lv_key = key_of( node_key ).
     IF lv_key = 0.
       RAISE node_not_found.
     ENDIF.
-    READ TABLE mt_item ASSIGNING FIELD-SYMBOL(<item>)
-         WITH KEY node_key = node_key_of( lv_key ) item_name = CONV ty_item_name( to_upper( item_name ) ).
+
+    temp5 = to_upper( item_name ).
+
+    READ TABLE mt_item ASSIGNING <item>
+         WITH KEY node_key = node_key_of( lv_key ) item_name = temp5.
     IF sy-subrc <> 0.
       RAISE item_not_found.
     ENDIF.
@@ -321,6 +362,7 @@ CLASS z2ui5_cl_cgui_column_tree IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD delete_node.
+    DATA ls_item LIKE LINE OF mt_item.
 
     super->delete_node( EXPORTING  node_key       = node_key
                         EXCEPTIONS node_not_found = 1
@@ -329,7 +371,8 @@ CLASS z2ui5_cl_cgui_column_tree IMPLEMENTATION.
       RAISE node_not_found.
     ENDIF.
     " the items of the nodes gone with the branch
-    LOOP AT mt_item INTO DATA(ls_item).
+
+    LOOP AT mt_item INTO ls_item.
       IF key_of( ls_item-node_key ) = 0.
         DELETE mt_item WHERE node_key = ls_item-node_key.
       ENDIF.
@@ -339,21 +382,44 @@ CLASS z2ui5_cl_cgui_column_tree IMPLEMENTATION.
 
   METHOD columns.
 
-    INSERT VALUE #( name  = mv_hierarchy
-                    text  = condense( ms_header-heading )
-                    width = COND #( WHEN ms_header-width_pix = abap_true THEN ms_header-width / 8
-                                    ELSE ms_header-width ) ) INTO TABLE result.
+    DATA temp6 TYPE z2ui5_cl_cgui_simple_tree=>ty_s_column.
+    DATA temp7 TYPE z2ui5_cl_cgui_simple_tree=>ty_s_column-width.
+    CLEAR temp6.
+    temp6-name = mv_hierarchy.
+    temp6-text = condense( ms_header-heading ).
+
+    IF ms_header-width_pix = abap_true.
+      temp7 = ms_header-width / 8.
+    ELSE.
+      temp7 = ms_header-width.
+    ENDIF.
+    temp6-width = temp7.
+    INSERT temp6 INTO TABLE result.
     INSERT LINES OF mt_column INTO TABLE result.
 
   ENDMETHOD.
 
   METHOD cells.
 
-    DATA(lv_node_key) = node_key_of( key ).
-    LOOP AT mt_column INTO DATA(ls_column).
-      DATA(ls_cell) = VALUE ty_s_cell( name = ls_column-name
-                                       kind = `TEXT` ).
-      READ TABLE mt_item INTO DATA(ls_item) WITH KEY node_key = lv_node_key item_name = CONV ty_item_name( ls_column-name ).
+    DATA lv_node_key TYPE z2ui5_cl_cgui_simple_tree=>ty_node_key.
+    DATA ls_column LIKE LINE OF mt_column.
+      DATA temp7 TYPE ty_s_cell.
+      DATA ls_cell LIKE temp7.
+      DATA temp8 TYPE ty_item_name.
+      DATA ls_item TYPE z2ui5_cl_cgui_column_tree=>ty_s_item.
+    lv_node_key = node_key_of( key ).
+
+    LOOP AT mt_column INTO ls_column.
+
+      CLEAR temp7.
+      temp7-name = ls_column-name.
+      temp7-kind = `TEXT`.
+
+      ls_cell = temp7.
+
+      temp8 = ls_column-name.
+
+      READ TABLE mt_item INTO ls_item WITH KEY node_key = lv_node_key item_name = temp8.
       IF sy-subrc = 0.
         ls_cell = cell_of( ls_item ).
         CLEAR ls_cell-width.
@@ -366,14 +432,32 @@ CLASS z2ui5_cl_cgui_column_tree IMPLEMENTATION.
   METHOD dispatch.
 
     " a link or a checkbox: the key of the node and the item apart by a space
-    DATA(lv_event) = to_upper( event ).
+    DATA lv_event TYPE string.
+      DATA lv_key TYPE string.
+      DATA lv_name TYPE string.
+      DATA temp9 TYPE i.
+      DATA lv_node_key TYPE z2ui5_cl_cgui_simple_tree=>ty_node_key.
+      DATA temp10 TYPE ty_item_name.
+      DATA lv_item LIKE temp10.
+      FIELD-SYMBOLS <item> TYPE z2ui5_cl_cgui_column_tree=>ty_s_item.
+        DATA temp1 TYPE xsdboolean.
+      DATA temp11 TYPE i.
+    lv_event = to_upper( event ).
     IF lv_event = `LINK` OR lv_event = `CHECKBOX`.
-      SPLIT condense( value ) AT ` ` INTO DATA(lv_key) DATA(lv_name).
+
+
+      SPLIT condense( value ) AT ` ` INTO lv_key lv_name.
       IF lv_key IS INITIAL OR lv_key CN `0123456789`.
         RETURN.
       ENDIF.
-      DATA(lv_node_key) = node_key_of( CONV i( lv_key ) ).
-      DATA(lv_item) = CONV ty_item_name( to_upper( lv_name ) ).
+
+      temp9 = lv_key.
+
+      lv_node_key = node_key_of( temp9 ).
+
+      temp10 = to_upper( lv_name ).
+
+      lv_item = temp10.
       IF lv_node_key IS INITIAL.
         RETURN.
       ENDIF.
@@ -383,9 +467,12 @@ CLASS z2ui5_cl_cgui_column_tree IMPLEMENTATION.
                           item_name = lv_item ).
         RETURN.
       ENDIF.
-      READ TABLE mt_item ASSIGNING FIELD-SYMBOL(<item>) WITH KEY node_key = lv_node_key item_name = lv_item.
+
+      READ TABLE mt_item ASSIGNING <item> WITH KEY node_key = lv_node_key item_name = lv_item.
       IF sy-subrc = 0 AND <item>-editable = abap_true AND <item>-disabled = abap_false.
-        <item>-chosen = xsdbool( <item>-chosen = abap_false ).
+
+        temp1 = boolc( <item>-chosen = abap_false ).
+        <item>-chosen = temp1.
         raise_item_event( event     = `CHECKBOX_CHANGE`
                           node_key  = lv_node_key
                           item_name = lv_item
@@ -398,7 +485,9 @@ CLASS z2ui5_cl_cgui_column_tree IMPLEMENTATION.
                      value = value ).
     " a click on a node is a click on its item of the hierarchy column too
     IF lv_event = `CLICK` AND condense( value ) CO `0123456789`.
-      lv_node_key = node_key_of( CONV i( condense( value ) ) ).
+
+      temp11 = condense( value ).
+      lv_node_key = node_key_of( temp11 ).
       IF lv_node_key IS NOT INITIAL.
         raise_item_event( event     = `ITEM_DOUBLE_CLICK`
                           node_key  = lv_node_key
@@ -415,26 +504,66 @@ CLASS z2ui5_cl_cgui_column_tree IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD cell_of.
+    DATA temp8 TYPE string.
+    DATA temp9 TYPE z2ui5_cl_cgui_simple_tree=>ty_s_cell-kind.
 
-    result = VALUE #( name    = condense( CONV string( item-item_name ) )
-                      text    = condense( item-text )
-                      checked = item-chosen
-                      width   = item-length
-                      kind    = COND #( WHEN item-class = item_class_link THEN `LINK`
-                                        WHEN item-class = item_class_checkbox THEN `CHECKBOX`
-                                        ELSE `TEXT` ) ).
+    CLEAR result.
+
+    temp8 = item-item_name.
+    result-name = condense( temp8 ).
+    result-text = condense( item-text ).
+    result-checked = item-chosen.
+    result-width = item-length.
+
+    IF item-class = item_class_link.
+      temp9 = `LINK`.
+    ELSEIF item-class = item_class_checkbox.
+      temp9 = `CHECKBOX`.
+    ELSE.
+      temp9 = `TEXT`.
+    ENDIF.
+    result-kind = temp9.
 
   ENDMETHOD.
 
   METHOD raise_item_event.
 
-    DATA(lv_node_key) = node_key.
-    DATA(lv_item_name) = item_name.
-    DATA(lv_checked) = checked.
-    raise_event( event  = event
-                 params = VALUE #( ( name = `NODE_KEY`  kind = cl_abap_objectdescr=>exporting value = REF #( lv_node_key ) )
-                                   ( name = `ITEM_NAME` kind = cl_abap_objectdescr=>exporting value = REF #( lv_item_name ) )
-                                   ( name = `CHECKED`   kind = cl_abap_objectdescr=>exporting value = REF #( lv_checked ) ) ) ).
+    DATA lv_node_key LIKE node_key.
+    DATA lv_item_name LIKE item_name.
+    DATA lv_checked LIKE checked.
+    DATA temp12 LIKE REF TO lv_checked.
+DATA temp10 LIKE REF TO lv_item_name.
+DATA temp1 LIKE REF TO lv_node_key.
+DATA temp2 TYPE abap_parmbind_tab.
+DATA temp3 LIKE LINE OF temp2.
+    lv_node_key = node_key.
+
+    lv_item_name = item_name.
+
+    lv_checked = checked.
+
+    GET REFERENCE OF lv_checked INTO temp12.
+
+GET REFERENCE OF lv_item_name INTO temp10.
+
+GET REFERENCE OF lv_node_key INTO temp1.
+
+CLEAR temp2.
+
+temp3-name = `NODE_KEY`.
+temp3-kind = cl_abap_objectdescr=>exporting.
+temp3-value = temp1.
+INSERT temp3 INTO TABLE temp2.
+temp3-name = `ITEM_NAME`.
+temp3-kind = cl_abap_objectdescr=>exporting.
+temp3-value = temp10.
+INSERT temp3 INTO TABLE temp2.
+temp3-name = `CHECKED`.
+temp3-kind = cl_abap_objectdescr=>exporting.
+temp3-value = temp12.
+INSERT temp3 INTO TABLE temp2.
+raise_event( event  = event
+                 params = temp2 ).
 
   ENDMETHOD.
 

@@ -57,9 +57,14 @@ CLASS z2ui5_cl_cgui_r2c_25 IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD start_of_selection.
+    DATA temp1 LIKE gt_notes.
 
     CLEAR gv_saved.
-    gt_notes = VALUE #( ( 'First line of the notes' ) ( 'Second line' ) ).
+
+    CLEAR temp1.
+    INSERT 'First line of the notes' INTO TABLE temp1.
+    INSERT 'Second line' INTO TABLE temp1.
+    gt_notes = temp1.
     call_screen( `0100` ).
 
   ENDMETHOD.
@@ -103,11 +108,13 @@ CLASS z2ui5_cl_cgui_r2c_25 IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD after_call_screen.
+          DATA lv_note LIKE LINE OF gt_notes.
 
     CASE dynnr.
       WHEN `0100`.
         IF gv_saved = 'X'.
-          LOOP AT gt_notes INTO DATA(lv_note).
+
+          LOOP AT gt_notes INTO lv_note.
             list( )->new_line(
                 )->write( lv_note ).
           ENDLOOP.
@@ -123,9 +130,16 @@ CLASS z2ui5_cl_cgui_r2c_25 IMPLEMENTATION.
 
     DATA lt_html TYPE STANDARD TABLE OF ty_line WITH DEFAULT KEY.
     DATA lv_url  TYPE c LENGTH 250.
-    APPEND |<h3>Notes of { p_carrid }</h3>| TO lt_html.
-    LOOP AT gt_notes INTO DATA(lv_line).
-      APPEND |<p>{ lv_line }</p>| TO lt_html.
+    DATA temp3 LIKE LINE OF lt_html.
+    DATA lv_line LIKE LINE OF gt_notes.
+      DATA temp4 LIKE LINE OF lt_html.
+    temp3 = |<h3>Notes of { p_carrid }</h3>|.
+    APPEND temp3 TO lt_html.
+
+    LOOP AT gt_notes INTO lv_line.
+
+      temp4 = |<p>{ lv_line }</p>|.
+      APPEND temp4 TO lt_html.
     ENDLOOP.
     go_html->load_data( IMPORTING assigned_url = lv_url
                         CHANGING  data_table   = lt_html ).
@@ -136,17 +150,14 @@ CLASS z2ui5_cl_cgui_r2c_25 IMPLEMENTATION.
   METHOD status_0100.
 
     IF go_editor IS INITIAL.
-      go_notes = NEW #( container_name = 'NOTES' ).
-      go_editor = NEW #( parent                     = go_notes
-                         wordwrap_mode              = z2ui5_cl_cgui_textedit=>wordwrap_at_fixed_position
-                         wordwrap_position          = 72
-                         wordwrap_to_linebreak_mode = z2ui5_cl_cgui_textedit=>true ).
+      CREATE OBJECT go_notes EXPORTING container_name = 'NOTES'.
+      CREATE OBJECT go_editor EXPORTING parent = go_notes wordwrap_mode = z2ui5_cl_cgui_textedit=>wordwrap_at_fixed_position wordwrap_position = 72 wordwrap_to_linebreak_mode = z2ui5_cl_cgui_textedit=>true.
       go_editor->set_toolbar_mode( z2ui5_cl_cgui_textedit=>false ).
       go_editor->set_statusbar_mode( z2ui5_cl_cgui_textedit=>false ).
       go_editor->set_text_as_r3table( gt_notes ).
 
-      go_preview = NEW #( container_name = 'PREVIEW' ).
-      go_html = NEW #( parent = go_preview ).
+      CREATE OBJECT go_preview EXPORTING container_name = 'PREVIEW'.
+      CREATE OBJECT go_html EXPORTING parent = go_preview.
       preview( ).
     ENDIF.
 

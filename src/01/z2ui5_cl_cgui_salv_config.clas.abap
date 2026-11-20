@@ -29,7 +29,7 @@ CLASS z2ui5_cl_cgui_salv_config DEFINITION PUBLIC CREATE PUBLIC.
         text    TYPE string,
         tooltip TYPE string,
       END OF ty_s_function.
-    TYPES ty_t_function TYPE STANDARD TABLE OF ty_s_function WITH EMPTY KEY.
+    TYPES ty_t_function TYPE STANDARD TABLE OF ty_s_function WITH DEFAULT KEY.
 
     DATA mv_title          TYPE string READ-ONLY.
     DATA mv_striped        TYPE abap_bool READ-ONLY.
@@ -219,12 +219,17 @@ CLASS z2ui5_cl_cgui_salv_config IMPLEMENTATION.
 
   METHOD add_function.
 
-    DATA(lv_name) = to_upper( condense( name ) ).
+    DATA lv_name TYPE string.
+    DATA temp1 TYPE z2ui5_cl_cgui_salv_config=>ty_s_function.
+    lv_name = to_upper( condense( name ) ).
     DELETE mt_function WHERE name = lv_name.
-    INSERT VALUE #( name    = lv_name
-                    icon    = condense( icon )
-                    text    = condense( text )
-                    tooltip = condense( tooltip ) ) INTO TABLE mt_function.
+
+    CLEAR temp1.
+    temp1-name = lv_name.
+    temp1-icon = condense( icon ).
+    temp1-text = condense( text ).
+    temp1-tooltip = condense( tooltip ).
+    INSERT temp1 INTO TABLE mt_function.
 
   ENDMETHOD.
 
@@ -247,13 +252,15 @@ CLASS z2ui5_cl_cgui_salv_config IMPLEMENTATION.
 
     DATA lt_index TYPE z2ui5_cl_cgui_alv=>ty_t_lvc_row.
     DATA lt_row_no TYPE z2ui5_cl_cgui_alv=>ty_t_lvc_roid.
+    DATA ls_index LIKE LINE OF lt_index.
 
     IF mo_grid IS NOT BOUND.
       RETURN.
     ENDIF.
     mo_grid->get_selected_rows( IMPORTING et_index_rows = lt_index
                                           et_row_no     = lt_row_no ).
-    LOOP AT lt_index INTO DATA(ls_index).
+
+    LOOP AT lt_index INTO ls_index.
       INSERT ls_index-index INTO TABLE value.
     ENDLOOP.
 

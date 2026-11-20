@@ -494,7 +494,7 @@ CLASS z2ui5_cl_cgui_frontend DEFINITION PUBLIC FINAL CREATE PRIVATE.
         url     TYPE string,
         content TYPE string,
       END OF ty_s_url.
-    CLASS-DATA gt_url TYPE STANDARD TABLE OF ty_s_url WITH EMPTY KEY.
+    CLASS-DATA gt_url TYPE STANDARD TABLE OF ty_s_url WITH DEFAULT KEY.
 
     " the run stops: z2ui5_cx_cgui_stop - raised here, a method with classic
     " EXCEPTIONS cannot RAISE EXCEPTION, it only lets a CX_NO_CHECK pass
@@ -521,18 +521,28 @@ ENDCLASS.
 CLASS z2ui5_cl_cgui_frontend IMPLEMENTATION.
 
   METHOD file_open_dialog.
+    DATA lt_pick TYPE string_table.
+      DATA lv_name LIKE LINE OF lt_pick.
+        FIELD-SYMBOLS <line> LIKE LINE OF file_table.
+        FIELD-SYMBOLS <name> TYPE any.
+    DATA temp18 TYPE string.
+    DATA temp3 TYPE string.
 
     IF go_report IS NOT BOUND.
       RAISE file_open_dialog_failed.
     ENDIF.
 
     " the second run of the F4: the files the user picked
-    DATA(lt_pick) = go_report->picked( ).
+
+    lt_pick = go_report->picked( ).
     IF lt_pick IS NOT INITIAL.
       CLEAR file_table.
-      LOOP AT lt_pick INTO DATA(lv_name).
-        APPEND INITIAL LINE TO file_table ASSIGNING FIELD-SYMBOL(<line>).
-        ASSIGN COMPONENT 1 OF STRUCTURE <line> TO FIELD-SYMBOL(<name>).
+
+      LOOP AT lt_pick INTO lv_name.
+
+        APPEND INITIAL LINE TO file_table ASSIGNING <line>.
+
+        ASSIGN COMPONENT 1 OF STRUCTURE <line> TO <name>.
         IF sy-subrc = 0.
           <name> = lv_name.
         ELSE.
@@ -544,9 +554,13 @@ CLASS z2ui5_cl_cgui_frontend IMPLEMENTATION.
       RETURN.
     ENDIF.
 
-    go_report->upload_popup( title    = CONV #( window_title )
+
+    temp18 = window_title.
+
+    temp3 = file_filter.
+    go_report->upload_popup( title    = temp18
                              multiple = multiselection
-                             filter   = CONV #( file_filter ) ).
+                             filter   = temp3 ).
     rc = 0.
     user_action = action_cancel.
 
@@ -585,21 +599,48 @@ CLASS z2ui5_cl_cgui_frontend IMPLEMENTATION.
 
     CONSTANTS lc_bom TYPE x LENGTH 3 VALUE 'EFBBBF'.
     DATA lv_line TYPE xstring.
+    DATA temp19 TYPE string.
+    DATA lv_content TYPE xstring.
+    DATA lv_found TYPE abap_bool.
+      DATA lt_pick TYPE string_table.
+        FIELD-SYMBOLS <temp20> LIKE LINE OF lt_pick.
+        DATA temp21 LIKE sy-tabix.
+      DATA lv_len TYPE i.
+      FIELD-SYMBOLS <line> LIKE LINE OF data_tab.
+      FIELD-SYMBOLS <bytes> TYPE any.
+      DATA lo_bytes TYPE REF TO cl_abap_typedescr.
+      DATA lv_off TYPE i.
+        DATA lv_part TYPE i.
+    DATA lv_text TYPE string.
+    DATA temp1 TYPE xsdboolean.
 
     CLEAR: filelength, header, data_tab.
     IF go_report IS NOT BOUND.
       RAISE file_open_error.
     ENDIF.
 
-    go_report->content( EXPORTING name    = CONV #( filename )
-                             IMPORTING content = DATA(lv_content)
-                                       found   = DATA(lv_found) ).
+
+    temp19 = filename.
+
+
+    go_report->content( EXPORTING name    = temp19
+                             IMPORTING content = lv_content
+                                       found   = lv_found ).
     IF lv_found = abap_false.
       " a name the browser has no file of - a path of the PC typed in or
       " fixed in the code: the file the user picks for it in the run again
-      DATA(lt_pick) = go_report->picked( ).
+
+      lt_pick = go_report->picked( ).
       IF lines( lt_pick ) = 1.
-        go_report->content( EXPORTING name    = lt_pick[ 1 ]
+
+
+        temp21 = sy-tabix.
+        READ TABLE lt_pick INDEX 1 ASSIGNING <temp20>.
+        sy-tabix = temp21.
+        IF sy-subrc <> 0.
+          ASSERT 1 = 0.
+        ENDIF.
+        go_report->content( EXPORTING name    = <temp20>
                             IMPORTING content = lv_content
                                       found   = lv_found ).
       ELSEIF go_report->upload_popup( title = file_name( filename ) ) = abap_true.
@@ -614,14 +655,18 @@ CLASS z2ui5_cl_cgui_frontend IMPLEMENTATION.
 
     IF to_upper( filetype ) = `BIN`.
       " the bytes, in lines of the length of a line of data_tab
-      DATA(lv_len) = 0.
-      APPEND INITIAL LINE TO data_tab ASSIGNING FIELD-SYMBOL(<line>).
-      ASSIGN COMPONENT 1 OF STRUCTURE <line> TO FIELD-SYMBOL(<bytes>).
+
+      lv_len = 0.
+
+      APPEND INITIAL LINE TO data_tab ASSIGNING <line>.
+
+      ASSIGN COMPONENT 1 OF STRUCTURE <line> TO <bytes>.
       IF sy-subrc <> 0.
         ASSIGN <line> TO <bytes>.
       ENDIF.
       " a line of type xstring takes the whole file
-      DATA(lo_bytes) = cl_abap_typedescr=>describe_by_data( <bytes> ).
+
+      lo_bytes = cl_abap_typedescr=>describe_by_data( <bytes> ).
       IF lo_bytes->type_kind = cl_abap_typedescr=>typekind_xstring.
         <bytes> = lv_content.
         RETURN.
@@ -631,9 +676,11 @@ CLASS z2ui5_cl_cgui_frontend IMPLEMENTATION.
       IF lv_len <= 0.
         RAISE invalid_type.
       ENDIF.
-      DATA(lv_off) = 0.
+
+      lv_off = 0.
       WHILE lv_off < filelength.
-        DATA(lv_part) = nmin( val1 = lv_len val2 = filelength - lv_off ).
+
+        lv_part = nmin( val1 = lv_len val2 = filelength - lv_off ).
         lv_line = lv_content+lv_off(lv_part).
         APPEND INITIAL LINE TO data_tab ASSIGNING <line>.
         ASSIGN COMPONENT 1 OF STRUCTURE <line> TO <bytes>.
@@ -650,9 +697,12 @@ CLASS z2ui5_cl_cgui_frontend IMPLEMENTATION.
     IF xstrlen( lv_content ) >= 3 AND lv_content(3) = lc_bom.
       lv_content = lv_content+3.
     ENDIF.
-    DATA(lv_text) = z2ui5_cl_cgui_context=>conv_get_string_by_xstring( lv_content ).
+
+    lv_text = z2ui5_cl_cgui_context=>conv_get_string_by_xstring( lv_content ).
+
+    temp1 = boolc( has_field_separator = abap_true OR to_upper( filetype ) = `DAT` ).
     text_to_table( EXPORTING text      = lv_text
-                             separator = xsdbool( has_field_separator = abap_true OR to_upper( filetype ) = `DAT` )
+                             separator = temp1
                    CHANGING  data_tab  = data_tab ).
 
   ENDMETHOD.
@@ -661,6 +711,13 @@ CLASS z2ui5_cl_cgui_frontend IMPLEMENTATION.
 
     CONSTANTS lc_bom TYPE x LENGTH 3 VALUE 'EFBBBF'.
     DATA lv_content TYPE xstring.
+      FIELD-SYMBOLS <line> TYPE ANY.
+        FIELD-SYMBOLS <bytes> TYPE any.
+        DATA temp22 TYPE xstring.
+        DATA lv_bytes LIKE temp22.
+      DATA lv_text TYPE string.
+      DATA temp2 TYPE xsdboolean.
+    DATA lv_name TYPE string.
 
     CLEAR filelength.
     IF go_report IS NOT BOUND.
@@ -668,20 +725,28 @@ CLASS z2ui5_cl_cgui_frontend IMPLEMENTATION.
     ENDIF.
 
     IF to_upper( filetype ) = `BIN`.
-      LOOP AT data_tab ASSIGNING FIELD-SYMBOL(<line>).
-        ASSIGN COMPONENT 1 OF STRUCTURE <line> TO FIELD-SYMBOL(<bytes>).
+
+      LOOP AT data_tab ASSIGNING <line>.
+
+        ASSIGN COMPONENT 1 OF STRUCTURE <line> TO <bytes>.
         IF sy-subrc <> 0.
           ASSIGN <line> TO <bytes>.
         ENDIF.
-        DATA(lv_bytes) = CONV xstring( <bytes> ).
+
+        temp22 = <bytes>.
+
+        lv_bytes = temp22.
         CONCATENATE lv_content lv_bytes INTO lv_content IN BYTE MODE.
       ENDLOOP.
       IF bin_filesize > 0 AND bin_filesize < xstrlen( lv_content ).
         lv_content = lv_content(bin_filesize).
       ENDIF.
     ELSE.
-      DATA(lv_text) = table_to_text( data_tab      = data_tab
-                                     separator     = xsdbool( write_field_separator = abap_true OR to_upper( filetype ) = `DAT` )
+
+
+      temp2 = boolc( write_field_separator = abap_true OR to_upper( filetype ) = `DAT` ).
+      lv_text = table_to_text( data_tab      = data_tab
+                                     separator     = temp2
                                      last_line_end = write_lf_after_last_line ).
       lv_content = z2ui5_cl_cgui_context=>conv_get_xstring_by_string( lv_text ).
       IF write_bom = abap_true.
@@ -690,7 +755,8 @@ CLASS z2ui5_cl_cgui_frontend IMPLEMENTATION.
     ENDIF.
 
     filelength = xstrlen( lv_content ).
-    DATA(lv_name) = file_name( filename ).
+
+    lv_name = file_name( filename ).
     IF lv_name IS INITIAL.
       lv_name = `download.txt`.
     ENDIF.
@@ -739,6 +805,11 @@ CLASS z2ui5_cl_cgui_frontend IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD directory_list_files.
+    DATA lv_pattern TYPE string.
+    DATA temp23 TYPE string_table.
+    DATA lv_name LIKE LINE OF temp23.
+      FIELD-SYMBOLS <line> LIKE LINE OF file_table.
+      FIELD-SYMBOLS <name> TYPE any.
 
     CLEAR: file_table, count.
     IF go_report IS NOT BOUND.
@@ -747,16 +818,22 @@ CLASS z2ui5_cl_cgui_frontend IMPLEMENTATION.
     IF directories_only = abap_true.
       RETURN.
     ENDIF.
-    DATA(lv_pattern) = to_upper( condense( filter ) ).
+
+    lv_pattern = to_upper( condense( filter ) ).
     IF lv_pattern IS INITIAL OR lv_pattern = `*.*`.
       lv_pattern = `*`.
     ENDIF.
-    LOOP AT go_report->names( ) INTO DATA(lv_name).
+
+    temp23 = go_report->names( ).
+
+    LOOP AT temp23 INTO lv_name.
       IF to_upper( lv_name ) NP lv_pattern.
         CONTINUE.
       ENDIF.
-      APPEND INITIAL LINE TO file_table ASSIGNING FIELD-SYMBOL(<line>).
-      ASSIGN COMPONENT 1 OF STRUCTURE <line> TO FIELD-SYMBOL(<name>).
+
+      APPEND INITIAL LINE TO file_table ASSIGNING <line>.
+
+      ASSIGN COMPONENT 1 OF STRUCTURE <line> TO <name>.
       IF sy-subrc = 0.
         <name> = lv_name.
       ELSE.
@@ -774,11 +851,14 @@ CLASS z2ui5_cl_cgui_frontend IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD file_exist.
+    DATA temp24 TYPE string.
 
     IF go_report IS NOT BOUND.
       RAISE cntl_error.
     ENDIF.
-    go_report->content( EXPORTING name  = CONV #( file )
+
+    temp24 = file.
+    go_report->content( EXPORTING name  = temp24
                              IMPORTING found = result ).
 
   ENDMETHOD.
@@ -796,12 +876,23 @@ CLASS z2ui5_cl_cgui_frontend IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD execute.
+    DATA temp25 TYPE string.
+    DATA lv_target LIKE temp25.
+    DATA lv_lower TYPE string.
 
     IF go_report IS NOT BOUND.
       RAISE cntl_error.
     ENDIF.
-    DATA(lv_target) = COND string( WHEN document IS NOT INITIAL THEN document ELSE parameter ).
-    DATA(lv_lower) = to_lower( lv_target ).
+
+    IF document IS NOT INITIAL.
+      temp25 = document.
+    ELSE.
+      temp25 = parameter.
+    ENDIF.
+
+    lv_target = temp25.
+
+    lv_lower = to_lower( lv_target ).
     IF strlen( lv_lower ) > 4 AND ( substring( val = lv_lower len = 5 ) = `http:`
         OR ( strlen( lv_lower ) > 5 AND substring( val = lv_lower len = 6 ) = `https:` )
         OR substring( val = lv_lower len = 5 ) = `mailt` ).
@@ -828,27 +919,48 @@ CLASS z2ui5_cl_cgui_frontend IMPLEMENTATION.
     DATA lt_line TYPE string_table.
     DATA lt_cell TYPE string_table.
 
-    DATA(lv_text) = replace( val  = text
+    DATA lv_text TYPE string.
+    FIELD-SYMBOLS <temp26> LIKE LINE OF lt_line.
+    DATA temp27 LIKE sy-tabix.
+    DATA lv_line LIKE LINE OF lt_line.
+      FIELD-SYMBOLS <row> LIKE LINE OF data_tab.
+      DATA lo_type TYPE REF TO cl_abap_typedescr.
+        DATA lv_cell LIKE LINE OF lt_cell.
+          FIELD-SYMBOLS <cell> TYPE any.
+    lv_text = replace( val  = text
                              sub  = |\r\n|
                              with = |\n|
                              occ  = 0 ).
     SPLIT lv_text AT |\n| INTO TABLE lt_line.
     " the line end of the last line opens no line of its own
-    IF lt_line IS NOT INITIAL AND lt_line[ lines( lt_line ) ] IS INITIAL.
+
+
+    temp27 = sy-tabix.
+    READ TABLE lt_line INDEX lines( lt_line ) ASSIGNING <temp26>.
+    sy-tabix = temp27.
+    IF sy-subrc <> 0.
+      ASSERT 1 = 0.
+    ENDIF.
+    IF lt_line IS NOT INITIAL AND <temp26> IS INITIAL.
       DELETE lt_line INDEX lines( lt_line ).
     ENDIF.
 
-    LOOP AT lt_line INTO DATA(lv_line).
-      APPEND INITIAL LINE TO data_tab ASSIGNING FIELD-SYMBOL(<row>).
-      DATA(lo_type) = cl_abap_typedescr=>describe_by_data( <row> ).
+
+    LOOP AT lt_line INTO lv_line.
+
+      APPEND INITIAL LINE TO data_tab ASSIGNING <row>.
+
+      lo_type = cl_abap_typedescr=>describe_by_data( <row> ).
       IF lo_type->kind <> cl_abap_typedescr=>kind_struct.
         <row> = lv_line.
         CONTINUE.
       ENDIF.
       IF separator = abap_true.
         SPLIT lv_line AT |\t| INTO TABLE lt_cell.
-        LOOP AT lt_cell INTO DATA(lv_cell).
-          ASSIGN COMPONENT sy-tabix OF STRUCTURE <row> TO FIELD-SYMBOL(<cell>).
+
+        LOOP AT lt_cell INTO lv_cell.
+
+          ASSIGN COMPONENT sy-tabix OF STRUCTURE <row> TO <cell>.
           IF sy-subrc <> 0.
             EXIT.
           ENDIF.
@@ -878,22 +990,36 @@ CLASS z2ui5_cl_cgui_frontend IMPLEMENTATION.
     DATA lt_line TYPE string_table.
     DATA lt_cell TYPE string_table.
 
-    LOOP AT data_tab ASSIGNING FIELD-SYMBOL(<row>).
-      DATA(lo_type) = cl_abap_typedescr=>describe_by_data( <row> ).
+    FIELD-SYMBOLS <row> TYPE ANY.
+      DATA lo_type TYPE REF TO cl_abap_typedescr.
+        FIELD-SYMBOLS <cell> TYPE any.
+      DATA temp28 TYPE string.
+      DATA temp1 TYPE string.
+    LOOP AT data_tab ASSIGNING <row>.
+
+      lo_type = cl_abap_typedescr=>describe_by_data( <row> ).
       IF lo_type->kind <> cl_abap_typedescr=>kind_struct.
         INSERT z2ui5_cl_cgui_context=>conv_to_text( <row> ) INTO TABLE lt_line.
         CONTINUE.
       ENDIF.
       CLEAR lt_cell.
       DO.
-        ASSIGN COMPONENT sy-index OF STRUCTURE <row> TO FIELD-SYMBOL(<cell>).
+
+        ASSIGN COMPONENT sy-index OF STRUCTURE <row> TO <cell>.
         IF sy-subrc <> 0.
           EXIT.
         ENDIF.
         INSERT z2ui5_cl_cgui_context=>conv_to_text( <cell> ) INTO TABLE lt_cell.
       ENDDO.
-      INSERT concat_lines_of( table = lt_cell
-                              sep   = COND #( WHEN separator = abap_true THEN |\t| ELSE `` ) ) INTO TABLE lt_line.
+
+      IF separator = abap_true.
+        temp28 = |\t|.
+      ELSE.
+        temp28 = ``.
+      ENDIF.
+
+      temp1 = concat_lines_of( table = lt_cell sep = temp28 ).
+      INSERT temp1 INTO TABLE lt_line.
     ENDLOOP.
     result = concat_lines_of( table = lt_line
                               sep   = |\r\n| ).
@@ -907,12 +1033,21 @@ CLASS z2ui5_cl_cgui_frontend IMPLEMENTATION.
 
     DATA lv_content TYPE xstring.
 
-    DATA(lv_type) = to_lower( condense( CONV string( type ) ) ).
+    DATA temp29 TYPE string.
+    DATA lv_type TYPE string.
+      DATA temp30 TYPE string.
+    DATA lv_url TYPE string.
+    DATA temp31 TYPE z2ui5_cl_cgui_frontend=>ty_s_url.
+    temp29 = type.
+
+    lv_type = to_lower( condense( temp29 ) ).
     IF lv_type IS INITIAL.
       RAISE dp_invalid_parameter.
     ENDIF.
     IF find( val = lv_type sub = `/` ) < 0.
-      lv_type = |{ lv_type }/{ to_lower( condense( CONV string( subtype ) ) ) }|.
+
+      temp30 = subtype.
+      lv_type = |{ lv_type }/{ to_lower( condense( temp30 ) ) }|.
     ENDIF.
     IF lv_type CP `text/*`.
       lv_content = z2ui5_cl_cgui_context=>conv_get_xstring_by_string( table_to_text( data_tab = data ) ).
@@ -923,9 +1058,13 @@ CLASS z2ui5_cl_cgui_frontend IMPLEMENTATION.
       lv_content = bytes_of( data = data
                              size = size ).
     ENDIF.
-    DATA(lv_url) = |z2ui5-cgui-url:{ lines( gt_url ) + 1 }|.
-    INSERT VALUE #( url     = lv_url
-                    content = |data:{ lv_type };base64,{ z2ui5_cl_cgui_context=>conv_encode_x_base64( lv_content ) }| )
+
+    lv_url = |z2ui5-cgui-url:{ lines( gt_url ) + 1 }|.
+
+    CLEAR temp31.
+    temp31-url = lv_url.
+    temp31-content = |data:{ lv_type };base64,{ z2ui5_cl_cgui_context=>conv_encode_x_base64( lv_content ) }|.
+    INSERT temp31
            INTO TABLE gt_url.
     url = lv_url.
 
@@ -933,12 +1072,20 @@ CLASS z2ui5_cl_cgui_frontend IMPLEMENTATION.
 
   METHOD bytes_of.
 
-    LOOP AT data ASSIGNING FIELD-SYMBOL(<line>).
-      ASSIGN COMPONENT 1 OF STRUCTURE <line> TO FIELD-SYMBOL(<bytes>).
+    FIELD-SYMBOLS <line> TYPE ANY.
+      FIELD-SYMBOLS <bytes> TYPE any.
+      DATA temp32 TYPE xstring.
+      DATA lv_bytes LIKE temp32.
+    LOOP AT data ASSIGNING <line>.
+
+      ASSIGN COMPONENT 1 OF STRUCTURE <line> TO <bytes>.
       IF sy-subrc <> 0.
         ASSIGN <line> TO <bytes>.
       ENDIF.
-      DATA(lv_bytes) = CONV xstring( <bytes> ).
+
+      temp32 = <bytes>.
+
+      lv_bytes = temp32.
       CONCATENATE result lv_bytes INTO result IN BYTE MODE.
     ENDLOOP.
     IF size > 0 AND size < xstrlen( result ).
@@ -958,28 +1105,38 @@ CLASS z2ui5_cl_cgui_frontend IMPLEMENTATION.
 
     DATA lr_line TYPE REF TO data.
     DATA lv_width TYPE i.
+    FIELD-SYMBOLS <line> TYPE data.
+    FIELD-SYMBOLS <bytes> TYPE any.
+    DATA lo_type TYPE REF TO cl_abap_typedescr.
+    DATA lv_offset TYPE i.
+      DATA lv_length TYPE i.
 
     IF append_to_table = abap_false.
       CLEAR binary_tab.
     ENDIF.
     output_length = xstrlen( buffer ).
     CREATE DATA lr_line LIKE LINE OF binary_tab.
-    ASSIGN lr_line->* TO FIELD-SYMBOL(<line>).
-    ASSIGN COMPONENT 1 OF STRUCTURE <line> TO FIELD-SYMBOL(<bytes>).
+
+    ASSIGN lr_line->* TO <line>.
+
+    ASSIGN COMPONENT 1 OF STRUCTURE <line> TO <bytes>.
     IF sy-subrc <> 0.
       ASSIGN <line> TO <bytes>.
     ENDIF.
-    DATA(lo_type) = cl_abap_typedescr=>describe_by_data( <bytes> ).
+
+    lo_type = cl_abap_typedescr=>describe_by_data( <bytes> ).
     lv_width = lo_type->length.
     " a line of type xstring takes it all
     IF lo_type->type_kind = cl_abap_typedescr=>typekind_xstring.
       lv_width = nmax( val1 = output_length
                        val2 = 1 ).
     ENDIF.
-    DATA(lv_offset) = 0.
+
+    lv_offset = 0.
     WHILE lv_offset < output_length.
       CLEAR <line>.
-      DATA(lv_length) = nmin( val1 = lv_width
+
+      lv_length = nmin( val1 = lv_width
                               val2 = output_length - lv_offset ).
       <bytes> = buffer+lv_offset(lv_length).
       APPEND <line> TO binary_tab.
@@ -996,7 +1153,11 @@ CLASS z2ui5_cl_cgui_frontend IMPLEMENTATION.
 
   METHOD ssfc_base64_encode.
 
-    DATA(lv_bytes) = CONV xstring( bindata ).
+    DATA temp33 TYPE xstring.
+    DATA lv_bytes LIKE temp33.
+    temp33 = bindata.
+
+    lv_bytes = temp33.
     IF binleng > 0 AND binleng < xstrlen( lv_bytes ).
       lv_bytes = lv_bytes(binleng).
     ENDIF.
@@ -1006,7 +1167,11 @@ CLASS z2ui5_cl_cgui_frontend IMPLEMENTATION.
 
   METHOD ssfc_base64_decode.
 
-    DATA(lv_text) = condense( CONV string( b64data ) ).
+    DATA temp34 TYPE string.
+    DATA lv_text TYPE string.
+    temp34 = b64data.
+
+    lv_text = condense( temp34 ).
     IF b64leng > 0 AND b64leng < strlen( lv_text ).
       lv_text = lv_text(b64leng).
     ENDIF.
@@ -1016,8 +1181,12 @@ CLASS z2ui5_cl_cgui_frontend IMPLEMENTATION.
 
   METHOD url_content.
 
-    result = condense( CONV string( url ) ).
-    READ TABLE gt_url INTO DATA(ls_url) WITH KEY url = result.
+    DATA temp35 TYPE string.
+    DATA ls_url TYPE z2ui5_cl_cgui_frontend=>ty_s_url.
+    temp35 = url.
+    result = condense( temp35 ).
+
+    READ TABLE gt_url INTO ls_url WITH KEY url = result.
     IF sy-subrc = 0.
       result = ls_url-content.
     ENDIF.
@@ -1037,10 +1206,12 @@ CLASS z2ui5_cl_cgui_frontend IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD file_name.
+    DATA lv_slash TYPE i.
 
     result = path.
     REPLACE ALL OCCURRENCES OF `\` IN result WITH `/`.
-    DATA(lv_slash) = find( val = result sub = `/` occ = -1 ).
+
+    lv_slash = find( val = result sub = `/` occ = -1 ).
     IF lv_slash >= 0.
       result = substring( val = result off = lv_slash + 1 ).
     ENDIF.
@@ -1049,19 +1220,43 @@ CLASS z2ui5_cl_cgui_frontend IMPLEMENTATION.
 
   METHOD mime_type.
 
-    DATA(lv_dot) = find( val = name sub = `.` occ = -1 ).
-    DATA(lv_ext) = COND string( WHEN lv_dot >= 0 THEN to_lower( substring( val = name off = lv_dot + 1 ) ) ).
-    result = SWITCH #( lv_ext
-                       WHEN `csv` THEN `text/csv`
-                       WHEN `txt` OR `log` OR `abap` THEN `text/plain`
-                       WHEN `xml` THEN `application/xml`
-                       WHEN `json` THEN `application/json`
-                       WHEN `html` OR `htm` THEN `text/html`
-                       WHEN `xlsx` THEN `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`
-                       WHEN `xls` THEN `application/vnd.ms-excel`
-                       WHEN `pdf` THEN `application/pdf`
-                       WHEN `zip` THEN `application/zip`
-                       ELSE `application/octet-stream` ).
+    DATA lv_dot TYPE i.
+    DATA temp36 TYPE string.
+    DATA lv_ext LIKE temp36.
+    DATA temp37 TYPE string.
+    lv_dot = find( val = name sub = `.` occ = -1 ).
+
+    IF lv_dot >= 0.
+      temp36 = to_lower( substring( val = name off = lv_dot + 1 ) ).
+    ELSE.
+      CLEAR temp36.
+    ENDIF.
+
+    lv_ext = temp36.
+
+    CASE lv_ext.
+      WHEN `csv`.
+        temp37 = `text/csv`.
+      WHEN `txt` OR `log` OR `abap`.
+        temp37 = `text/plain`.
+      WHEN `xml`.
+        temp37 = `application/xml`.
+      WHEN `json`.
+        temp37 = `application/json`.
+      WHEN `html` OR `htm`.
+        temp37 = `text/html`.
+      WHEN `xlsx`.
+        temp37 = `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`.
+      WHEN `xls`.
+        temp37 = `application/vnd.ms-excel`.
+      WHEN `pdf`.
+        temp37 = `application/pdf`.
+      WHEN `zip`.
+        temp37 = `application/zip`.
+      WHEN OTHERS.
+        temp37 = `application/octet-stream`.
+    ENDCASE.
+    result = temp37.
 
   ENDMETHOD.
 

@@ -28,11 +28,21 @@ ENDCLASS.
 CLASS z2ui5_cl_cgui_r2c_11 IMPLEMENTATION.
 
   METHOD initialization.
+    DATA temp1 LIKE s_range.
+    DATA temp2 LIKE LINE OF temp1.
 
     " the command field of the SAP GUI: transactions, /n, /o and OK codes
     set_command_field( ).
 
-    s_range = VALUE #( ( sign = `I` option = `BT` low = 1 high = 20 ) ).
+
+    CLEAR temp1.
+
+    temp2-sign = `I`.
+    temp2-option = `BT`.
+    temp2-low = 1.
+    temp2-high = 20.
+    INSERT temp2 INTO TABLE temp1.
+    s_range = temp1.
     p_title = 'Numbers'.
 
   ENDMETHOD.

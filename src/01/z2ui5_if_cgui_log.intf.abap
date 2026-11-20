@@ -13,7 +13,7 @@ INTERFACE z2ui5_if_cgui_log PUBLIC.
       type TYPE string,
       text TYPE string,
     END OF ty_s_message.
-  TYPES ty_t_message TYPE STANDARD TABLE OF ty_s_message WITH EMPTY KEY.
+  TYPES ty_t_message TYPE STANDARD TABLE OF ty_s_message WITH DEFAULT KEY.
 
   "! a message into the log
   METHODS add

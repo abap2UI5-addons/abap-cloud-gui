@@ -30,12 +30,12 @@ CLASS z2ui5_cl_cgui_sample_01 IMPLEMENTATION.
   METHOD z2ui5_if_app~main.
 
     me->client = client.
-    IF client->check_on_init( ).
+    IF client->check_on_init( ) IS NOT INITIAL.
       model_init( ).
       view_display( ).
-    ELSEIF client->check_on_navigated( ).
+    ELSEIF client->check_on_navigated( ) IS NOT INITIAL.
       view_display( ).
-    ELSEIF client->check_on_event( ).
+    ELSEIF client->check_on_event( ) IS NOT INITIAL.
       on_event( ).
     ENDIF.
 
@@ -43,7 +43,8 @@ CLASS z2ui5_cl_cgui_sample_01 IMPLEMENTATION.
 
   METHOD view_display.
 
-    DATA(screen) = z2ui5_cl_cgui_selscreen=>factory( client
+    DATA screen TYPE REF TO z2ui5_cl_cgui_selscreen.
+    screen = z2ui5_cl_cgui_selscreen=>factory( client
         )->block_begin( `Parameters`
         )->parameter( val = p_text  text = `Text` obligatory = abap_true
         )->parameter( val = p_matnr text = `Material`

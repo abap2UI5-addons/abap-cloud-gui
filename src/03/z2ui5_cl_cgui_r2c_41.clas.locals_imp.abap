@@ -18,6 +18,7 @@ CLASS lcl_stamp IMPLEMENTATION.
     DATA lt_bin TYPE STANDARD TABLE OF ty_line WITH DEFAULT KEY.
     DATA lv_url TYPE c LENGTH 255.
     DATA lt_event TYPE z2ui5_cl_cgui_gui=>ty_t_simple_events.
+    DATA temp1 TYPE z2ui5_cl_cgui_gui=>ty_s_simple_event.
 
     " a white GIF of one pixel - 43 bytes
     APPEND '47494638396101000100800000FFFFFF00000021F90401000000002C00000000010001000002024401003B' TO lt_bin.
@@ -33,13 +34,17 @@ CLASS lcl_stamp IMPLEMENTATION.
       RETURN.
     ENDIF.
 
-    mo_dock = NEW z2ui5_cl_cgui_container( side = z2ui5_cl_cgui_container=>dock_at_top ).
-    mo_picture = NEW z2ui5_cl_cgui_picture( parent = mo_dock ).
+    CREATE OBJECT mo_dock TYPE z2ui5_cl_cgui_container EXPORTING side = z2ui5_cl_cgui_container=>dock_at_top.
+    CREATE OBJECT mo_picture TYPE z2ui5_cl_cgui_picture EXPORTING parent = mo_dock.
     IF lcl_r2c=>app->p_fit = abap_true.
       mo_picture->set_display_mode( z2ui5_cl_cgui_picture=>display_mode_fit ).
     ENDIF.
     mo_picture->load_picture_from_url_async( lv_url ).
-    APPEND VALUE #( eventid = z2ui5_cl_cgui_picture=>eventid_picture_click appl_event = abap_true ) TO lt_event.
+
+    CLEAR temp1.
+    temp1-eventid = z2ui5_cl_cgui_picture=>eventid_picture_click.
+    temp1-appl_event = abap_true.
+    APPEND temp1 TO lt_event.
     mo_picture->set_registered_events( lt_event ).
     mo_picture->set_handler( handler = me
                              method  = `ON_CLICK`

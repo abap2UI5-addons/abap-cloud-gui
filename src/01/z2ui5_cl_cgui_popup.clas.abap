@@ -47,7 +47,7 @@ CLASS z2ui5_cl_cgui_popup DEFINITION PUBLIC FINAL CREATE PRIVATE.
         required  TYPE abap_bool,
         read_only TYPE abap_bool,
       END OF ty_s_field.
-    TYPES ty_t_field TYPE STANDARD TABLE OF ty_s_field WITH EMPTY KEY.
+    TYPES ty_t_field TYPE STANDARD TABLE OF ty_s_field WITH DEFAULT KEY.
 
     TYPES:
       "! the values of the listbox of field name
@@ -56,7 +56,7 @@ CLASS z2ui5_cl_cgui_popup DEFINITION PUBLIC FINAL CREATE PRIVATE.
         key  TYPE string,
         text TYPE string,
       END OF ty_s_listbox.
-    TYPES ty_t_listbox TYPE STANDARD TABLE OF ty_s_listbox WITH EMPTY KEY.
+    TYPES ty_t_listbox TYPE STANDARD TABLE OF ty_s_listbox WITH DEFAULT KEY.
 
     TYPES:
       "! a line of POPUP_TO_DECIDE_LIST - SPOPLI of the classic; ABAP Cloud
@@ -169,7 +169,7 @@ CLASS z2ui5_cl_cgui_popup IMPLEMENTATION.
 
   METHOD decide.
 
-    result = NEW #( ).
+    CREATE OBJECT result.
     result->mv_text   = question.
     result->mt_option = options.
     result->mv_title  = title.
@@ -182,21 +182,29 @@ CLASS z2ui5_cl_cgui_popup IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD get_values.
+    DATA temp1 LIKE LINE OF result->mt_field.
+    DATA lr_field LIKE REF TO temp1.
+    DATA temp2 LIKE LINE OF result->mt_listbox.
+    DATA lr_listbox LIKE REF TO temp2.
 
-    result = NEW #( ).
+    CREATE OBJECT result.
     result->mt_field  = fields.
     result->mv_text   = text.
     result->mv_title  = title.
     result->mv_event  = event.
     result->mv_cancel = abap_true.
     result->mt_listbox = listbox.
-    LOOP AT result->mt_field REFERENCE INTO DATA(lr_field).
+
+
+    LOOP AT result->mt_field REFERENCE INTO lr_field.
       lr_field->name = to_upper( lr_field->name ).
       IF lr_field->kind IS INITIAL.
         lr_field->kind = cs_kind-input.
       ENDIF.
     ENDLOOP.
-    LOOP AT result->mt_listbox REFERENCE INTO DATA(lr_listbox).
+
+
+    LOOP AT result->mt_listbox REFERENCE INTO lr_listbox.
       lr_listbox->name = to_upper( lr_listbox->name ).
     ENDLOOP.
     IF result->mv_title IS INITIAL.
@@ -207,7 +215,7 @@ CLASS z2ui5_cl_cgui_popup IMPLEMENTATION.
 
   METHOD confirm.
 
-    result = NEW #( ).
+    CREATE OBJECT result.
     result->mv_text         = question.
     result->mv_title        = title.
     result->mv_event        = event.
@@ -228,13 +236,23 @@ CLASS z2ui5_cl_cgui_popup IMPLEMENTATION.
 
   METHOD result_value.
 
-    DATA(lv_name) = to_upper( name ).
-    READ TABLE ms_result-fields REFERENCE INTO DATA(lr_field) WITH KEY name = lv_name.
+    DATA lv_name TYPE string.
+    DATA lr_field TYPE REF TO z2ui5_cl_cgui_popup=>ty_s_field.
+      DATA temp3 TYPE string.
+    lv_name = to_upper( name ).
+
+    READ TABLE ms_result-fields REFERENCE INTO lr_field WITH KEY name = lv_name.
     IF sy-subrc <> 0.
       RETURN.
     ENDIF.
     IF lr_field->kind = cs_kind-checkbox.
-      result = COND #( WHEN lr_field->flag = abap_true THEN `X` ).
+
+      IF lr_field->flag = abap_true.
+        temp3 = `X`.
+      ELSE.
+        CLEAR temp3.
+      ENDIF.
+      result = temp3.
     ELSE.
       result = lr_field->value.
     ENDIF.
@@ -243,8 +261,11 @@ CLASS z2ui5_cl_cgui_popup IMPLEMENTATION.
 
   METHOD result_keys.
 
-    DATA(lv_name) = to_upper( name ).
-    READ TABLE ms_result-fields REFERENCE INTO DATA(lr_field) WITH KEY name = lv_name.
+    DATA lv_name TYPE string.
+    DATA lr_field TYPE REF TO z2ui5_cl_cgui_popup=>ty_s_field.
+    lv_name = to_upper( name ).
+
+    READ TABLE ms_result-fields REFERENCE INTO lr_field WITH KEY name = lv_name.
     IF sy-subrc = 0.
       result = lr_field->keys.
     ENDIF.
@@ -252,15 +273,17 @@ CLASS z2ui5_cl_cgui_popup IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD z2ui5_if_app~main.
+    DATA lv_event TYPE string.
 
     me->client = client.
 
-    IF client->check_on_init( ).
+    IF client->check_on_init( ) IS NOT INITIAL.
       view_display( ).
       RETURN.
     ENDIF.
 
-    DATA(lv_event) = client->get_event( ).
+
+    lv_event = client->get_event( ).
     CLEAR mv_error.
 
     IF lv_event = cs_event-ok.
@@ -292,7 +315,8 @@ CLASS z2ui5_cl_cgui_popup IMPLEMENTATION.
 
     " decide( ) and get_values( ) leave with their event either way - the
     " caller reads the answer; confirm( ) has an event of its own for Cancel
-    DATA(lv_event) = mv_event.
+    DATA lv_event LIKE mv_event.
+    lv_event = mv_event.
     IF mv_confirm = abap_true AND ms_result-confirmed = abap_false.
       lv_event = mv_event_cancel.
     ENDIF.
@@ -308,9 +332,13 @@ CLASS z2ui5_cl_cgui_popup IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD check_required.
+    DATA temp4 LIKE LINE OF mt_field.
+    DATA lr_field LIKE REF TO temp4.
 
     result = abap_true.
-    LOOP AT mt_field REFERENCE INTO DATA(lr_field)
+
+
+    LOOP AT mt_field REFERENCE INTO lr_field
          WHERE required = abap_true AND kind <> cs_kind-checkbox AND value IS INITIAL.
       mv_error = replace( val  = 'Fill in the required field &1'(003)
                           sub  = `&1`
@@ -323,7 +351,15 @@ CLASS z2ui5_cl_cgui_popup IMPLEMENTATION.
 
   METHOD view_display.
 
-    DATA(lo_dialog) = z2ui5_cl_ui5_view_builder=>factory(
+    DATA lo_dialog TYPE REF TO z2ui5_cl_ui5_view_builder.
+    DATA lo_content TYPE REF TO z2ui5_cl_ui5_view_builder.
+    DATA lo_buttons TYPE REF TO z2ui5_cl_ui5_view_builder.
+      DATA lv_option LIKE LINE OF mt_option.
+        DATA lv_number LIKE sy-tabix.
+        DATA temp5 TYPE string.
+      DATA temp6 TYPE string.
+      DATA temp7 TYPE string.
+    lo_dialog = z2ui5_cl_ui5_view_builder=>factory(
         )->ele( n = `FragmentDefinition` ns = `core`
         )->a( n = `xmlns`      v = `sap.m`
         )->a( n = `xmlns:core` v = `sap.ui.core`
@@ -331,7 +367,8 @@ CLASS z2ui5_cl_cgui_popup IMPLEMENTATION.
         )->a( n = `title`      t = mv_title
         )->a( n = `afterClose` v = client->_event( cs_event-cancel ) ).
 
-    DATA(lo_content) = lo_dialog->ele( `content`
+
+    lo_content = lo_dialog->ele( `content`
         )->ele( `VBox`
         )->a( n = `class` v = `sapUiSmallMargin` ).
 
@@ -350,25 +387,38 @@ CLASS z2ui5_cl_cgui_popup IMPLEMENTATION.
       render_fields( lo_content ).
     ENDIF.
 
-    DATA(lo_buttons) = lo_dialog->ele( `buttons` ).
+
+    lo_buttons = lo_dialog->ele( `buttons` ).
     IF mt_option IS NOT INITIAL.
-      LOOP AT mt_option INTO DATA(lv_option).
+
+      LOOP AT mt_option INTO lv_option.
         " sy-tabix is read once: every a( ) below appends and moves it
-        DATA(lv_number) = sy-tabix.
+
+        lv_number = sy-tabix.
+
+        IF lv_number = 1.
+          temp5 = `Emphasized`.
+        ELSE.
+          temp5 = `Default`.
+        ENDIF.
         lo_buttons->tag( `Button`
             )->a( n = `text`  t = lv_option
-            )->a( n = `type`  v = COND #( WHEN lv_number = 1 THEN `Emphasized` ELSE `Default` )
+            )->a( n = `type`  v = temp5
             )->a( n = `press` v = client->_event( |{ cs_event-option }{ lv_number }| ) ).
       ENDLOOP.
     ELSE.
+
+      temp6 = 'OK'(004).
       lo_buttons->tag( `Button`
-          )->a( n = `text`  t = CONV #( 'OK'(004) )
+          )->a( n = `text`  t = temp6
           )->a( n = `type`  v = `Emphasized`
           )->a( n = `press` v = client->_event( cs_event-ok ) ).
     ENDIF.
     IF mv_cancel = abap_true.
+
+      temp7 = 'Cancel'(005).
       lo_buttons->tag( `Button`
-          )->a( n = `text`  t = CONV #( 'Cancel'(005) )
+          )->a( n = `text`  t = temp7
           )->a( n = `press` v = client->_event( cs_event-cancel ) ).
     ENDIF.
 
@@ -378,15 +428,33 @@ CLASS z2ui5_cl_cgui_popup IMPLEMENTATION.
 
   METHOD render_fields.
 
-    DATA(lo_form) = node->ele( n = `SimpleForm` ns = `form`
+    DATA lo_form TYPE REF TO z2ui5_cl_ui5_view_builder.
+    DATA temp8 LIKE LINE OF mt_field.
+    DATA lr_field LIKE REF TO temp8.
+      DATA lv_index LIKE sy-tabix.
+          DATA temp1 TYPE xsdboolean.
+          DATA temp2 TYPE xsdboolean.
+          DATA lo_multi TYPE REF TO z2ui5_cl_ui5_view_builder.
+          DATA temp3 TYPE xsdboolean.
+          DATA temp9 LIKE LINE OF mt_listbox.
+          DATA lr_multi LIKE REF TO temp9.
+          DATA lo_items TYPE REF TO z2ui5_cl_ui5_view_builder.
+          DATA temp4 TYPE xsdboolean.
+          DATA temp10 LIKE LINE OF mt_listbox.
+          DATA lr_value LIKE REF TO temp10.
+          DATA temp5 TYPE xsdboolean.
+    lo_form = node->ele( n = `SimpleForm` ns = `form`
         )->a( n = `xmlns:form` v = `sap.ui.layout.form`
         )->a( n = `editable`   b = abap_true
         )->a( n = `layout`     v = `ResponsiveGridLayout`
         )->a( n = `labelSpanM` v = `4`
         )->a( n = `labelSpanL` v = `4` ).
 
-    LOOP AT mt_field REFERENCE INTO DATA(lr_field).
-      DATA(lv_index) = sy-tabix.
+
+
+    LOOP AT mt_field REFERENCE INTO lr_field.
+
+      lv_index = sy-tabix.
 
       lo_form->tag( `Label`
           )->a( n = `text`     t = lr_field->text
@@ -394,56 +462,72 @@ CLASS z2ui5_cl_cgui_popup IMPLEMENTATION.
 
       CASE lr_field->kind.
         WHEN cs_kind-checkbox.
+
+          temp1 = boolc( lr_field->read_only = abap_false ).
           lo_form->tag( `CheckBox`
               )->a( n = `selected` v = client->_bind( val       = lr_field->flag
                                                      tab       = mt_field
                                                      tab_index = lv_index )
-              )->a( n = `editable` b = xsdbool( lr_field->read_only = abap_false ) ).
+              )->a( n = `editable` b = temp1 ).
 
         WHEN cs_kind-date.
+
+          temp2 = boolc( lr_field->read_only = abap_false ).
           lo_form->tag( `DatePicker`
               )->a( n = `value`       v = client->_bind( val       = lr_field->value
                                                         tab       = mt_field
                                                         tab_index = lv_index )
               )->a( n = `valueFormat` v = `yyyyMMdd`
-              )->a( n = `editable`    b = xsdbool( lr_field->read_only = abap_false ) ).
+              )->a( n = `editable`    b = temp2 ).
 
         WHEN cs_kind-multi.
-          DATA(lo_multi) = lo_form->ele( `MultiComboBox`
+
+
+          temp3 = boolc( lr_field->read_only = abap_false ).
+          lo_multi = lo_form->ele( `MultiComboBox`
               )->a( n = `selectedKeys` v = client->_bind( val       = lr_field->keys
                                                          tab       = mt_field
                                                          tab_index = lv_index )
-              )->a( n = `editable`     b = xsdbool( lr_field->read_only = abap_false )
+              )->a( n = `editable`     b = temp3
               )->ele( `items` ).
-          LOOP AT mt_listbox REFERENCE INTO DATA(lr_multi) WHERE name = lr_field->name.
+
+
+          LOOP AT mt_listbox REFERENCE INTO lr_multi WHERE name = lr_field->name.
             lo_multi->tag( n = `Item` ns = `core`
                 )->a( n = `key`  t = lr_multi->key
                 )->a( n = `text` t = lr_multi->text ).
           ENDLOOP.
 
         WHEN cs_kind-listbox.
-          DATA(lo_items) = lo_form->ele( `Select`
+
+
+          temp4 = boolc( lr_field->read_only = abap_false ).
+          lo_items = lo_form->ele( `Select`
               )->a( n = `selectedKey`    v = client->_bind( val       = lr_field->value
                                                            tab       = mt_field
                                                            tab_index = lv_index )
               )->a( n = `forceSelection` b = abap_false
-              )->a( n = `editable`       b = xsdbool( lr_field->read_only = abap_false )
+              )->a( n = `editable`       b = temp4
               )->ele( `items` ).
           lo_items->tag( n = `Item` ns = `core`
               )->a( n = `key`  v = ``
               )->a( n = `text` v = `` ).
-          LOOP AT mt_listbox REFERENCE INTO DATA(lr_value) WHERE name = lr_field->name.
+
+
+          LOOP AT mt_listbox REFERENCE INTO lr_value WHERE name = lr_field->name.
             lo_items->tag( n = `Item` ns = `core`
                 )->a( n = `key`  t = lr_value->key
                 )->a( n = `text` t = lr_value->text ).
           ENDLOOP.
 
         WHEN OTHERS.
+
+          temp5 = boolc( lr_field->read_only = abap_false ).
           lo_form->tag( `Input`
               )->a( n = `value`    v = client->_bind( val       = lr_field->value
                                                      tab       = mt_field
                                                      tab_index = lv_index )
-              )->a( n = `editable` b = xsdbool( lr_field->read_only = abap_false ) ).
+              )->a( n = `editable` b = temp5 ).
 
       ENDCASE.
     ENDLOOP.

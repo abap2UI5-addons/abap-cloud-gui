@@ -160,11 +160,32 @@ CLASS z2ui5_cl_cgui_r2c_23 IMPLEMENTATION.
 
   METHOD status_0100.
 
-    set_pf_status( functions = VALUE #( ( name = `SAVE` text = `Save` icon = `sap-icon://save` tooltip = `Save (F11)` ) )
-                   shortcuts = VALUE #( ( key = `F11` ucomm = `SAVE` ) ) ).
+    DATA temp1 TYPE z2ui5_cl_cgui_alv=>ty_t_function.
+    DATA temp2 LIKE LINE OF temp1.
+    DATA temp3 TYPE z2ui5_cl_cgui_report=>ty_t_shortcut.
+    DATA temp4 LIKE LINE OF temp3.
+    DATA lt_screen TYPE z2ui5_cl_cgui_selscreen=>ty_t_screen.
+    DATA ls_screen LIKE LINE OF lt_screen.
+    CLEAR temp1.
+
+    temp2-name = `SAVE`.
+    temp2-text = `Save`.
+    temp2-icon = `sap-icon://save`.
+    temp2-tooltip = `Save (F11)`.
+    INSERT temp2 INTO TABLE temp1.
+
+    CLEAR temp3.
+
+    temp4-key = `F11`.
+    temp4-ucomm = `SAVE`.
+    INSERT temp4 INTO TABLE temp3.
+    set_pf_status( functions = temp1
+                   shortcuts = temp3 ).
     set_title( |Booking on airline { p_carrid }| ).
-    DATA(lt_screen) = screen->loop_at_screen( ).
-    LOOP AT lt_screen INTO DATA(ls_screen).
+
+    lt_screen = screen->loop_at_screen( ).
+
+    LOOP AT lt_screen INTO ls_screen.
       IF ls_screen-group1 = 'SEA'.
         IF gv_check = 'X'.
           ls_screen-input = abap_true.

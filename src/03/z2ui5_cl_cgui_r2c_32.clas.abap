@@ -41,7 +41,8 @@ CLASS z2ui5_cl_cgui_r2c_32 IMPLEMENTATION.
 
   METHOD start_of_selection.
 
-    DATA(lv_xml) = |<order id="{ p_order }"><item qty="{ p_qty }">Paper</item></order>|.
+    DATA lv_xml TYPE string.
+    lv_xml = |<order id="{ p_order }"><item qty="{ p_qty }">Paper</item></order>|.
     z2ui5_cl_cgui_browser=>show_xml( xml_string = lv_xml
                                title      = |Order { p_order }| ).
     list( )->new_line(

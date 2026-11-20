@@ -57,7 +57,7 @@ CLASS z2ui5_cl_cgui_variant DEFINITION PUBLIC FINAL CREATE PUBLIC.
         dynamic      TYPE string,
         dynamic_high TYPE string,
       END OF ty_s_value.
-    TYPES ty_t_value TYPE STANDARD TABLE OF ty_s_value WITH EMPTY KEY.
+    TYPES ty_t_value TYPE STANDARD TABLE OF ty_s_value WITH DEFAULT KEY.
 
     TYPES:
       BEGIN OF ty_s_variant,
@@ -74,7 +74,7 @@ CLASS z2ui5_cl_cgui_variant DEFINITION PUBLIC FINAL CREATE PUBLIC.
         protect   TYPE string_table,
         hide      TYPE string_table,
       END OF ty_s_variant.
-    TYPES ty_t_variant TYPE STANDARD TABLE OF ty_s_variant WITH EMPTY KEY.
+    TYPES ty_t_variant TYPE STANDARD TABLE OF ty_s_variant WITH DEFAULT KEY.
 
     "! the current values of the attributes names of app
     CLASS-METHODS values_get
@@ -161,7 +161,9 @@ CLASS z2ui5_cl_cgui_variant IMPLEMENTATION.
     FIELD-SYMBOLS <attri> TYPE any.
     FIELD-SYMBOLS <range> TYPE ANY TABLE.
 
-    LOOP AT names INTO DATA(lv_name).
+    DATA lv_name LIKE LINE OF names.
+        DATA temp35 TYPE z2ui5_cl_cgui_variant=>ty_s_value.
+    LOOP AT names INTO lv_name.
       UNASSIGN <attri>.
       ASSIGN app->(lv_name) TO <attri>.
       IF <attri> IS NOT ASSIGNED.
@@ -173,9 +175,12 @@ CLASS z2ui5_cl_cgui_variant IMPLEMENTATION.
         INSERT LINES OF range_lines_get( name  = lv_name
                                          range = <range> ) INTO TABLE result.
       ELSE.
-        INSERT VALUE #( name = lv_name
-                        kind = cs_kind-parameter
-                        low  = <attri> ) INTO TABLE result.
+
+        CLEAR temp35.
+        temp35-name = lv_name.
+        temp35-kind = cs_kind-parameter.
+        temp35-low = <attri>.
+        INSERT temp35 INTO TABLE result.
       ENDIF.
     ENDLOOP.
 
@@ -186,6 +191,7 @@ CLASS z2ui5_cl_cgui_variant IMPLEMENTATION.
     FIELD-SYMBOLS <line> TYPE any.
     FIELD-SYMBOLS <comp> TYPE any.
     DATA ls_value TYPE ty_s_value.
+      DATA temp36 TYPE z2ui5_cl_cgui_variant=>ty_s_value.
 
     LOOP AT range ASSIGNING <line>.
       CLEAR ls_value.
@@ -216,8 +222,11 @@ CLASS z2ui5_cl_cgui_variant IMPLEMENTATION.
     ENDLOOP.
 
     IF result IS INITIAL.
-      INSERT VALUE #( name = name
-                      kind = cs_kind-select_option ) INTO TABLE result.
+
+      CLEAR temp36.
+      temp36-name = name.
+      temp36-kind = cs_kind-select_option.
+      INSERT temp36 INTO TABLE result.
     ENDIF.
 
   ENDMETHOD.
@@ -232,9 +241,11 @@ CLASS z2ui5_cl_cgui_variant IMPLEMENTATION.
     DATA lv_last   TYPE string.
 
     DATA ls_value TYPE ty_s_value.
+      DATA lr_value LIKE REF TO ls_value.
 
     LOOP AT values INTO ls_value.
-      DATA(lr_value) = REF #( ls_value ).
+
+      GET REFERENCE OF ls_value INTO lr_value.
       IF ls_value-dynamic IS NOT INITIAL.
         ls_value-low = dynamic_date( ls_value-dynamic ).
       ENDIF.
@@ -298,6 +309,7 @@ CLASS z2ui5_cl_cgui_variant IMPLEMENTATION.
     FIELD-SYMBOLS <line> TYPE any.
     FIELD-SYMBOLS <comp> TYPE any.
     DATA ls_value TYPE ty_s_value.
+        DATA temp37 TYPE z2ui5_cl_cgui_variant=>ty_s_value-kind.
 
     LOOP AT table ASSIGNING <line>.
       CLEAR ls_value.
@@ -311,7 +323,13 @@ CLASS z2ui5_cl_cgui_variant IMPLEMENTATION.
       UNASSIGN <comp>.
       ASSIGN COMPONENT `KIND` OF STRUCTURE <line> TO <comp>.
       IF <comp> IS ASSIGNED.
-        ls_value-kind = COND #( WHEN <comp> = cs_kind-parameter THEN cs_kind-parameter ELSE cs_kind-select_option ).
+
+        IF <comp> = cs_kind-parameter.
+          temp37 = cs_kind-parameter.
+        ELSE.
+          temp37 = cs_kind-select_option.
+        ENDIF.
+        ls_value-kind = temp37.
       ENDIF.
       UNASSIGN <comp>.
       ASSIGN COMPONENT `SIGN` OF STRUCTURE <line> TO <comp>.
@@ -344,10 +362,14 @@ CLASS z2ui5_cl_cgui_variant IMPLEMENTATION.
     DATA lv_part TYPE string.
     DATA lv_name TYPE string.
 
-    LOOP AT values REFERENCE INTO DATA(lr_value)
+    DATA temp38 LIKE LINE OF values.
+    DATA lr_value LIKE REF TO temp38.
+      DATA lr_field TYPE REF TO z2ui5_cl_cgui_selscreen=>ty_s_field.
+    LOOP AT values REFERENCE INTO lr_value
          WHERE low IS NOT INITIAL OR high IS NOT INITIAL.
       lv_name = lr_value->name.
-      READ TABLE fields REFERENCE INTO DATA(lr_field) WITH KEY name = lr_value->name.
+
+      READ TABLE fields REFERENCE INTO lr_field WITH KEY name = lr_value->name.
       IF sy-subrc = 0 AND lr_field->text IS NOT INITIAL.
         lv_name = lr_field->text.
       ENDIF.
@@ -377,14 +399,19 @@ CLASS z2ui5_cl_cgui_variant IMPLEMENTATION.
 
     DATA lv_offset TYPE i.
 
-    DATA(lv_today) = today.
+    DATA lv_today LIKE today.
+    DATA lv_dynamic TYPE string.
+      DATA lv_rest TYPE string.
+    lv_today = today.
     IF lv_today IS INITIAL.
       lv_today = sy-datum.
     ENDIF.
-    DATA(lv_dynamic) = to_upper( condense( dynamic ) ).
+
+    lv_dynamic = to_upper( condense( dynamic ) ).
 
     IF lv_dynamic CP |{ cs_dynamic-today }*|.
-      DATA(lv_rest) = substring( val = lv_dynamic
+
+      lv_rest = substring( val = lv_dynamic
                                  off = strlen( cs_dynamic-today ) ).
       IF lv_rest IS INITIAL.
         result = lv_today.
@@ -429,14 +456,59 @@ CLASS z2ui5_cl_cgui_variant IMPLEMENTATION.
 
   METHOD dynamic_values.
 
-    result = VALUE #( ( key = cs_dynamic-today            text = CONV #( 'Today'(001) ) )
-                      ( key = |{ cs_dynamic-today }-1|    text = CONV #( 'Yesterday'(002) ) )
-                      ( key = cs_dynamic-month_start      text = CONV #( 'First day of the month'(003) ) )
-                      ( key = cs_dynamic-month_end        text = CONV #( 'Last day of the month'(004) ) )
-                      ( key = cs_dynamic-prev_month_start text = CONV #( 'First day of the previous month'(005) ) )
-                      ( key = cs_dynamic-prev_month_end   text = CONV #( 'Last day of the previous month'(006) ) )
-                      ( key = cs_dynamic-year_start       text = CONV #( 'First day of the year'(007) ) )
-                      ( key = cs_dynamic-year_end         text = CONV #( 'Last day of the year'(008) ) ) ).
+    DATA temp39 TYPE z2ui5_cl_cgui_selscreen=>ty_t_value.
+    DATA temp40 LIKE LINE OF temp39.
+    DATA temp5 TYPE z2ui5_cl_cgui_selscreen=>ty_s_value-text.
+    DATA temp6 TYPE z2ui5_cl_cgui_selscreen=>ty_s_value-text.
+    DATA temp7 TYPE z2ui5_cl_cgui_selscreen=>ty_s_value-text.
+    DATA temp8 TYPE z2ui5_cl_cgui_selscreen=>ty_s_value-text.
+    DATA temp9 TYPE z2ui5_cl_cgui_selscreen=>ty_s_value-text.
+    DATA temp10 TYPE z2ui5_cl_cgui_selscreen=>ty_s_value-text.
+    DATA temp11 TYPE z2ui5_cl_cgui_selscreen=>ty_s_value-text.
+    DATA temp12 TYPE z2ui5_cl_cgui_selscreen=>ty_s_value-text.
+    CLEAR temp39.
+
+    temp40-key = cs_dynamic-today.
+
+    temp5 = 'Today'(001).
+    temp40-text = temp5.
+    INSERT temp40 INTO TABLE temp39.
+    temp40-key = |{ cs_dynamic-today }-1|.
+
+    temp6 = 'Yesterday'(002).
+    temp40-text = temp6.
+    INSERT temp40 INTO TABLE temp39.
+    temp40-key = cs_dynamic-month_start.
+
+    temp7 = 'First day of the month'(003).
+    temp40-text = temp7.
+    INSERT temp40 INTO TABLE temp39.
+    temp40-key = cs_dynamic-month_end.
+
+    temp8 = 'Last day of the month'(004).
+    temp40-text = temp8.
+    INSERT temp40 INTO TABLE temp39.
+    temp40-key = cs_dynamic-prev_month_start.
+
+    temp9 = 'First day of the previous month'(005).
+    temp40-text = temp9.
+    INSERT temp40 INTO TABLE temp39.
+    temp40-key = cs_dynamic-prev_month_end.
+
+    temp10 = 'Last day of the previous month'(006).
+    temp40-text = temp10.
+    INSERT temp40 INTO TABLE temp39.
+    temp40-key = cs_dynamic-year_start.
+
+    temp11 = 'First day of the year'(007).
+    temp40-text = temp11.
+    INSERT temp40 INTO TABLE temp39.
+    temp40-key = cs_dynamic-year_end.
+
+    temp12 = 'Last day of the year'(008).
+    temp40-text = temp12.
+    INSERT temp40 INTO TABLE temp39.
+    result = temp39.
 
   ENDMETHOD.
 

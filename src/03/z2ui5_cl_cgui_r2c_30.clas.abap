@@ -14,7 +14,8 @@ CLASS z2ui5_cl_cgui_r2c_30 DEFINITION PUBLIC
       END OF ty_result.
 
     " global data of the report
-    DATA gt_result TYPE STANDARD TABLE OF ty_result WITH DEFAULT KEY.
+    TYPES temp1_9de9ae7a30 TYPE STANDARD TABLE OF ty_result WITH DEFAULT KEY.
+DATA gt_result TYPE temp1_9de9ae7a30.
 
     " selection screen
     DATA p_pass TYPE i.
@@ -49,16 +50,42 @@ CLASS z2ui5_cl_cgui_r2c_30 IMPLEMENTATION.
 
   METHOD start_of_selection.
 
-    gt_result = VALUE #( ( student = 'Anna'  subject = 'Maths'   points = 71 )
-                         ( student = 'Ben'   subject = 'Maths'   points = 44 )
-                         ( student = 'Clara' subject = 'Physics' points = 58 ) ).
-    LOOP AT gt_result ASSIGNING FIELD-SYMBOL(<ls_result>).
-      <ls_result>-passed = xsdbool( <ls_result>-points >= p_pass ).
+    DATA temp1 LIKE gt_result.
+    DATA temp2 LIKE LINE OF temp1.
+    FIELD-SYMBOLS <ls_result> LIKE LINE OF gt_result.
+      DATA temp4 TYPE xsdboolean.
+    DATA lo_alv TYPE REF TO z2ui5_cl_cgui_alv.
+    DATA temp3 TYPE z2ui5_cl_cgui_context=>ty_t_comp.
+    DATA ls_column LIKE LINE OF temp3.
+    CLEAR temp1.
+
+    temp2-student = 'Anna'.
+    temp2-subject = 'Maths'.
+    temp2-points = 71.
+    INSERT temp2 INTO TABLE temp1.
+    temp2-student = 'Ben'.
+    temp2-subject = 'Maths'.
+    temp2-points = 44.
+    INSERT temp2 INTO TABLE temp1.
+    temp2-student = 'Clara'.
+    temp2-subject = 'Physics'.
+    temp2-points = 58.
+    INSERT temp2 INTO TABLE temp1.
+    gt_result = temp1.
+
+    LOOP AT gt_result ASSIGNING <ls_result>.
+
+      temp4 = boolc( <ls_result>-points >= p_pass ).
+      <ls_result>-passed = temp4.
     ENDLOOP.
 
-    DATA(lo_alv) = alv( gt_result
+
+    lo_alv = alv( gt_result
         )->set_title( 'Exam results' ).
-    LOOP AT lo_alv->get_columns( gt_result ) INTO DATA(ls_column).
+
+    temp3 = lo_alv->get_columns( gt_result ).
+
+    LOOP AT temp3 INTO ls_column.
       lo_alv->set_column_text( name = ls_column-name
                                text = |{ ls_column-name } ({ ls_column-label })| ).
     ENDLOOP.

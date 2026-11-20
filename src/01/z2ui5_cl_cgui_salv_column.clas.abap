@@ -160,13 +160,17 @@ CLASS z2ui5_cl_cgui_salv_column IMPLEMENTATION.
 
   METHOD set_visible.
 
-    mv_hidden = xsdbool( value = abap_false ).
+    DATA temp1 TYPE xsdboolean.
+    temp1 = boolc( value = abap_false ).
+    mv_hidden = temp1.
 
   ENDMETHOD.
 
   METHOD is_visible.
 
-    value = xsdbool( mv_hidden = abap_false AND mv_technical = abap_false ).
+    DATA temp2 TYPE xsdboolean.
+    temp2 = boolc( mv_hidden = abap_false AND mv_technical = abap_false ).
+    value = temp2.
 
   ENDMETHOD.
 
@@ -196,7 +200,9 @@ CLASS z2ui5_cl_cgui_salv_column IMPLEMENTATION.
 
   METHOD set_cell_type.
 
-    mv_hotspot = xsdbool( value = z2ui5_if_cgui_salv_c=>cell_type-hotspot OR value = z2ui5_if_cgui_salv_c=>cell_type-link ).
+    DATA temp3 TYPE xsdboolean.
+    temp3 = boolc( value = z2ui5_if_cgui_salv_c=>cell_type-hotspot OR value = z2ui5_if_cgui_salv_c=>cell_type-link ).
+    mv_hotspot = temp3.
 
   ENDMETHOD.
 

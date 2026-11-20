@@ -12,7 +12,7 @@ CLASS z2ui5_cl_cgui_sample_03 DEFINITION PUBLIC FINAL CREATE PUBLIC.
         price    TYPE p LENGTH 8 DECIMALS 2,
         currency TYPE string,
       END OF ty_s_row.
-    TYPES ty_t_row TYPE STANDARD TABLE OF ty_s_row WITH EMPTY KEY.
+    TYPES ty_t_row TYPE STANDARD TABLE OF ty_s_row WITH DEFAULT KEY.
 
     DATA mt_row TYPE ty_t_row.
 
@@ -33,12 +33,12 @@ CLASS z2ui5_cl_cgui_sample_03 IMPLEMENTATION.
   METHOD z2ui5_if_app~main.
 
     me->client = client.
-    IF client->check_on_init( ).
+    IF client->check_on_init( ) IS NOT INITIAL.
       model_init( ).
       view_display( ).
-    ELSEIF client->check_on_navigated( ).
+    ELSEIF client->check_on_navigated( ) IS NOT INITIAL.
       view_display( ).
-    ELSEIF client->check_on_event( ).
+    ELSEIF client->check_on_event( ) IS NOT INITIAL.
       on_event( ).
     ENDIF.
 
@@ -52,10 +52,14 @@ CLASS z2ui5_cl_cgui_sample_03 IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD on_event.
+      DATA lv_row TYPE i.
+      DATA ls_row TYPE z2ui5_cl_cgui_sample_03=>ty_s_row.
 
     IF client->get_event( ) = z2ui5_cl_cgui_alv=>cs_event-line_selection.
-      DATA(lv_row) = z2ui5_cl_cgui_alv=>get_row_by_event( client ).
-      READ TABLE mt_row INTO DATA(ls_row) INDEX lv_row.
+
+      lv_row = z2ui5_cl_cgui_alv=>get_row_by_event( client ).
+
+      READ TABLE mt_row INTO ls_row INDEX lv_row.
       IF sy-subrc = 0.
         client->message_toast_display( |{ ls_row-product } selected| ).
       ENDIF.
@@ -65,15 +69,67 @@ CLASS z2ui5_cl_cgui_sample_03 IMPLEMENTATION.
 
   METHOD model_init.
 
-    mt_row = VALUE #(
-        ( id = 1 product = `Notebook`  category = `Hardware` created = `20260105` price = `956.00` currency = `EUR` )
-        ( id = 2 product = `Monitor`   category = `Hardware` created = `20260112` price = `289.90` currency = `EUR` )
-        ( id = 3 product = `Keyboard`  category = `Hardware` created = `20260203` price = `49.99`  currency = `EUR` )
-        ( id = 4 product = `Office`    category = `Software` created = `20260217` price = `129.00` currency = `EUR` )
-        ( id = 5 product = `IDE`       category = `Software` created = `20260301` price = `0.00`   currency = `EUR` )
-        ( id = 6 product = `Mouse`     category = `Hardware` created = `20260310` price = `19.90`  currency = `EUR` )
-        ( id = 7 product = `Headset`   category = `Hardware` created = `20260322` price = `79.00`  currency = `EUR` )
-        ( id = 8 product = `Antivirus` category = `Software` created = `20260402` price = `39.95`  currency = `EUR` ) ).
+    DATA temp1 TYPE z2ui5_cl_cgui_sample_03=>ty_t_row.
+    DATA temp2 LIKE LINE OF temp1.
+    CLEAR temp1.
+
+    temp2-id = 1.
+    temp2-product = `Notebook`.
+    temp2-category = `Hardware`.
+    temp2-created = `20260105`.
+    temp2-price = `956.00`.
+    temp2-currency = `EUR`.
+    INSERT temp2 INTO TABLE temp1.
+    temp2-id = 2.
+    temp2-product = `Monitor`.
+    temp2-category = `Hardware`.
+    temp2-created = `20260112`.
+    temp2-price = `289.90`.
+    temp2-currency = `EUR`.
+    INSERT temp2 INTO TABLE temp1.
+    temp2-id = 3.
+    temp2-product = `Keyboard`.
+    temp2-category = `Hardware`.
+    temp2-created = `20260203`.
+    temp2-price = `49.99`.
+    temp2-currency = `EUR`.
+    INSERT temp2 INTO TABLE temp1.
+    temp2-id = 4.
+    temp2-product = `Office`.
+    temp2-category = `Software`.
+    temp2-created = `20260217`.
+    temp2-price = `129.00`.
+    temp2-currency = `EUR`.
+    INSERT temp2 INTO TABLE temp1.
+    temp2-id = 5.
+    temp2-product = `IDE`.
+    temp2-category = `Software`.
+    temp2-created = `20260301`.
+    temp2-price = `0.00`.
+    temp2-currency = `EUR`.
+    INSERT temp2 INTO TABLE temp1.
+    temp2-id = 6.
+    temp2-product = `Mouse`.
+    temp2-category = `Hardware`.
+    temp2-created = `20260310`.
+    temp2-price = `19.90`.
+    temp2-currency = `EUR`.
+    INSERT temp2 INTO TABLE temp1.
+    temp2-id = 7.
+    temp2-product = `Headset`.
+    temp2-category = `Hardware`.
+    temp2-created = `20260322`.
+    temp2-price = `79.00`.
+    temp2-currency = `EUR`.
+    INSERT temp2 INTO TABLE temp1.
+    temp2-id = 8.
+    temp2-product = `Antivirus`.
+    temp2-category = `Software`.
+    temp2-created = `20260402`.
+    temp2-price = `39.95`.
+    temp2-currency = `EUR`.
+    INSERT temp2 INTO TABLE temp1.
+    mt_row = temp1.
 
     mo_alv = z2ui5_cl_cgui_alv=>factory(
         )->set_title( `abap-cloud-gui - ALV Grid`

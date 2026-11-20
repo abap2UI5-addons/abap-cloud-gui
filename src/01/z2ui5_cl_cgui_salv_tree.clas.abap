@@ -112,32 +112,47 @@ CLASS z2ui5_cl_cgui_salv_tree IMPLEMENTATION.
   METHOD factory.
 
     DATA lr_line TYPE REF TO data.
+    FIELD-SYMBOLS <line> TYPE data.
 
-    r_salv_tree = NEW #( ).
+    CREATE OBJECT r_salv_tree.
     CREATE DATA lr_line LIKE LINE OF t_table.
-    ASSIGN lr_line->* TO FIELD-SYMBOL(<line>).
-    r_salv_tree->mo_columns = NEW #( <line> ).
+
+    ASSIGN lr_line->* TO <line>.
+    CREATE OBJECT r_salv_tree->mo_columns EXPORTING LINE = <line>.
 
   ENDMETHOD.
 
   METHOD constructor.
+    DATA temp1 TYPE z2ui5_if_cgui_gui=>ty_s_control.
+    DATA lo_report TYPE REF TO z2ui5_if_cgui_gui.
 
     super->constructor( ).
     " no part of the screen of its own - the tree of the report is
-    add( VALUE #( kind   = z2ui5_if_cgui_gui=>cs_kind-salv
-                  hidden = abap_true ) ).
-    mo_settings = NEW #( ).
-    DATA(lo_report) = z2ui5_cl_cgui_gui=>get_report( ).
+
+    CLEAR temp1.
+    temp1-kind = z2ui5_if_cgui_gui=>cs_kind-salv.
+    temp1-hidden = abap_true.
+    add( temp1 ).
+    CREATE OBJECT mo_settings.
+
+    lo_report = z2ui5_cl_cgui_gui=>get_report( ).
     IF lo_report IS BOUND.
       mo_tree = lo_report->tree( ).
     ELSE.
       mo_tree = z2ui5_cl_cgui_tree=>factory( ).
     ENDIF.
-    mo_nodes = NEW #( mo_tree ).
+    CREATE OBJECT mo_nodes EXPORTING TREE = mo_tree.
 
   ENDMETHOD.
 
   METHOD display.
+    DATA temp2 TYPE z2ui5_cl_cgui_salv_cols=>ty_t_column_ref.
+    DATA ls_ref LIKE LINE OF temp2.
+      DATA lo_column LIKE ls_ref-r_column.
+      DATA temp3 TYPE string.
+      DATA lv_text LIKE temp3.
+    DATA ls_function LIKE LINE OF mo_settings->mt_function.
+    DATA lo_report TYPE REF TO z2ui5_if_cgui_gui.
 
     IF mo_settings->mv_header IS NOT INITIAL.
       mo_tree->set_title( mo_settings->mv_header ).
@@ -145,11 +160,22 @@ CLASS z2ui5_cl_cgui_salv_tree IMPLEMENTATION.
     IF mo_settings->mv_hierarchy_header IS NOT INITIAL.
       mo_tree->set_hierarchy_header( mo_settings->mv_hierarchy_header ).
     ENDIF.
-    LOOP AT mo_columns->get( ) INTO DATA(ls_ref).
-      DATA(lo_column) = ls_ref-r_column.
-      DATA(lv_text) = COND string( WHEN lo_column->mv_long IS NOT INITIAL THEN lo_column->mv_long
-                                   WHEN lo_column->mv_medium IS NOT INITIAL THEN lo_column->mv_medium
-                                   ELSE lo_column->mv_short ).
+
+    temp2 = mo_columns->get( ).
+
+    LOOP AT temp2 INTO ls_ref.
+
+      lo_column = ls_ref-r_column.
+
+      IF lo_column->mv_long IS NOT INITIAL.
+        temp3 = lo_column->mv_long.
+      ELSEIF lo_column->mv_medium IS NOT INITIAL.
+        temp3 = lo_column->mv_medium.
+      ELSE.
+        temp3 = lo_column->mv_short.
+      ENDIF.
+
+      lv_text = temp3.
       IF lv_text IS NOT INITIAL.
         mo_tree->set_column_text( name = lo_column->mv_name
                                   text = lv_text ).
@@ -158,13 +184,15 @@ CLASS z2ui5_cl_cgui_salv_tree IMPLEMENTATION.
         mo_tree->set_column_hidden( lo_column->mv_name ).
       ENDIF.
     ENDLOOP.
-    LOOP AT mo_settings->mt_function INTO DATA(ls_function).
+
+    LOOP AT mo_settings->mt_function INTO ls_function.
       mo_tree->add_function( name    = ls_function-name
                              text    = ls_function-text
                              icon    = ls_function-icon
                              tooltip = ls_function-tooltip ).
     ENDLOOP.
-    DATA(lo_report) = z2ui5_cl_cgui_gui=>get_report( ).
+
+    lo_report = z2ui5_cl_cgui_gui=>get_report( ).
     IF lo_report IS BOUND.
       lo_report->tree_handler( me ).
     ENDIF.
@@ -234,22 +262,68 @@ CLASS z2ui5_cl_cgui_salv_tree IMPLEMENTATION.
   METHOD z2ui5_if_cgui_tree_events~on_node.
 
     DATA lv_column TYPE ty_column.
-    DATA(lv_key) = z2ui5_cl_cgui_salv_node=>to_key( key ).
-    raise_event( event  = `DOUBLE_CLICK`
-                 params = VALUE #( ( name = `NODE_KEY`   kind = cl_abap_objectdescr=>exporting value = REF #( lv_key ) )
-                                   ( name = `COLUMNNAME` kind = cl_abap_objectdescr=>exporting value = REF #( lv_column ) ) ) ).
+    DATA lv_key TYPE z2ui5_cl_cgui_salv_node=>ty_node_key.
+    DATA temp4 LIKE REF TO lv_column.
+DATA temp1 LIKE REF TO lv_key.
+DATA temp2 TYPE abap_parmbind_tab.
+DATA temp3 LIKE LINE OF temp2.
+    lv_key = z2ui5_cl_cgui_salv_node=>to_key( key ).
+
+    GET REFERENCE OF lv_column INTO temp4.
+
+GET REFERENCE OF lv_key INTO temp1.
+
+CLEAR temp2.
+
+temp3-name = `NODE_KEY`.
+temp3-kind = cl_abap_objectdescr=>exporting.
+temp3-value = temp1.
+INSERT temp3 INTO TABLE temp2.
+temp3-name = `COLUMNNAME`.
+temp3-kind = cl_abap_objectdescr=>exporting.
+temp3-value = temp4.
+INSERT temp3 INTO TABLE temp2.
+raise_event( event  = `DOUBLE_CLICK`
+                 params = temp2 ).
 
   ENDMETHOD.
 
   METHOD z2ui5_if_cgui_tree_events~on_checkbox.
 
     DATA lv_column TYPE ty_column.
-    DATA(lv_key) = z2ui5_cl_cgui_salv_node=>to_key( key ).
-    DATA(lv_checked) = checked.
-    raise_event( event  = `CHECKBOX_CHANGE`
-                 params = VALUE #( ( name = `NODE_KEY`   kind = cl_abap_objectdescr=>exporting value = REF #( lv_key ) )
-                                   ( name = `COLUMNNAME` kind = cl_abap_objectdescr=>exporting value = REF #( lv_column ) )
-                                   ( name = `CHECKED`    kind = cl_abap_objectdescr=>exporting value = REF #( lv_checked ) ) ) ).
+    DATA lv_key TYPE z2ui5_cl_cgui_salv_node=>ty_node_key.
+    DATA lv_checked LIKE checked.
+    DATA temp5 LIKE REF TO lv_checked.
+DATA temp2 LIKE REF TO lv_column.
+DATA temp4 LIKE REF TO lv_key.
+DATA temp1 TYPE abap_parmbind_tab.
+DATA temp3 LIKE LINE OF temp1.
+    lv_key = z2ui5_cl_cgui_salv_node=>to_key( key ).
+
+    lv_checked = checked.
+
+    GET REFERENCE OF lv_checked INTO temp5.
+
+GET REFERENCE OF lv_column INTO temp2.
+
+GET REFERENCE OF lv_key INTO temp4.
+
+CLEAR temp1.
+
+temp3-name = `NODE_KEY`.
+temp3-kind = cl_abap_objectdescr=>exporting.
+temp3-value = temp4.
+INSERT temp3 INTO TABLE temp1.
+temp3-name = `COLUMNNAME`.
+temp3-kind = cl_abap_objectdescr=>exporting.
+temp3-value = temp2.
+INSERT temp3 INTO TABLE temp1.
+temp3-name = `CHECKED`.
+temp3-kind = cl_abap_objectdescr=>exporting.
+temp3-value = temp5.
+INSERT temp3 INTO TABLE temp1.
+raise_event( event  = `CHECKBOX_CHANGE`
+                 params = temp1 ).
 
   ENDMETHOD.
 

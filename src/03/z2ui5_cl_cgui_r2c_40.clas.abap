@@ -38,18 +38,27 @@ CLASS z2ui5_cl_cgui_r2c_40 IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD start_of_selection.
+    DATA temp1 TYPE z2ui5_cl_cgui_gui=>ty_s_simple_event.
+    DATA temp2 LIKE lt_html.
 
-    go_html = NEW z2ui5_cl_cgui_html_viewer( parent = z2ui5_cl_cgui_container=>default_screen ).
-    APPEND VALUE #( eventid = z2ui5_cl_cgui_html_viewer=>m_id_sapevent appl_event = abap_true ) TO lt_event.
+    CREATE OBJECT go_html TYPE z2ui5_cl_cgui_html_viewer EXPORTING parent = z2ui5_cl_cgui_container=>default_screen.
+
+    CLEAR temp1.
+    temp1-eventid = z2ui5_cl_cgui_html_viewer=>m_id_sapevent.
+    temp1-appl_event = abap_true.
+    APPEND temp1 TO lt_event.
     go_html->set_registered_events( lt_event ).
-    go_menu = NEW lcl_menu( ).
+    CREATE OBJECT go_menu TYPE lcl_menu.
     go_html->set_handler( handler = go_menu
                           method  = `ON_SAPEVENT`
                           event   = `SAPEVENT` ).
 
-    lt_html = VALUE #( ( '<h2>Menu</h2>' )
-                       ( '<a href="sapevent:SOUP">Soup of the day</a><br>' )
-                       ( '<a href="sapevent:PASTA">Pasta</a>' ) ).
+
+    CLEAR temp2.
+    INSERT '<h2>Menu</h2>' INTO TABLE temp2.
+    INSERT '<a href="sapevent:SOUP">Soup of the day</a><br>' INTO TABLE temp2.
+    INSERT '<a href="sapevent:PASTA">Pasta</a>' INTO TABLE temp2.
+    lt_html = temp2.
     go_html->load_data( IMPORTING assigned_url = lv_url
                         CHANGING  data_table   = lt_html ).
     go_html->show_url( lv_url ).

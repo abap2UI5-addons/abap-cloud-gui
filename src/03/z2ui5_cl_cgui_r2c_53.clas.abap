@@ -54,7 +54,7 @@ CLASS z2ui5_cl_cgui_r2c_53 IMPLEMENTATION.
   METHOD start_of_selection.
 
     get_data( ).
-    gr_events = NEW lcl_events( ).
+    CREATE OBJECT gr_events TYPE lcl_events.
     display( ).
 
   ENDMETHOD.
@@ -67,15 +67,33 @@ CLASS z2ui5_cl_cgui_r2c_53 IMPLEMENTATION.
 
   METHOD get_data.
 
-    gt_call = VALUE #( ( id = '0001' interface = 'ORDER_CREATE'   status = 'E' message = 'Customer locked' )
-                       ( id = '0002' interface = 'ORDER_CREATE'   status = 'S' message = 'Order 4711 created' )
-                       ( id = '0003' interface = 'INVOICE_POST'   status = 'E' message = 'Period closed' ) ).
+    DATA temp1 TYPE z2ui5_cl_cgui_r2c_53=>ty_t_call.
+    DATA temp2 LIKE LINE OF temp1.
+    CLEAR temp1.
+
+    temp2-id = '0001'.
+    temp2-interface = 'ORDER_CREATE'.
+    temp2-status = 'E'.
+    temp2-message = 'Customer locked'.
+    INSERT temp2 INTO TABLE temp1.
+    temp2-id = '0002'.
+    temp2-interface = 'ORDER_CREATE'.
+    temp2-status = 'S'.
+    temp2-message = 'Order 4711 created'.
+    INSERT temp2 INTO TABLE temp1.
+    temp2-id = '0003'.
+    temp2-interface = 'INVOICE_POST'.
+    temp2-status = 'E'.
+    temp2-message = 'Period closed'.
+    INSERT temp2 INTO TABLE temp1.
+    gt_call = temp1.
 
   ENDMETHOD.
 
   METHOD display.
 
     DATA lr_column TYPE REF TO z2ui5_cl_cgui_salv_column.
+    DATA lr_events TYPE REF TO z2ui5_cl_cgui_salv_table.
 
     TRY.
         z2ui5_cl_cgui_salv_table=>factory( IMPORTING r_salv_table = gr_alv
@@ -100,7 +118,8 @@ CLASS z2ui5_cl_cgui_r2c_53 IMPLEMENTATION.
                  type = `I` ).
     ENDTRY.
 
-    DATA(lr_events) = gr_alv->get_event( ).
+
+    lr_events = gr_alv->get_event( ).
     lr_events->set_handler( handler = gr_events
                             method  = `ON_USER_COMMAND`
                             event   = `ADDED_FUNCTION` ).
@@ -126,9 +145,14 @@ CLASS z2ui5_cl_cgui_r2c_53 IMPLEMENTATION.
 
   METHOD process_selected_rows.
 
-    DATA(lt_rows) = gr_alv->get_selections( )->get_selected_rows( ).
-    LOOP AT lt_rows INTO DATA(lv_row).
-      READ TABLE gt_call INDEX lv_row ASSIGNING FIELD-SYMBOL(<call>).
+    DATA lt_rows TYPE z2ui5_cl_cgui_salv_config=>ty_t_row.
+    DATA lv_row LIKE LINE OF lt_rows.
+      FIELD-SYMBOLS <call> TYPE z2ui5_cl_cgui_r2c_53=>ty_call.
+    lt_rows = gr_alv->get_selections( )->get_selected_rows( ).
+
+    LOOP AT lt_rows INTO lv_row.
+
+      READ TABLE gt_call INDEX lv_row ASSIGNING <call>.
       IF sy-subrc = 0.
         <call>-status = 'S'.
         <call>-message = 'Processed again'.

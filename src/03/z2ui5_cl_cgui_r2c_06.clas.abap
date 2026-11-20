@@ -47,6 +47,8 @@ ENDCLASS.
 CLASS z2ui5_cl_cgui_r2c_06 IMPLEMENTATION.
 
   METHOD initialization.
+    DATA temp1 LIKE gt_plant.
+    DATA temp2 LIKE LINE OF temp1.
 
     " the command field of the SAP GUI: transactions, /n, /o and OK codes
     set_command_field( ).
@@ -57,9 +59,19 @@ CLASS z2ui5_cl_cgui_r2c_06 IMPLEMENTATION.
 
     b_reset = 'Reset'.
     p_source = 'ZR2C_06_DYNAMIC'.
-    gt_plant = VALUE #( ( werks = '1000' name = 'Hamburg' )
-                        ( werks = '2000' name = 'Walldorf' )
-                        ( werks = '3000' name = 'Berlin' ) ).
+
+    CLEAR temp1.
+
+    temp2-werks = '1000'.
+    temp2-name = 'Hamburg'.
+    INSERT temp2 INTO TABLE temp1.
+    temp2-werks = '2000'.
+    temp2-name = 'Walldorf'.
+    INSERT temp2 INTO TABLE temp1.
+    temp2-werks = '3000'.
+    temp2-name = 'Berlin'.
+    INSERT temp2 INTO TABLE temp1.
+    gt_plant = temp1.
 
   ENDMETHOD.
 
@@ -113,8 +125,11 @@ CLASS z2ui5_cl_cgui_r2c_06 IMPLEMENTATION.
 
   METHOD at_selection_screen_output.
 
-    DATA(lt_screen) = screen->loop_at_screen( ).
-    LOOP AT lt_screen INTO DATA(ls_screen).
+    DATA lt_screen TYPE z2ui5_cl_cgui_selscreen=>ty_t_screen.
+    DATA ls_screen LIKE LINE OF lt_screen.
+    lt_screen = screen->loop_at_screen( ).
+
+    LOOP AT lt_screen INTO ls_screen.
       CASE ls_screen-group1.
         WHEN 'DIS'.
           IF p_disp = abap_true.

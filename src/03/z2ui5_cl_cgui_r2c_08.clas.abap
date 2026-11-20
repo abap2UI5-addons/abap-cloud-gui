@@ -53,9 +53,26 @@ CLASS z2ui5_cl_cgui_r2c_08 IMPLEMENTATION.
 
     DATA lv_color TYPE string.
 
-    gt_task = VALUE #( ( id = 1 title = 'Write the report'   done = abap_true  due = '20260110' )
-                       ( id = 2 title = 'Convert the report' done = abap_false due = '20260120' )
-                       ( id = 3 title = 'Test the class'     done = abap_false due = '20260130' ) ).
+    DATA temp1 LIKE gt_task.
+    DATA temp2 LIKE LINE OF temp1.
+    CLEAR temp1.
+
+    temp2-id = 1.
+    temp2-title = 'Write the report'.
+    temp2-done = abap_true.
+    temp2-due = '20260110'.
+    INSERT temp2 INTO TABLE temp1.
+    temp2-id = 2.
+    temp2-title = 'Convert the report'.
+    temp2-done = abap_false.
+    temp2-due = '20260120'.
+    INSERT temp2 INTO TABLE temp1.
+    temp2-id = 3.
+    temp2-title = 'Test the class'.
+    temp2-done = abap_false.
+    temp2-due = '20260130'.
+    INSERT temp2 INTO TABLE temp1.
+    gt_task = temp1.
 
     lv_color = z2ui5_cl_cgui_list=>cs_color-key.
     list( )->new_line(

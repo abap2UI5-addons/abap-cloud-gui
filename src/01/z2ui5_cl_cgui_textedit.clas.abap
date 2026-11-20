@@ -229,11 +229,15 @@ ENDCLASS.
 CLASS z2ui5_cl_cgui_textedit IMPLEMENTATION.
 
   METHOD constructor.
+    DATA temp129 TYPE z2ui5_if_cgui_gui=>ty_s_control.
 
     super->constructor( ).
-    IF add( VALUE #( kind    = z2ui5_if_cgui_gui=>cs_kind-textedit
-                     parent  = id_of( parent )
-                     toolbar = abap_true ) ) = abap_false.
+
+    CLEAR temp129.
+    temp129-kind = z2ui5_if_cgui_gui=>cs_kind-textedit.
+    temp129-parent = id_of( parent ).
+    temp129-toolbar = abap_true.
+    IF add( temp129 ) = abap_false.
       RAISE error_cntl_create.
     ENDIF.
 
@@ -241,14 +245,24 @@ CLASS z2ui5_cl_cgui_textedit IMPLEMENTATION.
 
   METHOD set_textstream.
 
-    text_put( CONV #( text ) ).
+    DATA temp130 TYPE string.
+    temp130 = text.
+    text_put( temp130 ).
 
   ENDMETHOD.
 
   METHOD get_textstream.
 
-    DATA(ls_control) = get( ).
-    is_modified = COND #( WHEN ls_control-text <> mv_set THEN true ELSE false ).
+    DATA ls_control TYPE z2ui5_if_cgui_gui=>ty_s_control.
+    DATA temp131 TYPE i.
+    ls_control = get( ).
+
+    IF ls_control-text <> mv_set.
+      temp131 = true.
+    ELSE.
+      temp131 = false.
+    ENDIF.
+    is_modified = temp131.
     IF only_when_modified = true AND is_modified = false.
       RETURN.
     ENDIF.
@@ -264,8 +278,16 @@ CLASS z2ui5_cl_cgui_textedit IMPLEMENTATION.
 
   METHOD get_text_as_r3table.
 
-    DATA(ls_control) = get( ).
-    is_modified = COND #( WHEN ls_control-text <> mv_set THEN true ELSE false ).
+    DATA ls_control TYPE z2ui5_if_cgui_gui=>ty_s_control.
+    DATA temp132 TYPE i.
+    ls_control = get( ).
+
+    IF ls_control-text <> mv_set.
+      temp132 = true.
+    ELSE.
+      temp132 = false.
+    ENDIF.
+    is_modified = temp132.
     IF only_when_modified = true AND is_modified = false.
       RETURN.
     ENDIF.
@@ -282,8 +304,16 @@ CLASS z2ui5_cl_cgui_textedit IMPLEMENTATION.
 
   METHOD get_text_as_stream.
 
-    DATA(ls_control) = get( ).
-    is_modified = COND #( WHEN ls_control-text <> mv_set THEN true ELSE false ).
+    DATA ls_control TYPE z2ui5_if_cgui_gui=>ty_s_control.
+    DATA temp133 TYPE i.
+    ls_control = get( ).
+
+    IF ls_control-text <> mv_set.
+      temp133 = true.
+    ELSE.
+      temp133 = false.
+    ENDIF.
+    is_modified = temp133.
     IF only_when_modified = true AND is_modified = false.
       RETURN.
     ENDIF.
@@ -300,7 +330,8 @@ CLASS z2ui5_cl_cgui_textedit IMPLEMENTATION.
 
   METHOD set_readonly_mode.
 
-    DATA(ls_control) = get( ).
+    DATA ls_control TYPE z2ui5_if_cgui_gui=>ty_s_control.
+    ls_control = get( ).
     ls_control-readonly = flag( readonly_mode ).
     put( ls_control ).
 
@@ -308,7 +339,8 @@ CLASS z2ui5_cl_cgui_textedit IMPLEMENTATION.
 
   METHOD set_toolbar_mode.
 
-    DATA(ls_control) = get( ).
+    DATA ls_control TYPE z2ui5_if_cgui_gui=>ty_s_control.
+    ls_control = get( ).
     ls_control-toolbar = flag( toolbar_mode ).
     put( ls_control ).
 
@@ -316,7 +348,8 @@ CLASS z2ui5_cl_cgui_textedit IMPLEMENTATION.
 
   METHOD set_statusbar_mode.
 
-    DATA(ls_control) = get( ).
+    DATA ls_control TYPE z2ui5_if_cgui_gui=>ty_s_control.
+    ls_control = get( ).
     ls_control-statusbar = flag( statusbar_mode ).
     put( ls_control ).
 
@@ -324,7 +357,8 @@ CLASS z2ui5_cl_cgui_textedit IMPLEMENTATION.
 
   METHOD set_font_fixed.
 
-    DATA(ls_control) = get( ).
+    DATA ls_control TYPE z2ui5_if_cgui_gui=>ty_s_control.
+    ls_control = get( ).
     ls_control-fixed = flag( mode ).
     put( ls_control ).
 
@@ -335,7 +369,13 @@ CLASS z2ui5_cl_cgui_textedit IMPLEMENTATION.
 
   METHOD get_textmodified_status.
 
-    status = COND #( WHEN get( )-text <> mv_set THEN 1 ELSE 0 ).
+    DATA temp134 TYPE i.
+    IF get( )-text <> mv_set.
+      temp134 = 1.
+    ELSE.
+      temp134 = 0.
+    ENDIF.
+    status = temp134.
 
   ENDMETHOD.
 
@@ -354,8 +394,12 @@ CLASS z2ui5_cl_cgui_textedit IMPLEMENTATION.
 
     DATA lt_key TYPE string_table.
 
-    LOOP AT events ASSIGNING FIELD-SYMBOL(<event>).
-      ASSIGN COMPONENT `EVENTID` OF STRUCTURE <event> TO FIELD-SYMBOL(<id>).
+    FIELD-SYMBOLS <event> TYPE ANY.
+      FIELD-SYMBOLS <id> TYPE any.
+    DATA ls_control TYPE z2ui5_if_cgui_gui=>ty_s_control.
+    LOOP AT events ASSIGNING <event>.
+
+      ASSIGN COMPONENT `EVENTID` OF STRUCTURE <event> TO <id>.
       IF sy-subrc <> 0.
         CONTINUE.
       ENDIF.
@@ -366,7 +410,8 @@ CLASS z2ui5_cl_cgui_textedit IMPLEMENTATION.
           INSERT `F4` INTO TABLE lt_key.
       ENDCASE.
     ENDLOOP.
-    DATA(ls_control) = get( ).
+
+    ls_control = get( ).
     ls_control-keys = concat_lines_of( table = lt_key
                                        sep   = `,` ).
     put( ls_control ).
@@ -375,7 +420,8 @@ CLASS z2ui5_cl_cgui_textedit IMPLEMENTATION.
 
   METHOD get_selection_pos.
 
-    DATA(ls_control) = get( ).
+    DATA ls_control TYPE z2ui5_if_cgui_gui=>ty_s_control.
+    ls_control = get( ).
     position_of( EXPORTING text   = ls_control-text
                            offset = ls_control-sel_from
                  IMPORTING line   = from_line
@@ -389,7 +435,8 @@ CLASS z2ui5_cl_cgui_textedit IMPLEMENTATION.
 
   METHOD set_selection_pos.
 
-    DATA(ls_control) = get( ).
+    DATA ls_control TYPE z2ui5_if_cgui_gui=>ty_s_control.
+    ls_control = get( ).
     ls_control-sel_from = offset_of( text = ls_control-text
                                      line = from_line
                                      pos  = from_pos ).
@@ -401,11 +448,15 @@ CLASS z2ui5_cl_cgui_textedit IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD position_of.
+    DATA lv_index TYPE i.
+    DATA lv_end TYPE i.
 
     line = 1.
     pos = 1.
-    DATA(lv_index) = 0.
-    DATA(lv_end) = nmin( val1 = offset
+
+    lv_index = 0.
+
+    lv_end = nmin( val1 = offset
                          val2 = strlen( text ) ).
     WHILE lv_index < lv_end.
       IF text+lv_index(1) = |\n|.
@@ -421,8 +472,11 @@ CLASS z2ui5_cl_cgui_textedit IMPLEMENTATION.
 
   METHOD offset_of.
 
-    DATA(lv_line) = 1.
-    DATA(lv_len) = strlen( text ).
+    DATA lv_line TYPE i.
+    DATA lv_len TYPE i.
+    lv_line = 1.
+
+    lv_len = strlen( text ).
     WHILE result < lv_len AND lv_line < line.
       IF text+result(1) = |\n|.
         lv_line = lv_line + 1.
@@ -437,7 +491,8 @@ CLASS z2ui5_cl_cgui_textedit IMPLEMENTATION.
 
   METHOD text_put.
 
-    DATA(ls_control) = get( ).
+    DATA ls_control TYPE z2ui5_if_cgui_gui=>ty_s_control.
+    ls_control = get( ).
     ls_control-text = text.
     put( ls_control ).
     mv_set = text.
@@ -445,20 +500,30 @@ CLASS z2ui5_cl_cgui_textedit IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD lines_of.
+    DATA lv_text TYPE string.
+    DATA lt_line TYPE STANDARD TABLE OF string WITH DEFAULT KEY.
+    DATA lv_line LIKE LINE OF lt_line.
+      FIELD-SYMBOLS <line> LIKE LINE OF table.
+      FIELD-SYMBOLS <text> TYPE any.
 
     CLEAR table.
     IF text IS INITIAL.
       RETURN.
     ENDIF.
-    DATA(lv_text) = replace( val  = text
+
+    lv_text = replace( val  = text
                              sub  = |\r\n|
                              with = |\n|
                              occ  = 0 ).
-    SPLIT lv_text AT |\n| INTO TABLE DATA(lt_line).
-    LOOP AT lt_line INTO DATA(lv_line).
-      APPEND INITIAL LINE TO table ASSIGNING FIELD-SYMBOL(<line>).
+
+    SPLIT lv_text AT |\n| INTO TABLE lt_line.
+
+    LOOP AT lt_line INTO lv_line.
+
+      APPEND INITIAL LINE TO table ASSIGNING <line>.
       " a table of a structure (tline-tdline, a TEXT component) or of text
-      ASSIGN COMPONENT `TDLINE` OF STRUCTURE <line> TO FIELD-SYMBOL(<text>).
+
+      ASSIGN COMPONENT `TDLINE` OF STRUCTURE <line> TO <text>.
       IF sy-subrc <> 0.
         ASSIGN COMPONENT `TEXT` OF STRUCTURE <line> TO <text>.
       ENDIF.
@@ -478,8 +543,13 @@ CLASS z2ui5_cl_cgui_textedit IMPLEMENTATION.
 
     DATA lt_line TYPE string_table.
 
-    LOOP AT table ASSIGNING FIELD-SYMBOL(<line>).
-      ASSIGN COMPONENT `TDLINE` OF STRUCTURE <line> TO FIELD-SYMBOL(<text>).
+    FIELD-SYMBOLS <line> TYPE ANY.
+      FIELD-SYMBOLS <text> TYPE any.
+        DATA temp135 LIKE LINE OF lt_line.
+        DATA temp136 LIKE LINE OF lt_line.
+    LOOP AT table ASSIGNING <line>.
+
+      ASSIGN COMPONENT `TDLINE` OF STRUCTURE <line> TO <text>.
       IF sy-subrc <> 0.
         ASSIGN COMPONENT `TEXT` OF STRUCTURE <line> TO <text>.
       ENDIF.
@@ -489,9 +559,13 @@ CLASS z2ui5_cl_cgui_textedit IMPLEMENTATION.
       " a character field as string loses its trailing blanks, as the
       " classic editor showed the line
       IF sy-subrc = 0.
-        INSERT CONV string( <text> ) INTO TABLE lt_line.
+
+        temp135 = <text>.
+        INSERT temp135 INTO TABLE lt_line.
       ELSE.
-        INSERT CONV string( <line> ) INTO TABLE lt_line.
+
+        temp136 = <line>.
+        INSERT temp136 INTO TABLE lt_line.
       ENDIF.
     ENDLOOP.
     result = concat_lines_of( table = lt_line

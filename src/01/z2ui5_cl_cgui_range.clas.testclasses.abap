@@ -2,7 +2,7 @@
 CLASS ltcl_client DEFINITION FINAL FOR TESTING.
 
   PUBLIC SECTION.
-    INTERFACES z2ui5_if_client PARTIALLY IMPLEMENTED.
+    INTERFACES z2ui5_if_client .
 
     DATA mv_init  TYPE abap_bool.
     DATA mv_event TYPE string.
@@ -14,6 +14,105 @@ ENDCLASS.
 
 
 CLASS ltcl_client IMPLEMENTATION.
+  METHOD z2ui5_if_client~check_on_navigated.
+    RETURN. " todo, implement method
+  ENDMETHOD.
+  METHOD z2ui5_if_client~check_app_prev_stack.
+    RETURN. " todo, implement method
+  ENDMETHOD.
+  METHOD z2ui5_if_client~check_on_event.
+    RETURN. " todo, implement method
+  ENDMETHOD.
+  METHOD z2ui5_if_client~follow_up_action.
+    RETURN. " todo, implement method
+  ENDMETHOD.
+  METHOD z2ui5_if_client~window_get_row.
+    RETURN. " todo, implement method
+  ENDMETHOD.
+  METHOD z2ui5_if_client~window_bind_tab.
+    RETURN. " todo, implement method
+  ENDMETHOD.
+  METHOD z2ui5_if_client~_bind_path.
+    RETURN. " todo, implement method
+  ENDMETHOD.
+  METHOD z2ui5_if_client~_bind_edit.
+    RETURN. " todo, implement method
+  ENDMETHOD.
+  METHOD z2ui5_if_client~_event_client.
+    RETURN. " todo, implement method
+  ENDMETHOD.
+  METHOD z2ui5_if_client~message_toast_display.
+    RETURN. " todo, implement method
+  ENDMETHOD.
+  METHOD z2ui5_if_client~message_box_display.
+    RETURN. " todo, implement method
+  ENDMETHOD.
+  METHOD z2ui5_if_client~nav_app_call.
+    RETURN. " todo, implement method
+  ENDMETHOD.
+  METHOD z2ui5_if_client~_event_nav_app_leave.
+    RETURN. " todo, implement method
+  ENDMETHOD.
+  METHOD z2ui5_if_client~get_app.
+    RETURN. " todo, implement method
+  ENDMETHOD.
+  METHOD z2ui5_if_client~get.
+    RETURN. " todo, implement method
+  ENDMETHOD.
+  METHOD z2ui5_if_client~popover_destroy.
+    RETURN. " todo, implement method
+  ENDMETHOD.
+  METHOD z2ui5_if_client~popover_display.
+    RETURN. " todo, implement method
+  ENDMETHOD.
+  METHOD z2ui5_if_client~popover_model_update.
+    RETURN. " todo, implement method
+  ENDMETHOD.
+  METHOD z2ui5_if_client~popup_model_update.
+    RETURN. " todo, implement method
+  ENDMETHOD.
+  METHOD z2ui5_if_client~nest2_view_model_update.
+    RETURN. " todo, implement method
+  ENDMETHOD.
+  METHOD z2ui5_if_client~nest2_view_destroy.
+    RETURN. " todo, implement method
+  ENDMETHOD.
+  METHOD z2ui5_if_client~nest2_view_display.
+    RETURN. " todo, implement method
+  ENDMETHOD.
+  METHOD z2ui5_if_client~nest_view_model_update.
+    RETURN. " todo, implement method
+  ENDMETHOD.
+  METHOD z2ui5_if_client~nest_view_destroy.
+    RETURN. " todo, implement method
+  ENDMETHOD.
+  METHOD z2ui5_if_client~nest_view_display.
+    RETURN. " todo, implement method
+  ENDMETHOD.
+  METHOD z2ui5_if_client~hash_replace.
+    RETURN. " todo, implement method
+  ENDMETHOD.
+  METHOD z2ui5_if_client~hash_set.
+    RETURN. " todo, implement method
+  ENDMETHOD.
+  METHOD z2ui5_if_client~app_state_get_href.
+    RETURN. " todo, implement method
+  ENDMETHOD.
+  METHOD z2ui5_if_client~app_state_set_active.
+    RETURN. " todo, implement method
+  ENDMETHOD.
+  METHOD z2ui5_if_client~set_session_stateful.
+    RETURN. " todo, implement method
+  ENDMETHOD.
+  METHOD z2ui5_if_client~view_model_update.
+    RETURN. " todo, implement method
+  ENDMETHOD.
+  METHOD z2ui5_if_client~view_display.
+    RETURN. " todo, implement method
+  ENDMETHOD.
+  METHOD z2ui5_if_client~view_destroy.
+    RETURN. " todo, implement method
+  ENDMETHOD.
 
   METHOD z2ui5_if_client~check_on_init.
 
@@ -107,7 +206,7 @@ CLASS ltcl_test IMPLEMENTATION.
 
   METHOD setup.
 
-    mo_client = NEW #( ).
+    CREATE OBJECT mo_client.
 
   ENDMETHOD.
 
@@ -125,11 +224,27 @@ CLASS ltcl_test IMPLEMENTATION.
     DATA lt_range TYPE RANGE OF ty_c4.
     DATA lt_back  TYPE RANGE OF ty_c4.
 
-    lt_range = VALUE #( ( sign = `I` option = `BT` low = `A` high = `C` )
-                        ( sign = `E` option = `EQ` low = `B` ) ).
+    DATA temp1 LIKE lt_range.
+    DATA temp2 LIKE LINE OF temp1.
+    DATA lv_error TYPE string.
+    CLEAR temp1.
+
+    CLEAR temp2.
+    temp2-sign = `I`.
+    temp2-option = `BT`.
+    temp2-low = `A`.
+    temp2-high = `C`.
+    INSERT temp2 INTO TABLE temp1.
+    CLEAR temp2.
+    temp2-sign = `E`.
+    temp2-option = `EQ`.
+    temp2-low = `B`.
+    INSERT temp2 INTO TABLE temp1.
+    lt_range = temp1.
+
 
     z2ui5_cl_cgui_range=>rows_to_range( EXPORTING rows  = z2ui5_cl_cgui_range=>rows_from_range( lt_range )
-                                        IMPORTING error = DATA(lv_error)
+                                        IMPORTING error = lv_error
                                         CHANGING  range = lt_back ).
 
     cl_abap_unit_assert=>assert_initial( lv_error ).
@@ -142,19 +257,56 @@ CLASS ltcl_test IMPLEMENTATION.
 
     DATA lt_range TYPE RANGE OF ty_c4.
 
-    z2ui5_cl_cgui_range=>rows_to_range( EXPORTING rows  = VALUE #( ( sign = `I` option = `EQ` low = `ab*` )
-                                                                   ( sign = `E` option = `CP` low = `xy` )
-                                                                   ( sign = `I` option = `EQ` )
-                                                                   ( sign = `I` option = `BT` low = `k` ) )
+    DATA temp3 TYPE z2ui5_cl_cgui_range=>ty_t_row.
+    DATA temp4 LIKE LINE OF temp3.
+    DATA lv_error TYPE string.
+    DATA temp5 TYPE ty_r_c4.
+    DATA temp6 LIKE LINE OF temp5.
+    CLEAR temp3.
+
+    CLEAR temp4.
+    temp4-sign = `I`.
+    temp4-option = `EQ`.
+    temp4-low = `ab*`.
+    INSERT temp4 INTO TABLE temp3.
+    CLEAR temp4.
+    temp4-sign = `E`.
+    temp4-option = `CP`.
+    temp4-low = `xy`.
+    INSERT temp4 INTO TABLE temp3.
+    CLEAR temp4.
+    temp4-sign = `I`.
+    temp4-option = `EQ`.
+    INSERT temp4 INTO TABLE temp3.
+    CLEAR temp4.
+    temp4-sign = `I`.
+    temp4-option = `BT`.
+    temp4-low = `k`.
+    INSERT temp4 INTO TABLE temp3.
+
+    z2ui5_cl_cgui_range=>rows_to_range( EXPORTING rows  = temp3
                                                   upper = abap_true
-                                        IMPORTING error = DATA(lv_error)
+                                        IMPORTING error = lv_error
                                         CHANGING  range = lt_range ).
 
     cl_abap_unit_assert=>assert_initial( lv_error ).
+
+    CLEAR temp5.
+
+    temp6-sign = `I`.
+    temp6-option = `CP`.
+    temp6-low = `AB*`.
+    INSERT temp6 INTO TABLE temp5.
+    temp6-sign = `E`.
+    temp6-option = `EQ`.
+    temp6-low = `XY`.
+    INSERT temp6 INTO TABLE temp5.
+    temp6-sign = `I`.
+    temp6-option = `EQ`.
+    temp6-low = `K`.
+    INSERT temp6 INTO TABLE temp5.
     cl_abap_unit_assert=>assert_equals( act = lt_range
-                                        exp = VALUE ty_r_c4( ( sign = `I` option = `CP` low = `AB*` )
-                                                         ( sign = `E` option = `EQ` low = `XY` )
-                                                         ( sign = `I` option = `EQ` low = `K` ) ) ).
+                                        exp = temp5 ).
 
   ENDMETHOD.
 
@@ -162,15 +314,47 @@ CLASS ltcl_test IMPLEMENTATION.
 
     DATA lt_range TYPE RANGE OF i.
 
-    lt_range = VALUE #( ( sign = `I` option = `EQ` low = 7 ) ).
-    z2ui5_cl_cgui_range=>rows_to_range( EXPORTING rows  = VALUE #( ( sign = `I` option = `EQ` low = `5` )
-                                                                   ( sign = `I` option = `EQ` low = `abc` ) )
-                                        IMPORTING error = DATA(lv_error)
+    DATA temp7 LIKE lt_range.
+    DATA temp8 LIKE LINE OF temp7.
+    DATA temp9 TYPE z2ui5_cl_cgui_range=>ty_t_row.
+    DATA temp10 LIKE LINE OF temp9.
+    DATA lv_error TYPE string.
+    FIELD-SYMBOLS <temp11> LIKE LINE OF lt_range.
+    DATA temp12 LIKE sy-tabix.
+    CLEAR temp7.
+
+    temp8-sign = `I`.
+    temp8-option = `EQ`.
+    temp8-low = 7.
+    INSERT temp8 INTO TABLE temp7.
+    lt_range = temp7.
+
+    CLEAR temp9.
+
+    temp10-sign = `I`.
+    temp10-option = `EQ`.
+    temp10-low = `5`.
+    INSERT temp10 INTO TABLE temp9.
+    temp10-sign = `I`.
+    temp10-option = `EQ`.
+    temp10-low = `abc`.
+    INSERT temp10 INTO TABLE temp9.
+
+    z2ui5_cl_cgui_range=>rows_to_range( EXPORTING rows  = temp9
+                                        IMPORTING error = lv_error
                                         CHANGING  range = lt_range ).
 
     cl_abap_unit_assert=>assert_char_cp( act = lv_error
                                          exp = `*2*` ).
-    cl_abap_unit_assert=>assert_equals( act = lt_range[ 1 ]-low
+
+
+    temp12 = sy-tabix.
+    READ TABLE lt_range INDEX 1 ASSIGNING <temp11>.
+    sy-tabix = temp12.
+    IF sy-subrc <> 0.
+      ASSERT 1 = 0.
+    ENDIF.
+    cl_abap_unit_assert=>assert_equals( act = <temp11>-low
                                         exp = 7 ).
 
   ENDMETHOD.
@@ -179,8 +363,19 @@ CLASS ltcl_test IMPLEMENTATION.
 
     DATA lt_range TYPE RANGE OF i.
 
-    z2ui5_cl_cgui_range=>rows_to_range( EXPORTING rows  = VALUE #( ( sign = `I` option = `BT` low = `9` high = `3` ) )
-                                        IMPORTING error = DATA(lv_error)
+    DATA temp13 TYPE z2ui5_cl_cgui_range=>ty_t_row.
+    DATA temp14 LIKE LINE OF temp13.
+    DATA lv_error TYPE string.
+    CLEAR temp13.
+
+    temp14-sign = `I`.
+    temp14-option = `BT`.
+    temp14-low = `9`.
+    temp14-high = `3`.
+    INSERT temp14 INTO TABLE temp13.
+
+    z2ui5_cl_cgui_range=>rows_to_range( EXPORTING rows  = temp13
+                                        IMPORTING error = lv_error
                                         CHANGING  range = lt_range ).
 
     cl_abap_unit_assert=>assert_not_initial( lv_error ).
@@ -192,44 +387,138 @@ CLASS ltcl_test IMPLEMENTATION.
 
     DATA lt_range TYPE RANGE OF d.
 
-    lt_range = VALUE #( ( sign = `I` option = `BT` low = `00000000` high = `20261231` ) ).
-    DATA(lt_row) = z2ui5_cl_cgui_range=>rows_from_range( range   = lt_range
+    DATA temp15 LIKE lt_range.
+    DATA temp16 LIKE LINE OF temp15.
+    DATA lt_row TYPE z2ui5_cl_cgui_range=>ty_t_row.
+    FIELD-SYMBOLS <temp17> LIKE LINE OF lt_row.
+    DATA temp18 LIKE sy-tabix.
+    FIELD-SYMBOLS <temp19> LIKE LINE OF lt_row.
+    DATA temp20 LIKE sy-tabix.
+    CLEAR temp15.
+
+    temp16-sign = `I`.
+    temp16-option = `BT`.
+    temp16-low = `00000000`.
+    temp16-high = `20261231`.
+    INSERT temp16 INTO TABLE temp15.
+    lt_range = temp15.
+
+    lt_row = z2ui5_cl_cgui_range=>rows_from_range( range   = lt_range
                                                          control = z2ui5_cl_cgui_range=>cs_control-date ).
 
-    cl_abap_unit_assert=>assert_initial( lt_row[ 1 ]-low ).
-    cl_abap_unit_assert=>assert_equals( act = lt_row[ 1 ]-high
+
+
+    temp18 = sy-tabix.
+    READ TABLE lt_row INDEX 1 ASSIGNING <temp17>.
+    sy-tabix = temp18.
+    IF sy-subrc <> 0.
+      ASSERT 1 = 0.
+    ENDIF.
+    cl_abap_unit_assert=>assert_initial( <temp17>-low ).
+
+
+    temp20 = sy-tabix.
+    READ TABLE lt_row INDEX 1 ASSIGNING <temp19>.
+    sy-tabix = temp20.
+    IF sy-subrc <> 0.
+      ASSERT 1 = 0.
+    ENDIF.
+    cl_abap_unit_assert=>assert_equals( act = <temp19>-high
                                         exp = `20261231` ).
 
   ENDMETHOD.
 
   METHOD paste_from_clipboard.
 
-    DATA(lt_row) = z2ui5_cl_cgui_range=>rows_from_text( |A\r\n  B \tC;D*\n\n| ).
+    DATA lt_row TYPE z2ui5_cl_cgui_range=>ty_t_row.
+    FIELD-SYMBOLS <temp21> LIKE LINE OF lt_row.
+    DATA temp22 LIKE sy-tabix.
+    FIELD-SYMBOLS <temp23> LIKE LINE OF lt_row.
+    DATA temp24 LIKE sy-tabix.
+    lt_row = z2ui5_cl_cgui_range=>rows_from_text( |A\r\n  B \tC;D*\n\n| ).
 
     cl_abap_unit_assert=>assert_equals( act = lines( lt_row )
                                         exp = 4 ).
-    cl_abap_unit_assert=>assert_equals( act = lt_row[ 2 ]-low
+
+
+    temp22 = sy-tabix.
+    READ TABLE lt_row INDEX 2 ASSIGNING <temp21>.
+    sy-tabix = temp22.
+    IF sy-subrc <> 0.
+      ASSERT 1 = 0.
+    ENDIF.
+    cl_abap_unit_assert=>assert_equals( act = <temp21>-low
                                         exp = `B` ).
-    cl_abap_unit_assert=>assert_equals( act = lt_row[ 4 ]-option
+
+
+    temp24 = sy-tabix.
+    READ TABLE lt_row INDEX 4 ASSIGNING <temp23>.
+    sy-tabix = temp24.
+    IF sy-subrc <> 0.
+      ASSERT 1 = 0.
+    ENDIF.
+    cl_abap_unit_assert=>assert_equals( act = <temp23>-option
                                         exp = `CP` ).
 
   ENDMETHOD.
 
   METHOD f4_values_into_rows.
 
-    DATA(lt_row) = VALUE z2ui5_cl_cgui_range=>ty_t_row( ( key = `1` sign = `I` option = `BT` low = `A` )
-                                                        ( key = `2` sign = `I` option = `EQ` ) ).
+    DATA temp25 TYPE z2ui5_cl_cgui_range=>ty_t_row.
+    DATA temp26 LIKE LINE OF temp25.
+    DATA lt_row LIKE temp25.
+    DATA temp27 TYPE string_table.
+    FIELD-SYMBOLS <temp29> LIKE LINE OF lt_row.
+    DATA temp30 LIKE sy-tabix.
+    FIELD-SYMBOLS <temp31> LIKE LINE OF lt_row.
+    DATA temp32 LIKE sy-tabix.
+    CLEAR temp25.
+
+    CLEAR temp26.
+    temp26-key = `1`.
+    temp26-sign = `I`.
+    temp26-option = `BT`.
+    temp26-low = `A`.
+    INSERT temp26 INTO TABLE temp25.
+    CLEAR temp26.
+    temp26-key = `2`.
+    temp26-sign = `I`.
+    temp26-option = `EQ`.
+    INSERT temp26 INTO TABLE temp25.
+
+    lt_row = temp25.
 
     z2ui5_cl_cgui_range=>row_set_value( EXPORTING row_key = `1`
                                                   part    = `high`
                                                   value   = `F`
                                         CHANGING  rows    = lt_row ).
-    z2ui5_cl_cgui_range=>rows_add_values( EXPORTING values = VALUE #( ( `X` ) ( `Y` ) ( `X` ) )
+
+    CLEAR temp27.
+    INSERT `X` INTO TABLE temp27.
+    INSERT `Y` INTO TABLE temp27.
+    INSERT `X` INTO TABLE temp27.
+    z2ui5_cl_cgui_range=>rows_add_values( EXPORTING values = temp27
                                           CHANGING  rows   = lt_row ).
 
-    cl_abap_unit_assert=>assert_equals( act = lt_row[ 1 ]-high
+
+
+    temp30 = sy-tabix.
+    READ TABLE lt_row INDEX 1 ASSIGNING <temp29>.
+    sy-tabix = temp30.
+    IF sy-subrc <> 0.
+      ASSERT 1 = 0.
+    ENDIF.
+    cl_abap_unit_assert=>assert_equals( act = <temp29>-high
                                         exp = `F` ).
-    cl_abap_unit_assert=>assert_equals( act = lt_row[ 2 ]-low
+
+
+    temp32 = sy-tabix.
+    READ TABLE lt_row INDEX 2 ASSIGNING <temp31>.
+    sy-tabix = temp32.
+    IF sy-subrc <> 0.
+      ASSERT 1 = 0.
+    ENDIF.
+    cl_abap_unit_assert=>assert_equals( act = <temp31>-low
                                         exp = `X` ).
     cl_abap_unit_assert=>assert_equals( act = lines( lt_row )
                                         exp = 3 ).
@@ -240,14 +529,32 @@ CLASS ltcl_test IMPLEMENTATION.
 
     DATA lt_range TYPE RANGE OF ty_c4.
 
-    lt_range = VALUE #( ( sign = `E` option = `EQ` low = `B` ) ).
-    DATA(lo_popup) = z2ui5_cl_cgui_range=>factory( range   = lt_range
-                                                   setting = VALUE #( title      = `Code`
-                                                                      value_help = abap_true ) ).
+    DATA temp33 LIKE lt_range.
+    DATA temp34 LIKE LINE OF temp33.
+    DATA temp35 TYPE z2ui5_cl_cgui_range=>ty_s_setting.
+    DATA lo_popup TYPE REF TO z2ui5_cl_cgui_range.
+    DATA lv_popup LIKE mo_client->mv_popup.
+    FIELD-SYMBOLS <temp36> LIKE LINE OF lo_popup->mt_row.
+    DATA temp37 LIKE sy-tabix.
+    CLEAR temp33.
+
+    temp34-sign = `E`.
+    temp34-option = `EQ`.
+    temp34-low = `B`.
+    INSERT temp34 INTO TABLE temp33.
+    lt_range = temp33.
+
+    CLEAR temp35.
+    temp35-title = `Code`.
+    temp35-value_help = abap_true.
+
+    lo_popup = z2ui5_cl_cgui_range=>factory( range   = lt_range
+                                                   setting = temp35 ).
     run( popup = lo_popup
          init  = abap_true ).
 
-    DATA(lv_popup) = mo_client->mv_popup.
+
+    lv_popup = mo_client->mv_popup.
     cl_abap_unit_assert=>assert_char_cp( act = lv_popup
                                          exp = `*title="Code"*` ).
     cl_abap_unit_assert=>assert_char_cp( act = lv_popup
@@ -256,14 +563,33 @@ CLASS ltcl_test IMPLEMENTATION.
                                          exp = `*valueHelpRequest="EVENT:CGUI_RANGE_F4"*` ).
     cl_abap_unit_assert=>assert_char_cp( act = lv_popup
                                          exp = `*EVENT:CGUI_RANGE_F4_MULTI*` ).
-    cl_abap_unit_assert=>assert_equals( act = lo_popup->mt_row[ 1 ]-sign
+
+
+    temp37 = sy-tabix.
+    READ TABLE lo_popup->mt_row INDEX 1 ASSIGNING <temp36>.
+    sy-tabix = temp37.
+    IF sy-subrc <> 0.
+      ASSERT 1 = 0.
+    ENDIF.
+    cl_abap_unit_assert=>assert_equals( act = <temp36>-sign
                                         exp = `E` ).
 
   ENDMETHOD.
 
   METHOD popup_add_delete_ok.
 
-    DATA(lo_popup) = z2ui5_cl_cgui_range=>factory( ).
+    DATA lo_popup TYPE REF TO z2ui5_cl_cgui_range.
+    DATA temp38 TYPE string_table.
+    FIELD-SYMBOLS <temp1> LIKE LINE OF lo_popup->mt_row.
+    DATA temp2 LIKE sy-tabix.
+    FIELD-SYMBOLS <temp40> LIKE LINE OF lo_popup->mt_row.
+    DATA temp41 LIKE sy-tabix.
+    FIELD-SYMBOLS <temp42> LIKE LINE OF lo_popup->mt_row.
+    DATA temp43 LIKE sy-tabix.
+    DATA ls_result TYPE z2ui5_cl_cgui_range=>ty_s_result.
+    FIELD-SYMBOLS <temp44> LIKE LINE OF ls_result-rows.
+    DATA temp45 LIKE sy-tabix.
+    lo_popup = z2ui5_cl_cgui_range=>factory( ).
     run( popup = lo_popup
          init  = abap_true ).
     cl_abap_unit_assert=>assert_equals( act = lines( lo_popup->mt_row )
@@ -274,35 +600,83 @@ CLASS ltcl_test IMPLEMENTATION.
     cl_abap_unit_assert=>assert_equals( act = lines( lo_popup->mt_row )
                                         exp = 2 ).
 
+
+    CLEAR temp38.
+
+
+    temp2 = sy-tabix.
+    READ TABLE lo_popup->mt_row INDEX 1 ASSIGNING <temp1>.
+    sy-tabix = temp2.
+    IF sy-subrc <> 0.
+      ASSERT 1 = 0.
+    ENDIF.
+    INSERT <temp1>-key INTO TABLE temp38.
     run( popup = lo_popup
          event = z2ui5_cl_cgui_range=>cs_event-delete
-         args  = VALUE #( ( lo_popup->mt_row[ 1 ]-key ) ) ).
+         args  = temp38 ).
     cl_abap_unit_assert=>assert_equals( act = lines( lo_popup->mt_row )
                                         exp = 1 ).
 
-    lo_popup->mt_row[ 1 ]-sign = `E`.
-    lo_popup->mt_row[ 1 ]-low  = `Z`.
+
+
+    temp41 = sy-tabix.
+    READ TABLE lo_popup->mt_row INDEX 1 ASSIGNING <temp40>.
+    sy-tabix = temp41.
+    IF sy-subrc <> 0.
+      ASSERT 1 = 0.
+    ENDIF.
+    <temp40>-sign = `E`.
+
+
+    temp43 = sy-tabix.
+    READ TABLE lo_popup->mt_row INDEX 1 ASSIGNING <temp42>.
+    sy-tabix = temp43.
+    IF sy-subrc <> 0.
+      ASSERT 1 = 0.
+    ENDIF.
+    <temp42>-low  = `Z`.
     run( popup = lo_popup
          event = z2ui5_cl_cgui_range=>cs_event-ok ).
 
-    DATA(ls_result) = lo_popup->result( ).
+
+    ls_result = lo_popup->result( ).
     cl_abap_unit_assert=>assert_true( mo_client->mv_left ).
     cl_abap_unit_assert=>assert_true( ls_result-confirmed ).
-    cl_abap_unit_assert=>assert_equals( act = ls_result-rows[ 1 ]-sign
+
+
+    temp45 = sy-tabix.
+    READ TABLE ls_result-rows INDEX 1 ASSIGNING <temp44>.
+    sy-tabix = temp45.
+    IF sy-subrc <> 0.
+      ASSERT 1 = 0.
+    ENDIF.
+    cl_abap_unit_assert=>assert_equals( act = <temp44>-sign
                                         exp = `E` ).
 
   ENDMETHOD.
 
   METHOD popup_f4_leaves.
 
-    DATA(lo_popup) = z2ui5_cl_cgui_range=>factory( setting = VALUE #( value_help = abap_true ) ).
+    DATA temp46 TYPE z2ui5_cl_cgui_range=>ty_s_setting.
+    DATA lo_popup TYPE REF TO z2ui5_cl_cgui_range.
+    DATA temp47 TYPE string_table.
+    DATA ls_result TYPE z2ui5_cl_cgui_range=>ty_s_result.
+    CLEAR temp46.
+    temp46-value_help = abap_true.
+
+    lo_popup = z2ui5_cl_cgui_range=>factory( setting = temp46 ).
     run( popup = lo_popup
          init  = abap_true ).
+
+    CLEAR temp47.
+    INSERT `1` INTO TABLE temp47.
+    INSERT `low` INTO TABLE temp47.
     run( popup = lo_popup
          event = z2ui5_cl_cgui_range=>cs_event-f4
-         args  = VALUE #( ( `1` ) ( `low` ) ) ).
+         args  = temp47 ).
 
-    DATA(ls_result) = lo_popup->result( ).
+
+    ls_result = lo_popup->result( ).
     cl_abap_unit_assert=>assert_true( mo_client->mv_left ).
     cl_abap_unit_assert=>assert_false( ls_result-confirmed ).
     cl_abap_unit_assert=>assert_true( ls_result-f4 ).
@@ -315,7 +689,8 @@ CLASS ltcl_test IMPLEMENTATION.
 
   METHOD popup_paste.
 
-    DATA(lo_popup) = z2ui5_cl_cgui_range=>factory( ).
+    DATA lo_popup TYPE REF TO z2ui5_cl_cgui_range.
+    lo_popup = z2ui5_cl_cgui_range=>factory( ).
     run( popup = lo_popup
          init  = abap_true ).
     run( popup = lo_popup

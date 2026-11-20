@@ -59,7 +59,17 @@ CLASS ltcl_test IMPLEMENTATION.
 
   METHOD range_include_eq.
 
-    DATA(lt_range) = VALUE ty_t_range_i( ( sign = `I` option = `EQ` low = 5 ) ).
+    DATA temp1 TYPE ty_t_range_i.
+    DATA temp2 LIKE LINE OF temp1.
+    DATA lt_range LIKE temp1.
+    CLEAR temp1.
+
+    temp2-sign = `I`.
+    temp2-option = `EQ`.
+    temp2-low = 5.
+    INSERT temp2 INTO TABLE temp1.
+
+    lt_range = temp1.
 
     cl_abap_unit_assert=>assert_equals( exp = abap_true
                                         act = z2ui5_cl_cgui_context=>range_check( val   = 5
@@ -72,7 +82,18 @@ CLASS ltcl_test IMPLEMENTATION.
 
   METHOD range_include_bt.
 
-    DATA(lt_range) = VALUE ty_t_range_i( ( sign = `I` option = `BT` low = 10 high = 20 ) ).
+    DATA temp3 TYPE ty_t_range_i.
+    DATA temp4 LIKE LINE OF temp3.
+    DATA lt_range LIKE temp3.
+    CLEAR temp3.
+
+    temp4-sign = `I`.
+    temp4-option = `BT`.
+    temp4-low = 10.
+    temp4-high = 20.
+    INSERT temp4 INTO TABLE temp3.
+
+    lt_range = temp3.
 
     cl_abap_unit_assert=>assert_equals( exp = abap_true
                                         act = z2ui5_cl_cgui_context=>range_check( val   = 10
@@ -88,8 +109,24 @@ CLASS ltcl_test IMPLEMENTATION.
 
   METHOD range_exclude.
 
-    DATA(lt_range) = VALUE ty_t_range_i( ( sign = `I` option = `BT` low = 10 high = 20 )
-                                         ( sign = `E` option = `EQ` low = 15 ) ).
+    DATA temp5 TYPE ty_t_range_i.
+    DATA temp6 LIKE LINE OF temp5.
+    DATA lt_range LIKE temp5.
+    CLEAR temp5.
+
+    CLEAR temp6.
+    temp6-sign = `I`.
+    temp6-option = `BT`.
+    temp6-low = 10.
+    temp6-high = 20.
+    INSERT temp6 INTO TABLE temp5.
+    CLEAR temp6.
+    temp6-sign = `E`.
+    temp6-option = `EQ`.
+    temp6-low = 15.
+    INSERT temp6 INTO TABLE temp5.
+
+    lt_range = temp5.
 
     cl_abap_unit_assert=>assert_equals( exp = abap_true
                                         act = z2ui5_cl_cgui_context=>range_check( val   = 14
@@ -102,7 +139,17 @@ CLASS ltcl_test IMPLEMENTATION.
 
   METHOD range_only_exclude.
 
-    DATA(lt_range) = VALUE ty_t_range_i( ( sign = `E` option = `GT` low = 100 ) ).
+    DATA temp7 TYPE ty_t_range_i.
+    DATA temp8 LIKE LINE OF temp7.
+    DATA lt_range LIKE temp7.
+    CLEAR temp7.
+
+    temp8-sign = `E`.
+    temp8-option = `GT`.
+    temp8-low = 100.
+    INSERT temp8 INTO TABLE temp7.
+
+    lt_range = temp7.
 
     cl_abap_unit_assert=>assert_equals( exp = abap_true
                                         act = z2ui5_cl_cgui_context=>range_check( val   = 50
@@ -116,7 +163,17 @@ CLASS ltcl_test IMPLEMENTATION.
   METHOD range_pattern.
 
     TYPES ty_t_range_c TYPE RANGE OF string.
-    DATA(lt_range) = VALUE ty_t_range_c( ( sign = `I` option = `CP` low = `L*` ) ).
+    DATA temp9 TYPE ty_t_range_c.
+    DATA temp10 LIKE LINE OF temp9.
+    DATA lt_range LIKE temp9.
+    CLEAR temp9.
+
+    temp10-sign = `I`.
+    temp10-option = `CP`.
+    temp10-low = `L*`.
+    INSERT temp10 INTO TABLE temp9.
+
+    lt_range = temp9.
 
     cl_abap_unit_assert=>assert_equals( exp = abap_true
                                         act = z2ui5_cl_cgui_context=>range_check( val   = `LH`
@@ -129,9 +186,29 @@ CLASS ltcl_test IMPLEMENTATION.
 
   METHOD range_to_text.
 
-    DATA(lt_range) = VALUE ty_t_range_i( ( sign = `I` option = `EQ` low = 5 )
-                                         ( sign = `I` option = `BT` low = 10 high = 20 )
-                                         ( sign = `E` option = `EQ` low = 15 ) ).
+    DATA temp11 TYPE ty_t_range_i.
+    DATA temp12 LIKE LINE OF temp11.
+    DATA lt_range LIKE temp11.
+    CLEAR temp11.
+
+    CLEAR temp12.
+    temp12-sign = `I`.
+    temp12-option = `EQ`.
+    temp12-low = 5.
+    INSERT temp12 INTO TABLE temp11.
+    CLEAR temp12.
+    temp12-sign = `I`.
+    temp12-option = `BT`.
+    temp12-low = 10.
+    temp12-high = 20.
+    INSERT temp12 INTO TABLE temp11.
+    CLEAR temp12.
+    temp12-sign = `E`.
+    temp12-option = `EQ`.
+    temp12-low = 15.
+    INSERT temp12 INTO TABLE temp11.
+
+    lt_range = temp11.
 
     cl_abap_unit_assert=>assert_equals( exp = `5; 10...20; !15`
                                         act = z2ui5_cl_cgui_context=>range_to_text( lt_range ) ).
@@ -140,11 +217,33 @@ CLASS ltcl_test IMPLEMENTATION.
 
   METHOD range_to_text_more_lines.
 
-    DATA(lt_range) = VALUE ty_t_range_i( ( sign = `I` option = `EQ` low = 1 )
-                                         ( sign = `I` option = `EQ` low = 2 )
-                                         ( sign = `I` option = `EQ` low = 3 )
-                                         ( sign = `I` option = `EQ` low = 4 )
-                                         ( sign = `I` option = `EQ` low = 5 ) ).
+    DATA temp13 TYPE ty_t_range_i.
+    DATA temp14 LIKE LINE OF temp13.
+    DATA lt_range LIKE temp13.
+    CLEAR temp13.
+
+    temp14-sign = `I`.
+    temp14-option = `EQ`.
+    temp14-low = 1.
+    INSERT temp14 INTO TABLE temp13.
+    temp14-sign = `I`.
+    temp14-option = `EQ`.
+    temp14-low = 2.
+    INSERT temp14 INTO TABLE temp13.
+    temp14-sign = `I`.
+    temp14-option = `EQ`.
+    temp14-low = 3.
+    INSERT temp14 INTO TABLE temp13.
+    temp14-sign = `I`.
+    temp14-option = `EQ`.
+    temp14-low = 4.
+    INSERT temp14 INTO TABLE temp13.
+    temp14-sign = `I`.
+    temp14-option = `EQ`.
+    temp14-low = 5.
+    INSERT temp14 INTO TABLE temp13.
+
+    lt_range = temp13.
 
     cl_abap_unit_assert=>assert_equals( exp = `1; 2; 3 (+2)`
                                         act = z2ui5_cl_cgui_context=>range_to_text( lt_range ) ).
@@ -166,10 +265,18 @@ CLASS ltcl_test IMPLEMENTATION.
   METHOD base64_round_trip.
 
     " one, two and three bytes of the last group - the padding of each
-    DATA(lv_x) = CONV xstring( `48656C6C6F2C20E282AC21` ).
+    DATA temp15 TYPE xstring.
+    DATA lv_x LIKE temp15.
+      DATA lv_part TYPE xstring.
+      DATA lv_b64 TYPE string.
+    temp15 = `48656C6C6F2C20E282AC21`.
+
+    lv_x = temp15.
     DO 3 TIMES.
-      DATA(lv_part) = lv_x(sy-index).
-      DATA(lv_b64) = z2ui5_cl_cgui_context=>conv_encode_x_base64( lv_part ).
+
+      lv_part = lv_x(sy-index).
+
+      lv_b64 = z2ui5_cl_cgui_context=>conv_encode_x_base64( lv_part ).
       cl_abap_unit_assert=>assert_equals( exp = lv_part
                                           act = z2ui5_cl_cgui_context=>conv_decode_x_base64( lv_b64 ) ).
     ENDDO.
@@ -202,23 +309,47 @@ CLASS ltcl_test IMPLEMENTATION.
         id   TYPE i,
         name TYPE string,
       END OF ty_s_row.
-    DATA lt_row TYPE STANDARD TABLE OF ty_s_row WITH EMPTY KEY.
+    DATA lt_row TYPE STANDARD TABLE OF ty_s_row WITH DEFAULT KEY.
 
-    DATA(lt_comp) = z2ui5_cl_cgui_context=>rtti_get_t_comp( lt_row ).
+    DATA lt_comp TYPE z2ui5_cl_cgui_context=>ty_t_comp.
+    FIELD-SYMBOLS <temp16> LIKE LINE OF lt_comp.
+    DATA temp17 LIKE sy-tabix.
+    FIELD-SYMBOLS <temp18> LIKE LINE OF lt_comp.
+    DATA temp19 LIKE sy-tabix.
+    lt_comp = z2ui5_cl_cgui_context=>rtti_get_t_comp( lt_row ).
 
     cl_abap_unit_assert=>assert_equals( exp = 2
                                         act = lines( lt_comp ) ).
+
+
+    temp17 = sy-tabix.
+    READ TABLE lt_comp INDEX 1 ASSIGNING <temp16>.
+    sy-tabix = temp17.
+    IF sy-subrc <> 0.
+      ASSERT 1 = 0.
+    ENDIF.
     cl_abap_unit_assert=>assert_equals( exp = `ID`
-                                        act = lt_comp[ 1 ]-name ).
+                                        act = <temp16>-name ).
+
+
+    temp19 = sy-tabix.
+    READ TABLE lt_comp INDEX 2 ASSIGNING <temp18>.
+    sy-tabix = temp19.
+    IF sy-subrc <> 0.
+      ASSERT 1 = 0.
+    ENDIF.
     cl_abap_unit_assert=>assert_equals( exp = `NAME`
-                                        act = lt_comp[ 2 ]-label ).
+                                        act = <temp18>-label ).
 
   ENDMETHOD.
 
   METHOD attri_name_by_ref.
 
-    DATA(lo_app) = NEW ltcl_attri( ).
-    DATA(lv_copy) = lo_app->mv_text.
+    DATA lo_app TYPE REF TO ltcl_attri.
+    DATA lv_copy LIKE lo_app->mv_text.
+    CREATE OBJECT lo_app TYPE ltcl_attri.
+
+    lv_copy = lo_app->mv_text.
 
     cl_abap_unit_assert=>assert_equals( exp = `MV_TEXT`
                                         act = z2ui5_cl_cgui_context=>attri_name_by_ref( app = lo_app
@@ -235,7 +366,8 @@ CLASS ltcl_test IMPLEMENTATION.
 
     DATA lv_flag TYPE xsdboolean.
 
-    DATA(lt_fix) = z2ui5_cl_cgui_context=>rtti_get_fixed_values( cl_abap_typedescr=>describe_by_data( lv_flag ) ).
+    DATA lt_fix TYPE z2ui5_cl_cgui_context=>ty_t_fix_val.
+    lt_fix = z2ui5_cl_cgui_context=>rtti_get_fixed_values( cl_abap_typedescr=>describe_by_data( lv_flag ) ).
 
     cl_abap_unit_assert=>assert_equals( exp = 2
                                         act = lines( lt_fix ) ).
@@ -248,7 +380,8 @@ CLASS ltcl_test IMPLEMENTATION.
 
     DATA lt_range TYPE RANGE OF xsdboolean.
 
-    DATA(lo_descr) = z2ui5_cl_cgui_context=>rtti_get_value_descr( lt_range ).
+    DATA lo_descr TYPE REF TO cl_abap_typedescr.
+    lo_descr = z2ui5_cl_cgui_context=>rtti_get_value_descr( lt_range ).
 
     cl_abap_unit_assert=>assert_equals( exp = cl_abap_typedescr=>kind_elem
                                         act = lo_descr->kind ).

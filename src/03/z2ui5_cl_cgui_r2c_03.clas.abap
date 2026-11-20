@@ -133,8 +133,26 @@ CLASS z2ui5_cl_cgui_r2c_03 IMPLEMENTATION.
       lr_pos  TYPE RANGE OF i.
     DATA lr_big LIKE RANGE OF ls_item-quantity.
 
-    lr_pos = VALUE #( ( sign = 'I' option = 'BT' low = 1 high = 1000 ) ).
-    lr_big = VALUE #( ( sign = 'I' option = 'GE' low = 10 ) ).
+    DATA temp1 LIKE lr_pos.
+    DATA temp2 LIKE LINE OF temp1.
+    DATA temp3 LIKE lr_big.
+    DATA temp4 LIKE LINE OF temp3.
+    CLEAR temp1.
+
+    temp2-sign = 'I'.
+    temp2-option = 'BT'.
+    temp2-low = 1.
+    temp2-high = 1000.
+    INSERT temp2 INTO TABLE temp1.
+    lr_pos = temp1.
+
+    CLEAR temp3.
+
+    temp4-sign = 'I'.
+    temp4-option = 'GE'.
+    temp4-low = 10.
+    INSERT temp4 INTO TABLE temp3.
+    lr_big = temp3.
     cv_net = 0.
     LOOP AT it_items INTO ls_item.
       IF z2ui5_cl_cgui_context=>range_check( val = ls_item-pos range = lr_pos ) = abap_false.

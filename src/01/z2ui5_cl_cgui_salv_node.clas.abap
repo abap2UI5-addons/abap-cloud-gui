@@ -149,15 +149,16 @@ CLASS z2ui5_cl_cgui_salv_node IMPLEMENTATION.
 
   METHOD to_key.
 
-    result = condense( CONV string( key ) ).
+    DATA temp1 TYPE string.
+    temp1 = key.
+    result = condense( temp1 ).
 
   ENDMETHOD.
 
   METHOD node_of.
 
     IF key IS NOT INITIAL.
-      value = NEW #( tree = mo_tree
-                     key  = key ).
+      CREATE OBJECT value EXPORTING tree = mo_tree key = key.
     ENDIF.
 
   ENDMETHOD.
@@ -189,29 +190,61 @@ CLASS z2ui5_cl_cgui_salv_node IMPLEMENTATION.
 
   METHOD get_first_child.
 
-    DATA(lt_child) = mo_tree->get_children( mv_key ).
+    DATA lt_child TYPE z2ui5_cl_cgui_tree=>ty_t_node.
+      FIELD-SYMBOLS <temp2> LIKE LINE OF lt_child.
+      DATA temp3 LIKE sy-tabix.
+    lt_child = mo_tree->get_children( mv_key ).
     IF lt_child IS NOT INITIAL.
-      value = node_of( lt_child[ 1 ]-key ).
+
+
+      temp3 = sy-tabix.
+      READ TABLE lt_child INDEX 1 ASSIGNING <temp2>.
+      sy-tabix = temp3.
+      IF sy-subrc <> 0.
+        ASSERT 1 = 0.
+      ENDIF.
+      value = node_of( <temp2>-key ).
     ENDIF.
 
   ENDMETHOD.
 
   METHOD get_next_sibling.
 
-    DATA(lo_tree) = mo_tree.
-    DATA(lt_sibling) = lo_tree->get_children( lo_tree->get_parent( mv_key ) ).
+    DATA lo_tree LIKE mo_tree.
+    DATA lt_sibling TYPE z2ui5_cl_cgui_tree=>ty_t_node.
+      FIELD-SYMBOLS <temp4> LIKE LINE OF lt_sibling.
+      DATA temp5 LIKE sy-tabix.
+    lo_tree = mo_tree.
+
+    lt_sibling = lo_tree->get_children( lo_tree->get_parent( mv_key ) ).
     READ TABLE lt_sibling TRANSPORTING NO FIELDS WITH KEY key = mv_key.
     IF sy-subrc = 0 AND sy-tabix < lines( lt_sibling ).
-      value = node_of( lt_sibling[ sy-tabix + 1 ]-key ).
+
+
+      temp5 = sy-tabix.
+      READ TABLE lt_sibling INDEX sy-tabix + 1 ASSIGNING <temp4>.
+      sy-tabix = temp5.
+      IF sy-subrc <> 0.
+        ASSERT 1 = 0.
+      ENDIF.
+      value = node_of( <temp4>-key ).
     ENDIF.
 
   ENDMETHOD.
 
   METHOD get_children.
 
-    LOOP AT mo_tree->get_children( mv_key ) INTO DATA(ls_node).
-      INSERT VALUE #( key  = to_key( ls_node-key )
-                      node = node_of( ls_node-key ) ) INTO TABLE value.
+    DATA temp6 TYPE z2ui5_cl_cgui_tree=>ty_t_node.
+    DATA ls_node LIKE LINE OF temp6.
+      DATA temp7 TYPE z2ui5_cl_cgui_salv_node=>ty_s_node_ref.
+    temp6 = mo_tree->get_children( mv_key ).
+
+    LOOP AT temp6 INTO ls_node.
+
+      CLEAR temp7.
+      temp7-key = to_key( ls_node-key ).
+      temp7-node = node_of( ls_node-key ).
+      INSERT temp7 INTO TABLE value.
     ENDLOOP.
 
   ENDMETHOD.

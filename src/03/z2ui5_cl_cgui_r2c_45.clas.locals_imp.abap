@@ -30,9 +30,27 @@ ENDCLASS.
 CLASS lcl_pack IMPLEMENTATION.
   METHOD show.
     DATA lo_column TYPE REF TO z2ui5_cl_cgui_salv_column.
-    gt_item = VALUE #( ( item = '001' name = 'Tent'          weight = 2400 )
-                       ( item = '002' name = 'Sleeping bag'  weight = 1100 )
-                       ( item = '003' name = 'Stove'         weight = 350 ) ).
+    DATA temp1 TYPE z2ui5_cl_cgui_r2c_45=>ty_t_item.
+    DATA temp2 LIKE LINE OF temp1.
+        DATA temp3 TYPE REF TO lcl_pack.
+        DATA temp4 TYPE REF TO lcl_pack.
+        DATA temp5 TYPE REF TO lcl_pack.
+        DATA lx_salv TYPE REF TO z2ui5_cx_cgui_salv.
+    CLEAR temp1.
+
+    temp2-item = '001'.
+    temp2-name = 'Tent'.
+    temp2-weight = 2400.
+    INSERT temp2 INTO TABLE temp1.
+    temp2-item = '002'.
+    temp2-name = 'Sleeping bag'.
+    temp2-weight = 1100.
+    INSERT temp2 INTO TABLE temp1.
+    temp2-item = '003'.
+    temp2-name = 'Stove'.
+    temp2-weight = 350.
+    INSERT temp2 INTO TABLE temp1.
+    gt_item = temp1.
     TRY.
         z2ui5_cl_cgui_salv_table=>factory( IMPORTING r_salv_table = go_salv
                                 CHANGING  t_table      = gt_item ).
@@ -46,17 +64,24 @@ CLASS lcl_pack IMPLEMENTATION.
         lo_column->set_long_text( 'Weight (g)' ).
         lo_column ?= go_salv->get_columns( )->get_column( 'ITEM' ).
         lo_column->set_cell_type( z2ui5_if_cgui_salv_c=>cell_type-hotspot ).
-        go_salv->get_event( )->set_handler( handler = NEW lcl_pack( )
+
+        CREATE OBJECT temp3 TYPE lcl_pack.
+        go_salv->get_event( )->set_handler( handler = temp3
                                             method  = `ON_FUNCTION`
                                             event   = `ADDED_FUNCTION` ).
-        go_salv->get_event( )->set_handler( handler = NEW lcl_pack( )
+
+        CREATE OBJECT temp4 TYPE lcl_pack.
+        go_salv->get_event( )->set_handler( handler = temp4
                                             method  = `ON_DOUBLE_CLICK`
                                             event   = `DOUBLE_CLICK` ).
-        go_salv->get_event( )->set_handler( handler = NEW lcl_pack( )
+
+        CREATE OBJECT temp5 TYPE lcl_pack.
+        go_salv->get_event( )->set_handler( handler = temp5
                                             method  = `ON_LINK`
                                             event   = `LINK_CLICK` ).
         go_salv->display( ).
-      CATCH z2ui5_cx_cgui_salv INTO DATA(lx_salv).
+
+      CATCH z2ui5_cx_cgui_salv INTO lx_salv.
         lcl_r2c=>app->message( text = lx_salv->get_text( )
                  type = `I` ).
     ENDTRY.
@@ -64,21 +89,51 @@ CLASS lcl_pack IMPLEMENTATION.
 
   METHOD on_function.
     DATA lv_total TYPE i.
+        DATA lt_row TYPE z2ui5_cl_cgui_salv_config=>ty_t_row.
+        DATA lv_row LIKE LINE OF lt_row.
+          FIELD-SYMBOLS <temp6> LIKE LINE OF gt_item.
+          DATA temp7 LIKE sy-tabix.
     CASE e_salv_function.
       WHEN 'WEIGH'.
-        DATA(lt_row) = go_salv->get_selections( )->get_selected_rows( ).
-        LOOP AT lt_row INTO DATA(lv_row).
-          lv_total = lv_total + gt_item[ lv_row ]-weight.
+
+        lt_row = go_salv->get_selections( )->get_selected_rows( ).
+
+        LOOP AT lt_row INTO lv_row.
+
+
+          temp7 = sy-tabix.
+          READ TABLE gt_item INDEX lv_row ASSIGNING <temp6>.
+          sy-tabix = temp7.
+          IF sy-subrc <> 0.
+            ASSERT 1 = 0.
+          ENDIF.
+          lv_total = lv_total + <temp6>-weight.
         ENDLOOP.
         lcl_r2c=>app->message( |{ lines( lt_row ) } item(s), { lv_total } g| ).
     ENDCASE.
   ENDMETHOD.
 
   METHOD on_double_click.
-    lcl_r2c=>app->message( |{ gt_item[ row ]-name } in row { row }| ).
+    FIELD-SYMBOLS <temp8> LIKE LINE OF gt_item.
+    DATA temp9 LIKE sy-tabix.
+    temp9 = sy-tabix.
+    READ TABLE gt_item INDEX row ASSIGNING <temp8>.
+    sy-tabix = temp9.
+    IF sy-subrc <> 0.
+      ASSERT 1 = 0.
+    ENDIF.
+    lcl_r2c=>app->message( |{ <temp8>-name } in row { row }| ).
   ENDMETHOD.
 
   METHOD on_link.
-    lcl_r2c=>app->message( |Item { gt_item[ row ]-item } ({ column })| ).
+    FIELD-SYMBOLS <temp10> LIKE LINE OF gt_item.
+    DATA temp11 LIKE sy-tabix.
+    temp11 = sy-tabix.
+    READ TABLE gt_item INDEX row ASSIGNING <temp10>.
+    sy-tabix = temp11.
+    IF sy-subrc <> 0.
+      ASSERT 1 = 0.
+    ENDIF.
+    lcl_r2c=>app->message( |Item { <temp10>-item } ({ column })| ).
   ENDMETHOD.
 ENDCLASS.

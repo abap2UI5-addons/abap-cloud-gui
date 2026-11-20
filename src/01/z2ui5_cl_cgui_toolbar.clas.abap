@@ -123,10 +123,14 @@ ENDCLASS.
 CLASS z2ui5_cl_cgui_toolbar IMPLEMENTATION.
 
   METHOD constructor.
+    DATA temp1 TYPE z2ui5_if_cgui_gui=>ty_s_control.
 
     super->constructor( ).
-    IF add( VALUE #( kind   = z2ui5_if_cgui_gui=>cs_kind-toolbar
-                     parent = id_of( parent ) ) ) = abap_false.
+
+    CLEAR temp1.
+    temp1-kind = z2ui5_if_cgui_gui=>cs_kind-toolbar.
+    temp1-parent = id_of( parent ).
+    IF add( temp1 ) = abap_false.
       RAISE cntl_error.
     ENDIF.
 
@@ -134,26 +138,44 @@ CLASS z2ui5_cl_cgui_toolbar IMPLEMENTATION.
 
   METHOD add_button.
 
-    DATA(ls_control) = get( ).
-    INSERT VALUE #( fcode     = to_upper( condense( fcode ) )
-                    icon      = condense( icon )
-                    text      = text
-                    quickinfo = quickinfo
-                    type      = butn_type
-                    disabled  = flag( is_disabled )
-                    checked   = flag( is_checked ) ) INTO TABLE ls_control-buttons.
+    DATA ls_control TYPE z2ui5_if_cgui_gui=>ty_s_control.
+    DATA temp2 TYPE z2ui5_if_cgui_gui=>ty_s_button.
+    ls_control = get( ).
+
+    CLEAR temp2.
+    temp2-fcode = to_upper( condense( fcode ) ).
+    temp2-icon = condense( icon ).
+    temp2-text = text.
+    temp2-quickinfo = quickinfo.
+    temp2-type = butn_type.
+    temp2-disabled = flag( is_disabled ).
+    temp2-checked = flag( is_checked ).
+    INSERT temp2 INTO TABLE ls_control-buttons.
     put( ls_control ).
 
   ENDMETHOD.
 
   METHOD add_button_group.
 
-    LOOP AT data_table ASSIGNING FIELD-SYMBOL(<row>).
-      DATA(lv_type) = component( row  = <row>
+    FIELD-SYMBOLS <row> TYPE ANY.
+      DATA lv_type TYPE string.
+      DATA temp3 TYPE i.
+      DATA temp1 TYPE i.
+    LOOP AT data_table ASSIGNING <row>.
+
+      lv_type = component( row  = <row>
                                  name = `BUTN_TYPE` ).
+
+      temp3 = condense( lv_type ).
+
+      IF lv_type CO ` 0123456789`.
+        temp1 = temp3.
+      ELSE.
+        CLEAR temp1.
+      ENDIF.
       add_button( fcode       = component( row = <row> name = `FUNCTION` )
                   icon        = component( row = <row> name = `ICON` )
-                  butn_type   = COND #( WHEN lv_type CO ` 0123456789` THEN CONV i( condense( lv_type ) ) )
+                  butn_type   = temp1
                   text        = component( row = <row> name = `TEXT` )
                   quickinfo   = component( row = <row> name = `QUICKINFO` )
                   is_disabled = component( row = <row> name = `DISABLED` )
@@ -164,10 +186,18 @@ CLASS z2ui5_cl_cgui_toolbar IMPLEMENTATION.
 
   METHOD set_button_state.
 
-    DATA(ls_control) = get( ).
-    DATA(lv_fcode) = to_upper( condense( fcode ) ).
-    LOOP AT ls_control-buttons ASSIGNING FIELD-SYMBOL(<button>) WHERE fcode = lv_fcode.
-      <button>-disabled = xsdbool( flag( enabled ) = abap_false ).
+    DATA ls_control TYPE z2ui5_if_cgui_gui=>ty_s_control.
+    DATA lv_fcode TYPE string.
+    FIELD-SYMBOLS <button> LIKE LINE OF ls_control-buttons.
+      DATA temp1 TYPE xsdboolean.
+    ls_control = get( ).
+
+    lv_fcode = to_upper( condense( fcode ) ).
+
+    LOOP AT ls_control-buttons ASSIGNING <button> WHERE fcode = lv_fcode.
+
+      temp1 = boolc( flag( enabled ) = abap_false ).
+      <button>-disabled = temp1.
       <button>-checked = flag( checked ).
     ENDLOOP.
     put( ls_control ).
@@ -176,9 +206,14 @@ CLASS z2ui5_cl_cgui_toolbar IMPLEMENTATION.
 
   METHOD set_button_info.
 
-    DATA(ls_control) = get( ).
-    DATA(lv_fcode) = to_upper( condense( fcode ) ).
-    LOOP AT ls_control-buttons ASSIGNING FIELD-SYMBOL(<button>) WHERE fcode = lv_fcode.
+    DATA ls_control TYPE z2ui5_if_cgui_gui=>ty_s_control.
+    DATA lv_fcode TYPE string.
+    FIELD-SYMBOLS <button> LIKE LINE OF ls_control-buttons.
+    ls_control = get( ).
+
+    lv_fcode = to_upper( condense( fcode ) ).
+
+    LOOP AT ls_control-buttons ASSIGNING <button> WHERE fcode = lv_fcode.
       IF icon IS SUPPLIED.
         <button>-icon = icon.
       ENDIF.
@@ -195,8 +230,11 @@ CLASS z2ui5_cl_cgui_toolbar IMPLEMENTATION.
 
   METHOD delete_button.
 
-    DATA(ls_control) = get( ).
-    DATA(lv_fcode) = to_upper( condense( fcode ) ).
+    DATA ls_control TYPE z2ui5_if_cgui_gui=>ty_s_control.
+    DATA lv_fcode TYPE string.
+    ls_control = get( ).
+
+    lv_fcode = to_upper( condense( fcode ) ).
     DELETE ls_control-buttons WHERE fcode = lv_fcode.
     put( ls_control ).
 
@@ -204,7 +242,8 @@ CLASS z2ui5_cl_cgui_toolbar IMPLEMENTATION.
 
   METHOD delete_all_buttons.
 
-    DATA(ls_control) = get( ).
+    DATA ls_control TYPE z2ui5_if_cgui_gui=>ty_s_control.
+    ls_control = get( ).
     CLEAR ls_control-buttons.
     put( ls_control ).
 
@@ -216,13 +255,27 @@ CLASS z2ui5_cl_cgui_toolbar IMPLEMENTATION.
   METHOD dispatch.
 
     DATA lv_fcode TYPE c LENGTH 70.
+    DATA lv_event TYPE string.
+        DATA temp4 LIKE REF TO lv_fcode.
+DATA temp2 TYPE abap_parmbind_tab.
+DATA temp3 LIKE LINE OF temp2.
 
     lv_fcode = value.
-    DATA(lv_event) = to_upper( event ).
+
+    lv_event = to_upper( event ).
     CASE lv_event.
       WHEN `FUNCTION_SELECTED` OR `DROPDOWN_CLICKED`.
-        raise_event( event  = lv_event
-                     params = VALUE #( ( name = `FCODE` kind = cl_abap_objectdescr=>exporting value = REF #( lv_fcode ) ) ) ).
+
+        GET REFERENCE OF lv_fcode INTO temp4.
+
+CLEAR temp2.
+
+temp3-name = `FCODE`.
+temp3-kind = cl_abap_objectdescr=>exporting.
+temp3-value = temp4.
+INSERT temp3 INTO TABLE temp2.
+raise_event( event  = lv_event
+                     params = temp2 ).
       WHEN OTHERS.
         super->dispatch( event = event
                          value = value ).
@@ -232,9 +285,13 @@ CLASS z2ui5_cl_cgui_toolbar IMPLEMENTATION.
 
   METHOD component.
 
-    ASSIGN COMPONENT name OF STRUCTURE row TO FIELD-SYMBOL(<value>).
+    FIELD-SYMBOLS <value> TYPE any.
+      DATA temp5 TYPE string.
+    ASSIGN COMPONENT name OF STRUCTURE row TO <value>.
     IF sy-subrc = 0.
-      result = condense( CONV string( <value> ) ).
+
+      temp5 = <value>.
+      result = condense( temp5 ).
     ENDIF.
 
   ENDMETHOD.
