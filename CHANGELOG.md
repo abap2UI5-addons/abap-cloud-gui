@@ -46,6 +46,8 @@ release.
   attribute highlighting matched the class of the tag highlighting.
 - The pages workflow builds the site for a pull request that changes the
   corpus of report2UI5, whose reports are the site's examples.
+- The gates run against abap2UI5 1.150.0 (`1.150.0-702` for 7.02), the
+  core pin moved from 1.149.0.
 
 **The value help and table controls in windows too**
 
