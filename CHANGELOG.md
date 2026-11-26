@@ -8,6 +8,11 @@ release.
 
 **Fixes**
 
+- The value help (`z2ui5_cl_cgui_select`) shows a column with a namespace
+  (`/SCWM/...`) again: its cell bound `{/SCWM/...}`, an absolute path read
+  from the model root, and stayed empty. The column name now goes through
+  `z2ui5_cl_ui5_view_builder=>component_path( )`; every other name is
+  unchanged. abaplint is 2.120.120.
 - An obligatory list box (`AS LISTBOX` of the selection screen) no longer
   sets `required` on its `sap.m.Select`: the property exists from UI5 1.74
   on, and the floor is 1.71. The label still marks the field, and the

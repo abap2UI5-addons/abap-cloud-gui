@@ -14,4 +14,10 @@ cp "$root/.github/abaplint/abap_702.jsonc" "$build/abaplint.jsonc"
 cd "$build"
 # --fix exits non-zero while findings remain; the check below decides
 npx abaplint --fix abaplint.jsonc > /dev/null 2>&1 || true
+# what auto_downport publishes: `npm run syfixes` turns the downport's
+# RAISE EXCEPTION TYPE cx_sy_itab_line_not_found into ASSERT 1 = 0. From
+# abaplint 2.120.120 on the check reports that RAISE in a method with classic
+# EXCEPTIONS (the stand-ins of z2ui5_cl_cgui_frontend and _html_viewer) - the
+# published branch never has it, so the gate checks the same code
+find src -type f -name '*.abap' -exec sed -i -e 's/ RAISE EXCEPTION TYPE cx_sy_itab_line_not_found/ ASSERT 1 = 0/g' {} +
 npx abaplint abaplint.jsonc

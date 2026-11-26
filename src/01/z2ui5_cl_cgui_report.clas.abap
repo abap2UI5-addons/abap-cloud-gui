@@ -4098,7 +4098,7 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
         CONTINUE.
       ENDIF.
       ASSIGN lr_val->* TO <field_val>.
-      TRANSLATE <field_val> TO UPPER CASE.
+      <field_val> = to_upper( <field_val> ).
     ENDLOOP.
 
   ENDMETHOD.

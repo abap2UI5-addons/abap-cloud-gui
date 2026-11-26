@@ -678,8 +678,8 @@ CLASS z2ui5_cl_cgui_view IMPLEMENTATION.
     DATA(ls_focus) = ctx-client->get( )-s_focus.
     DATA(lv_id) = 0.
     IF ls_focus-id CP |{ z2ui5_cl_cgui_report=>cv_cgui_textedit_id }*|.
-      lv_id = CONV i( substring( val = ls_focus-id
-                                 off = strlen( z2ui5_cl_cgui_report=>cv_cgui_textedit_id ) ) ).
+      lv_id = substring( val = ls_focus-id
+                         off = strlen( z2ui5_cl_cgui_report=>cv_cgui_textedit_id ) ).
     ENDIF.
     LOOP AT <gui> ASSIGNING FIELD-SYMBOL(<control>)
          WHERE kind = z2ui5_if_cgui_gui=>cs_kind-textedit AND freed = abap_false.

@@ -537,7 +537,7 @@ CLASS z2ui5_cl_cgui_select IMPLEMENTATION.
         )->ele( `cells` ).
     LOOP AT mt_column INTO DATA(ls_column).
       lo_cells->tag( `Text`
-          )->a( n = `text` v = |\{{ ls_column-name }\}| ).
+          )->a( n = `text` v = |\{{ z2ui5_cl_ui5_view_builder=>component_path( ls_column-name ) }\}| ).
     ENDLOOP.
 
     DATA(lo_columns) = lo_dialog->ele( `columns` ).
