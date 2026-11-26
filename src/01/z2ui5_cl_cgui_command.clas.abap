@@ -435,7 +435,10 @@ CLASS z2ui5_cl_cgui_command IMPLEMENTATION.
       CLEAR: lv_name, lv_value.
       SPLIT lv_param AT `=` INTO lv_name lv_value.
       lv_name = to_upper( url_decode( lv_name ) ).
-      IF line_exists( <fields>[ name = lv_name ] ) OR lv_name = z2ui5_cl_cgui_report=>cv_cgui_url_skip OR lv_name = `VARIANT`.
+      " ctx-fields->* rather than <fields>: transpiler 2.14.35 hands the
+      " field symbol itself to the table expression (getRowType is not a
+      " function) - the same table, read through the typed reference
+      IF line_exists( ctx-fields->*[ name = lv_name ] ) OR lv_name = z2ui5_cl_cgui_report=>cv_cgui_url_skip OR lv_name = `VARIANT`.
         CONTINUE.
       ENDIF.
       INSERT lv_param INTO TABLE lt_keep.
