@@ -17,6 +17,11 @@ release.
   sets `required` on its `sap.m.Select`: the property exists from UI5 1.74
   on, and the floor is 1.71. The label still marks the field, and the
   obligatory check of the backend is unchanged.
+- The abap2UI5-linter is 0.12.0 (`@abap2ui5/linter`). Its new warnings on
+  `z2ui5_cl_cgui_report` are waived in `abap2ui5lint.jsonc` with the
+  reason: `nonpublic-data-reference` for the protected copies of the grid's
+  field catalog and layout, `nonserializable-attribute` for
+  `mo_cgui_screen`, which no roundtrip carries.
 - The abap2UI5-linter is 0.11.2 (`@abap2ui5/linter`,
   `@abap2ui5/linter-render`). It fixed the false positives 0.11.0 was
   written around, so the workarounds are gone: two string templates with a
@@ -51,11 +56,12 @@ release.
   attribute highlighting matched the class of the tag highlighting.
 - The pages workflow builds the site for a pull request that changes the
   corpus of report2UI5, whose reports are the site's examples.
-- The gates run against abap2UI5 `main` (`702` for 7.02) - 1.151.0, whose
-  windowed table the addon needs, until its tag is cut; the core pin moved
-  from 1.149.0 over 1.150.0. The lint takes abap2UI5's packages `src/00` to
-  `src/02` only: `src/03` is its installation package (the ICF handler and
-  the BSP), which nothing here uses.
+- The gates run against abap2UI5 1.151.0 (`1.151.0-702` for 7.02), whose
+  windowed table the addon needs - pinned to the tag again now that it is
+  cut; the core pin moved from 1.149.0 over 1.150.0. The lint takes
+  abap2UI5's packages `src/00` to `src/02` only: `src/03` is its
+  installation package (the ICF handler and the BSP), which nothing here
+  uses.
 
 **The value help and table controls in windows too**
 
