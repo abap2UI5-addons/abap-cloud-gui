@@ -61,7 +61,14 @@ test("abaplint ABAP Cloud: every class of the test set src/03 is clean", { timeo
 test("abaplint v702: every generated class downports and checks with the 7.02 syntax", { timeout: 600000 }, (t) => {
   const r = lint({ files, target: "v702", ddic: DDIC });
   repositoryFindings(t, r);
-  assert.equal(r.generated.length, 0, fmt(r.generated));
+  // the downport writes INSERT '<literal>' INTO TABLE for VALUE #( ( '...' ) )
+  // into a table of c LENGTH n - valid ABAP, but abaplint's check_syntax
+  // reports "Types not compatible" (abap2UI5 backlog
+  // abaplint-downport-value-char-literal; the same two classes are noIssues in
+  // .github/abaplint/abap_702.jsonc). Drop this once abaplint accepts it.
+  const known = (i) => /z2ui5_cl_cgui_r2c_(25|40)\./.test(i.file) && /Types not compatible/.test(i.message);
+  const generated = r.generated.filter((i) => !known(i));
+  assert.equal(generated.length, 0, fmt(generated));
 });
 
 test("abap2UI5 linter: no finding in any generated class", { timeout: 300000 }, () => {
