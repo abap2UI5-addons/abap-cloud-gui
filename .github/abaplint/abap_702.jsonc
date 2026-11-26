@@ -5,7 +5,13 @@
   // abap2UI5 publishes. The addon has no other dependency - its popups are
   // classes of its own.
   "global": {
-    "files": ["/src/**/*.*"]
+    "files": ["/src/**/*.*"],
+    // the two generated report2UI5 samples fill a table of c LENGTH 255 with
+    // VALUE #( ( '...' ) ); the downport writes INSERT '...' INTO TABLE, which
+    // is valid ABAP but abaplint's check_syntax reports as "Types not
+    // compatible" (abap2UI5 backlog abaplint-downport-value-char-literal) -
+    // drop this once abaplint accepts it
+    "noIssues": ["/src/03/z2ui5_cl_cgui_r2c_25.clas.abap", "/src/03/z2ui5_cl_cgui_r2c_40.clas.abap"]
   },
   "dependencies": [
     {
