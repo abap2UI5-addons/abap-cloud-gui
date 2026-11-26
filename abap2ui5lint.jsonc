@@ -35,6 +35,23 @@
       "exclude": [
         "z2ui5_cl_cgui_report\\."
       ]
+    },
+    // Linter 0.12.0: mr_cgui_grid_fieldcat / mr_cgui_grid_layout stay
+    // PROTECTED - copies for get_frontend_*( ), not part of the report's
+    // public API; moving them to PUBLIC changes how the draft stores them
+    // and is a change of its own, not part of the linter bump.
+    "nonpublic-data-reference": {
+      "exclude": [
+        "z2ui5_cl_cgui_report\\."
+      ]
+    },
+    // Linter 0.12.0: mo_cgui_screen is set and CLEARed within
+    // at_selection_screen_output( ) - no roundtrip carries it, so the draft
+    // leaving it out loses nothing (the unit test asserts it is not bound).
+    "nonserializable-attribute": {
+      "exclude": [
+        "z2ui5_cl_cgui_report\\."
+      ]
     }
   },
 
