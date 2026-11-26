@@ -223,8 +223,12 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
     "! of the report no box field: a copy with the field ZZSELKZ
     DATA mr_cgui_alv_box TYPE REF TO data.
     " the rows the grid shows when it is filtered or paged - a copy; per row
-    " the row of the table it comes from is mt_cgui_alv_index
+    " the row of the table it comes from is mt_cgui_alv_index. Paged, the
+    " rows loaded so far of mt_cgui_alv_order
     DATA mr_cgui_alv_page TYPE REF TO data.
+    "! the rows the grid shows in all - its length when it is paged, bound
+    "! with mr_cgui_alv_page
+    DATA mv_cgui_alv_total TYPE i.
 
     "! the variants of the report as the browser's local storage holds them
     "! (z2ui5_cl_cgui_variant=>catalog_to_string( )) - bound to the storage
@@ -246,9 +250,13 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
     "! the input fields of the list (WRITE ... INPUT) - every field is bound
     "! to its line
     DATA mt_cgui_list_input TYPE z2ui5_cl_cgui_list=>ty_t_input.
-    "! the lines of the table control of the dynpro (LOOP WITH CONTROL) -
-    "! bound to its inputs
+    "! the lines of the table control of the dynpro (LOOP WITH CONTROL)
     DATA mt_cgui_tc_row TYPE ty_t_cgui_tc_row.
+    "! the lines of the table control the browser holds - the first ones of
+    "! mt_cgui_tc_row, a window at a time; bound to its inputs
+    DATA mt_cgui_tc_view TYPE ty_t_cgui_tc_row.
+    "! the lines of the table control in all - bound with mt_cgui_tc_view
+    DATA mv_cgui_tc_total TYPE i.
     "! the SAP GUI controls of the report (z2ui5_if_cgui_gui) - a text
     "! editor is bound to its line
     DATA mt_cgui_gui TYPE z2ui5_if_cgui_gui=>ty_t_control.
@@ -1149,6 +1157,9 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
     DATA mo_cgui_tree          TYPE REF TO z2ui5_cl_cgui_tree.
     " per row of mr_cgui_alv_page the row of the table it comes from
     DATA mt_cgui_alv_index     TYPE z2ui5_cl_cgui_alv=>ty_t_index.
+    " paged: the rows of the table the grid shows, in its order - its
+    " windows are loaded from it (alv_window_load( ))
+    DATA mt_cgui_alv_order     TYPE z2ui5_cl_cgui_alv=>ty_t_index.
 
     DATA mv_cgui_alv_name      TYPE string.
     DATA mt_cgui_level         TYPE ty_t_cgui_level.
@@ -1871,6 +1882,17 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
       RETURNING
         VALUE(result) TYPE string.
 
+    "! the request of the paged grid (cs_event-rows): the next rows after
+    "! the ones the browser holds, or the first ones of a new sort or filter
+    METHODS alv_window.
+
+    "! rows skip + 1 to skip + top of mt_cgui_alv_order into the copy the
+    "! paged grid shows - the ones before stay
+    METHODS alv_window_load
+      IMPORTING
+        skip TYPE i
+        top  TYPE i.
+
     "! the row of the table behind row of the grid
     METHODS alv_row
       IMPORTING
@@ -2245,7 +2267,7 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
         CREATE DATA mr_cgui_alv LIKE <tab>.
         ASSIGN mr_cgui_alv->* TO <copy>.
         <copy> = <tab>.
-        CLEAR: mr_cgui_alv_box, mr_cgui_alv_page, mt_cgui_alv_index.
+        CLEAR: mr_cgui_alv_box, mr_cgui_alv_page, mt_cgui_alv_index, mt_cgui_alv_order.
       ENDIF.
     ELSEIF tab IS BOUND.
       ASSIGN tab->* TO <tab>.
@@ -2535,6 +2557,8 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
                       html_frame = REF #( mv_cgui_html_frame )
                       tc         = mv_cgui_tc
                       tc_row     = REF #( mt_cgui_tc_row )
+                      tc_view    = REF #( mt_cgui_tc_view )
+                      tc_total   = REF #( mv_cgui_tc_total )
                       screen     = mv_cgui_screen
                       dynpro     = mv_cgui_dynpro
                       in_run     = mv_cgui_in_run ).
@@ -3353,6 +3377,10 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
     alv_page_sync( ).
     alv_single_sync( ).
     alv_edit_sync( ).
+    " the input in the lines of the table control the browser holds
+    IF mv_cgui_tc IS NOT INITIAL.
+      z2ui5_cl_cgui_view=>tablecontrol_sync( gui_ctx( ) ).
+    ENDIF.
     " the ticks of the tree, before the event reads them
     IF mo_cgui_tree IS BOUND.
       mo_cgui_tree->sync( mt_cgui_tree_view ).
@@ -3610,6 +3638,11 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
           on_dynpro_command( `` ).
         ENDIF.
 
+      WHEN z2ui5_cl_cgui_view=>cv_tc_rows.
+        " the table control asks for lines - the screen stays as it is
+        mv_cgui_nav = abap_true.
+        z2ui5_cl_cgui_view=>tablecontrol_rows( gui_ctx( ) ).
+
       WHEN OTHERS.
         result = abap_false.
 
@@ -3644,6 +3677,10 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
         mo_cgui_alv->set_search( client->get_event_arg( ) ).
       WHEN z2ui5_cl_cgui_alv=>cs_event-f4.
         alv_event_f4( ).
+      WHEN z2ui5_cl_cgui_alv=>cs_event-rows.
+        " the grid asks for rows - the screen stays as it is
+        mv_cgui_nav = abap_true.
+        alv_window( ).
       WHEN z2ui5_cl_cgui_alv=>cs_event-details.
         alv_event_details( lr_full ).
       WHEN z2ui5_cl_cgui_alv=>cs_event-layout.
@@ -3800,7 +3837,7 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
                     w_cols   = mv_cgui_window_cols
                     w_lines  = mv_cgui_window_lines ) INTO TABLE mt_cgui_level.
     CLEAR: mo_cgui_list, mo_cgui_alv, mv_cgui_alv_name, mr_cgui_alv, mr_cgui_alv_box,
-           mr_cgui_alv_page, mt_cgui_alv_index, mo_cgui_tree, mt_cgui_tree_view,
+           mr_cgui_alv_page, mt_cgui_alv_index, mt_cgui_alv_order, mo_cgui_tree, mt_cgui_tree_view,
            mv_cgui_window, mv_cgui_window_title, mv_cgui_window_cols, mv_cgui_window_lines.
 
   ENDMETHOD.
@@ -3823,7 +3860,7 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
     mv_cgui_window_title = ls_level-w_title.
     mv_cgui_window_cols  = ls_level-w_cols.
     mv_cgui_window_lines = ls_level-w_lines.
-    CLEAR: mr_cgui_alv_box, mr_cgui_alv_page, mt_cgui_alv_index.
+    CLEAR: mr_cgui_alv_box, mr_cgui_alv_page, mt_cgui_alv_index, mt_cgui_alv_order.
 
   ENDMETHOD.
 
@@ -4061,7 +4098,7 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
         CONTINUE.
       ENDIF.
       ASSIGN lr_val->* TO <field_val>.
-      TRANSLATE <field_val> TO UPPER CASE.
+      <field_val> = to_upper( <field_val> ).
     ENDLOOP.
 
   ENDMETHOD.
@@ -5179,7 +5216,7 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
     z2ui5_cl_cgui_memory=>history_store( memory_ctx( ) ).
 
     CLEAR: mo_cgui_list, mo_cgui_alv, mr_cgui_alv, mr_cgui_alv_box, mv_cgui_alv_name, mt_cgui_level,
-           mr_cgui_alv_page, mt_cgui_alv_index, mo_cgui_tree, mt_cgui_tree_view,
+           mr_cgui_alv_page, mt_cgui_alv_index, mt_cgui_alv_order, mo_cgui_tree, mt_cgui_tree_view,
            mv_cgui_window, mv_cgui_window_title, mv_cgui_window_cols, mv_cgui_window_lines,
            mt_cgui_grid, mv_cgui_grid, mr_cgui_grid_fieldcat, mr_cgui_grid_layout.
     mv_cgui_left = abap_false.
@@ -5993,7 +6030,7 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
 
     FIELD-SYMBOLS <tab> TYPE STANDARD TABLE.
 
-    CLEAR: mr_cgui_alv, mr_cgui_alv_box, mr_cgui_alv_page, mt_cgui_alv_index.
+    CLEAR: mr_cgui_alv, mr_cgui_alv_box, mr_cgui_alv_page, mt_cgui_alv_index, mt_cgui_alv_order.
     mv_cgui_alv_name = z2ui5_cl_cgui_context=>attri_name_by_ref( app = me
                                                                  val = tab ).
     IF mv_cgui_alv_name IS INITIAL.
@@ -6929,39 +6966,79 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
 
   METHOD alv_row.
 
-    FIELD-SYMBOLS <bound> TYPE STANDARD TABLE.
-    DATA lv_bound_row TYPE i.
-
     result = row.
     IF row <= 0 OR mo_cgui_alv IS NOT BOUND.
       RETURN.
     ENDIF.
 
-    " a large table (set_paging) is bound with window_bind_tab( ): the browser
-    " shows it in the order the server sorted and filtered it, so row is a
-    " position in that order - the bound table's row is what the framework
-    " answers
-    lv_bound_row = row.
-    IF mo_cgui_alv->get_page_size( ) > 0.
-      DATA(lr_bound) = COND #( WHEN mr_cgui_alv_page IS BOUND THEN mr_cgui_alv_page ELSE alv_shown( ) ).
-      IF lr_bound IS BOUND AND client IS BOUND.
-        ASSIGN lr_bound->* TO <bound>.
-        lv_bound_row = client->window_get_row( val = <bound>
-                                              row = row ).
-        IF lv_bound_row = 0.
-          lv_bound_row = row.
-        ENDIF.
-      ENDIF.
-    ENDIF.
-    result = lv_bound_row.
-
-    " filtered: the bound table is the copy, its rows lead back to the table
+    " filtered or paged: the bound table is the copy, the browser shows its
+    " rows as they are - a row of it leads back to the table
     IF mr_cgui_alv_page IS BOUND.
-      READ TABLE mt_cgui_alv_index INTO result INDEX lv_bound_row.
+      READ TABLE mt_cgui_alv_index INTO result INDEX row.
       IF sy-subrc <> 0.
-        result = lv_bound_row.
+        result = row.
       ENDIF.
     ENDIF.
+
+  ENDMETHOD.
+
+  METHOD alv_window.
+
+    FIELD-SYMBOLS <request> TYPE z2ui5_if_client=>ty_s_window_request.
+    FIELD-SYMBOLS <tab>     TYPE STANDARD TABLE.
+    FIELD-SYMBOLS <page>    TYPE STANDARD TABLE.
+
+    DATA(lr_request) = client->get( )-r_event_data.
+    DATA(lr_tab) = alv_shown( ).
+    IF lr_request IS NOT BOUND OR lr_tab IS NOT BOUND OR mr_cgui_alv_page IS NOT BOUND.
+      RETURN.
+    ENDIF.
+    ASSIGN lr_request->* TO <request>.
+    ASSIGN mr_cgui_alv_page->* TO <page>.
+
+    " more rows: the next ones of the order there is - the input in the rows
+    " the browser holds went back into the table before (alv_page_sync( ))
+    IF <request>-reason = z2ui5_if_client=>cs_window_reason-more.
+      alv_window_load( skip = lines( <page> )
+                       top  = <request>-top ).
+      RETURN.
+    ENDIF.
+
+    " a sort or a filter of a column menu: the order anew, over all rows,
+    " and its first rows
+    ASSIGN lr_tab->* TO <tab>.
+    mo_cgui_alv->window_request( <request> ).
+    mt_cgui_alv_order = mo_cgui_alv->window_order( <tab> ).
+    alv_window_load( skip = 0
+                     top  = <request>-top ).
+
+  ENDMETHOD.
+
+  METHOD alv_window_load.
+
+    FIELD-SYMBOLS <tab>  TYPE STANDARD TABLE.
+    FIELD-SYMBOLS <page> TYPE STANDARD TABLE.
+
+    DATA(lr_tab) = alv_shown( ).
+    IF lr_tab IS NOT BOUND OR mr_cgui_alv_page IS NOT BOUND.
+      RETURN.
+    ENDIF.
+    ASSIGN lr_tab->* TO <tab>.
+    ASSIGN mr_cgui_alv_page->* TO <page>.
+    IF skip = 0.
+      CLEAR: <page>, mt_cgui_alv_index.
+    ENDIF.
+    LOOP AT mt_cgui_alv_order INTO DATA(lv_row) FROM lines( <page> ) + 1.
+      IF lines( <page> ) >= skip + top.
+        EXIT.
+      ENDIF.
+      READ TABLE <tab> ASSIGNING FIELD-SYMBOL(<row>) INDEX lv_row.
+      IF sy-subrc = 0.
+        INSERT <row> INTO TABLE <page>.
+        INSERT lv_row INTO TABLE mt_cgui_alv_index.
+      ENDIF.
+    ENDLOOP.
+    mv_cgui_alv_total = lines( mt_cgui_alv_order ).
 
   ENDMETHOD.
 
@@ -7586,12 +7663,26 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
         ENDIF.
         " filtered: the browser gets a copy of the rows the filter lets
         " through, mt_cgui_alv_index leads back to the rows of the table.
-        " A large table is not cut into pages here - the grid binds it with
-        " window_bind_tab( ), and the browser gets a window of it (set_paging)
+        " Paged (set_paging): the copy holds the first rows of the order the
+        " grid shows, the grid binds it with window_bind_tab( ) and asks for
+        " the next ones (alv_window( ))
         DATA(lv_all) = lines( <tab> ).
+        CLEAR: mr_cgui_alv_page, mt_cgui_alv_index, mt_cgui_alv_order.
+        IF mo_cgui_alv->get_page_size( ) > 0.
+          mt_cgui_alv_order = mo_cgui_alv->window_order( <tab> ).
+          CREATE DATA mr_cgui_alv_page LIKE <tab>.
+          alv_window_load( skip = 0
+                           top  = mo_cgui_alv->get_page_size( ) ).
+          ASSIGN mr_cgui_alv_page->* TO <tab>.
+          mo_cgui_alv->render( node   = node
+                               client = client
+                               tab    = <tab>
+                               total  = mv_cgui_alv_total
+                               all    = lv_all ).
+          RETURN.
+        ENDIF.
         DATA(lt_index) = mo_cgui_alv->filter_index( <tab> ).
         DATA(lv_total) = lines( lt_index ).
-        CLEAR: mr_cgui_alv_page, mt_cgui_alv_index.
         IF mo_cgui_alv->is_filtered( ) = abap_true.
           CREATE DATA mr_cgui_alv_page LIKE <tab>.
           ASSIGN mr_cgui_alv_page->* TO <page>.

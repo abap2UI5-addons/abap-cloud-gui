@@ -468,7 +468,7 @@ test("zr2c_51_tabstrip: a tabstrip on a dynpro - the tabs, the subscreen of the 
 });
 
 test("zr2c_52_tablecontrol: a table control on a dynpro - the PBO loop fills its lines, the PAI loop writes back what the user typed", { skip }, async () => {
-  const rows = () => d.state().models.MAIN.data.MT_CGUI_TC_ROW;
+  const rows = () => d.state().models.MAIN.data.MT_CGUI_TC_VIEW;
   const xml = () => d.state().slots.MAIN.xml;
   let s = await d.start("z2ui5_cl_cgui_r2c_52");
   // the lines of the PBO loop, a column ready for input
@@ -477,7 +477,7 @@ test("zr2c_52_tablecontrol: a table control on a dynpro - the PBO loop fills its
   assert.match(xml(), /text="Seats per connection"/);
 
   // the seats of the second line changed: Enter runs the PAI loop, MODIFY at current_line
-  s = await d.act(s.session, { values: { "/MT_CGUI_TC_ROW/1/C02": "25" }, event: "CGUI_ENTER" });
+  s = await d.act(s.session, { values: { "/MT_CGUI_TC_VIEW/1/C02": "25" }, event: "CGUI_ENTER" });
   assert.deepEqual(rows().map((r) => `${r.C01} ${r.C02}`), ["0400 10", "0402 25", "2402 30"]);
 
   // Back: what followed CALL SCREEN lists the table as the PAI left it

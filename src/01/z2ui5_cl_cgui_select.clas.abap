@@ -3,7 +3,8 @@
 "! its own. The columns come from the line type of the table (RTTI), their
 "! headers from the DDIC labels, dates and times are shown in the user's
 "! format; the search filters on the server across all columns and keeps
-"! the rows already picked. A column ZZSELKZ of the table preselects its
+"! the rows already picked. The dialog holds a window of the hits
+"! (window_bind_tab( )): 100 rows, and the next ones as it grows. A column ZZSELKZ of the table preselects its
 "! rows and is not shown:
 "!   client->nav_app_call( z2ui5_cl_cgui_select=>factory( tab         = lt_carrier
 "!                                                        title       = `Airline`
@@ -24,7 +25,12 @@ CLASS z2ui5_cl_cgui_select DEFINITION PUBLIC FINAL CREATE PRIVATE.
         confirm TYPE string VALUE `CGUI_SEL_CONFIRM`,
         cancel  TYPE string VALUE `CGUI_SEL_CANCEL`,
         search  TYPE string VALUE `CGUI_SEL_SEARCH`,
+        "! the dialog asks for more rows (window_bind_tab( ))
+        rows    TYPE string VALUE `CGUI_SEL_ROWS`,
       END OF cs_event.
+
+    "! the rows the dialog asks for at a time
+    CONSTANTS cv_window TYPE i VALUE 100.
 
     "! the column that marks a row as picked - in the table passed it
     "! preselects
@@ -47,8 +53,12 @@ CLASS z2ui5_cl_cgui_select DEFINITION PUBLIC FINAL CREATE PRIVATE.
     TYPES ty_t_column TYPE STANDARD TABLE OF ty_s_column WITH EMPTY KEY.
 
     "! the rows shown - a text column per column of the table, ZZSELKZ and
-    "! ZZROW. PUBLIC, the dialog is bound to it
+    "! ZZROW: the hits loaded so far, in their order. PUBLIC, the dialog is
+    "! bound to it
     DATA mr_view TYPE REF TO data.
+    "! the hits in all - the length the dialog shows. PUBLIC, bound with the
+    "! rows
+    DATA mv_total TYPE i.
 
     " public for the draft of abap2UI5: it keeps a data reference between two
     " roundtrips only when it is a public attribute (its S-RTTI payload) -
@@ -96,10 +106,22 @@ CLASS z2ui5_cl_cgui_select DEFINITION PUBLIC FINAL CREATE PRIVATE.
     DATA mv_event_cancel TYPE string.
     DATA mv_table_line   TYPE abap_bool.
     DATA mt_column       TYPE ty_t_column.
+    " the hits of the search - per hit its row of mr_all, in their order
+    DATA mt_hit          TYPE STANDARD TABLE OF i WITH EMPTY KEY.
 
   PRIVATE SECTION.
 
     METHODS rows_build.
+
+    "! hits skip + 1 to skip + top into the rows shown - the ones before
+    "! stay, as the dialog holds them
+    METHODS rows_load
+      IMPORTING
+        skip TYPE i
+        top  TYPE i.
+
+    "! the request of the dialog: more rows, or the first ones again
+    METHODS on_rows.
 
     "! the marks of the rows shown into all rows - before a search
     "! replaces the rows shown and before the pick is read
@@ -175,7 +197,6 @@ CLASS z2ui5_cl_cgui_select IMPLEMENTATION.
     DATA lv_index TYPE i.
     FIELD-SYMBOLS <source> TYPE STANDARD TABLE.
     FIELD-SYMBOLS <all>    TYPE STANDARD TABLE.
-    FIELD-SYMBOLS <view>   TYPE STANDARD TABLE.
     FIELD-SYMBOLS <src>    TYPE any.
     FIELD-SYMBOLS <row>    TYPE any.
     FIELD-SYMBOLS <value>  TYPE any.
@@ -229,10 +250,59 @@ CLASS z2ui5_cl_cgui_select IMPLEMENTATION.
       <mark> = lv_index.
 
       INSERT <row> INTO TABLE <all>.
+      INSERT lv_index INTO TABLE mt_hit.
     ENDLOOP.
 
+    rows_load( skip = 0
+               top  = cv_window ).
+
+  ENDMETHOD.
+
+  METHOD rows_load.
+
+    FIELD-SYMBOLS <view> TYPE STANDARD TABLE.
+    FIELD-SYMBOLS <all>  TYPE STANDARD TABLE.
+
     ASSIGN mr_view->* TO <view>.
-    <view> = <all>.
+    ASSIGN mr_all->* TO <all>.
+    IF skip = 0.
+      CLEAR <view>.
+    ENDIF.
+    LOOP AT mt_hit INTO DATA(lv_hit) FROM lines( <view> ) + 1.
+      IF lines( <view> ) >= skip + top.
+        EXIT.
+      ENDIF.
+      READ TABLE <all> ASSIGNING FIELD-SYMBOL(<row>) INDEX lv_hit.
+      IF sy-subrc = 0.
+        INSERT <row> INTO TABLE <view>.
+      ENDIF.
+    ENDLOOP.
+    mv_total = lines( mt_hit ).
+
+  ENDMETHOD.
+
+  METHOD on_rows.
+
+    FIELD-SYMBOLS <request> TYPE z2ui5_if_client=>ty_s_window_request.
+    FIELD-SYMBOLS <view>    TYPE STANDARD TABLE.
+
+    DATA(lr_request) = client->get( )-r_event_data.
+    IF lr_request IS NOT BOUND.
+      RETURN.
+    ENDIF.
+    ASSIGN lr_request->* TO <request>.
+    ASSIGN mr_view->* TO <view>.
+    " the marks of the rows the dialog held, before others replace them -
+    " the dialog sorts and filters nothing of its own, a SORT or a FILTER
+    " loads the first rows again
+    marks_keep( ).
+    IF <request>-reason = z2ui5_if_client=>cs_window_reason-more.
+      rows_load( skip = lines( <view> )
+                 top  = <request>-top ).
+    ELSE.
+      rows_load( skip = 0
+                 top  = <request>-top ).
+    ENDIF.
 
   ENDMETHOD.
 
@@ -255,17 +325,22 @@ CLASS z2ui5_cl_cgui_select IMPLEMENTATION.
     FIELD-SYMBOLS <tab>  TYPE STANDARD TABLE.
     FIELD-SYMBOLS <row>  TYPE any.
     FIELD-SYMBOLS <comp> TYPE any.
+    DATA lt_tab TYPE STANDARD TABLE OF REF TO data WITH EMPTY KEY.
 
-    ASSIGN mr_view->* TO <tab>.
-    LOOP AT <tab> ASSIGNING <row>.
-      ASSIGN COMPONENT cv_row OF STRUCTURE <row> TO <comp>.
-      IF <comp> = index.
-        ASSIGN COMPONENT cv_selkz OF STRUCTURE <row> TO <comp>.
-        <comp> = abap_true.
-      ELSEIF mv_multi = abap_false.
-        ASSIGN COMPONENT cv_selkz OF STRUCTURE <row> TO <comp>.
-        <comp> = abap_false.
-      ENDIF.
+    " the rows shown and all rows - a row need not be loaded to be picked
+    lt_tab = VALUE #( ( mr_view ) ( mr_all ) ).
+    LOOP AT lt_tab INTO DATA(lr_tab).
+      ASSIGN lr_tab->* TO <tab>.
+      LOOP AT <tab> ASSIGNING <row>.
+        ASSIGN COMPONENT cv_row OF STRUCTURE <row> TO <comp>.
+        IF <comp> = index.
+          ASSIGN COMPONENT cv_selkz OF STRUCTURE <row> TO <comp>.
+          <comp> = abap_true.
+        ELSEIF mv_multi = abap_false.
+          ASSIGN COMPONENT cv_selkz OF STRUCTURE <row> TO <comp>.
+          <comp> = abap_false.
+        ENDIF.
+      ENDLOOP.
     ENDLOOP.
 
   ENDMETHOD.
@@ -282,6 +357,8 @@ CLASS z2ui5_cl_cgui_select IMPLEMENTATION.
     CASE client->get_event( ).
       WHEN cs_event-search.
         on_search( client->get_event_arg( ) ).
+      WHEN cs_event-rows.
+        on_rows( ).
       WHEN cs_event-confirm.
         on_confirm( client->get_event_arg( ) ).
       WHEN cs_event-cancel.
@@ -317,32 +394,29 @@ CLASS z2ui5_cl_cgui_select IMPLEMENTATION.
 
   METHOD on_search.
 
-    FIELD-SYMBOLS <view> TYPE STANDARD TABLE.
     FIELD-SYMBOLS <all>  TYPE STANDARD TABLE.
     FIELD-SYMBOLS <row>  TYPE any.
     FIELD-SYMBOLS <text> TYPE any.
 
     marks_keep( ).
-    ASSIGN mr_view->* TO <view>.
     ASSIGN mr_all->* TO <all>.
 
+    " the hits anew and their first window - the response sends both
+    CLEAR mt_hit.
     DATA(lv_search) = condense( val ).
-    IF lv_search IS INITIAL.
-      <view> = <all>.
-      RETURN.
-    ENDIF.
-
     " CS ignores the case
-    CLEAR <view>.
     LOOP AT <all> ASSIGNING <row>.
+      DATA(lv_index) = sy-tabix.
       LOOP AT mt_column INTO DATA(ls_column).
         ASSIGN COMPONENT ls_column-name OF STRUCTURE <row> TO <text>.
-        IF <text> CS lv_search.
-          INSERT <row> INTO TABLE <view>.
+        IF lv_search IS INITIAL OR <text> CS lv_search.
+          INSERT lv_index INTO TABLE mt_hit.
           EXIT.
         ENDIF.
       ENDLOOP.
     ENDLOOP.
+    rows_load( skip = 0
+               top  = cv_window ).
 
   ENDMETHOD.
 
@@ -373,9 +447,8 @@ CLASS z2ui5_cl_cgui_select IMPLEMENTATION.
                                sep   = `/`
                                index = -1 ).
       IF lv_last CO `0123456789`.
-        " the position in the window's order - the row of the view behind it
-        lv_index = client->window_get_row( val = <view>
-                                          row = lv_last + 1 ).
+        " the rows shown are what the dialog shows - the position is the row
+        lv_index = lv_last + 1.
         READ TABLE <view> ASSIGNING <row> INDEX lv_index.
         IF sy-subrc = 0.
           ASSIGN COMPONENT cv_row OF STRUCTURE <row> TO <comp>.
@@ -441,10 +514,12 @@ CLASS z2ui5_cl_cgui_select IMPLEMENTATION.
         )->ele( `TableSelectDialog`
         )->a( n = `title`            t = mv_title
         " a hit list can be long: the browser gets 100 rows at a time and the
-        " next ones as the dialog grows (window_bind_tab( )); the search filters the
-        " view table on the server and the response sends its first window
+        " next ones as the dialog grows (window_bind_tab( ), the event rows); the
+        " search filters on the server and the response sends its first window
         )->a( n = `items`            v = client->window_bind_tab( val    = <view>
-                                                            window = 100 )
+                                                                  total  = mv_total
+                                                                  event  = cs_event-rows
+                                                                  window = cv_window )
         )->a( n = `multiSelect`      b = mv_multi
         )->a( n = `growing`          b = abap_true
         )->a( n = `contentWidth`     v = COND #( WHEN lines( mt_column ) > 3 THEN `60rem` ELSE `40rem` )
@@ -462,7 +537,7 @@ CLASS z2ui5_cl_cgui_select IMPLEMENTATION.
         )->ele( `cells` ).
     LOOP AT mt_column INTO DATA(ls_column).
       lo_cells->tag( `Text`
-          )->a( n = `text` v = |\{{ ls_column-name }\}| ).
+          )->a( n = `text` v = |\{{ z2ui5_cl_ui5_view_builder=>component_path( ls_column-name ) }\}| ).
     ENDLOOP.
 
     DATA(lo_columns) = lo_dialog->ele( `columns` ).

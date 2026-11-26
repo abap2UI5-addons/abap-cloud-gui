@@ -10,6 +10,8 @@ CLASS ltcl_client DEFINITION FINAL FOR TESTING.
     DATA mv_popup TYPE string.
     DATA mv_left  TYPE abap_bool.
     DATA mv_leave_event TYPE string.
+    " the request of a window event (get( )-r_event_data)
+    DATA mr_event_data TYPE REF TO data.
 
 ENDCLASS.
 
@@ -55,10 +57,10 @@ CLASS ltcl_client IMPLEMENTATION.
 
   ENDMETHOD.
 
-  " the double keeps the rows in the order of the table
-  METHOD z2ui5_if_client~window_get_row.
+  METHOD z2ui5_if_client~get.
 
-    result = row.
+    result-event = mv_event.
+    result-r_event_data = mr_event_data.
 
   ENDMETHOD.
 
@@ -122,6 +124,7 @@ CLASS ltcl_test DEFINITION FINAL FOR TESTING
     METHODS preselected_rows FOR TESTING.
     METHODS table_of_strings FOR TESTING.
     METHODS cancel_leaves FOR TESTING.
+    METHODS window_more_rows FOR TESTING.
 
 ENDCLASS.
 
@@ -286,6 +289,49 @@ CLASS ltcl_test IMPLEMENTATION.
     cl_abap_unit_assert=>assert_true( mo_client->mv_left ).
     cl_abap_unit_assert=>assert_equals( act = mo_client->mv_leave_event
                                         exp = `CANCELLED` ).
+
+  ENDMETHOD.
+
+  METHOD window_more_rows.
+
+    FIELD-SYMBOLS <view> TYPE STANDARD TABLE.
+    FIELD-SYMBOLS <row>  TYPE string.
+    DATA lt_value   TYPE string_table.
+    DATA ls_request TYPE z2ui5_if_client=>ty_s_window_request.
+
+    DO z2ui5_cl_cgui_select=>cv_window + 50 TIMES.
+      INSERT |V{ sy-index }| INTO TABLE lt_value.
+    ENDDO.
+    DATA(lo_popup) = z2ui5_cl_cgui_select=>factory( lt_value ).
+    run( popup = lo_popup
+         init  = abap_true ).
+
+    " the first window, and the length of the whole list
+    ASSIGN lo_popup->mr_view->* TO <view>.
+    cl_abap_unit_assert=>assert_equals( act = lines( <view> )
+                                        exp = z2ui5_cl_cgui_select=>cv_window ).
+    cl_abap_unit_assert=>assert_equals( act = lo_popup->mv_total
+                                        exp = z2ui5_cl_cgui_select=>cv_window + 50 ).
+
+    " the dialog grows: the next rows are appended to the ones it holds
+    ls_request = VALUE #( path   = `/MR_VIEW/*`
+                          reason = z2ui5_if_client=>cs_window_reason-more
+                          skip   = z2ui5_cl_cgui_select=>cv_window
+                          top    = z2ui5_cl_cgui_select=>cv_window ).
+    mo_client->mr_event_data = REF #( ls_request ).
+    run( popup = lo_popup
+         event = z2ui5_cl_cgui_select=>cs_event-rows ).
+    cl_abap_unit_assert=>assert_equals( act = lines( <view> )
+                                        exp = z2ui5_cl_cgui_select=>cv_window + 50 ).
+
+    " a row of the second window is the row the dialog shows
+    run( popup = lo_popup
+         event = z2ui5_cl_cgui_select=>cs_event-confirm
+         args  = VALUE #( ( |/MR_VIEW/*/{ z2ui5_cl_cgui_select=>cv_window + 9 }| ) ) ).
+    DATA(ls_result) = lo_popup->result( ).
+    ASSIGN ls_result-row->* TO <row>.
+    cl_abap_unit_assert=>assert_equals( act = <row>
+                                        exp = |V{ z2ui5_cl_cgui_select=>cv_window + 10 }| ).
 
   ENDMETHOD.
 
