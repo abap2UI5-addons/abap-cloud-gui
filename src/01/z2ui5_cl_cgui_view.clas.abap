@@ -706,17 +706,25 @@ CLASS z2ui5_cl_cgui_view IMPLEMENTATION.
     DATA lo_builder TYPE REF TO z2ui5_cl_ui5_view_builder.
 
     IF ctx-html_frame->* IS INITIAL.
-      " the mirror class is named like the view builder of the same release,
-      " z2ui5_cl_ui5f_htmlfrm_js - its name is derived from the builder's, so
-      " it follows the namespace rename (a literal would not)
+      " the HTMLFrame control ships in z2ui5_cl_ui5f_cc (from 1.151.0 on) or,
+      " before that, in z2ui5_cl_ui5f_htmlfrm_js - both names are derived from
+      " the builder's, so they follow the namespace rename (a literal would not)
       DATA(lv_builder) = CAST cl_abap_refdescr( cl_abap_typedescr=>describe_by_data( lo_builder )
                                                 )->get_referenced_type( )->get_relative_name( ).
-      cl_abap_typedescr=>describe_by_name( EXPORTING  p_name         = replace( val  = lv_builder
-                                                                                 sub  = `CL_UI5_VIEW_BUILDER`
-                                                                                 with = `CL_UI5F_HTMLFRM_JS` )
-                                           EXCEPTIONS type_not_found = 1
-                                                      OTHERS         = 2 ).
-      ctx-html_frame->* = COND #( WHEN sy-subrc = 0 THEN abap_true ELSE `-` ).
+      DATA(lt_class) = VALUE string_table( ( `CL_UI5F_CC` ) ( `CL_UI5F_HTMLFRM_JS` ) ).
+      DATA(lv_found) = abap_false.
+      LOOP AT lt_class INTO DATA(lv_class).
+        cl_abap_typedescr=>describe_by_name( EXPORTING  p_name         = replace( val  = lv_builder
+                                                                                   sub  = `CL_UI5_VIEW_BUILDER`
+                                                                                   with = lv_class )
+                                             EXCEPTIONS type_not_found = 1
+                                                        OTHERS         = 2 ).
+        IF sy-subrc = 0.
+          lv_found = abap_true.
+          EXIT.
+        ENDIF.
+      ENDLOOP.
+      ctx-html_frame->* = COND #( WHEN lv_found = abap_true THEN abap_true ELSE `-` ).
     ENDIF.
     result = xsdbool( ctx-html_frame->* = abap_true ).
 
