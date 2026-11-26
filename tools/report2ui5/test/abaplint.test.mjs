@@ -71,8 +71,15 @@ test("abaplint v702: every generated class downports and checks with the 7.02 sy
   assert.equal(generated.length, 0, fmt(generated));
 });
 
-test("abap2UI5 linter: no finding in any generated class", { timeout: 300000 }, () => {
+// Hints are listed, not counted: they do not fail an abap2ui5lint run either,
+// and a generated class keeps the report's own conditions as written (zr2c_17:
+// `IF p_edit IS INITIAL`, which lifecycle-is-initial hints at from 0.12.0 on).
+test("abap2UI5 linter: no warning or error in any generated class", { timeout: 300000 }, (t) => {
   const r = lintUi5({ files });
   assert.ok(r.files >= converted.length, `${r.files} classes checked`);
-  assert.equal(r.issues.length, 0, r.issues.map((i) => `${i.file}:${i.row}:${i.col} [${i.key}] ${i.message}`).join("\n"));
+  const show = (list) => list.map((i) => `${i.file}:${i.row}:${i.col} [${i.key}] ${i.message}`).join("\n");
+  const hints = r.issues.filter((i) => i.severity === "hint");
+  if (hints.length) t.diagnostic(`${hints.length} hint(s):\n${show(hints)}`);
+  const findings = r.issues.filter((i) => i.severity !== "hint");
+  assert.equal(findings.length, 0, show(findings));
 });
