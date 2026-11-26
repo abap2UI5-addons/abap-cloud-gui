@@ -39,8 +39,9 @@ CLASS ltcl_client DEFINITION FINAL FOR TESTING.
     DATA mt_action TYPE string_table.
     DATA mv_popup  TYPE string.
     " what the last window_bind_tab( ) was asked for
-    DATA mv_window TYPE i.
-    DATA mt_window_sort TYPE z2ui5_if_client=>ty_t_bind_tab_sort.
+    DATA mv_window       TYPE i.
+    DATA mv_window_total TYPE i.
+    DATA mv_window_event TYPE string.
 
 ENDCLASS.
 
@@ -75,6 +76,7 @@ CLASS ltcl_test DEFINITION FINAL FOR TESTING
     METHODS xlsx_export FOR TESTING.
     METHODS text_for_printing FOR TESTING.
     METHODS paging FOR TESTING.
+    METHODS window_order FOR TESTING.
     METHODS filter_rows FOR TESTING.
     METHODS colors_and_header FOR TESTING.
     METHODS columns_and_cell_types FOR TESTING.
@@ -117,8 +119,9 @@ CLASS ltcl_client IMPLEMENTATION.
 
   METHOD z2ui5_if_client~window_bind_tab.
 
-    mv_window      = window.
-    mt_window_sort = t_sort.
+    mv_window       = window.
+    mv_window_total = total.
+    mv_window_event = event.
     result = |\{/{ z2ui5_cl_cgui_context=>attri_name_by_ref( app = mo_app
                                                              val = val ) }\}|.
 
@@ -497,8 +500,10 @@ CLASS ltcl_test IMPLEMENTATION.
     cl_abap_unit_assert=>assert_equals( act = lo_alv->get_page( )
                                         exp = 3 ).
 
-    " a large table is bound with window_bind_tab( ): the browser gets a window
-    " of page_size rows, the title counts the whole table, no page buttons
+    " a large table is bound with window_bind_tab( ): the rows handed over are
+    " the ones loaded, total the rows there are - the browser asks for the
+    " next page_size rows with cs_event-rows; the title counts the whole
+    " table, no page buttons
     DATA(lo_view) = z2ui5_cl_ui5_view_builder=>factory( )->ele( `VBox` ).
     lo_alv->set_title( `Flights` )->set_sort( name       = `PRICE`
                                               descending = abap_true ).
@@ -512,14 +517,48 @@ CLASS ltcl_test IMPLEMENTATION.
     cl_abap_unit_assert=>assert_true( xsdbool( lv_view CS `rows="{/MT_ROW}"` ) ).
     cl_abap_unit_assert=>assert_equals( act = mo_client->mv_window
                                         exp = 2 ).
-    " the sort of the layout is the order the server applies
-    cl_abap_unit_assert=>assert_equals( act = mo_client->mt_window_sort
-                                        exp = VALUE z2ui5_if_client=>ty_t_bind_tab_sort( ( path = `PRICE` descending = abap_true ) ) ).
+    cl_abap_unit_assert=>assert_equals( act = mo_client->mv_window_total
+                                        exp = 5 ).
+    cl_abap_unit_assert=>assert_equals( act = mo_client->mv_window_event
+                                        exp = z2ui5_cl_cgui_alv=>cs_event-rows ).
+    " no sorter in the binding: the rows come in the order the app loads
+    cl_abap_unit_assert=>assert_false( xsdbool( lv_view CS `sorter` ) ).
 
     lo_alv->page_turn( direction = z2ui5_cl_cgui_alv=>cs_page-first
                        lines     = 5 ).
     cl_abap_unit_assert=>assert_equals( act = lo_alv->get_page_offset( )
                                         exp = 0 ).
+
+  ENDMETHOD.
+
+  METHOD window_order.
+
+    DATA(lo_alv) = z2ui5_cl_cgui_alv=>factory( )->set_paging( 2 ).
+    lo_alv->set_sort( name       = `PRICE`
+                      descending = abap_true ).
+
+    " the order of the paged grid: the sort of the layout
+    cl_abap_unit_assert=>assert_equals( act = lo_alv->window_order( mo_app->mt_row )
+                                        exp = VALUE z2ui5_cl_cgui_alv=>ty_t_index( ( 3 ) ( 2 ) ( 1 ) ) ).
+
+    " a sort of a column menu replaces it, a filter lets the rows through
+    " its groups do - the conditions of one group ORed
+    lo_alv->window_request( VALUE #( reason   = z2ui5_if_client=>cs_window_reason-filter
+                                     t_sort   = VALUE #( ( path = `CARRID` ) )
+                                     t_filter = VALUE #( ( group = 1 path = `CARRID` operator = `Contains` value1 = `a` )
+                                                         ( group = 1 path = `CARRID` operator = `EQ` value1 = `LH` )
+                                                         ( group = 2 path = `FLDATE` operator = `LE` value1 = `2026-01-06` ) ) ) ).
+    cl_abap_unit_assert=>assert_equals( act = lo_alv->window_order( mo_app->mt_row )
+                                        exp = VALUE z2ui5_cl_cgui_alv=>ty_t_index( ( 2 ) ( 1 ) ) ).
+
+    " more rows keep the order; a new sort of the layout ends what a
+    " column menu asked for
+    lo_alv->window_request( VALUE #( reason = z2ui5_if_client=>cs_window_reason-more ) ).
+    cl_abap_unit_assert=>assert_equals( act = lines( lo_alv->window_order( mo_app->mt_row ) )
+                                        exp = 2 ).
+    lo_alv->set_sort( `CONNID` ).
+    cl_abap_unit_assert=>assert_equals( act = lo_alv->window_order( mo_app->mt_row )
+                                        exp = VALUE z2ui5_cl_cgui_alv=>ty_t_index( ( 3 ) ( 2 ) ( 1 ) ) ).
 
   ENDMETHOD.
 

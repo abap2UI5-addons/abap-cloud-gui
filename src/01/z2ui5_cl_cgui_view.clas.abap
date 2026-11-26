@@ -21,8 +21,9 @@ CLASS z2ui5_cl_cgui_view DEFINITION PUBLIC FINAL CREATE PUBLIC.
       "! (bound - the text of an editor, the document of a viewer are
       "! attributes of the control line) and their objects, whether the
       "! frontend has the HTML frame (empty: not asked yet), the table
-      "! control of the dynpro and its rows, the screen shown, the dynpro
-      "! and whether the report is in its run
+      "! control of the dynpro, its rows, the rows the browser holds of
+      "! them (bound) and their number in all (bound), the screen shown, the
+      "! dynpro and whether the report is in its run
       BEGIN OF ty_s_ctx,
         client     TYPE REF TO z2ui5_if_client,
         gui        TYPE REF TO z2ui5_if_cgui_gui=>ty_t_control,
@@ -30,6 +31,8 @@ CLASS z2ui5_cl_cgui_view DEFINITION PUBLIC FINAL CREATE PUBLIC.
         html_frame TYPE REF TO ty_flag,
         tc         TYPE string,
         tc_row     TYPE REF TO data,
+        tc_view    TYPE REF TO data,
+        tc_total   TYPE REF TO i,
         screen     TYPE string,
         dynpro     TYPE string,
         in_run     TYPE abap_bool,
@@ -37,6 +40,11 @@ CLASS z2ui5_cl_cgui_view DEFINITION PUBLIC FINAL CREATE PUBLIC.
 
     "! the event of the button that shows a grid that does not show
     CONSTANTS cv_show TYPE string VALUE `CGUI_SHOW`.
+    "! the event of the table control asking for more lines
+    "! (window_bind_tab( ))
+    CONSTANTS cv_tc_rows TYPE string VALUE `CGUI_TC_ROWS`.
+    "! the lines the table control asks for at a time
+    CONSTANTS cv_tc_window TYPE i VALUE 50.
 
     "! the control id into node - every kind but a container and the grid
     "! that shows, which the report renders itself
@@ -76,6 +84,18 @@ CLASS z2ui5_cl_cgui_view DEFINITION PUBLIC FINAL CREATE PUBLIC.
         columns TYPE z2ui5_if_cgui_gui=>ty_t_tc_column
         node    TYPE REF TO z2ui5_cl_ui5_view_builder.
 
+    "! the request of the table control (cv_tc_rows): the next lines after
+    "! the ones the browser holds, or the first ones again
+    CLASS-METHODS tablecontrol_rows
+      IMPORTING
+        ctx TYPE ty_s_ctx.
+
+    "! the lines the browser holds of the table control - with the user's
+    "! input - back into its rows, the same line for the same index
+    CLASS-METHODS tablecontrol_sync
+      IMPORTING
+        ctx TYPE ty_s_ctx.
+
     "! F1 or F4 in a text editor: the editor the key goes to - the one with
     "! the focus, else the first that registered the key; 0 when none. The
     "! selection of the editor with the focus is noted on its control
@@ -112,6 +132,14 @@ CLASS z2ui5_cl_cgui_view DEFINITION PUBLIC FINAL CREATE PUBLIC.
   PROTECTED SECTION.
 
   PRIVATE SECTION.
+    "! lines skip + 1 to skip + top of the table control into the lines
+    "! the browser holds - the ones before stay
+    CLASS-METHODS tablecontrol_load
+      IMPORTING
+        ctx  TYPE ty_s_ctx
+        skip TYPE i
+        top  TYPE i.
+
     CLASS-METHODS render_textedit
       IMPORTING
         ctx     TYPE ty_s_ctx
@@ -516,18 +544,25 @@ CLASS z2ui5_cl_cgui_view IMPLEMENTATION.
 
   METHOD tablecontrol.
 
-    FIELD-SYMBOLS <rows> TYPE STANDARD TABLE.
+    FIELD-SYMBOLS <view>  TYPE STANDARD TABLE.
+    FIELD-SYMBOLS <total> TYPE i.
 
-    IF to_upper( name ) <> ctx-tc OR ctx-tc_row IS NOT BOUND.
+    IF to_upper( name ) <> ctx-tc OR ctx-tc_row IS NOT BOUND OR ctx-tc_view IS NOT BOUND OR ctx-tc_total IS NOT BOUND.
       RETURN.
     ENDIF.
-    ASSIGN ctx-tc_row->* TO <rows>.
     " the lines of a table control can be many: the browser gets 50 at a time
-    " and the next ones as the table grows (window_bind_tab( )); an input lands in
-    " the line it was made in
+    " and the next ones as the table grows (window_bind_tab( ), the event
+    " cv_tc_rows); an input lands in the line it was made in
+    tablecontrol_load( ctx  = ctx
+                       skip = 0
+                       top  = cv_tc_window ).
+    ASSIGN ctx-tc_view->* TO <view>.
+    ASSIGN ctx-tc_total->* TO <total>.
     DATA(lo_table) = node->ele( `Table`
-        )->a( n = `items`      v = ctx-client->window_bind_tab( val    = <rows>
-                                                          window = 50 )
+        )->a( n = `items`      v = ctx-client->window_bind_tab( val    = <view>
+                                                                total  = <total>
+                                                                event  = cv_tc_rows
+                                                                window = cv_tc_window )
         )->a( n = `growing`    b = abap_true
         )->a( n = `class`      v = `sapUiSmallMarginBottom` ).
     IF title IS NOT INITIAL.
@@ -560,6 +595,75 @@ CLASS z2ui5_cl_cgui_view IMPLEMENTATION.
       ELSE.
         lo_cells->tag( `Text`
             )->a( n = `text` v = lv_cell ).
+      ENDIF.
+    ENDLOOP.
+
+  ENDMETHOD.
+
+  METHOD tablecontrol_rows.
+
+    FIELD-SYMBOLS <request> TYPE z2ui5_if_client=>ty_s_window_request.
+    FIELD-SYMBOLS <view>    TYPE STANDARD TABLE.
+
+    DATA(lr_request) = ctx-client->get( )-r_event_data.
+    IF lr_request IS NOT BOUND OR ctx-tc_view IS NOT BOUND.
+      RETURN.
+    ENDIF.
+    ASSIGN lr_request->* TO <request>.
+    ASSIGN ctx-tc_view->* TO <view>.
+    " a table control sorts and filters nothing - a SORT or a FILTER loads
+    " the first lines again
+    IF <request>-reason = z2ui5_if_client=>cs_window_reason-more.
+      tablecontrol_load( ctx  = ctx
+                         skip = lines( <view> )
+                         top  = <request>-top ).
+    ELSE.
+      tablecontrol_load( ctx  = ctx
+                         skip = 0
+                         top  = <request>-top ).
+    ENDIF.
+
+  ENDMETHOD.
+
+  METHOD tablecontrol_load.
+
+    FIELD-SYMBOLS <rows>  TYPE STANDARD TABLE.
+    FIELD-SYMBOLS <view>  TYPE STANDARD TABLE.
+    FIELD-SYMBOLS <total> TYPE i.
+
+    IF ctx-tc_row IS NOT BOUND OR ctx-tc_view IS NOT BOUND OR ctx-tc_total IS NOT BOUND.
+      RETURN.
+    ENDIF.
+    ASSIGN ctx-tc_row->* TO <rows>.
+    ASSIGN ctx-tc_view->* TO <view>.
+    ASSIGN ctx-tc_total->* TO <total>.
+    IF skip = 0.
+      CLEAR <view>.
+    ENDIF.
+    LOOP AT <rows> ASSIGNING FIELD-SYMBOL(<row>) FROM lines( <view> ) + 1.
+      IF lines( <view> ) >= skip + top.
+        EXIT.
+      ENDIF.
+      INSERT <row> INTO TABLE <view>.
+    ENDLOOP.
+    <total> = lines( <rows> ).
+
+  ENDMETHOD.
+
+  METHOD tablecontrol_sync.
+
+    FIELD-SYMBOLS <rows> TYPE STANDARD TABLE.
+    FIELD-SYMBOLS <view> TYPE STANDARD TABLE.
+
+    IF ctx-tc_row IS NOT BOUND OR ctx-tc_view IS NOT BOUND.
+      RETURN.
+    ENDIF.
+    ASSIGN ctx-tc_row->* TO <rows>.
+    ASSIGN ctx-tc_view->* TO <view>.
+    LOOP AT <view> ASSIGNING FIELD-SYMBOL(<shown>).
+      READ TABLE <rows> ASSIGNING FIELD-SYMBOL(<row>) INDEX sy-tabix.
+      IF sy-subrc = 0.
+        <row> = <shown>.
       ENDIF.
     ENDLOOP.
 

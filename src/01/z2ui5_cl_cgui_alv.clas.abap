@@ -52,6 +52,9 @@ CLASS z2ui5_cl_cgui_alv DEFINITION PUBLIC FINAL CREATE PUBLIC.
         f4             TYPE string VALUE `CGUI_ALV_F4`,
         chart          TYPE string VALUE `CGUI_ALV_CHART`,
         chart_close    TYPE string VALUE `CGUI_ALV_CHART_CLOSE`,
+        "! a large table (set_paging) asks for rows - the request is in
+        "! client->get( )-r_event_data (z2ui5_if_client=>ty_s_window_request)
+        rows           TYPE string VALUE `CGUI_ALV_ROWS`,
       END OF cs_event.
 
     CONSTANTS:
@@ -455,10 +458,12 @@ CLASS z2ui5_cl_cgui_alv DEFINITION PUBLIC FINAL CREATE PUBLIC.
         VALUE(result) TYPE REF TO z2ui5_cl_cgui_alv.
 
     "! large tables: the browser gets page_size rows at a time and the next
-    "! ones as the grid scrolls - the rows are bound with window_bind_tab( ), so a
-    "! sort or a filter in a column menu runs on the server over all rows,
-    "! and selection, input and events land in the rows they were made in.
-    "! 0 switches it off
+    "! ones as the grid scrolls - the table handed to render( ) is bound with
+    "! window_bind_tab( ) as the rows loaded so far, total as the rows there
+    "! are, and the grid asks for more rows, a sort or a filter of a column
+    "! menu with the event cs_event-rows. The report runtime answers it over
+    "! all rows (window_request( ), window_order( )); selection, input and
+    "! events land in the rows they were made in. 0 switches it off
     METHODS set_paging
       IMPORTING
         page_size     TYPE i DEFAULT 500
@@ -1005,6 +1010,22 @@ CLASS z2ui5_cl_cgui_alv DEFINITION PUBLIC FINAL CREATE PUBLIC.
       RETURNING
         VALUE(result) TYPE z2ui5_cl_cgui_range=>ty_s_setting.
 
+    "! a request of the paged grid (cs_event-rows): a SORT or a FILTER of a
+    "! column menu is kept - the order window_order( ) gives from now on, as
+    "! long as the layout keeps its sort
+    METHODS window_request
+      IMPORTING
+        request TYPE z2ui5_if_client=>ty_s_window_request.
+
+    "! the rows of tab the paged grid shows, in its order: those the filter
+    "! of the grid, the search and the filter of a column menu let through,
+    "! sorted as a column menu asked or else as the layout sorts
+    METHODS window_order
+      IMPORTING
+        tab           TYPE STANDARD TABLE
+      RETURNING
+        VALUE(result) TYPE ty_t_index.
+
   PROTECTED SECTION.
     " PROTECTED, not PRIVATE: the settings travel in the app's draft, and the
     " transpiled runtime reaches PROTECTED attributes but not PRIVATE ones
@@ -1043,6 +1064,11 @@ CLASS z2ui5_cl_cgui_alv DEFINITION PUBLIC FINAL CREATE PUBLIC.
     DATA mv_single_row     TYPE i.
     DATA mt_dropdown       TYPE STANDARD TABLE OF ty_s_value WITH EMPTY KEY.
     DATA mt_dropdown_col   TYPE string_table.
+    " the sort and the filter a column menu of the paged grid asked for, and
+    " the sort of the layout then
+    DATA mt_window_sort    TYPE z2ui5_if_client=>ty_t_bind_tab_sort.
+    DATA mt_window_filter  TYPE z2ui5_if_client=>ty_t_bind_tab_filter.
+    DATA mt_window_layout  TYPE abap_sortorder_tab.
 
   PRIVATE SECTION.
 
@@ -1146,10 +1172,32 @@ CLASS z2ui5_cl_cgui_alv DEFINITION PUBLIC FINAL CREATE PUBLIC.
       RETURNING
         VALUE(result) TYPE abap_sortorder_tab.
 
+    "! the sort the layout sets - the columns with their direction, whether
+    "! a table has them or not
+    METHODS sort_layout
+      RETURNING
+        VALUE(result) TYPE abap_sortorder_tab.
+
     "! tab in the sort order of the columns
     METHODS sort_rows
       CHANGING
         tab TYPE STANDARD TABLE.
+
+    "! the row numbers of tab in index in order - a merge sort, stable
+    CLASS-METHODS index_sort
+      IMPORTING
+        tab   TYPE STANDARD TABLE
+        order TYPE abap_sortorder_tab
+      CHANGING
+        index TYPE ty_t_index.
+
+    "! the filter of a column menu as filters of the grid: a group of
+    "! conditions on one column is its multiple selection
+    METHODS window_filter
+      IMPORTING
+        tab           TYPE STANDARD TABLE
+      RETURNING
+        VALUE(result) TYPE ty_t_filter.
 
     "! is row a of tab before row b in order
     CLASS-METHODS rows_less
@@ -2722,14 +2770,7 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
 
   METHOD sort_rows.
 
-    " a merge sort of the row numbers, bottom up - stable, and by the
-    " components the columns name at run time: SORT ... BY (otab) and
-    " SORT ... BY (name) sort nothing in the transpiled runtime
-    DATA lt_index  TYPE STANDARD TABLE OF i WITH EMPTY KEY.
-    DATA lt_merged TYPE STANDARD TABLE OF i WITH EMPTY KEY.
-    DATA lv_right  TYPE abap_bool.
-    DATA lv_a      TYPE i.
-    DATA lv_b      TYPE i.
+    DATA lt_index  TYPE ty_t_index.
     DATA lv_number TYPE i.
     DATA lr_copy   TYPE REF TO data.
     FIELD-SYMBOLS <copy> TYPE STANDARD TABLE.
@@ -2744,6 +2785,37 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
       lv_number = sy-index.
       INSERT lv_number INTO TABLE lt_index.
     ENDDO.
+    index_sort( EXPORTING tab   = tab
+                          order = lt_order
+                CHANGING  index = lt_index ).
+
+    " the rows anew in that order
+    CREATE DATA lr_copy LIKE tab.
+    ASSIGN lr_copy->* TO <copy>.
+    <copy> = tab.
+    CLEAR tab.
+    LOOP AT lt_index INTO DATA(lv_row).
+      READ TABLE <copy> INDEX lv_row ASSIGNING <row>.
+      INSERT <row> INTO TABLE tab.
+    ENDLOOP.
+
+  ENDMETHOD.
+
+  METHOD index_sort.
+
+    " a merge sort of the row numbers, bottom up - stable, and by the
+    " components the columns name at run time: SORT ... BY (otab) and
+    " SORT ... BY (name) sort nothing in the transpiled runtime
+    DATA lt_merged TYPE ty_t_index.
+    DATA lv_right  TYPE abap_bool.
+    DATA lv_a      TYPE i.
+    DATA lv_b      TYPE i.
+    DATA lv_number TYPE i.
+
+    DATA(lv_lines) = lines( index ).
+    IF order IS INITIAL OR lv_lines < 2.
+      RETURN.
+    ENDIF.
 
     DATA(lv_width) = 1.
     WHILE lv_width < lv_lines.
@@ -2764,37 +2836,27 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
             lv_right = abap_true.
           ELSE.
             " the right one only when it is really before - stable
-            READ TABLE lt_index INDEX lv_j INTO lv_a.
-            READ TABLE lt_index INDEX lv_i INTO lv_b.
+            READ TABLE index INDEX lv_j INTO lv_a.
+            READ TABLE index INDEX lv_i INTO lv_b.
             lv_right = rows_less( tab   = tab
-                                  order = lt_order
+                                  order = order
                                   a     = lv_a
                                   b     = lv_b ).
           ENDIF.
           IF lv_right = abap_true.
-            READ TABLE lt_index INDEX lv_j INTO lv_number.
+            READ TABLE index INDEX lv_j INTO lv_number.
             lv_j = lv_j + 1.
           ELSE.
-            READ TABLE lt_index INDEX lv_i INTO lv_number.
+            READ TABLE index INDEX lv_i INTO lv_number.
             lv_i = lv_i + 1.
           ENDIF.
           INSERT lv_number INTO TABLE lt_merged.
         ENDWHILE.
         lv_left = lv_end.
       ENDWHILE.
-      lt_index = lt_merged.
+      index = lt_merged.
       lv_width = lv_width * 2.
     ENDWHILE.
-
-    " the rows anew in that order
-    CREATE DATA lr_copy LIKE tab.
-    ASSIGN lr_copy->* TO <copy>.
-    <copy> = tab.
-    CLEAR tab.
-    LOOP AT lt_index INTO DATA(lv_row).
-      READ TABLE <copy> INDEX lv_row ASSIGNING <row>.
-      INSERT <row> INTO TABLE tab.
-    ENDLOOP.
 
   ENDMETHOD.
 
@@ -2828,15 +2890,144 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
   METHOD sort_order.
 
     DATA(lt_comp) = z2ui5_cl_cgui_context=>rtti_get_t_comp( tab ).
+    LOOP AT sort_layout( ) INTO DATA(ls_order).
+      IF line_exists( lt_comp[ name = ls_order-name ] ).
+        INSERT ls_order INTO TABLE result.
+      ENDIF.
+    ENDLOOP.
+
+  ENDMETHOD.
+
+  METHOD sort_layout.
+
     DATA(lt_sorted) = mt_column.
     DELETE lt_sorted WHERE sort IS INITIAL.
     SORT lt_sorted BY sort_seq name.
     LOOP AT lt_sorted INTO DATA(ls_column).
-      IF NOT line_exists( lt_comp[ name = ls_column-name ] ).
-        CONTINUE.
-      ENDIF.
       INSERT VALUE #( name       = ls_column-name
                       descending = xsdbool( ls_column-sort = cs_sort-descending ) ) INTO TABLE result.
+    ENDLOOP.
+
+  ENDMETHOD.
+
+  METHOD window_request.
+
+    " MORE goes on in the order there is
+    IF request-reason = z2ui5_if_client=>cs_window_reason-more.
+      RETURN.
+    ENDIF.
+    mt_window_sort   = request-t_sort.
+    mt_window_filter = request-t_filter.
+    mt_window_layout = sort_layout( ).
+
+  ENDMETHOD.
+
+  METHOD window_order.
+
+    DATA lt_order TYPE abap_sortorder_tab.
+
+    " what a column menu asked for holds until the layout sorts anew
+    DATA(lt_layout) = sort_layout( ).
+    IF mt_window_layout <> lt_layout.
+      CLEAR: mt_window_sort, mt_window_filter, mt_window_layout.
+    ENDIF.
+
+    " the filter of the grid and the one of the column menus together
+    DATA(lt_keep) = mt_filter.
+    DATA(lt_window) = window_filter( tab ).
+    INSERT LINES OF lt_window INTO TABLE mt_filter.
+    result = filter_index( tab ).
+    mt_filter = lt_keep.
+
+    LOOP AT mt_window_sort INTO DATA(ls_sort).
+      INSERT VALUE #( name       = ls_sort-path
+                      descending = ls_sort-descending ) INTO TABLE lt_order.
+    ENDLOOP.
+    IF lt_order IS INITIAL.
+      lt_order = sort_order( tab ).
+    ENDIF.
+    index_sort( EXPORTING tab   = tab
+                          order = lt_order
+                CHANGING  index = result ).
+
+  ENDMETHOD.
+
+  METHOD window_filter.
+
+    " the conditions of a group are ORed, the groups ANDed - as the lines of
+    " a multiple selection and the filters of the grid. A group that ORs
+    " conditions on two columns has no multiple selection and is left out
+    TYPES:
+      BEGIN OF ty_s_group,
+        group TYPE i,
+        name  TYPE string,
+        mixed TYPE abap_bool,
+        rows  TYPE z2ui5_cl_cgui_range=>ty_t_row,
+      END OF ty_s_group.
+    DATA lt_group TYPE STANDARD TABLE OF ty_s_group WITH EMPTY KEY.
+    DATA ls_row   TYPE z2ui5_cl_cgui_range=>ty_s_row.
+
+    DATA(lt_comp) = z2ui5_cl_cgui_context=>rtti_get_t_comp( tab ).
+    LOOP AT mt_window_filter INTO DATA(ls_cond).
+      READ TABLE lt_group ASSIGNING FIELD-SYMBOL(<group>) WITH KEY group = ls_cond-group.
+      IF sy-subrc <> 0.
+        INSERT VALUE #( group = ls_cond-group
+                        name  = ls_cond-path ) INTO TABLE lt_group ASSIGNING <group>.
+      ELSEIF <group>-name <> ls_cond-path.
+        <group>-mixed = abap_true.
+      ENDIF.
+
+      " a date or a time comes as the browser writes it, the cell has digits
+      DATA(lv_low) = ls_cond-value1.
+      DATA(lv_high) = ls_cond-value2.
+      READ TABLE lt_comp INTO DATA(ls_comp) WITH KEY name = ls_cond-path.
+      IF sy-subrc = 0 AND ls_comp-type_kind = cl_abap_typedescr=>typekind_date.
+        lv_low = replace( val = lv_low sub = `-` with = `` occ = 0 ).
+        lv_high = replace( val = lv_high sub = `-` with = `` occ = 0 ).
+      ELSEIF sy-subrc = 0 AND ls_comp-type_kind = cl_abap_typedescr=>typekind_time.
+        lv_low = replace( val = lv_low sub = `:` with = `` occ = 0 ).
+        lv_high = replace( val = lv_high sub = `:` with = `` occ = 0 ).
+      ENDIF.
+
+      " a sap.ui.model.FilterOperator as a line of a multiple selection
+      ls_row = VALUE #( sign = `I`
+                        low  = lv_low ).
+      CASE ls_cond-operator.
+        WHEN `EQ` OR `NE` OR `LT` OR `LE` OR `GT` OR `GE`.
+          ls_row-option = ls_cond-operator.
+        WHEN `BT` OR `NB`.
+          ls_row-option = ls_cond-operator.
+          ls_row-high = lv_high.
+        WHEN `Contains`.
+          ls_row-option = `CP`.
+          ls_row-low = |*{ lv_low }*|.
+        WHEN `NotContains`.
+          ls_row-option = `NP`.
+          ls_row-low = |*{ lv_low }*|.
+        WHEN `StartsWith`.
+          ls_row-option = `CP`.
+          ls_row-low = |{ lv_low }*|.
+        WHEN `NotStartsWith`.
+          ls_row-option = `NP`.
+          ls_row-low = |{ lv_low }*|.
+        WHEN `EndsWith`.
+          ls_row-option = `CP`.
+          ls_row-low = |*{ lv_low }|.
+        WHEN `NotEndsWith`.
+          ls_row-option = `NP`.
+          ls_row-low = |*{ lv_low }|.
+        WHEN OTHERS.
+          " an operator a multiple selection does not know - the group
+          " cannot be applied
+          <group>-mixed = abap_true.
+          CONTINUE.
+      ENDCASE.
+      INSERT ls_row INTO TABLE <group>-rows.
+    ENDLOOP.
+
+    LOOP AT lt_group INTO DATA(ls_group) WHERE mixed = abap_false.
+      INSERT VALUE #( name = ls_group-name
+                      rows = ls_group-rows ) INTO TABLE result.
     ENDLOOP.
 
   ENDMETHOD.
@@ -3296,14 +3487,12 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
 
     DATA(lv_multi) = xsdbool( has_selection( ) = abap_true AND has_box_field( tab ) = abap_true ).
     DATA(lv_sorter) = sorter( tab ).
-    " a large table (set_paging) is bound with window_bind_tab( ): the browser
-    " holds a window of the rows and the server sorts and filters them - a
-    " sorter in the binding would order the window alone. The sort of the
-    " layout is the order the app passes; a click in a column menu sorts
-    " anew on the server, and a render with the same layout keeps that
-    DATA(lt_window_sort) = VALUE z2ui5_if_client=>ty_t_bind_tab_sort( FOR ls_order IN sort_order( tab )
-                                                                     ( path       = ls_order-name
-                                                                       descending = ls_order-descending ) ).
+    " a large table (set_paging) is bound with window_bind_tab( ): tab holds
+    " the rows loaded so far in the order the app loaded them (window_order( )),
+    " total the rows there are - a sorter in the binding would order the
+    " loaded rows alone. More rows, and a sort or a filter of a column menu,
+    " come back as cs_event-rows. total is passed on as it is: an attribute
+    " of the app is read anew with every response
 
     render_header( node ).
 
@@ -3311,10 +3500,16 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
         )->a( n = `xmlns:table`        v = `sap.ui.table`
         )->a( n = `xmlns:core`         v = `sap.ui.core`
         )->a( n = `core:require`       v = type_require( )
-        )->a( n = `rows`               v = COND #( WHEN mv_page_size > 0
+        )->a( n = `rows`               v = COND #( WHEN mv_page_size > 0 AND total >= 0
                                                    THEN client->window_bind_tab( val    = tab
-                                                                           window = mv_page_size
-                                                                           t_sort = lt_window_sort )
+                                                                                 total  = total
+                                                                                 event  = cs_event-rows
+                                                                                 window = mv_page_size )
+                                                   WHEN mv_page_size > 0
+                                                   THEN client->window_bind_tab( val    = tab
+                                                                                 total  = lines( tab )
+                                                                                 event  = cs_event-rows
+                                                                                 window = mv_page_size )
                                                    WHEN lv_sorter IS INITIAL
                                                    THEN client->_bind( tab )
                                                    ELSE |\{path: '{ client->_bind_path( tab ) }', sorter: { lv_sorter }\}| )
@@ -4024,7 +4219,8 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
                    OR event = cs_event-chart
                    OR event = cs_event-chart_close
                    OR event = cs_event-search
-                   OR event = cs_event-f4 ).
+                   OR event = cs_event-f4
+                   OR event = cs_event-rows ).
 
   ENDMETHOD.
 

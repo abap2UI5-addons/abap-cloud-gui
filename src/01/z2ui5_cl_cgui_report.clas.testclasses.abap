@@ -214,11 +214,8 @@ CLASS ltcl_client DEFINITION FINAL FOR TESTING.
     DATA mv_left      TYPE abap_bool.
     DATA mv_box       TYPE string.
     DATA mv_box_type  TYPE string.
-    " window_bind_tab( ): the window asked for, and the order the server would
-    " show the rows in - window_get_row( ) answers from it (the position
-    " itself when it is empty)
-    DATA mv_window       TYPE i.
-    DATA mt_window_order TYPE STANDARD TABLE OF i WITH EMPTY KEY.
+    " window_bind_tab( ): the window asked for
+    DATA mv_window TYPE i.
 
     " the name of the public attribute val is - or, as the framework's model
     " dissolves a reference, the attribute whose REF TO data points at val
@@ -822,15 +819,6 @@ CLASS ltcl_client IMPLEMENTATION.
 
   ENDMETHOD.
 
-  METHOD z2ui5_if_client~window_get_row.
-
-    result = row.
-    IF mt_window_order IS NOT INITIAL.
-      result = VALUE #( mt_window_order[ row ] OPTIONAL ).
-    ENDIF.
-
-  ENDMETHOD.
-
   METHOD z2ui5_if_client~_bind.
 
     " the framework finds a binding by the reference of the value: a public
@@ -1283,14 +1271,22 @@ CLASS ltcl_test IMPLEMENTATION.
                                         exp = `AA` ).
     cl_abap_unit_assert=>assert_true( xsdbool( mo_client->mv_view CS `<Table` AND mo_client->mv_view CS `<Input value="{C02}"` ) ).
     cl_abap_unit_assert=>assert_true( xsdbool( mo_client->mv_view CS `<Text text="{C01}"` AND mo_client->mv_view CS `Seats` ) ).
+    " the browser holds the first window of the lines, bound with their total
+    cl_abap_unit_assert=>assert_equals( act = mo_cut->mt_cgui_tc_view
+                                        exp = mo_cut->mt_cgui_tc_row ).
+    cl_abap_unit_assert=>assert_equals( act = mo_cut->mv_cgui_tc_total
+                                        exp = 2 ).
+    cl_abap_unit_assert=>assert_equals( act = mo_client->mv_window
+                                        exp = z2ui5_cl_cgui_view=>cv_tc_window ).
 
-    " the user changes a cell: the PAI loop reads it into the work area and
-    " modifies its line; the PBO hands the lines over anew
-    mo_cut->mt_cgui_tc_row[ 2 ]-c02 = `25`.
+    " the user changes a cell of the line the browser holds: the PAI loop
+    " reads it into the work area and modifies its line; the PBO hands the
+    " lines over anew
+    mo_cut->mt_cgui_tc_view[ 2 ]-c02 = `25`.
     event( `CHECK` ).
     cl_abap_unit_assert=>assert_equals( act = mo_report->mt_seat[ 2 ]-seats
                                         exp = 25 ).
-    cl_abap_unit_assert=>assert_equals( act = mo_cut->mt_cgui_tc_row[ 2 ]-c02
+    cl_abap_unit_assert=>assert_equals( act = mo_cut->mt_cgui_tc_view[ 2 ]-c02
                                         exp = `25` ).
 
   ENDMETHOD.
@@ -2605,63 +2601,103 @@ CLASS ltcl_test IMPLEMENTATION.
 
   METHOD alv_paging_maps_rows.
 
+    DATA ls_request TYPE z2ui5_if_client=>ty_s_window_request.
+
     init( ).
     mo_report->p_carrid = `LH`.
     mo_report->mv_alv = abap_true.
     event( z2ui5_cl_cgui_report=>cs_ucomm-execute ).
-    DATA(lv_rows) = lines( mo_report->mt_row ).
-    cl_abap_unit_assert=>assert_true( xsdbool( lv_rows >= 2 ) ).
+    cl_abap_unit_assert=>assert_equals( act = lines( mo_report->mt_row )
+                                        exp = 3 ).
 
-    " one row a window: the grid binds the table itself with window_bind_tab( ) -
-    " no copy of a page, the title counts all rows
+    " one row a window: the grid binds a copy with the rows loaded with
+    " window_bind_tab( ), the total and the title count all rows
     mo_cut->mo_cgui_alv->set_paging( 1 ).
     event( name = z2ui5_cl_cgui_alv=>cs_event-search
            args = VALUE #( ( `` ) ) ).
     cl_abap_unit_assert=>assert_equals( act = mo_client->mv_window
                                         exp = 1 ).
-    cl_abap_unit_assert=>assert_not_bound( mo_cut->mr_cgui_alv_page ).
-    cl_abap_unit_assert=>assert_true( xsdbool( mo_client->mv_view CS |({ lv_rows })| ) ).
+    cl_abap_unit_assert=>assert_bound( mo_cut->mr_cgui_alv_page ).
+    cl_abap_unit_assert=>assert_equals( act = mo_cut->mt_cgui_alv_index
+                                        exp = VALUE z2ui5_cl_cgui_alv=>ty_t_index( ( 1 ) ) ).
+    cl_abap_unit_assert=>assert_equals( act = mo_cut->mv_cgui_alv_total
+                                        exp = 3 ).
+    cl_abap_unit_assert=>assert_true( xsdbool( mo_client->mv_view CS `(3)` ) ).
 
-    " the server shows the rows in its own order - the last row first: a
-    " line selection on the first row shown is the last row of the table
-    mo_client->mt_window_order = VALUE #( ( lv_rows ) ).
-    DO lv_rows - 1 TIMES.
-      INSERT sy-index INTO TABLE mo_client->mt_window_order.
-    ENDDO.
+    " the grid asks for more rows: the next one of the order follows, the
+    " screen is not drawn again
+    CLEAR mo_client->mv_view.
+    ls_request = VALUE #( path   = `/MR_CGUI_ALV_PAGE/*`
+                          reason = z2ui5_if_client=>cs_window_reason-more
+                          skip   = 1
+                          top    = 1 ).
+    mo_client->ms_get-r_event_data = REF #( ls_request ).
+    event( z2ui5_cl_cgui_alv=>cs_event-rows ).
+    cl_abap_unit_assert=>assert_equals( act = mo_cut->mt_cgui_alv_index
+                                        exp = VALUE z2ui5_cl_cgui_alv=>ty_t_index( ( 1 ) ( 2 ) ) ).
+    cl_abap_unit_assert=>assert_initial( mo_client->mv_view ).
+
+    " a sort of a column menu: the first rows anew, over all rows - the most
+    " seats first. A line selection on the first row shown is the last row
+    " of the table
+    ls_request = VALUE #( path   = `/MR_CGUI_ALV_PAGE/*`
+                          reason = z2ui5_if_client=>cs_window_reason-sort
+                          top    = 1
+                          t_sort = VALUE z2ui5_if_client=>ty_t_bind_tab_sort( ( path       = `SEATS`
+                                                                                descending = abap_true ) ) ).
+    mo_client->ms_get-r_event_data = REF #( ls_request ).
+    event( z2ui5_cl_cgui_alv=>cs_event-rows ).
+    cl_abap_unit_assert=>assert_equals( act = mo_cut->mt_cgui_alv_index
+                                        exp = VALUE z2ui5_cl_cgui_alv=>ty_t_index( ( 3 ) ) ).
     event( name = z2ui5_cl_cgui_alv=>cs_event-line_selection
-           args = VALUE #( ( `/XX/MT_ROW/0` ) ) ).
+           args = VALUE #( ( `/XX/MR_CGUI_ALV_PAGE/0` ) ) ).
     cl_abap_unit_assert=>assert_equals( act = mo_report->mv_lsel_row
-                                        exp = lv_rows ).
+                                        exp = 3 ).
 
   ENDMETHOD.
 
   METHOD alv_paging_filtered_maps_rows.
+
+    DATA ls_request TYPE z2ui5_if_client=>ty_s_window_request.
 
     init( ).
     mo_report->p_carrid = `LH`.
     mo_report->mv_alv = abap_true.
     event( z2ui5_cl_cgui_report=>cs_ucomm-execute ).
 
-    " filtered and large: the copy of the rows the filter lets through is
-    " bound with window_bind_tab( ) - a position leads to the copy's row first,
-    " the copy's row to the table's
+    " searched and large: the copy holds the first of the rows the search
+    " lets through, bound with window_bind_tab( ) - a row of the copy leads
+    " to the table's
     mo_cut->mo_cgui_alv->set_paging( 1 ).
     event( name = z2ui5_cl_cgui_alv=>cs_event-search
-           args = VALUE #( ( `UA` ) ) ).
+           args = VALUE #( ( `A` ) ) ).
     cl_abap_unit_assert=>assert_bound( mo_cut->mr_cgui_alv_page ).
     cl_abap_unit_assert=>assert_equals( act = mo_client->mv_window
                                         exp = 1 ).
-    DATA(lv_copy) = lines( mo_cut->mt_cgui_alv_index ).
-    cl_abap_unit_assert=>assert_true( xsdbool( lv_copy >= 1 ) ).
+    cl_abap_unit_assert=>assert_equals( act = mo_cut->mt_cgui_alv_index
+                                        exp = VALUE z2ui5_cl_cgui_alv=>ty_t_index( ( 2 ) ) ).
+    cl_abap_unit_assert=>assert_equals( act = mo_cut->mv_cgui_alv_total
+                                        exp = 2 ).
 
-    " read before the event: the line selection leaves the grid, which
-    " clears the copy and its index
-    DATA(lv_row) = mo_cut->mt_cgui_alv_index[ lv_copy ].
-    mo_client->mt_window_order = VALUE #( ( lv_copy ) ).
+    " a filter of a column menu on top of the search
+    ls_request = VALUE #( path     = `/MR_CGUI_ALV_PAGE/*`
+                          reason   = z2ui5_if_client=>cs_window_reason-filter
+                          top      = 1
+                          t_filter = VALUE z2ui5_if_client=>ty_t_bind_tab_filter( ( group    = 1
+                                                                                    path     = `CARRID`
+                                                                                    operator = `StartsWith`
+                                                                                    value1   = `u` ) ) ).
+    mo_client->ms_get-r_event_data = REF #( ls_request ).
+    event( z2ui5_cl_cgui_alv=>cs_event-rows ).
+    cl_abap_unit_assert=>assert_equals( act = mo_cut->mt_cgui_alv_index
+                                        exp = VALUE z2ui5_cl_cgui_alv=>ty_t_index( ( 3 ) ) ).
+    cl_abap_unit_assert=>assert_equals( act = mo_cut->mv_cgui_alv_total
+                                        exp = 1 ).
+
     event( name = z2ui5_cl_cgui_alv=>cs_event-line_selection
            args = VALUE #( ( `/XX/MR_CGUI_ALV_PAGE/0` ) ) ).
     cl_abap_unit_assert=>assert_equals( act = mo_report->mv_lsel_row
-                                        exp = lv_row ).
+                                        exp = 3 ).
 
   ENDMETHOD.
 

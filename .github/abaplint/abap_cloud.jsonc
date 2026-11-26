@@ -11,9 +11,10 @@
     },
     {
       "url": "https://github.com/abap2UI5/abap2UI5",
-      "branch": "1.150.0",
+      "branch": "main",
+      // 1.151.0 - move to the tag once it is cut
       "folder": "/abap2UI5",
-      "files": "/src/**/*.*"
+      "files": "/src/0[0-2]/**/*.*"
     }
   ],
   "syntax": {

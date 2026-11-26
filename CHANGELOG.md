@@ -46,18 +46,25 @@ release.
   attribute highlighting matched the class of the tag highlighting.
 - The pages workflow builds the site for a pull request that changes the
   corpus of report2UI5, whose reports are the site's examples.
-- The gates run against abap2UI5 1.150.0 (`1.150.0-702` for 7.02), the
-  core pin moved from 1.149.0.
+- The gates run against abap2UI5 `main` (`702` for 7.02) - 1.151.0, whose
+  windowed table the addon needs, until its tag is cut; the core pin moved
+  from 1.149.0 over 1.150.0. The lint takes abap2UI5's packages `src/00` to
+  `src/02` only: `src/03` is its installation package (the ICF handler and
+  the BSP), which nothing here uses.
 
 **The value help and table controls in windows too**
 
 - The hit list of `z2ui5_cl_cgui_select` (F4, the variant catalog) and the
   table control of a dynpro bind with `window_bind_tab( )` like a large ALV: the
   browser gets 100 hits / 50 lines at a time and the next ones as the list
-  grows, instead of every row at once. A single pick maps the row the browser
-  shows to the hit through `window_get_row( )`; the search still filters on
-  the server, and a mark or an input lands in its own row. Needs abap2UI5
-  with `window_bind_tab( )`, as the ALV does.
+  grows, instead of every row at once. The addon loads them itself: the list
+  asks with an event of its own (`z2ui5_cl_cgui_select=>cs_event-rows`,
+  `z2ui5_cl_cgui_view=>cv_tc_rows`), the rows bound are the ones loaded
+  (`mr_view` and `mv_total` of the popup, `mt_cgui_tc_view` and
+  `mv_cgui_tc_total` of the report), so a single pick is the row the browser
+  shows; the search still filters on the server, and a mark or an input
+  lands in its own row. Needs abap2UI5 1.151.0 (the app-driven
+  `window_bind_tab( val total event window )`), as the ALV does.
 
 **Breaking: object names of at most 25 characters**
 
@@ -81,17 +88,23 @@ release.
 **A large ALV in windows instead of pages**
 
 - `set_paging( n )` binds the table with abap2UI5's `window_bind_tab( )`
-  (abap2UI5/abap2UI5#2980, #2981) instead of cutting a page out of it: the
-  browser gets n rows and the next ones as the grid scrolls, a sort or a
-  filter from a column menu runs on the server over all rows instead of
-  over the page shown, and the sort of the layout is the order the server
-  starts from. The page buttons are gone; hotspots, line selection, cell
-  clicks and F4 map the row the browser shows to the table's row through
-  `window_get_row( )`. The filter of the ALV still binds a copy of the rows
-  it lets through. `get_page( )`, `get_page_offset( )` and `page_turn( )`
-  stay and do nothing the grid shows. Needs abap2UI5 with `window_bind_tab( )`
-  (named `_bind_tab( )` until abap2UI5/abap2UI5#3009) - the core pin moves
-  with the release that has it.
+  instead of cutting a page out of it: the browser gets n rows and the next
+  ones as the grid scrolls, a sort or a filter from a column menu runs on
+  the server over all rows instead of over the page shown, and the sort of
+  the layout is the order the grid starts from. The report runtime answers
+  the grid's requests (`z2ui5_cl_cgui_alv=>cs_event-rows`, abap2UI5 1.151.0
+  hands them to the app): the grid is bound to a copy of the rows loaded so
+  far (`mr_cgui_alv_page`, its length `mv_cgui_alv_total`), more rows are
+  the next ones of the order, a sort or a filter of a column menu orders and
+  filters all rows anew (`window_request( )`, `window_order( )` of the ALV -
+  a group of conditions on one column is a multiple selection of it) and
+  holds until the layout sorts anew, and no request draws the screen again.
+  The page buttons are gone; hotspots, line selection, cell clicks and F4
+  lead from the row the browser shows to the table's row through the copy.
+  `get_page( )`, `get_page_offset( )` and `page_turn( )` stay and do
+  nothing the grid shows. An app that renders a paged ALV of its own binds
+  the rows it loaded as `tab` with `total` and answers `cs_event-rows`
+  itself.
 
 **report2UI5: a SALV with a GUI status of its own**
 
