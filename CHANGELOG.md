@@ -21,6 +21,12 @@ release.
   alone, the backend never heard of it) - the toolbar's filter is the one.
 - The ALV and the list activate on NW 7.02 - 7.40 again: they named
   `cl_abap_typedescr=>typekind_int8`, which these releases do not have.
+- ALV totals and subtotals: a column with a currency or unit
+  (`set_column_currency( )`, `set_column_quantity( )`) is totalled per
+  currency or unit, as the classic ALV does - 100 EUR and 200 USD were a
+  total of 300; the grid stacks the numbers, the printout has a totals line
+  each. A paged grid (`set_paging( )`) adds up all rows its filter lets
+  through, not only the first rows it holds (`render( sums = )`).
 - report2UI5 no longer writes wrong code where it used to: `HIDE` is
   `list( )->hide( )` at the statement - the value when `HIDE` runs, not at
   the `WRITE` before it - and works for a table with a header line and in a

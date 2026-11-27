@@ -167,13 +167,16 @@ CLASS z2ui5_cl_cgui_alv DEFINITION PUBLIC FINAL CREATE PUBLIC.
       END OF ty_s_value.
     TYPES ty_t_value TYPE STANDARD TABLE OF ty_s_value WITH EMPTY KEY.
 
-    " the aggregate of column over the rows
+    " the aggregate of column over the rows - of the rows of one currency
+    " or unit (unit) where the column has one: amounts of different
+    " currencies are not added up
     TYPES:
       BEGIN OF ty_s_aggregate,
         column      TYPE string,
         label       TYPE string,
         aggregation TYPE string,
         value       TYPE decfloat34,
+        unit        TYPE string,
       END OF ty_s_aggregate.
     TYPES ty_t_aggregate TYPE STANDARD TABLE OF ty_s_aggregate WITH EMPTY KEY.
 
@@ -214,11 +217,13 @@ CLASS z2ui5_cl_cgui_alv DEFINITION PUBLIC FINAL CREATE PUBLIC.
     TYPES ty_t_layout TYPE STANDARD TABLE OF ty_s_layout WITH EMPTY KEY.
 
     " the subtotal of column for the rows whose subtotal columns hold group
+    " - and, where the column has a currency or unit, that one (unit)
     TYPES:
       BEGIN OF ty_s_subtotal,
         group  TYPE string,
         column TYPE string,
         value  TYPE decfloat34,
+        unit   TYPE string,
       END OF ty_s_subtotal.
     TYPES ty_t_subtotal TYPE STANDARD TABLE OF ty_s_subtotal WITH EMPTY KEY.
     TYPES ty_t_column TYPE STANDARD TABLE OF ty_s_column WITH EMPTY KEY.
@@ -813,7 +818,8 @@ CLASS z2ui5_cl_cgui_alv DEFINITION PUBLIC FINAL CREATE PUBLIC.
         tab TYPE STANDARD TABLE.
 
     "! the aggregates of the columns - total, average, minimum, maximum and
-    "! count over the rows of tab
+    "! count over the rows of tab, per currency or unit of a column that
+    "! has one (set_column_currency( ), set_column_quantity( ))
     METHODS get_aggregates
       IMPORTING
         tab           TYPE STANDARD TABLE
@@ -853,7 +859,7 @@ CLASS z2ui5_cl_cgui_alv DEFINITION PUBLIC FINAL CREATE PUBLIC.
         VALUE(result) TYPE REF TO z2ui5_cl_cgui_alv.
 
     "! the subtotals of the summed columns per group of the subtotal
-    "! columns, in the order of the sorting
+    "! columns, in the order of the sorting - per currency or unit too
     METHODS get_subtotals
       IMPORTING
         tab           TYPE STANDARD TABLE
@@ -938,14 +944,17 @@ CLASS z2ui5_cl_cgui_alv DEFINITION PUBLIC FINAL CREATE PUBLIC.
         VALUE(result) TYPE abap_bool.
 
     "! append the grid to node, a container of an existing view whose
-    "! default namespace is sap.m
+    "! default namespace is sap.m; sums, a table like tab, holds the rows
+    "! the totals and subtotals add up where tab holds only some of them
+    "! (the first rows of a paged grid) - tab without it
     METHODS render
       IMPORTING
         node   TYPE REF TO z2ui5_cl_ui5_view_builder
         client TYPE REF TO z2ui5_if_client
         tab    TYPE STANDARD TABLE
         total  TYPE i DEFAULT -1
-        all    TYPE i DEFAULT -1.
+        all    TYPE i DEFAULT -1
+        sums   TYPE REF TO data OPTIONAL.
 
     "! the grid as a complete view
     METHODS stringify
@@ -1272,6 +1281,15 @@ CLASS z2ui5_cl_cgui_alv DEFINITION PUBLIC FINAL CREATE PUBLIC.
         name          TYPE string
       RETURNING
         VALUE(result) TYPE ty_s_column.
+
+    "! the column that holds the currency or the unit of column - empty
+    "! when it has none or tab has no such column
+    METHODS unit_column
+      IMPORTING
+        column        TYPE ty_s_column
+        tab           TYPE STANDARD TABLE
+      RETURNING
+        VALUE(result) TYPE string.
 
     METHODS render_toolbar
       IMPORTING
@@ -2259,9 +2277,23 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
 
   METHOD get_aggregates.
 
+    " per currency or unit: 100 USD and 200 EUR are not a total of 300 -
+    " the classic ALV totals per currency, and so does this one
+    TYPES:
+      BEGIN OF ty_s_part,
+        unit  TYPE string,
+        value TYPE decfloat34,
+        count TYPE i,
+      END OF ty_s_part.
+    DATA lt_part      TYPE SORTED TABLE OF ty_s_part WITH UNIQUE KEY unit.
+    DATA ls_part      TYPE ty_s_part.
+    DATA ls_aggregate TYPE ty_s_aggregate.
+    DATA lv_value     TYPE decfloat34.
+    DATA lv_unit      TYPE string.
+    DATA lv_unit_col  TYPE string.
     FIELD-SYMBOLS <cell> TYPE any.
-    DATA lv_value TYPE decfloat34.
-    DATA lv_count TYPE i.
+    FIELD-SYMBOLS <unit> TYPE any.
+    FIELD-SYMBOLS <part> TYPE ty_s_part.
 
     LOOP AT columns_visible( tab ) INTO DATA(ls_comp).
       DATA(ls_column) = column_setting( ls_comp-name ).
@@ -2270,47 +2302,88 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
       IF lv_kind IS INITIAL.
         CONTINUE.
       ENDIF.
-      DATA(ls_aggregate) = VALUE ty_s_aggregate( column      = ls_comp-name
-                                                 label       = ls_comp-label
-                                                 aggregation = lv_kind ).
-      CLEAR lv_count.
+      " a count counts cells, whatever their currency
+      CLEAR lv_unit_col.
+      IF lv_kind <> cs_aggregation-count.
+        lv_unit_col = unit_column( column = ls_column
+                                   tab    = tab ).
+      ENDIF.
+      CLEAR lt_part.
       LOOP AT tab ASSIGNING FIELD-SYMBOL(<row>).
         ASSIGN COMPONENT ls_comp-name OF STRUCTURE <row> TO <cell>.
         IF sy-subrc <> 0.
           EXIT.
         ENDIF.
         IF lv_kind = cs_aggregation-count.
-          IF <cell> IS NOT INITIAL.
-            lv_count = lv_count + 1.
-          ENDIF.
-          CONTINUE.
-        ENDIF.
-        TRY.
-            lv_value = <cell>.
-          CATCH cx_sy_conversion_error cx_sy_arithmetic_error.
+          IF <cell> IS INITIAL.
             CONTINUE.
-        ENDTRY.
-        lv_count = lv_count + 1.
+          ENDIF.
+        ELSE.
+          TRY.
+              lv_value = <cell>.
+            CATCH cx_sy_conversion_error cx_sy_arithmetic_error.
+              CONTINUE.
+          ENDTRY.
+        ENDIF.
+        CLEAR lv_unit.
+        IF lv_unit_col IS NOT INITIAL.
+          ASSIGN COMPONENT lv_unit_col OF STRUCTURE <row> TO <unit>.
+          lv_unit = <unit>.
+        ENDIF.
+        READ TABLE lt_part ASSIGNING <part> WITH TABLE KEY unit = lv_unit.
+        IF sy-subrc <> 0.
+          CLEAR ls_part.
+          ls_part-unit = lv_unit.
+          INSERT ls_part INTO TABLE lt_part ASSIGNING <part>.
+        ENDIF.
+        <part>-count = <part>-count + 1.
         CASE lv_kind.
+          WHEN cs_aggregation-count.
           WHEN cs_aggregation-minimum.
-            IF lv_count = 1 OR lv_value < ls_aggregate-value.
-              ls_aggregate-value = lv_value.
+            IF <part>-count = 1 OR lv_value < <part>-value.
+              <part>-value = lv_value.
             ENDIF.
           WHEN cs_aggregation-maximum.
-            IF lv_count = 1 OR lv_value > ls_aggregate-value.
-              ls_aggregate-value = lv_value.
+            IF <part>-count = 1 OR lv_value > <part>-value.
+              <part>-value = lv_value.
             ENDIF.
           WHEN OTHERS.
-            ls_aggregate-value = ls_aggregate-value + lv_value.
+            <part>-value = <part>-value + lv_value.
         ENDCASE.
       ENDLOOP.
-      IF lv_kind = cs_aggregation-count.
-        ls_aggregate-value = lv_count.
-      ELSEIF lv_kind = cs_aggregation-average AND lv_count > 0.
-        ls_aggregate-value = ls_aggregate-value / lv_count.
+      " no row: the aggregate of nothing, as a total of 0
+      IF lt_part IS INITIAL.
+        CLEAR ls_part.
+        INSERT ls_part INTO TABLE lt_part.
       ENDIF.
-      INSERT ls_aggregate INTO TABLE result.
+      LOOP AT lt_part INTO ls_part.
+        ls_aggregate = VALUE #( column      = ls_comp-name
+                                label       = ls_comp-label
+                                aggregation = lv_kind
+                                value       = ls_part-value
+                                unit        = ls_part-unit ).
+        IF lv_kind = cs_aggregation-count.
+          ls_aggregate-value = ls_part-count.
+        ELSEIF lv_kind = cs_aggregation-average AND ls_part-count > 0.
+          ls_aggregate-value = ls_part-value / ls_part-count.
+        ENDIF.
+        INSERT ls_aggregate INTO TABLE result.
+      ENDLOOP.
     ENDLOOP.
+
+  ENDMETHOD.
+
+  METHOD unit_column.
+
+    result = COND #( WHEN column-currency IS NOT INITIAL THEN column-currency
+                     ELSE column-quantity ).
+    IF result IS INITIAL.
+      RETURN.
+    ENDIF.
+    DATA(lt_comp) = z2ui5_cl_cgui_context=>rtti_get_t_comp( tab ).
+    IF NOT line_exists( lt_comp[ name = result ] ).
+      CLEAR result.
+    ENDIF.
 
   ENDMETHOD.
 
@@ -3088,15 +3161,24 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
       BEGIN OF ty_s_seen,
         group  TYPE string,
         column TYPE string,
+        unit   TYPE string,
         pos    TYPE i,
       END OF ty_s_seen.
+    TYPES:
+      BEGIN OF ty_s_unit_col,
+        column TYPE string,
+        unit   TYPE string,
+      END OF ty_s_unit_col.
     FIELD-SYMBOLS <row>  TYPE any.
     FIELD-SYMBOLS <cell> TYPE any.
-    DATA lt_part   TYPE string_table.
-    DATA lt_seen   TYPE SORTED TABLE OF ty_s_seen WITH UNIQUE KEY group column.
-    DATA lt_index  TYPE ty_t_index.
-    DATA lv_value  TYPE decfloat34.
-    DATA lv_number TYPE i.
+    FIELD-SYMBOLS <unit> TYPE any.
+    DATA lt_part     TYPE string_table.
+    DATA lt_seen     TYPE SORTED TABLE OF ty_s_seen WITH UNIQUE KEY group column unit.
+    DATA lt_unit_col TYPE STANDARD TABLE OF ty_s_unit_col WITH EMPTY KEY.
+    DATA lt_index    TYPE ty_t_index.
+    DATA lv_value    TYPE decfloat34.
+    DATA lv_number   TYPE i.
+    DATA lv_unit     TYPE string.
 
     DATA(lt_comp) = z2ui5_cl_cgui_context=>rtti_get_t_comp( tab ).
     DATA(lt_group) = mt_column.
@@ -3107,6 +3189,13 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
     IF lt_group IS INITIAL OR lt_summed IS INITIAL.
       RETURN.
     ENDIF.
+    " a subtotal per currency or unit as well - amounts of two currencies
+    " are not added up
+    LOOP AT lt_summed INTO DATA(ls_with_unit).
+      INSERT VALUE #( column = ls_with_unit-name
+                      unit   = unit_column( column = ls_with_unit
+                                            tab    = tab ) ) INTO TABLE lt_unit_col.
+    ENDLOOP.
 
     " the rows in the order of the sorting - the groups follow it, not the
     " order of their texts: 9 before 10, and descending where it sorts so
@@ -3142,17 +3231,26 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
           CATCH cx_sy_conversion_error cx_sy_arithmetic_error.
             CONTINUE.
         ENDTRY.
+        CLEAR lv_unit.
+        READ TABLE lt_unit_col INTO DATA(ls_unit_col) WITH KEY column = ls_summed-name.
+        IF sy-subrc = 0 AND ls_unit_col-unit IS NOT INITIAL.
+          ASSIGN COMPONENT ls_unit_col-unit OF STRUCTURE <row> TO <unit>.
+          lv_unit = <unit>.
+        ENDIF.
         READ TABLE lt_seen INTO DATA(ls_seen) WITH TABLE KEY group  = lv_group
-                                                             column = ls_summed-name.
+                                                             column = ls_summed-name
+                                                             unit   = lv_unit.
         IF sy-subrc = 0.
           READ TABLE result ASSIGNING FIELD-SYMBOL(<sum>) INDEX ls_seen-pos.
           <sum>-value = <sum>-value + lv_value.
         ELSE.
           INSERT VALUE #( group  = lv_group
                           column = ls_summed-name
-                          value  = lv_value ) INTO TABLE result.
+                          value  = lv_value
+                          unit   = lv_unit ) INTO TABLE result.
           INSERT VALUE #( group  = lv_group
                           column = ls_summed-name
+                          unit   = lv_unit
                           pos    = lines( result ) ) INTO TABLE lt_seen.
         ENDIF.
       ENDLOOP.
@@ -3175,6 +3273,9 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
     DATA lv_text  TYPE string.
     DATA lv_index TYPE i.
     DATA lv_total TYPE abap_bool.
+    DATA lv_rank  TYPE i.
+    DATA lv_count TYPE i.
+    DATA lv_found TYPE abap_bool.
     DATA lr_copy  TYPE REF TO data.
     FIELD-SYMBOLS <copy> TYPE STANDARD TABLE.
     FIELD-SYMBOLS <row>  TYPE any.
@@ -3211,22 +3312,34 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
     ENDLOOP.
 
     " the aggregates of the columns - a total, an average, a minimum, a
-    " maximum or a count, as the grid shows them
-    CLEAR lt_cell.
+    " maximum or a count, as the grid shows them: a line per currency or
+    " unit, the n-th line the n-th aggregate of each column
+    DATA(lv_rows) = lines( lt_cells ).
     DATA(lt_aggregate) = get_aggregates( <copy> ).
-    LOOP AT lt_comp INTO ls_comp.
-      lv_index = sy-tabix.
-      READ TABLE lt_aggregate INTO DATA(ls_aggregate) WITH KEY column = ls_comp-name.
-      IF sy-subrc <> 0.
-        INSERT `` INTO TABLE lt_cell.
-        CONTINUE.
+    DO.
+      lv_rank = sy-index.
+      CLEAR: lt_cell, lv_found.
+      LOOP AT lt_comp INTO ls_comp.
+        lv_index = sy-tabix.
+        CLEAR: lv_text, lv_count.
+        LOOP AT lt_aggregate INTO DATA(ls_aggregate) WHERE column = ls_comp-name.
+          lv_count = lv_count + 1.
+          IF lv_count = lv_rank.
+            lv_text = aggregate_text( ls_aggregate ).
+            lv_found = abap_true.
+            EXIT.
+          ENDIF.
+        ENDLOOP.
+        INSERT lv_text INTO TABLE lt_cell.
+        lt_width[ lv_index ]-width = nmax( val1 = lt_width[ lv_index ]-width
+                                           val2 = strlen( lv_text ) ).
+      ENDLOOP.
+      IF lv_found = abap_false.
+        EXIT.
       ENDIF.
       lv_total = abap_true.
-      lv_text = aggregate_text( ls_aggregate ).
-      INSERT lv_text INTO TABLE lt_cell.
-      lt_width[ lv_index ]-width = nmax( val1 = lt_width[ lv_index ]-width
-                                         val2 = strlen( lv_text ) ).
-    ENDLOOP.
+      INSERT lt_cell INTO TABLE lt_cells.
+    ENDDO.
 
     " header, rule, rows, rule and totals
     LOOP AT lt_comp INTO ls_comp.
@@ -3249,12 +3362,8 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
     DATA(lv_rule) = repeat( val = `-` occ = strlen( lv_line ) ).
     INSERT lv_rule INTO TABLE result.
 
-    IF lv_total = abap_true.
-      INSERT lt_cell INTO TABLE lt_cells.
-    ENDIF.
-    DATA(lv_rows) = lines( lt_cells ).
     LOOP AT lt_cells INTO DATA(lt_values).
-      IF lv_total = abap_true AND sy-tabix = lv_rows.
+      IF lv_total = abap_true AND sy-tabix = lv_rows + 1.
         INSERT lv_rule INTO TABLE result.
       ENDIF.
       CLEAR lv_line.
@@ -3513,6 +3622,8 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
 
   METHOD render.
 
+    FIELD-SYMBOLS <sums> TYPE STANDARD TABLE.
+
     DATA(lv_rows) = mv_visible_rows.
     IF lv_rows <= 0.
       lv_rows = lines( tab ).
@@ -3598,11 +3709,17 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
                     tab    = tab
                     multi  = lv_multi ).
 
+    " the totals of all rows - a paged grid holds the first ones only
+    IF sums IS BOUND.
+      ASSIGN sums->* TO <sums>.
+    ELSE.
+      ASSIGN tab TO <sums>.
+    ENDIF.
     render_sums( node = node
-                 tab  = tab ).
+                 tab  = <sums> ).
 
     render_subtotals( node = node
-                      tab  = tab ).
+                      tab  = <sums> ).
 
     render_header( node  = node
                    items = mt_footer ).
@@ -4002,9 +4119,11 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
     ENDLOOP.
 
     DATA(lo_items) = lo_table->ele( `items` ).
-    DATA lv_group  TYPE string.
-    DATA lv_number TYPE string.
-    DATA lo_cells  TYPE REF TO z2ui5_cl_ui5_view_builder.
+    DATA lv_group   TYPE string.
+    DATA lv_number  TYPE string.
+    DATA lo_cells   TYPE REF TO z2ui5_cl_ui5_view_builder.
+    DATA lo_numbers TYPE REF TO z2ui5_cl_ui5_view_builder.
+    DATA lt_value   TYPE ty_t_subtotal.
     LOOP AT lt_subtotal INTO DATA(ls_subtotal).
       IF lo_cells IS NOT BOUND OR ls_subtotal-group <> lv_group.
         lv_group = ls_subtotal-group.
@@ -4012,15 +4131,29 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
         lo_cells->tag( `Text`
             )->a( n = `text` t = lv_group ).
         LOOP AT lt_summed INTO ls_summed.
-          CLEAR lv_number.
-          READ TABLE lt_subtotal INTO DATA(ls_value) WITH KEY group  = lv_group
-                                                             column = ls_summed-name.
-          IF sy-subrc = 0.
-            lv_number = |{ ls_value-value NUMBER = USER }|.
+          " one number per currency or unit of the group - stacked where
+          " the group has several
+          CLEAR lt_value.
+          LOOP AT lt_subtotal INTO DATA(ls_value) WHERE group = lv_group AND column = ls_summed-name.
+            INSERT ls_value INTO TABLE lt_value.
+          ENDLOOP.
+          IF lines( lt_value ) > 1.
+            lo_numbers = lo_cells->ele( `VBox` )->a( n = `alignItems` v = `End` ).
+          ELSE.
+            lo_numbers = lo_cells.
           ENDIF.
-          lo_cells->tag( `ObjectNumber`
-              )->a( n = `number`     t = lv_number
-              )->a( n = `emphasized` b = abap_true ).
+          IF lt_value IS INITIAL.
+            INSERT VALUE #( ) INTO TABLE lt_value.
+          ENDIF.
+          LOOP AT lt_value INTO ls_value.
+            lv_number = COND #( WHEN ls_value-column IS NOT INITIAL THEN |{ ls_value-value NUMBER = USER }| ).
+            lo_numbers->tag( `ObjectNumber`
+                )->a( n = `number`     t = lv_number
+                )->a( n = `emphasized` b = abap_true ).
+            IF ls_value-unit IS NOT INITIAL.
+              lo_numbers->a( n = `unit` t = ls_value-unit ).
+            ENDIF.
+          ENDLOOP.
         ENDLOOP.
       ENDIF.
     ENDLOOP.
@@ -4081,6 +4214,9 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
                      WHEN aggregate-aggregation = cs_aggregation-average
                      THEN |{ aggregate-value NUMBER = USER DECIMALS = 2 }|
                      ELSE |{ aggregate-value NUMBER = USER }| ).
+    IF aggregate-unit IS NOT INITIAL.
+      result = |{ result } { aggregate-unit }|.
+    ENDIF.
 
   ENDMETHOD.
 

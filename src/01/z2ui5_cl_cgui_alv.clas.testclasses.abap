@@ -21,8 +21,17 @@ CLASS ltcl_app DEFINITION FINAL CREATE PUBLIC.
       END OF ty_s_plain.
     TYPES ty_t_plain TYPE STANDARD TABLE OF ty_s_plain WITH EMPTY KEY.
 
-    DATA mt_row   TYPE ty_t_row.
-    DATA mt_plain TYPE ty_t_plain.
+    TYPES:
+      BEGIN OF ty_s_amount,
+        carrid TYPE c LENGTH 3,
+        amount TYPE p LENGTH 8 DECIMALS 2,
+        waers  TYPE c LENGTH 5,
+      END OF ty_s_amount.
+    TYPES ty_t_amount TYPE STANDARD TABLE OF ty_s_amount WITH EMPTY KEY.
+
+    DATA mt_row    TYPE ty_t_row.
+    DATA mt_plain  TYPE ty_t_plain.
+    DATA mt_amount TYPE ty_t_amount.
 
 ENDCLASS.
 
@@ -78,6 +87,7 @@ CLASS ltcl_test DEFINITION FINAL FOR TESTING
     METHODS paging FOR TESTING.
     METHODS window_order FOR TESTING.
     METHODS window_filter_selects FOR TESTING.
+    METHODS totals_per_currency FOR TESTING.
     METHODS filter_rows FOR TESTING.
     METHODS colors_and_header FOR TESTING.
     METHODS columns_and_cell_types FOR TESTING.
@@ -635,6 +645,51 @@ CLASS ltcl_test IMPLEMENTATION.
     cl_abap_unit_assert=>assert_false( lo_alv->is_filtered( ) ).
     cl_abap_unit_assert=>assert_equals( act = lines( lo_alv->filter_index( mo_app->mt_row ) )
                                         exp = 3 ).
+
+  ENDMETHOD.
+
+  METHOD totals_per_currency.
+
+    mo_app->mt_amount = VALUE #( ( carrid = `LH` amount = 100 waers = `EUR` )
+                                 ( carrid = `LH` amount = 200 waers = `USD` )
+                                 ( carrid = `AA` amount = 50  waers = `EUR` ) ).
+    DATA(lo_alv) = z2ui5_cl_cgui_alv=>factory(
+        )->set_column_sum( `AMOUNT`
+        )->set_column_currency( name           = `AMOUNT`
+                                currency_field = `WAERS` ).
+
+    " 100 EUR and 200 USD are no total of 300: one total per currency
+    DATA(lt_aggregate) = lo_alv->get_aggregates( mo_app->mt_amount ).
+    cl_abap_unit_assert=>assert_equals( act = lines( lt_aggregate )
+                                        exp = 2 ).
+    cl_abap_unit_assert=>assert_equals( act = lt_aggregate[ unit = `EUR` ]-value
+                                        exp = CONV decfloat34( 150 ) ).
+    cl_abap_unit_assert=>assert_equals( act = lt_aggregate[ unit = `USD` ]-value
+                                        exp = CONV decfloat34( 200 ) ).
+
+    " the printout: a totals line per currency
+    DATA(lt_text) = lo_alv->to_text( mo_app->mt_amount ).
+    cl_abap_unit_assert=>assert_equals( act = lines( lt_text )
+                                        exp = 8 ).
+    cl_abap_unit_assert=>assert_true( xsdbool( lt_text[ 7 ] CS `EUR` ) ).
+    cl_abap_unit_assert=>assert_true( xsdbool( lt_text[ 8 ] CS `USD` ) ).
+
+    " the subtotals per group and currency
+    DATA(lt_subtotal) = lo_alv->set_sort( name     = `CARRID`
+                                          subtotal = abap_true )->get_subtotals( mo_app->mt_amount ).
+    cl_abap_unit_assert=>assert_equals( act = lines( lt_subtotal )
+                                        exp = 3 ).
+    cl_abap_unit_assert=>assert_equals( act = lt_subtotal[ group = `LH` unit = `USD` ]-value
+                                        exp = CONV decfloat34( 200 ) ).
+
+    " a paged grid holds the first rows - the totals are those of all rows
+    DATA(lt_first) = VALUE ltcl_app=>ty_t_amount( ( mo_app->mt_amount[ 1 ] ) ).
+    DATA(lo_view) = z2ui5_cl_ui5_view_builder=>factory( )->ele( `VBox` ).
+    z2ui5_cl_cgui_alv=>factory( )->set_column_sum( `AMOUNT` )->render( node   = lo_view
+                                                                     client = mo_client
+                                                                     tab    = lt_first
+                                                                     sums   = REF #( mo_app->mt_amount ) ).
+    cl_abap_unit_assert=>assert_true( xsdbool( lo_view->stringify( ) CS `350` ) ).
 
   ENDMETHOD.
 

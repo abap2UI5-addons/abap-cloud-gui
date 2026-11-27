@@ -1896,6 +1896,15 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
         skip TYPE i
         top  TYPE i.
 
+    "! the rows of tab the order of the paged grid holds (mt_cgui_alv_order)
+    "! - tab itself when no filter leaves one out; a copy of this
+    "! roundtrip, not kept in the draft
+    METHODS alv_order_rows
+      IMPORTING
+        tab           TYPE REF TO data
+      RETURNING
+        VALUE(result) TYPE REF TO data.
+
     "! the row of the table behind row of the grid
     METHODS alv_row
       IMPORTING
@@ -7022,6 +7031,29 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
 
   ENDMETHOD.
 
+  METHOD alv_order_rows.
+
+    FIELD-SYMBOLS <tab>  TYPE STANDARD TABLE.
+    FIELD-SYMBOLS <rows> TYPE STANDARD TABLE.
+
+    ASSIGN tab->* TO <tab>.
+    IF mo_cgui_alv->is_filtered( ) = abap_false.
+      result = tab.
+      RETURN.
+    ENDIF.
+    CREATE DATA result LIKE <tab>.
+    ASSIGN result->* TO <rows>.
+    " empty - the transpiled runtime copies the rows along with LIKE
+    CLEAR <rows>.
+    LOOP AT mt_cgui_alv_order INTO DATA(lv_row).
+      READ TABLE <tab> ASSIGNING FIELD-SYMBOL(<row>) INDEX lv_row.
+      IF sy-subrc = 0.
+        INSERT <row> INTO TABLE <rows>.
+      ENDIF.
+    ENDLOOP.
+
+  ENDMETHOD.
+
   METHOD alv_visible_source.
 
     result = alv_source( ).
@@ -7650,6 +7682,9 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
         CLEAR: mr_cgui_alv_page, mt_cgui_alv_index, mt_cgui_alv_order.
         IF mo_cgui_alv->get_page_size( ) > 0.
           mt_cgui_alv_order = mo_cgui_alv->window_order( <tab> ).
+          " the totals add up every row of the order, not the first ones
+          " the page holds
+          DATA(lr_sums) = alv_order_rows( lr_tab ).
           CREATE DATA mr_cgui_alv_page LIKE <tab>.
           alv_window_load( skip = 0
                            top  = mo_cgui_alv->get_page_size( ) ).
@@ -7658,7 +7693,8 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
                                client = client
                                tab    = <tab>
                                total  = mv_cgui_alv_total
-                               all    = lv_all ).
+                               all    = lv_all
+                               sums   = lr_sums ).
           RETURN.
         ENDIF.
         DATA(lt_index) = mo_cgui_alv->filter_index( <tab> ).
