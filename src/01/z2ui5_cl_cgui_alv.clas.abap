@@ -859,6 +859,14 @@ CLASS z2ui5_cl_cgui_alv DEFINITION PUBLIC FINAL CREATE PUBLIC.
       RETURNING
         VALUE(result) TYPE ty_t_subtotal.
 
+    "! the functions added to a toolbar - a button each, its name the event
+    "! of the press
+    CLASS-METHODS render_functions
+      IMPORTING
+        bar       TYPE REF TO z2ui5_cl_ui5_view_builder
+        client    TYPE REF TO z2ui5_if_client
+        functions TYPE ty_t_function.
+
     "! a type kind of a number - an integer, packed, float or decfloat
     CLASS-METHODS is_numeric
       IMPORTING
@@ -2768,6 +2776,18 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
 
   ENDMETHOD.
 
+  METHOD render_functions.
+
+    LOOP AT functions REFERENCE INTO DATA(lr_function).
+      bar->tag( `Button`
+          )->a( n = `text`    t = lr_function->text
+          )->a( n = `icon`    v = lr_function->icon
+          )->a( n = `tooltip` t = lr_function->tooltip
+          )->a( n = `press`   v = client->_event( lr_function->name ) ).
+    ENDLOOP.
+
+  ENDMETHOD.
+
   METHOD is_numeric.
 
     CASE type_kind.
@@ -3620,13 +3640,9 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
           )->a( n = `press`   v = client->_event( cs_event-deselect_all ) ).
     ENDIF.
 
-    LOOP AT mt_function REFERENCE INTO DATA(lr_function).
-      lo_bar->tag( `Button`
-          )->a( n = `text`    t = lr_function->text
-          )->a( n = `icon`    v = lr_function->icon
-          )->a( n = `tooltip` t = lr_function->tooltip
-          )->a( n = `press`   v = client->_event( lr_function->name ) ).
-    ENDLOOP.
+    render_functions( bar       = lo_bar
+                      client    = client
+                      functions = mt_function ).
 
     IF mv_no_search = abap_false.
       lo_bar->tag( `SearchField`

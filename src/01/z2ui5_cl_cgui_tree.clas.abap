@@ -796,13 +796,9 @@ CLASS z2ui5_cl_cgui_tree IMPLEMENTATION.
     lo_bar->tag( `Title`
         )->a( n = `text` t = mv_title ).
     lo_bar->tag( `ToolbarSpacer` ).
-    LOOP AT mt_function REFERENCE INTO DATA(lr_function).
-      lo_bar->tag( `Button`
-          )->a( n = `text`    t = lr_function->text
-          )->a( n = `icon`    v = lr_function->icon
-          )->a( n = `tooltip` t = lr_function->tooltip
-          )->a( n = `press`   v = client->_event( lr_function->name ) ).
-    ENDLOOP.
+    z2ui5_cl_cgui_alv=>render_functions( bar       = lo_bar
+                                         client    = client
+                                         functions = mt_function ).
     lo_bar->tag( `Button`
         )->a( n = `icon`    v = `sap-icon://expand-group`
         )->a( n = `tooltip` t = CONV #( 'Expand all'(001) )
