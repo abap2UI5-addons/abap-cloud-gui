@@ -1329,13 +1329,6 @@ CLASS z2ui5_cl_cgui_alv DEFINITION PUBLIC FINAL CREATE PUBLIC.
       RETURNING
         VALUE(result) TYPE string.
 
-    "! val as text of an XML element
-    CLASS-METHODS xlsx_escape
-      IMPORTING
-        val           TYPE string
-      RETURNING
-        VALUE(result) TYPE string.
-
     CLASS-METHODS csv_escape
       IMPORTING
         val           TYPE string
@@ -3308,7 +3301,7 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
     INSERT |{ lc_xml }<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>|
            INTO TABLE lt_xml.
     LOOP AT lt_visible INTO DATA(ls_visible).
-      INSERT |<c t="inlineStr"><is><t>{ xlsx_escape( ls_visible-label ) }</t></is></c>| INTO TABLE lt_cell.
+      INSERT |<c t="inlineStr"><is><t>{ z2ui5_cl_cgui_chart=>xml_escape( ls_visible-label ) }</t></is></c>| INTO TABLE lt_cell.
     ENDLOOP.
     INSERT |<row>{ concat_lines_of( lt_cell ) }</row>| INTO TABLE lt_xml.
 
@@ -3323,7 +3316,7 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
         IF is_numeric( ls_visible-type_kind ) = abap_true.
           INSERT |<c><v>{ <cell> }</v></c>| INTO TABLE lt_cell.
         ELSE.
-          DATA(lv_cell) = xlsx_escape( cell_to_text( val  = <cell>
+          DATA(lv_cell) = z2ui5_cl_cgui_chart=>xml_escape( cell_to_text( val  = <cell>
                                                      comp = ls_visible ) ).
           INSERT |<c t="inlineStr"><is><t>{ lv_cell }</t></is></c>| INTO TABLE lt_cell.
         ENDIF.
@@ -3360,15 +3353,6 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
     lo_zip->add( name    = `xl/worksheets/sheet1.xml`
                  content = z2ui5_cl_cgui_context=>conv_get_xstring_by_string( concat_lines_of( lt_xml ) ) ).
     result = lo_zip->save( ).
-
-  ENDMETHOD.
-
-  METHOD xlsx_escape.
-
-    result = replace( val = val sub = `&` with = `&amp;` occ = 0 ).
-    result = replace( val = result sub = `<` with = `&lt;` occ = 0 ).
-    result = replace( val = result sub = `>` with = `&gt;` occ = 0 ).
-    result = replace( val = result sub = `"` with = `&quot;` occ = 0 ).
 
   ENDMETHOD.
 

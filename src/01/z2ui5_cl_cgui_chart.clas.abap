@@ -83,6 +83,13 @@ CLASS z2ui5_cl_cgui_chart DEFINITION PUBLIC FINAL CREATE PUBLIC.
       RETURNING
         VALUE(result) TYPE string.
 
+    "! val escaped for the text or an attribute of XML - &, <, > and "
+    CLASS-METHODS xml_escape
+      IMPORTING
+        val           TYPE clike
+      RETURNING
+        VALUE(result) TYPE string.
+
   PRIVATE SECTION.
 
     "! the colour of series n
@@ -137,12 +144,6 @@ CLASS z2ui5_cl_cgui_chart DEFINITION PUBLIC FINAL CREATE PUBLIC.
       IMPORTING
         val           TYPE clike
         len           TYPE i
-      RETURNING
-        VALUE(result) TYPE string.
-
-    CLASS-METHODS xml
-      IMPORTING
-        val           TYPE clike
       RETURNING
         VALUE(result) TYPE string.
 
@@ -332,7 +333,7 @@ CLASS z2ui5_cl_cgui_chart IMPLEMENTATION.
 
   METHOD label.
 
-    result = xml( substring( val = val len = nmin( val1 = len val2 = strlen( val ) ) ) ).
+    result = xml_escape( substring( val = val len = nmin( val1 = len val2 = strlen( val ) ) ) ).
 
   ENDMETHOD.
 
@@ -383,7 +384,7 @@ CLASS z2ui5_cl_cgui_chart IMPLEMENTATION.
         " a negative value in another colour, as the single series always had
         DATA(lv_fill) = COND string( WHEN lv_series = 1 AND lv_value < 0 THEN `#E8743B` ELSE color( lv_index ) ).
         result = |{ result }<rect x="{ lc_label }" y="{ lv_bar_y }" width="{ lv_len }" height="{ lc_bar - 2 }" | &&
-                 |fill="{ lv_fill }"><title>{ xml( ls_point-label ) }: { lv_value }</title></rect>| &&
+                 |fill="{ lv_fill }"><title>{ xml_escape( ls_point-label ) }: { lv_value }</title></rect>| &&
                  |<text x="{ lc_label + lv_len + 6 }" y="{ lv_bar_y + lc_bar - 4 }" fill="#32363A">{ lv_value }</text>|.
       ENDLOOP.
     ENDLOOP.
@@ -445,11 +446,11 @@ CLASS z2ui5_cl_cgui_chart IMPLEMENTATION.
           DATA(lv_cx) = lv_x + lv_slot / 2.
           lv_path = COND #( WHEN lv_path IS INITIAL THEN |{ lv_cx },{ lv_y }| ELSE |{ lv_path } { lv_cx },{ lv_y }| ).
           result = |{ result }<circle cx="{ lv_cx }" cy="{ lv_y }" r="3" fill="{ color( lv_index ) }">| &&
-                   |<title>{ xml( ls_point-label ) }: { lv_value }</title></circle>|.
+                   |<title>{ xml_escape( ls_point-label ) }: { lv_value }</title></circle>|.
         ELSE.
           result = |{ result }<rect x="{ lv_x + 4 + ( lv_index - 1 ) * lv_bar }" y="{ nmin( val1 = lv_y val2 = lv_zero ) }" | &&
                    |width="{ lv_bar - 1 }" height="{ nmax( val1 = 1 val2 = abs( lv_zero - lv_y ) ) }" fill="{ color( lv_index ) }">| &&
-                   |<title>{ xml( ls_point-label ) }: { lv_value }</title></rect>|.
+                   |<title>{ xml_escape( ls_point-label ) }: { lv_value }</title></rect>|.
         ENDIF.
       ENDLOOP.
       IF line = abap_true AND lv_path IS NOT INITIAL.
@@ -504,10 +505,10 @@ CLASS z2ui5_cl_cgui_chart IMPLEMENTATION.
       " one slice of all is the whole circle - an arc cannot end where it starts
       IF lv_value = lv_total.
         result = |{ result }<circle cx="{ lv_cx }" cy="{ lv_cy }" r="{ lc_radius }" fill="{ color( lv_index ) }">| &&
-                 |<title>{ xml( ls_point-label ) }: { lv_value }</title></circle>|.
+                 |<title>{ xml_escape( ls_point-label ) }: { lv_value }</title></circle>|.
       ELSE.
         result = |{ result }<path d="M { lv_cx } { lv_cy } L { lv_x1 } { lv_y1 } A { lc_radius } { lc_radius } 0 { lv_large } 1 { lv_x2 } { lv_y2 } Z" | &&
-                 |fill="{ color( lv_index ) }"><title>{ xml( ls_point-label ) }: { lv_value }</title></path>|.
+                 |fill="{ color( lv_index ) }"><title>{ xml_escape( ls_point-label ) }: { lv_value }</title></path>|.
       ENDIF.
       DATA(lv_ly) = 8 + ( lv_index - 1 ) * 20.
       result = |{ result }<rect x="{ 2 * lc_radius + 32 }" y="{ lv_ly }" width="12" height="12" fill="{ color( lv_index ) }"/>| &&
@@ -519,7 +520,7 @@ CLASS z2ui5_cl_cgui_chart IMPLEMENTATION.
 
   ENDMETHOD.
 
-  METHOD xml.
+  METHOD xml_escape.
 
     result = replace( val = val    sub = `&` with = `&amp;` occ = 0 ).
     result = replace( val = result sub = `<` with = `&lt;`  occ = 0 ).
