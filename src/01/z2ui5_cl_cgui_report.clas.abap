@@ -1712,6 +1712,7 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
     METHODS value_help_entity
       IMPORTING
         field         TYPE string
+        pattern       TYPE string OPTIONAL
       RETURNING
         VALUE(result) TYPE abap_bool.
 
@@ -1728,6 +1729,7 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
       IMPORTING
         field         TYPE string
         descr         TYPE REF TO cl_abap_typedescr
+        pattern       TYPE string OPTIONAL
       RETURNING
         VALUE(result) TYPE abap_bool.
 
@@ -3154,17 +3156,24 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
     ENDIF.
     ASSIGN lr_val->* TO <field_val>.
     DATA(lo_descr) = z2ui5_cl_cgui_context=>rtti_get_value_descr( <field_val> ).
+    " what the user typed with a * or + restricts the hit list, as in SAP GUI
+    DATA(lv_pattern) = ``.
+    IF cl_abap_typedescr=>describe_by_data( <field_val> )->kind = cl_abap_typedescr=>kind_elem.
+      lv_pattern = |{ <field_val> }|.
+    ENDIF.
 
     " a CDS entity named as the value help comes first, then MATCHCODE
     " OBJECT, then what the type of the field knows
-    IF value_help_entity( field ) = abap_true.
+    IF value_help_entity( field   = field
+                          pattern = lv_pattern ) = abap_true.
       RETURN.
     ENDIF.
     IF value_help_matchcode( field ) = abap_true.
       RETURN.
     ENDIF.
-    IF value_help_descr( field = field
-                         descr = lo_descr ) = abap_true.
+    IF value_help_descr( field   = field
+                         descr   = lo_descr
+                         pattern = lv_pattern ) = abap_true.
       RETURN.
     ENDIF.
 
@@ -3184,7 +3193,9 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
     IF sy-subrc <> 0 OR lr_mc->entity IS INITIAL.
       RETURN.
     ENDIF.
-    DATA(lr_entity) = z2ui5_cl_cgui_context=>entity_select( lr_mc->entity ).
+    DATA(lr_entity) = z2ui5_cl_cgui_context=>entity_select( entity  = lr_mc->entity
+                                                            column  = lr_mc->entity_elem
+                                                            pattern = pattern ).
     IF lr_entity IS NOT BOUND.
       RETURN.
     ENDIF.
@@ -3273,7 +3284,8 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
     " the value table with the texts of its text table
     DATA(ls_table) = z2ui5_cl_cgui_context=>rtti_get_value_table( descr ).
     IF ls_table-table IS NOT INITIAL.
-      DATA(lr_rows) = z2ui5_cl_cgui_context=>value_table_select( ls_table ).
+      DATA(lr_rows) = z2ui5_cl_cgui_context=>value_table_select( table   = ls_table
+                                                                 pattern = pattern ).
       IF lr_rows IS BOUND.
         ASSIGN lr_rows->* TO <tab>.
         IF <tab> IS NOT INITIAL.

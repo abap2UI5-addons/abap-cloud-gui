@@ -35,6 +35,12 @@ release.
 - The multiple selection (a select-option, the ALV filter) takes a number
   as the user writes it: `1,5` and `1.234,50` with a decimal comma were
   refused as "enter a valid value".
+- The standard F4 of a value table and of a CDS entity: the hit list is the
+  first 500 values by the key, not any 500, and a value typed with `*` or
+  `+` (`47*`) restricts it as in SAP GUI. The texts are read for the values
+  shown only - the whole text table of the language was read and matched
+  in a nested loop - and matched on every field the text table shares with
+  the value table (a region's text belongs to its country too).
 - report2UI5 no longer writes wrong code where it used to: `HIDE` is
   `list( )->hide( )` at the statement - the value when `HIDE` runs, not at
   the `WRITE` before it - and works for a table with a header line and in a

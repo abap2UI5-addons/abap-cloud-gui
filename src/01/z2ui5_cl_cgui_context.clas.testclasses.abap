@@ -40,6 +40,7 @@ CLASS ltcl_test DEFINITION FINAL FOR TESTING
     METHODS binding_currency_unit FOR TESTING.
     METHODS binding_plain FOR TESTING.
     METHODS binding_comp FOR TESTING.
+    METHODS like_of_a_pattern FOR TESTING.
 
 ENDCLASS.
 
@@ -49,6 +50,23 @@ ENDCLASS.
 
 
 CLASS ltcl_test IMPLEMENTATION.
+
+  METHOD like_of_a_pattern.
+
+    " the wildcards of SAP GUI as those of LIKE, LIKE's own escaped
+    cl_abap_unit_assert=>assert_equals(
+        exp = `KUNNR LIKE '47%' ESCAPE '#'`
+        act = z2ui5_cl_cgui_context=>sql_like( column  = `kunnr`
+                                                pattern = `47*` ) ).
+    cl_abap_unit_assert=>assert_equals(
+        exp = `NAME LIKE 'A#_B_#%''%' ESCAPE '#'`
+        act = z2ui5_cl_cgui_context=>sql_like( column  = `NAME`
+                                                pattern = `A_B+%'*` ) ).
+    " no wildcard - no restriction
+    cl_abap_unit_assert=>assert_initial( z2ui5_cl_cgui_context=>sql_like( column  = `KUNNR`
+                                                                           pattern = `4711` ) ).
+
+  ENDMETHOD.
 
   METHOD range_empty_selects_all.
 
