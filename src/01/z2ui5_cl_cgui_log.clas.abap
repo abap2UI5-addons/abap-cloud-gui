@@ -17,8 +17,12 @@ CLASS z2ui5_cl_cgui_log DEFINITION PUBLIC FINAL CREATE PUBLIC.
 
     METHODS clear.
 
-  PRIVATE SECTION.
+  PROTECTED SECTION.
+    " PROTECTED, not PRIVATE: the log is kept with the report, and the
+    " transpiled runtime reaches PROTECTED attributes but not PRIVATE ones
     DATA mt_message TYPE z2ui5_if_cgui_log=>ty_t_message.
+
+  PRIVATE SECTION.
 
 ENDCLASS.
 
