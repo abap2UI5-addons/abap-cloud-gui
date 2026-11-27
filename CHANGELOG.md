@@ -219,6 +219,11 @@ release.
   for input - and the multiple selection a parameter, as the URL does: a
   crafted event set such a field, or ended in an assignment error.
   `z2ui5_cl_cgui_selscreen=>ty_s_field` has `read_only`.
+- CALL SELECTION-SCREEN ... AS WINDOW runs AT SELECTION-SCREEN OUTPUT, ON
+  field and AT SELECTION-SCREEN for the screen called, as SAP GUI does for
+  every selection screen - an E message keeps the dialog; its parameters
+  are converted to upper case and ALPHA like those of the selection screen
+  (`mat1` stayed lower case and found nothing).
 
 **The value help and table controls in windows too**
 

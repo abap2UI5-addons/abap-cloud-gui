@@ -163,6 +163,7 @@ CLASS ltcl_report DEFINITION INHERITING FROM z2ui5_cl_cgui_report FINAL.
     METHODS at_roundtrip_start REDEFINITION.
     METHODS initialization REDEFINITION.
     METHODS at_selection_screen_on_block REDEFINITION.
+    METHODS at_selection_screen_on REDEFINITION.
     METHODS end_of_page REDEFINITION.
     METHODS at_selection_screen_on_exit REDEFINITION.
     METHODS at_value_request REDEFINITION.
@@ -269,6 +270,7 @@ CLASS ltcl_test DEFINITION FINAL FOR TESTING
     METHODS line_selection_calls_screen FOR TESTING.
     METHODS user_command_secondary_list FOR TESTING.
     METHODS empty_list_restarts FOR TESTING.
+    METHODS screen_as_window_checks FOR TESTING.
     METHODS popup_in_the_run FOR TESTING.
     METHODS leave_during_the_run FOR TESTING.
     METHODS file_upload_and_download FOR TESTING.
@@ -768,6 +770,16 @@ CLASS ltcl_report IMPLEMENTATION.
 
   ENDMETHOD.
 
+  METHOD at_selection_screen_on.
+
+    IF field = `P_TEXT` AND p_text = `BAD`.
+      message( text  = `Not this text`
+               type  = `E`
+               field = field ).
+    ENDIF.
+
+  ENDMETHOD.
+
   METHOD at_selection_screen_on_block.
 
     mv_block = block.
@@ -1098,6 +1110,32 @@ CLASS ltcl_test IMPLEMENTATION.
                                         exp = 2 ).
     cl_abap_unit_assert=>assert_equals( act = mo_report->p_carrid
                                         exp = `LH` ).
+
+  ENDMETHOD.
+
+  METHOD screen_as_window_checks.
+
+    " CALL SELECTION-SCREEN 1100 AS WINDOW
+    init( ).
+    mo_cut->call_selection_screen( `1100` ).
+    event( `NOTHING` ).
+    cl_abap_unit_assert=>assert_true( xsdbool( mo_client->mv_popup CS `Note on 1100` ) ).
+
+    " the input as SAP GUI converts it, then AT SELECTION-SCREEN ON - an
+    " error keeps the dialog
+    mo_report->p_text = `bad`.
+    event( z2ui5_cl_cgui_report=>cs_ucomm-screen_ok ).
+    cl_abap_unit_assert=>assert_equals( act = mo_report->p_text
+                                        exp = `BAD` ).
+    cl_abap_unit_assert=>assert_equals( act = mo_cut->mv_cgui_dynnr
+                                        exp = `1100` ).
+    cl_abap_unit_assert=>assert_true( xsdbool( line_exists( mo_cut->mt_cgui_msg[ text = `Not this text` ] ) ) ).
+
+    mo_report->p_text = `fine`.
+    event( z2ui5_cl_cgui_report=>cs_ucomm-screen_ok ).
+    cl_abap_unit_assert=>assert_equals( act = mo_report->p_text
+                                        exp = `FINE` ).
+    cl_abap_unit_assert=>assert_initial( mo_cut->mv_cgui_dynnr ).
 
   ENDMETHOD.
 

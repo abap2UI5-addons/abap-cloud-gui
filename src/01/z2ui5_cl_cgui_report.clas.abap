@@ -1596,6 +1596,12 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
       RETURNING
         VALUE(result) TYPE abap_bool.
 
+    "! upper case and ALPHA of the parameters among fields, as SAP GUI
+    "! converts the input
+    METHODS input_convert
+      IMPORTING
+        fields TYPE z2ui5_cl_cgui_selscreen=>ty_t_field.
+
     "! the inputs of the roundtrip: the select-option buffer into the ranges,
     "! character fields to upper case
     METHODS input_sync.
@@ -4274,9 +4280,6 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
   METHOD input_sync.
 
     FIELD-SYMBOLS <range> TYPE STANDARD TABLE.
-    FIELD-SYMBOLS <field_val>   TYPE clike.
-    FIELD-SYMBOLS <alpha_val>   TYPE any.
-    DATA lr_val TYPE REF TO data.
 
     IF mv_cgui_screen <> cs_screen-selection.
       RETURN.
@@ -4317,8 +4320,18 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
       ENDTRY.
     ENDLOOP.
 
+    input_convert( mt_cgui_field ).
+
+  ENDMETHOD.
+
+  METHOD input_convert.
+
+    FIELD-SYMBOLS <field_val> TYPE clike.
+    FIELD-SYMBOLS <alpha_val> TYPE any.
+    DATA lr_val TYPE REF TO data.
+
     " PARAMETERS without LOWER CASE
-    LOOP AT mt_cgui_field REFERENCE INTO lr_field
+    LOOP AT fields REFERENCE INTO DATA(lr_field)
          WHERE upper = abap_true AND kind = z2ui5_cl_cgui_selscreen=>cs_field_kind-parameter.
       lr_val = attri_assign( lr_field->name ).
       IF lr_val IS NOT BOUND.
@@ -4330,7 +4343,7 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
 
     " the conversion exit ALPHA of a parameter's data element - 4711 into a
     " KUNNR is 0000004711, as SAP GUI stores it
-    LOOP AT mt_cgui_field REFERENCE INTO lr_field
+    LOOP AT fields REFERENCE INTO lr_field
          WHERE kind = z2ui5_cl_cgui_selscreen=>cs_field_kind-parameter.
       lr_val = attri_assign( lr_field->name ).
       IF lr_val IS NOT BOUND.
@@ -6900,8 +6913,27 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
 
   METHOD on_screen_ok.
 
-    " the required fields of the popup screen, then the report decides
+    " the input as on the selection screen, the required fields of the
+    " popup screen, then AT SELECTION-SCREEN ON field and AT SELECTION-SCREEN
+    " as for every selection screen - an error keeps the dialog
+    input_convert( mt_cgui_dynnr_field ).
     IF check_obligatory( mt_cgui_dynnr_field ) = abap_false.
+      RETURN.
+    ENDIF.
+    mv_cgui_stop = abap_false.
+    LOOP AT mt_cgui_dynnr_field REFERENCE INTO DATA(lr_field) WHERE shown = abap_true.
+      mv_cgui_on_field = lr_field->name.
+      at_selection_screen_on( lr_field->name ).
+      CLEAR mv_cgui_on_field.
+      IF mv_cgui_stop = abap_true.
+        EXIT.
+      ENDIF.
+    ENDLOOP.
+    IF mv_cgui_stop = abap_false.
+      at_selection_screen( ).
+    ENDIF.
+    IF mv_cgui_stop = abap_true.
+      mv_cgui_stop = abap_false.
       RETURN.
     ENDIF.
 
@@ -7931,6 +7963,10 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
     DATA(screen) = z2ui5_cl_cgui_selscreen=>factory( client ).
     selection_screen_dynnr( dynnr  = mv_cgui_dynnr
                             screen = screen ).
+    " its PBO: AT SELECTION-SCREEN OUTPUT, as for every selection screen
+    mo_cgui_screen = screen.
+    at_selection_screen_output( screen ).
+    CLEAR mo_cgui_screen.
     mt_cgui_dynnr_field = screen->get_fields( ).
 
     DATA(lo_dialog) = z2ui5_cl_ui5_view_builder=>factory(
