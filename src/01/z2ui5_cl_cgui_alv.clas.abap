@@ -4135,8 +4135,16 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
 
     FIELD-SYMBOLS <row>  TYPE any.
     FIELD-SYMBOLS <cell> TYPE any.
+    FIELD-SYMBOLS <copy> TYPE STANDARD TABLE.
     DATA lt_line TYPE string_table.
     DATA lt_cell TYPE string_table.
+    DATA lr_copy TYPE REF TO data.
+
+    " in the order of the layout, as to_text( ) and to_xlsx( ) have it
+    CREATE DATA lr_copy LIKE tab.
+    ASSIGN lr_copy->* TO <copy>.
+    <copy> = tab.
+    sort_rows( CHANGING tab = <copy> ).
 
     DATA(lv_sep) = mv_separator.
     IF lv_sep IS INITIAL.
@@ -4150,7 +4158,7 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
     ENDLOOP.
     INSERT concat_lines_of( table = lt_cell sep = lv_sep ) INTO TABLE lt_line.
 
-    LOOP AT tab ASSIGNING <row>.
+    LOOP AT <copy> ASSIGNING <row>.
       CLEAR lt_cell.
       LOOP AT lt_comp INTO ls_comp.
         ASSIGN COMPONENT ls_comp-name OF STRUCTURE <row> TO <cell>.

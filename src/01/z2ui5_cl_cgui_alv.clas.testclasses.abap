@@ -444,6 +444,27 @@ CLASS ltcl_test IMPLEMENTATION.
                                        tab    = mo_app->mt_row ).
     cl_abap_unit_assert=>assert_true( xsdbool( lv_view CS `headerText="Subtotals"` ) ).
 
+    " the groups in the order of the sorting, not of their texts: 9 before 10
+    mo_app->mt_plain = VALUE #( ( carrid = `LH` seats = 10 )
+                                ( carrid = `AA` seats = 9 )
+                                ( carrid = `UA` seats = 10 ) ).
+    lt_subtotal = z2ui5_cl_cgui_alv=>factory(
+        )->set_sort( name     = `SEATS`
+                     subtotal = abap_true
+        )->set_column_sum( `SEATS` )->get_subtotals( mo_app->mt_plain ).
+    cl_abap_unit_assert=>assert_equals( act = lines( lt_subtotal )
+                                        exp = 2 ).
+    cl_abap_unit_assert=>assert_equals( act = lt_subtotal[ 1 ]-value
+                                        exp = CONV decfloat34( 9 ) ).
+    cl_abap_unit_assert=>assert_equals( act = lt_subtotal[ 2 ]-value
+                                        exp = CONV decfloat34( 20 ) ).
+
+    " the CSV export in the order of the layout as well
+    DATA(lv_csv) = z2ui5_cl_cgui_alv=>factory( )->set_sort( `CARRID` )->to_csv( mo_app->mt_row ).
+    FIND `AA` IN lv_csv MATCH OFFSET DATA(lv_aa).
+    FIND `LH` IN lv_csv MATCH OFFSET DATA(lv_lh).
+    cl_abap_unit_assert=>assert_true( xsdbool( lv_aa < lv_lh ) ).
+
   ENDMETHOD.
 
   METHOD xlsx_export.
