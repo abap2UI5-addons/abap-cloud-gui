@@ -38,6 +38,11 @@ CLASS z2ui5_cl_cgui_salv_column DEFINITION PUBLIC CREATE PUBLIC.
       IMPORTING
         value TYPE clike.
 
+    "! the longest text set - long, else medium, else short
+    METHODS get_text
+      RETURNING
+        VALUE(value) TYPE string.
+
     METHODS get_long_text
       RETURNING
         VALUE(value) TYPE string.
@@ -137,6 +142,14 @@ CLASS z2ui5_cl_cgui_salv_column IMPLEMENTATION.
   METHOD set_short_text.
 
     mv_short = value.
+
+  ENDMETHOD.
+
+  METHOD get_text.
+
+    value = COND #( WHEN mv_long IS NOT INITIAL THEN mv_long
+                    WHEN mv_medium IS NOT INITIAL THEN mv_medium
+                    ELSE mv_short ).
 
   ENDMETHOD.
 

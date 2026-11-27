@@ -270,9 +270,7 @@ CLASS z2ui5_cl_cgui_salv_table IMPLEMENTATION.
     LOOP AT mo_columns->get( ) INTO DATA(ls_ref).
       DATA(lo_column) = ls_ref-r_column.
       INSERT VALUE #( fieldname = lo_column->mv_name
-                      scrtext_l = COND #( WHEN lo_column->mv_long IS NOT INITIAL THEN lo_column->mv_long
-                                          WHEN lo_column->mv_medium IS NOT INITIAL THEN lo_column->mv_medium
-                                          ELSE lo_column->mv_short )
+                      scrtext_l = lo_column->get_text( )
                       no_out    = lo_column->mv_hidden
                       tech      = lo_column->mv_technical
                       hotspot   = lo_column->mv_hotspot

@@ -157,9 +157,7 @@ CLASS z2ui5_cl_cgui_salv_tree IMPLEMENTATION.
     ENDIF.
     LOOP AT mo_columns->get( ) INTO DATA(ls_ref).
       DATA(lo_column) = ls_ref-r_column.
-      DATA(lv_text) = COND string( WHEN lo_column->mv_long IS NOT INITIAL THEN lo_column->mv_long
-                                   WHEN lo_column->mv_medium IS NOT INITIAL THEN lo_column->mv_medium
-                                   ELSE lo_column->mv_short ).
+      DATA(lv_text) = lo_column->get_text( ).
       IF lv_text IS NOT INITIAL.
         mo_tree->set_column_text( name = lo_column->mv_name
                                   text = lv_text ).
