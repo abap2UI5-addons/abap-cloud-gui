@@ -189,12 +189,7 @@ CLASS z2ui5_cl_cgui_file IMPLEMENTATION.
       RETURN.
     ENDIF.
     " the name without the folder - the browser hands C:\fakepath\name over
-    ls_file-name = mv_path.
-    REPLACE ALL OCCURRENCES OF `\` IN ls_file-name WITH `/`.
-    DATA(lv_slash) = find( val = ls_file-name sub = `/` occ = -1 ).
-    IF lv_slash >= 0.
-      ls_file-name = substring( val = ls_file-name off = lv_slash + 1 ).
-    ENDIF.
+    ls_file-name = z2ui5_cl_cgui_frontend=>file_name( mv_path ).
     IF ls_file-name IS INITIAL.
       ls_file-name = `upload`.
     ENDIF.
