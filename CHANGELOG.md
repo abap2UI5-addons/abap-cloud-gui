@@ -41,6 +41,11 @@ release.
   shown only - the whole text table of the language was read and matched
   in a nested loop - and matched on every field the text table shares with
   the value table (a region's text belongs to its country too).
+- The conversion exit `ALPHA` runs on input, as in SAP GUI: `4711` typed
+  into a parameter or select-option of a data element with `ALPHA`
+  (`KUNNR`, `MATNR`, `VBELN`, ...), into the multiple selection or the ALV
+  filter of such a column is `0000004711`, so `WHERE kunnr = p_kunnr` finds
+  it. The value is shown with its leading zeros afterwards.
 - report2UI5 no longer writes wrong code where it used to: `HIDE` is
   `list( )->hide( )` at the statement - the value when `HIDE` runs, not at
   the `WRITE` before it - and works for a table with a header line and in a

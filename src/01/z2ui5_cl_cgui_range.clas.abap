@@ -318,13 +318,21 @@ CLASS z2ui5_cl_cgui_range IMPLEMENTATION.
     <comp> = sign.
     ASSIGN COMPONENT `OPTION` OF STRUCTURE <line> TO <comp>.
     <comp> = option.
+    " a value with the conversion exit ALPHA as SAP GUI stores it - not a
+    " pattern
     IF low IS SUPPLIED.
       ASSIGN COMPONENT `LOW` OF STRUCTURE <line> TO <comp>.
       <comp> = low.
+      IF option <> `CP` AND option <> `NP`.
+        z2ui5_cl_cgui_context=>conv_alpha_in( CHANGING val = <comp> ).
+      ENDIF.
     ENDIF.
     IF high IS SUPPLIED.
       ASSIGN COMPONENT `HIGH` OF STRUCTURE <line> TO <comp>.
       <comp> = high.
+      IF option <> `CP` AND option <> `NP`.
+        z2ui5_cl_cgui_context=>conv_alpha_in( CHANGING val = <comp> ).
+      ENDIF.
     ENDIF.
     INSERT <line> INTO TABLE range.
 
@@ -422,6 +430,11 @@ CLASS z2ui5_cl_cgui_range IMPLEMENTATION.
                            with = |{ lv_index }| ).
           RETURN.
       ENDTRY.
+      " 4711 into a KUNNR is 0000004711, as SAP GUI stores it
+      IF ls_row-option <> `CP` AND ls_row-option <> `NP`.
+        z2ui5_cl_cgui_context=>conv_alpha_in( CHANGING val = <low> ).
+        z2ui5_cl_cgui_context=>conv_alpha_in( CHANGING val = <high> ).
+      ENDIF.
 
       " a date or a time takes digits only - text would be taken over as it is
       IF ls_row-option <> `CP` AND ls_row-option <> `NP`

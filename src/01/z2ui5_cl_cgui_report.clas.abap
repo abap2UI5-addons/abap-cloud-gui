@@ -4085,6 +4085,8 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
 
     FIELD-SYMBOLS <range> TYPE STANDARD TABLE.
     FIELD-SYMBOLS <field_val>   TYPE clike.
+    FIELD-SYMBOLS <alpha_val>   TYPE any.
+    DATA lr_val TYPE REF TO data.
 
     IF mv_cgui_screen <> cs_screen-selection.
       RETURN.
@@ -4128,12 +4130,24 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
     " PARAMETERS without LOWER CASE
     LOOP AT mt_cgui_field REFERENCE INTO lr_field
          WHERE upper = abap_true AND kind = z2ui5_cl_cgui_selscreen=>cs_field_kind-parameter.
-      DATA(lr_val) = attri_assign( lr_field->name ).
+      lr_val = attri_assign( lr_field->name ).
       IF lr_val IS NOT BOUND.
         CONTINUE.
       ENDIF.
       ASSIGN lr_val->* TO <field_val>.
       <field_val> = to_upper( <field_val> ).
+    ENDLOOP.
+
+    " the conversion exit ALPHA of a parameter's data element - 4711 into a
+    " KUNNR is 0000004711, as SAP GUI stores it
+    LOOP AT mt_cgui_field REFERENCE INTO lr_field
+         WHERE kind = z2ui5_cl_cgui_selscreen=>cs_field_kind-parameter.
+      lr_val = attri_assign( lr_field->name ).
+      IF lr_val IS NOT BOUND.
+        CONTINUE.
+      ENDIF.
+      ASSIGN lr_val->* TO <alpha_val>.
+      z2ui5_cl_cgui_context=>conv_alpha_in( CHANGING val = <alpha_val> ).
     ENDLOOP.
 
   ENDMETHOD.

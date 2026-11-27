@@ -139,6 +139,12 @@ CLASS z2ui5_cl_cgui_context DEFINITION PUBLIC FINAL CREATE PUBLIC.
       RETURNING
         VALUE(result) TYPE string.
 
+    "! the conversion exit ALPHA of the data element of val, as SAP GUI
+    "! runs it on input: 4711 into a KUNNR is 0000004711 - else val stays
+    CLASS-METHODS conv_alpha_in
+      CHANGING
+        val TYPE any.
+
     " the elementary components of the line type of a table of structures,
     " with their DDIC label (or the component name) - the ALV field catalog
     CLASS-METHODS rtti_get_t_comp
@@ -1853,6 +1859,26 @@ CLASS z2ui5_cl_cgui_context IMPLEMENTATION.
         ENDLOOP.
       CATCH cx_root ##NO_HANDLER.
         " no texts - the values all the same
+    ENDTRY.
+
+  ENDMETHOD.
+
+  METHOD conv_alpha_in.
+
+    FIELD-SYMBOLS <char> TYPE c.
+
+    TRY.
+        DATA(lo_elem) = CAST cl_abap_elemdescr( cl_abap_typedescr=>describe_by_data( val ) ).
+        IF lo_elem->type_kind <> cl_abap_typedescr=>typekind_char OR lo_elem->is_ddic_type( ) = abap_false.
+          RETURN.
+        ENDIF.
+        IF lo_elem->get_ddic_field( )-convexit <> `ALPHA`.
+          RETURN.
+        ENDIF.
+        ASSIGN val TO <char>.
+        <char> = |{ <char> ALPHA = IN }|.
+      CATCH cx_root ##NO_HANDLER.
+        " no DDIC (ABAP Cloud, a type of the program) - no conversion
     ENDTRY.
 
   ENDMETHOD.
