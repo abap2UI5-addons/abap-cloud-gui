@@ -533,6 +533,12 @@ test("zr2c_06_dynamic: radio buttons and checkbox with USER-COMMAND, MODIF ID, L
   s = await d.act(s.session, { event: "CGUI_BACK" });
   s = await d.act(s.session, { values: { P_EXPERT: true }, event: "EXPERT" });
   assert.equal(s.fields.find((f) => f.name === "P_PLANT")?.value, "1000", "the plant MODE set");
+  // in create mode AT SELECTION-SCREEN OUTPUT makes the plant an output field
+  // (screen-input = 0): its F4 takes no value, the runtime opens none
+  s = await d.act(s.session, { event: "CGUI_VALUE_REQUEST" });
+  assert.equal(s.layer, "main", "no F4 into a field not ready for input");
+  s = await d.act(s.session, { values: { P_DISP: true, P_CREA: false }, event: "MODE" });
+  assert.equal(s.fields.find((f) => f.name === "P_PLANT")?.value, "1000", "display mode keeps the plant");
   s = await d.act(s.session, { event: "CGUI_VALUE_REQUEST" });
   assert.equal(s.layer, "popup");
   // the F4 popup (z2ui5_cl_cgui_select, the runtime's own value selection) is a table of the snapshot
@@ -552,8 +558,9 @@ test("zr2c_06_dynamic: radio buttons and checkbox with USER-COMMAND, MODIF ID, L
   assert.equal(s.layer, "main");
   assert.equal(s.fields.find((f) => f.name === "P_PLANT").value, "3000", "the picked row's WERKS");
 
-  // the push button
-  s = await d.act(s.session, { event: "RESET" });
+  // the push button - in create mode, whose description it clears
+  s = await d.act(s.session, { values: { P_CREA: true, P_DISP: false }, event: "MODE" });
+  s = await d.act(s.session, { values: { P_NAME: "Nut" }, event: "RESET" });
   assert.deepEqual(toasts(s), ["Selection screen reset"]);
   assert.equal(s.fields.find((f) => f.name === "P_NAME").value, "");
 });
