@@ -64,8 +64,9 @@ CLASS z2ui5_cl_cgui_selscreen DEFINITION PUBLIC FINAL CREATE PRIVATE.
       "! NO-DISPLAY, value_help whether the field has F4, no_intervals the
       "! classic NO INTERVALS of a select-option, max_length its input length,
       "! value_check the classic VALUE CHECK, help whether F1 has a text, dtel
-      "! the data element, block the name of the block it is in, group the
-      "! group of a radio button
+      "! the data element, block the name of the block it is in, blocks the
+      "! named blocks it is in from the outermost one, group the group of a
+      "! radio button
       BEGIN OF ty_s_field,
         name       TYPE string,
         text       TYPE string,
@@ -86,6 +87,9 @@ CLASS z2ui5_cl_cgui_selscreen DEFINITION PUBLIC FINAL CREATE PRIVATE.
         matchcode    TYPE string,
         entity       TYPE string,
         entity_elem  TYPE string,
+        "! shown but not ready for input (read_only, screen-input = 0)
+        read_only    TYPE abap_bool,
+        blocks       TYPE string_table,
       END OF ty_s_field.
 
     TYPES:
@@ -596,6 +600,14 @@ CLASS z2ui5_cl_cgui_selscreen DEFINITION PUBLIC FINAL CREATE PRIVATE.
         item          TYPE ty_s_item
       RETURNING
         VALUE(result) TYPE ty_t_value.
+
+    "! whether a radio button is selected now - its attribute, which AT
+    "! SELECTION-SCREEN OUTPUT may have switched since it was declared
+    METHODS radio_selected
+      IMPORTING
+        item          TYPE ty_s_item
+      RETURNING
+        VALUE(result) TYPE abap_bool.
 
     METHODS render_listbox
       IMPORTING
@@ -1147,22 +1159,49 @@ CLASS z2ui5_cl_cgui_selscreen IMPLEMENTATION.
 
   ENDMETHOD.
 
+  METHOD radio_selected.
+
+    FIELD-SYMBOLS <field_val> TYPE any.
+
+    result = item-selected.
+    IF item-name IS INITIAL OR mv_preview = abap_true OR mo_app IS NOT BOUND.
+      RETURN.
+    ENDIF.
+    ASSIGN mo_app->(item-name) TO <field_val>.
+    IF <field_val> IS ASSIGNED.
+      result = xsdbool( <field_val> = abap_true ).
+    ENDIF.
+
+  ENDMETHOD.
+
   METHOD get_fields.
 
+    " the blocks open, from the outermost one - a block in a block
+    DATA lt_open  TYPE string_table.
     DATA lv_block TYPE string.
+    DATA lt_block TYPE string_table.
 
     LOOP AT mt_item REFERENCE INTO DATA(lr_item).
       CASE lr_item->kind.
         WHEN cs_kind-block_begin.
-          lv_block = lr_item->group.
+          INSERT lr_item->group INTO TABLE lt_open.
           CONTINUE.
         WHEN cs_kind-block_end.
-          CLEAR lv_block.
+          IF lt_open IS NOT INITIAL.
+            DELETE lt_open INDEX lines( lt_open ).
+          ENDIF.
           CONTINUE.
       ENDCASE.
       IF lr_item->name IS INITIAL.
         CONTINUE.
       ENDIF.
+      CLEAR: lv_block, lt_block.
+      IF lt_open IS NOT INITIAL.
+        lv_block = lt_open[ lines( lt_open ) ].
+      ENDIF.
+      LOOP AT lt_open INTO DATA(lv_open) WHERE table_line IS NOT INITIAL.
+        INSERT lv_open INTO TABLE lt_block.
+      ENDLOOP.
       INSERT VALUE #( name       = lr_item->name
                       text       = lr_item->text
                       obligatory = xsdbool( lr_item->required = abap_true
@@ -1187,7 +1226,9 @@ CLASS z2ui5_cl_cgui_selscreen IMPLEMENTATION.
                       group        = COND #( WHEN lr_item->kind = cs_kind-radiobutton THEN lr_item->group )
                       matchcode    = lr_item->matchcode
                       entity       = lr_item->entity
-                      entity_elem  = lr_item->entity_elem ) INTO TABLE result.
+                      entity_elem  = lr_item->entity_elem
+                      read_only    = lr_item->read_only
+                      blocks       = lt_block ) INTO TABLE result.
     ENDLOOP.
 
   ENDMETHOD.
@@ -1567,7 +1608,7 @@ CLASS z2ui5_cl_cgui_selscreen IMPLEMENTATION.
         " buttons. The view is rendered anew after every roundtrip, so the
         " wiring follows the selection
         DATA(lv_ucomm) = group_user_command( item-group ).
-        IF lv_ucomm IS NOT INITIAL AND item-selected = abap_false.
+        IF lv_ucomm IS NOT INITIAL AND radio_selected( item ) = abap_false.
           node->a( n = `select` v = client->_event( lv_ucomm ) ).
         ENDIF.
 

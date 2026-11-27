@@ -4,10 +4,11 @@
 "! cl_salv_functional_settings in one, and cl_salv_tree_settings:
 "! get_display_settings( ),
 "! get_functions( ), get_selections( ), ... of z2ui5_cl_cgui_salv_table
-"! answer it. The title, the striped rows, the functions added and the
-"! selection mode go to the grid at display( ); get_selected_rows( ) are the
-"! rows the user picked in it. The rest is taken without effect - the grid
-"! of the browser sorts, filters and totals by itself
+"! answer it. The title, the striped rows, the functions added, the
+"! selection mode, the sorts (with their subtotals) and the totals of the
+"! aggregations go to the grid at display( ); get_selected_rows( ) are the
+"! rows the user picked in it. The rest is taken without effect - an
+"! aggregation other than the total among them
 CLASS z2ui5_cl_cgui_salv_config DEFINITION PUBLIC CREATE PUBLIC.
 
   PUBLIC SECTION.
@@ -30,11 +31,22 @@ CLASS z2ui5_cl_cgui_salv_config DEFINITION PUBLIC CREATE PUBLIC.
         tooltip TYPE string,
       END OF ty_s_function.
     TYPES ty_t_function TYPE STANDARD TABLE OF ty_s_function WITH EMPTY KEY.
+    TYPES:
+      "! a sort added - the initial sort of the grid, in this order
+      BEGIN OF ty_s_sort,
+        columnname TYPE string,
+        descending TYPE abap_bool,
+        subtotal   TYPE abap_bool,
+      END OF ty_s_sort.
+    TYPES ty_t_sort TYPE STANDARD TABLE OF ty_s_sort WITH EMPTY KEY.
 
     DATA mv_title          TYPE string READ-ONLY.
     DATA mv_striped        TYPE abap_bool READ-ONLY.
     DATA mv_selection_mode TYPE i READ-ONLY.
     DATA mt_function       TYPE ty_t_function READ-ONLY.
+    DATA mt_sort           TYPE ty_t_sort READ-ONLY.
+    "! the columns totalled - add_aggregation( ) with the total
+    DATA mt_aggregation    TYPE string_table READ-ONLY.
 
     "! the grid of the table - z2ui5_cl_cgui_salv_table sets it at display( )
     METHODS set_grid
@@ -269,10 +281,32 @@ CLASS z2ui5_cl_cgui_salv_config IMPLEMENTATION.
   METHOD get_current_cell ##NEEDED.
   ENDMETHOD.
 
-  METHOD add_sort ##NEEDED.
+  METHOD add_sort.
+
+    DATA(lv_name) = to_upper( condense( columnname ) ).
+    DELETE mt_sort WHERE columnname = lv_name.
+    DATA(ls_sort) = VALUE ty_s_sort( columnname = lv_name
+                                     descending = xsdbool( sequence = z2ui5_if_cgui_salv_c=>sort-sort_down )
+                                     subtotal   = subtotal ).
+    IF position > 0 AND position <= lines( mt_sort ).
+      INSERT ls_sort INTO mt_sort INDEX position.
+    ELSE.
+      INSERT ls_sort INTO TABLE mt_sort.
+    ENDIF.
+
   ENDMETHOD.
 
-  METHOD add_aggregation ##NEEDED.
+  METHOD add_aggregation.
+
+    " the grid totals - a minimum, maximum or average has no counterpart
+    IF aggregation IS NOT INITIAL AND aggregation <> z2ui5_if_cgui_salv_c=>aggregation-total.
+      RETURN.
+    ENDIF.
+    DATA(lv_name) = to_upper( condense( columnname ) ).
+    IF NOT line_exists( mt_aggregation[ table_line = lv_name ] ).
+      INSERT lv_name INTO TABLE mt_aggregation.
+    ENDIF.
+
   ENDMETHOD.
 
   METHOD set_key ##NEEDED.

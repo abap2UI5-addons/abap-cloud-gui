@@ -1,7 +1,8 @@
 "! The stand-in of cl_salv_column, cl_salv_column_table and
 "! cl_salv_column_list - a column of z2ui5_cl_cgui_salv_table. What is set
-"! here is the field catalog of the grid at display( ); the rest of the
-"! settings of a classic column are taken without effect
+"! here is the field catalog of the grid at display( ) - texts, visibility,
+"! key, hotspot, length, tooltip, zero, alignment; the rest of the settings
+"! of a classic column are taken without effect
 CLASS z2ui5_cl_cgui_salv_column DEFINITION PUBLIC CREATE PUBLIC.
 
   PUBLIC SECTION.
@@ -17,6 +18,10 @@ CLASS z2ui5_cl_cgui_salv_column DEFINITION PUBLIC CREATE PUBLIC.
     DATA mv_key       TYPE abap_bool READ-ONLY.
     DATA mv_length    TYPE i READ-ONLY.
     DATA mv_tooltip   TYPE string READ-ONLY.
+    "! set_zero( abap_false ) - a zero shows as an empty cell
+    DATA mv_no_zero   TYPE abap_bool READ-ONLY.
+    "! set_alignment( ) - L, R or C, the JUST of the field catalog
+    DATA mv_just      TYPE c LENGTH 1 READ-ONLY.
 
     METHODS constructor
       IMPORTING
@@ -213,13 +218,22 @@ CLASS z2ui5_cl_cgui_salv_column IMPLEMENTATION.
 
   ENDMETHOD.
 
-  METHOD set_alignment ##NEEDED.
+  METHOD set_alignment.
+
+    mv_just = SWITCH #( value
+                        WHEN z2ui5_if_cgui_salv_c=>alignment-left THEN `L`
+                        WHEN z2ui5_if_cgui_salv_c=>alignment-right THEN `R`
+                        WHEN z2ui5_if_cgui_salv_c=>alignment-centered THEN `C` ).
+
   ENDMETHOD.
 
   METHOD set_optimized ##NEEDED.
   ENDMETHOD.
 
-  METHOD set_zero ##NEEDED.
+  METHOD set_zero.
+
+    mv_no_zero = xsdbool( value = abap_false ).
+
   ENDMETHOD.
 
   METHOD set_lowercase ##NEEDED.

@@ -38,6 +38,15 @@ CLASS ltcl_test IMPLEMENTATION.
     cl_abap_unit_assert=>assert_equals( exp = `NAME`
                                         act = lt_column[ 2 ]-r_column->get_columnname( ) ).
 
+    " set_column_position( ) moves the column - the order of the grid
+    lo_columns->set_column_position( columnname = 'weight'
+                                     position   = 1 ).
+    lt_column = lo_columns->get( ).
+    cl_abap_unit_assert=>assert_equals( exp = 'WEIGHT'
+                                        act = lt_column[ 1 ]-columnname ).
+    cl_abap_unit_assert=>assert_equals( exp = 'NAME'
+                                        act = lt_column[ 3 ]-columnname ).
+
   ENDMETHOD.
 
   METHOD columns_of_an_include.
@@ -64,6 +73,11 @@ CLASS ltcl_test IMPLEMENTATION.
                                         act = lo_column->get_long_text( ) ).
     cl_abap_unit_assert=>assert_true( lo_column->mv_hotspot ).
     cl_abap_unit_assert=>assert_false( lo_column->is_visible( ) ).
+    lo_column->set_zero( abap_false ).
+    lo_column->set_alignment( z2ui5_if_cgui_salv_c=>alignment-right ).
+    cl_abap_unit_assert=>assert_true( lo_column->mv_no_zero ).
+    cl_abap_unit_assert=>assert_equals( exp = `R`
+                                        act = lo_column->mv_just ).
 
   ENDMETHOD.
 
@@ -97,6 +111,21 @@ CLASS ltcl_test IMPLEMENTATION.
                                         act = lines( lo_settings->mt_function ) ).
     cl_abap_unit_assert=>assert_equals( exp = `Weigh again`
                                         act = lo_settings->mt_function[ 1 ]-text ).
+    " sorts in their order, totals - a minimum has no counterpart
+    lo_settings->add_sort( 'name' ).
+    lo_settings->add_sort( columnname = 'item'
+                           position   = 1
+                           sequence   = z2ui5_if_cgui_salv_c=>sort-sort_down
+                           subtotal   = abap_true ).
+    cl_abap_unit_assert=>assert_equals( exp = `ITEM`
+                                        act = lo_settings->mt_sort[ 1 ]-columnname ).
+    cl_abap_unit_assert=>assert_true( lo_settings->mt_sort[ 1 ]-descending ).
+    cl_abap_unit_assert=>assert_true( lo_settings->mt_sort[ 1 ]-subtotal ).
+    lo_settings->add_aggregation( 'weight' ).
+    lo_settings->add_aggregation( columnname  = 'item'
+                                  aggregation = z2ui5_if_cgui_salv_c=>aggregation-minimum ).
+    cl_abap_unit_assert=>assert_equals( exp = VALUE string_table( ( `WEIGHT` ) )
+                                        act = lo_settings->mt_aggregation ).
     " no grid shown yet - no rows selected
     cl_abap_unit_assert=>assert_initial( lo_settings->get_selected_rows( ) ).
 

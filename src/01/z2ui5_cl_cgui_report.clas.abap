@@ -328,6 +328,16 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
         w_title  TYPE string,
         w_cols   TYPE i,
         w_lines  TYPE i,
+        " the grid the ALV of the level shows, and its field catalog and layout
+        grid     TYPE i,
+        grid_cat TYPE REF TO data,
+        grid_lay TYPE REF TO data,
+        " the controls there were - those created after belong to the next level
+        gui      TYPE i,
+        " SET PF-STATUS of the level
+        pf       TYPE z2ui5_cl_cgui_alv=>ty_t_function,
+        pf_keys  TYPE ty_t_shortcut,
+        pf_excl  TYPE string_table,
       END OF ty_s_cgui_level.
     TYPES ty_t_cgui_level TYPE STANDARD TABLE OF ty_s_cgui_level WITH EMPTY KEY.
 
@@ -335,10 +345,14 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
       "! a screen CALL SCREEN returns to - the selection screen, the output
       "! or a dynpro (dynnr)
       " the screen and the dynpro CALL SCREEN came from, and the dynpro it called
+      " and the status it showed
       BEGIN OF ty_s_cgui_call,
-        screen TYPE string,
-        dynnr  TYPE string,
-        called TYPE string,
+        screen  TYPE string,
+        dynnr   TYPE string,
+        called  TYPE string,
+        pf      TYPE z2ui5_cl_cgui_alv=>ty_t_function,
+        pf_keys TYPE ty_t_shortcut,
+        pf_excl TYPE string_table,
       END OF ty_s_cgui_call.
     TYPES ty_t_cgui_call TYPE STANDARD TABLE OF ty_s_cgui_call WITH EMPTY KEY.
 
@@ -905,7 +919,7 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
 
     "! POPUP_TO_DECIDE_LIST with its SPOPLI table: every VAROPTION one option
     "! of popup_to_decide( ) - the answer is the number of the line, `A` for
-    "! cancel, as the classic one: every line of the table is an option
+    "! cancel, as the classic one; a line with HIDE or INACTIVE is no option
     METHODS popup_to_decide_list
       IMPORTING
         question TYPE clike
@@ -1227,6 +1241,19 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
     " at_line_selection( ) / at_link_click( ) runs - read_list( ) is the
     " list clicked
     DATA mv_cgui_on_line       TYPE abap_bool.
+    " at_user_command( ) runs on the output: what it writes, the ALV or the
+    " tree it shows is the next level - opened by the first of them
+    " (mv_cgui_level_new), so that up to there the event works on the list
+    " shown
+    DATA mv_cgui_on_command    TYPE abap_bool.
+    DATA mv_cgui_level_new     TYPE abap_bool.
+    " the run ended on the selection screen: the classic report restarts
+    " after the event (restart_pending( ))
+    DATA mv_cgui_restart       TYPE abap_bool.
+    " START-OF-SELECTION called a dynpro or opened a popup that answers
+    " with a user command: END-OF-SELECTION and the list follow when the
+    " dynpro returns or the answer comes (run_answer_output( ))
+    DATA mv_cgui_run_wait      TYPE abap_bool.
     " the method a popup with then calls back with its answer
     DATA mv_cgui_then          TYPE string.
     DATA mv_cgui_on_field      TYPE string.
@@ -1258,6 +1285,9 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
 
     DATA mv_cgui_batch         TYPE abap_bool.
     DATA mv_cgui_answer        TYPE string.
+    " popup_to_decide_list( ): the line of the table each option stands for -
+    " lines with HIDE or INACTIVE are no option
+    DATA mt_cgui_decide_line   TYPE STANDARD TABLE OF i WITH EMPTY KEY.
     DATA mt_cgui_popup_values  TYPE z2ui5_cl_cgui_popup=>ty_t_field.
     DATA mv_cgui_dynnr         TYPE string.
     DATA mv_cgui_dynnr_title   TYPE string.
@@ -1483,6 +1513,39 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
 
     METHODS level_pop.
 
+    "! the next level, when an event on the output opens one now
+    "! (mv_cgui_level_new)
+    METHODS level_open.
+
+    "! after an event that may have started a level: a level that shows
+    "! nothing is dropped, the list shows again; CALL SCREEN keeps it for
+    "! the return; the selection screen has no levels
+    METHODS level_settle.
+
+    "! the current level shows nothing - no list content, ALV, tree or
+    "! control of its own
+    METHODS level_empty
+      RETURNING
+        VALUE(result) TYPE abap_bool.
+
+    "! the controls on the list created at the level shown and after it
+    "! (from: the controls there were) are gone
+    METHODS level_free
+      IMPORTING
+        from TYPE i.
+
+    "! the controls freed are gone for good: their objects, texts, HTML,
+    "! buttons, handlers and grids no longer travel with the draft and the
+    "! response - the line of mt_cgui_gui stays, its index is the id
+    METHODS gui_release.
+
+    "! the run ended on the selection screen (mv_cgui_restart): the classic
+    "! report restarts - its data as after INITIALIZATION, no output
+    METHODS restart_pending.
+
+    "! the output of the last run is gone
+    METHODS output_clear.
+
     "! the layout of the selection screen the report shows: its own, or the
     "! screen of SUBMIT ... USING SELECTION-SCREEN
     METHODS selection_screen_layout
@@ -1532,11 +1595,20 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
 
     "! abap_true when field is a field of the selection screen or of the
     "! popup screen - the attribute name an event argument carries
+    "! a field of the screen the user sees and may change - of kind
+    "! (z2ui5_cl_cgui_selscreen=>cs_field_kind) when given
     METHODS screen_field_check
       IMPORTING
         field         TYPE string
+        kind          TYPE string OPTIONAL
       RETURNING
         VALUE(result) TYPE abap_bool.
+
+    "! upper case and ALPHA of the parameters among fields, as SAP GUI
+    "! converts the input
+    METHODS input_convert
+      IMPORTING
+        fields TYPE z2ui5_cl_cgui_selscreen=>ty_t_field.
 
     "! the inputs of the roundtrip: the select-option buffer into the ranges,
     "! character fields to upper case
@@ -1617,13 +1689,35 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
 
     METHODS on_execute.
 
+    "! the run - or, with end, its end after a dynpro or a popup of
+    "! START-OF-SELECTION
     METHODS run
+      IMPORTING
+        end           TYPE abap_bool DEFAULT abap_false
       RETURNING
         VALUE(result) TYPE abap_bool.
 
     METHODS run_steps
       RETURNING
         VALUE(result) TYPE abap_bool.
+
+    "! the run after START-OF-SELECTION: END-OF-SELECTION, the page footer
+    "! and whether there is a list
+    METHODS run_end
+      RETURNING
+        VALUE(result) TYPE abap_bool.
+
+    "! the run waits: for a dynpro it called, a dynpro of another class, a
+    "! popup that answers with a user command
+    METHODS run_waits
+      RETURNING
+        VALUE(result) TYPE abap_bool.
+
+    "! what follows a run: the output, or the restart on the selection
+    "! screen
+    METHODS run_done
+      IMPORTING
+        ok TYPE abap_bool.
 
     METHODS check_screen
       RETURNING
@@ -1991,8 +2085,17 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
       RETURNING
         VALUE(result) TYPE string_table.
 
-    "! VALUE CHECK, ON BLOCK and ON RADIOBUTTON GROUP
+    "! VALUE CHECK - with OBLIGATORY the checks of the screen itself, before
+    "! any event of the report
     METHODS check_values
+      RETURNING
+        VALUE(result) TYPE abap_bool.
+
+    "! AT SELECTION-SCREEN ON field, field by field in the order of the
+    "! screen; ON BLOCK after the last field of the block (an inner block
+    "! before the outer one), ON RADIOBUTTON GROUP after the last button
+    "! of the group - the order of the PAI of the classic selection screen
+    METHODS check_events
       RETURNING
         VALUE(result) TYPE abap_bool.
 
@@ -2131,12 +2234,14 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
       IF client->get_event( ) IS NOT INITIAL.
         on_event( ).
       ENDIF.
+      restart_pending( ).
       IF mv_cgui_nav = abap_false.
         view_display( ).
       ENDIF.
     ELSEIF client->check_on_event( ).
       input_sync( ).
       on_event( ).
+      restart_pending( ).
       IF mv_cgui_nav = abap_false.
         view_display( ).
       ENDIF.
@@ -2148,6 +2253,7 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
       draft_keep( ).
     ENDIF.
 
+    gui_release( ).
     messages_display( ).
     cgui_statics_keep( ).
 
@@ -2824,9 +2930,12 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
       RETURN.
     ENDIF.
 
-    INSERT VALUE #( screen = mv_cgui_screen
-                    dynnr  = mv_cgui_dynpro
-                    called = dynnr_norm( dynnr ) ) INTO TABLE mt_cgui_dynpro_stack.
+    INSERT VALUE #( screen  = mv_cgui_screen
+                    dynnr   = mv_cgui_dynpro
+                    called  = dynnr_norm( dynnr )
+                    pf      = mt_cgui_pf
+                    pf_keys = mt_cgui_pf_keys
+                    pf_excl = mt_cgui_excl_out ) INTO TABLE mt_cgui_dynpro_stack.
     mv_cgui_dynpro = dynnr_norm( dynnr ).
     mv_cgui_screen = cs_screen-dynpro.
     CLEAR: mv_cgui_dynpro_next, mv_cgui_dynpro_left.
@@ -2918,12 +3027,26 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
       mv_cgui_screen = ls_call-screen.
       mv_cgui_dynpro = ls_call-dynnr.
       lv_called = ls_call-called.
+      " the status of the screen it returns to
+      mt_cgui_pf = ls_call-pf.
+      mt_cgui_pf_keys = ls_call-pf_keys.
+      mt_cgui_excl_out = ls_call-pf_excl.
     ENDIF.
     after_call_screen( lv_called ).
-    " CALL SCREEN in START-OF-SELECTION: the list written after it shows
-    IF mv_cgui_screen = cs_screen-selection AND ( mo_cgui_list IS BOUND OR mo_cgui_alv IS BOUND ).
-      mv_cgui_screen = cs_screen-output.
-    ENDIF.
+    CASE mv_cgui_screen.
+      WHEN cs_screen-selection.
+        " CALL SCREEN in START-OF-SELECTION: END-OF-SELECTION and the list
+        " follow - elsewhere the list written after it shows
+        IF mv_cgui_run_wait = abap_true.
+          run_answer_output( ).
+        ELSEIF mo_cgui_list IS BOUND OR mo_cgui_alv IS BOUND.
+          mv_cgui_screen = cs_screen-output.
+        ENDIF.
+      WHEN cs_screen-output.
+        " CALL SCREEN in AT LINE-SELECTION: the level it opened, or the
+        " list it came from when nothing was written
+        level_settle( ).
+    ENDCASE.
 
   ENDMETHOD.
 
@@ -3492,6 +3615,11 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
 
       WHEN cs_ucomm-cancel.
         CLEAR: mv_cgui_pending_field, mv_cgui_pending_kind.
+        " the popup the run waited for is cancelled - the run ends there
+        IF mv_cgui_run_wait = abap_true AND mv_cgui_screen = cs_screen-selection.
+          CLEAR: mv_cgui_pending_ucomm, mv_cgui_run_wait.
+          mv_cgui_restart = abap_true.
+        ENDIF.
 
       WHEN cs_ucomm-variants_loaded.
         on_storage_loaded( ).
@@ -3524,7 +3652,8 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
       " the argument names the attribute - from the browser, so only a field
       " of the screen, never another attribute of the class
       WHEN z2ui5_cl_cgui_selscreen=>cs_event-select_option.
-        IF screen_field_check( client->get_event_arg( ) ) = abap_true.
+        IF screen_field_check( field = client->get_event_arg( )
+                               kind  = z2ui5_cl_cgui_selscreen=>cs_field_kind-select_option ) = abap_true.
           on_range_popup( client->get_event_arg( ) ).
         ENDIF.
 
@@ -3839,7 +3968,6 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
 
     IF mv_cgui_screen = cs_screen-output.
       leave_to_selection_screen( ).
-      fresh_restart( ).
     ENDIF.
 
   ENDMETHOD.
@@ -3858,16 +3986,7 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
                          hide = hide ).
     ENDIF.
     mv_cgui_on_line = abap_false.
-
-    IF mv_cgui_screen <> cs_screen-output.
-      " leave_to_selection_screen( ) - the levels are gone
-      CLEAR mt_cgui_level.
-      RETURN.
-    ENDIF.
-    IF mo_cgui_alv IS NOT BOUND AND mo_cgui_tree IS NOT BOUND
-        AND ( mo_cgui_list IS NOT BOUND OR mo_cgui_list->has_content( ) = abap_false ).
-      level_pop( ).
-    ENDIF.
+    level_settle( ).
 
   ENDMETHOD.
 
@@ -3882,10 +4001,19 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
                     window   = mv_cgui_window
                     w_title  = mv_cgui_window_title
                     w_cols   = mv_cgui_window_cols
-                    w_lines  = mv_cgui_window_lines ) INTO TABLE mt_cgui_level.
+                    w_lines  = mv_cgui_window_lines
+                    grid     = mv_cgui_grid
+                    grid_cat = mr_cgui_grid_fieldcat
+                    grid_lay = mr_cgui_grid_layout
+                    gui      = lines( mt_cgui_gui )
+                    pf       = mt_cgui_pf
+                    pf_keys  = mt_cgui_pf_keys
+                    pf_excl  = mt_cgui_excl_out ) INTO TABLE mt_cgui_level.
+    " the status stays until the level sets its own, as in SAP GUI
     CLEAR: mo_cgui_list, mo_cgui_alv, mv_cgui_alv_name, mr_cgui_alv, mr_cgui_alv_box,
            mr_cgui_alv_page, mt_cgui_alv_index, mt_cgui_alv_order, mo_cgui_tree, mt_cgui_tree_view,
-           mv_cgui_window, mv_cgui_window_title, mv_cgui_window_cols, mv_cgui_window_lines.
+           mv_cgui_window, mv_cgui_window_title, mv_cgui_window_cols, mv_cgui_window_lines,
+           mv_cgui_grid, mr_cgui_grid_fieldcat, mr_cgui_grid_layout.
 
   ENDMETHOD.
 
@@ -3898,6 +4026,9 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
     DATA(ls_level) = mt_cgui_level[ lv_lines ].
     DELETE mt_cgui_level INDEX lv_lines.
 
+    " the controls of the level dropped - a grid of it no longer takes the
+    " events of the list below
+    level_free( ls_level-gui ).
     mo_cgui_list     = ls_level-list.
     mo_cgui_alv      = ls_level-alv.
     mo_cgui_tree     = ls_level-tree.
@@ -3909,18 +4040,87 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
     mv_cgui_window_title = ls_level-w_title.
     mv_cgui_window_cols  = ls_level-w_cols.
     mv_cgui_window_lines = ls_level-w_lines.
-    CLEAR: mr_cgui_alv_page, mt_cgui_alv_index, mt_cgui_alv_order.
+    mv_cgui_grid           = ls_level-grid.
+    mr_cgui_grid_fieldcat  = ls_level-grid_cat.
+    mr_cgui_grid_layout    = ls_level-grid_lay.
+    mt_cgui_pf       = ls_level-pf.
+    mt_cgui_pf_keys  = ls_level-pf_keys.
+    mt_cgui_excl_out = ls_level-pf_excl.
+    CLEAR: mr_cgui_alv_page, mt_cgui_alv_index, mt_cgui_alv_order, mt_cgui_tree_view.
+
+  ENDMETHOD.
+
+  METHOD level_open.
+
+    IF mv_cgui_level_new = abap_false.
+      RETURN.
+    ENDIF.
+    mv_cgui_level_new = abap_false.
+    level_push( ).
+
+  ENDMETHOD.
+
+  METHOD level_settle.
+
+    CASE mv_cgui_screen.
+      WHEN cs_screen-output.
+        IF mt_cgui_level IS NOT INITIAL AND level_empty( ) = abap_true.
+          " SET PF-STATUS without a list: the status of the list that shows
+          DATA(lt_pf) = mt_cgui_pf.
+          DATA(lt_pf_keys) = mt_cgui_pf_keys.
+          DATA(lt_pf_excl) = mt_cgui_excl_out.
+          level_pop( ).
+          mt_cgui_pf = lt_pf.
+          mt_cgui_pf_keys = lt_pf_keys.
+          mt_cgui_excl_out = lt_pf_excl.
+        ENDIF.
+      WHEN cs_screen-dynpro.
+        " CALL SCREEN: the level stays - what follows the call writes into
+        " it, dynpro_return( ) drops it when it stays empty
+        RETURN.
+      WHEN OTHERS.
+        " leave_to_selection_screen( ) - the levels are gone
+        CLEAR mt_cgui_level.
+    ENDCASE.
+
+  ENDMETHOD.
+
+  METHOD level_empty.
+
+    IF mo_cgui_alv IS BOUND OR mo_cgui_tree IS BOUND
+        OR ( mo_cgui_list IS BOUND AND mo_cgui_list->has_content( ) = abap_true ).
+      RETURN.
+    ENDIF.
+    " a control the level put on the list, a grid on cl_gui_container=>default_screen
+    DATA(lv_from) = COND i( WHEN mt_cgui_level IS NOT INITIAL THEN mt_cgui_level[ lines( mt_cgui_level ) ]-gui ).
+    LOOP AT mt_cgui_gui TRANSPORTING NO FIELDS FROM lv_from + 1
+         WHERE parent = 0 AND dynnr = `LIST` AND freed = abap_false.
+      RETURN.
+    ENDLOOP.
+    result = abap_true.
+
+  ENDMETHOD.
+
+  METHOD level_free.
+
+    LOOP AT mt_cgui_gui ASSIGNING FIELD-SYMBOL(<control>) FROM from + 1 WHERE parent = 0 AND dynnr = `LIST`.
+      <control>-freed = abap_true.
+    ENDLOOP.
 
   ENDMETHOD.
 
   METHOD lsind.
 
-    result = lines( mt_cgui_level ).
+    " at_user_command( ): the list it writes, as sy-lsind - before it wrote
+    result = lines( mt_cgui_level ) + COND i( WHEN mv_cgui_level_new = abap_true THEN 1 ).
 
   ENDMETHOD.
 
   METHOD set_lsind.
 
+    " sy-lsind = sy-lsind - 1 in at_user_command( ): its list replaces the
+    " one shown
+    level_open( ).
     WHILE lines( mt_cgui_level ) > nmax( val1 = 0 val2 = val ).
       DELETE mt_cgui_level INDEX lines( mt_cgui_level ).
     ENDWHILE.
@@ -3955,7 +4155,9 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
       WHEN cs_pending-screen.
         " what followed CALL SCREEN in the caller
         after_call_screen( lv_field ).
-        IF mv_cgui_screen = cs_screen-selection AND ( mo_cgui_list IS BOUND OR mo_cgui_alv IS BOUND ).
+        IF mv_cgui_run_wait = abap_true.
+          run_answer_output( ).
+        ELSEIF mv_cgui_screen = cs_screen-selection AND ( mo_cgui_list IS BOUND OR mo_cgui_alv IS BOUND ).
           mv_cgui_screen = cs_screen-output.
         ENDIF.
 
@@ -4049,6 +4251,14 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
     ENDTRY.
     mv_cgui_answer = lo_popup->result( )-answer.
     mt_cgui_popup_values = lo_popup->result( )-fields.
+    " POPUP_TO_DECIDE_LIST answers the line of its table
+    IF mt_cgui_decide_line IS NOT INITIAL AND mv_cgui_answer CO `0123456789` AND mv_cgui_answer IS NOT INITIAL.
+      READ TABLE mt_cgui_decide_line INTO DATA(lv_line) INDEX CONV i( mv_cgui_answer ).
+      IF sy-subrc = 0.
+        mv_cgui_answer = |{ lv_line }|.
+      ENDIF.
+    ENDIF.
+    CLEAR mt_cgui_decide_line.
 
 
   ENDMETHOD.
@@ -4074,19 +4284,28 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
 
   METHOD screen_field_check.
 
+    " a NO-DISPLAY field (a switch SUBMIT sets), a field not ready for input
+    " or a parameter named as a select-option is no target of the browser
     DATA(lv_name) = to_upper( field ).
-    result = xsdbool( lv_name IS NOT INITIAL
-                      AND ( line_exists( mt_cgui_field[ name = lv_name ] )
-                         OR line_exists( mt_cgui_dynnr_field[ name = lv_name ] ) ) ).
+    IF lv_name IS INITIAL.
+      RETURN.
+    ENDIF.
+    READ TABLE mt_cgui_field INTO DATA(ls_field) WITH KEY name = lv_name.
+    IF sy-subrc <> 0.
+      READ TABLE mt_cgui_dynnr_field INTO ls_field WITH KEY name = lv_name.
+      IF sy-subrc <> 0.
+        RETURN.
+      ENDIF.
+    ENDIF.
+    result = xsdbool( ls_field-shown = abap_true AND ls_field-no_display = abap_false
+                      AND ls_field-read_only = abap_false
+                      AND ( kind IS INITIAL OR ls_field-kind = kind ) ).
 
   ENDMETHOD.
 
   METHOD input_sync.
 
     FIELD-SYMBOLS <range> TYPE STANDARD TABLE.
-    FIELD-SYMBOLS <field_val>   TYPE clike.
-    FIELD-SYMBOLS <alpha_val>   TYPE any.
-    DATA lr_val TYPE REF TO data.
 
     IF mv_cgui_screen <> cs_screen-selection.
       RETURN.
@@ -4127,8 +4346,18 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
       ENDTRY.
     ENDLOOP.
 
+    input_convert( mt_cgui_field ).
+
+  ENDMETHOD.
+
+  METHOD input_convert.
+
+    FIELD-SYMBOLS <field_val> TYPE clike.
+    FIELD-SYMBOLS <alpha_val> TYPE any.
+    DATA lr_val TYPE REF TO data.
+
     " PARAMETERS without LOWER CASE
-    LOOP AT mt_cgui_field REFERENCE INTO lr_field
+    LOOP AT fields REFERENCE INTO DATA(lr_field)
          WHERE upper = abap_true AND kind = z2ui5_cl_cgui_selscreen=>cs_field_kind-parameter.
       lr_val = attri_assign( lr_field->name ).
       IF lr_val IS NOT BOUND.
@@ -4140,7 +4369,7 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
 
     " the conversion exit ALPHA of a parameter's data element - 4711 into a
     " KUNNR is 0000004711, as SAP GUI stores it
-    LOOP AT mt_cgui_field REFERENCE INTO lr_field
+    LOOP AT fields REFERENCE INTO lr_field
          WHERE kind = z2ui5_cl_cgui_selscreen=>cs_field_kind-parameter.
       lr_val = attri_assign( lr_field->name ).
       IF lr_val IS NOT BOUND.
@@ -4421,6 +4650,18 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
     " a function on a dynpro is its PAI
     ELSEIF mv_cgui_screen = cs_screen-dynpro.
       on_dynpro_command( ucomm ).
+    " AT USER-COMMAND on a list: what it writes is the next list level,
+    " opened by its first output - Back returns to the list shown now
+    ELSEIF mv_cgui_screen = cs_screen-output.
+      mv_cgui_level_new = abap_true.
+      mv_cgui_on_command = abap_true.
+      at_user_command( ucomm ).
+      mv_cgui_on_command = abap_false.
+      DATA(lv_opened) = xsdbool( mv_cgui_level_new = abap_false ).
+      mv_cgui_level_new = abap_false.
+      IF lv_opened = abap_true OR mv_cgui_screen <> cs_screen-output.
+        level_settle( ).
+      ENDIF.
     ELSE.
       at_user_command( ucomm ).
       IF lv_run_answer = abap_true.
@@ -4431,6 +4672,17 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD run_answer_output.
+
+    " the rest of START-OF-SELECTION ran after the answer or the dynpro:
+    " END-OF-SELECTION and the list - unless it waits for the next one
+    IF mv_cgui_run_wait = abap_true.
+      IF mv_cgui_screen <> cs_screen-selection OR run_waits( ) = abap_true.
+        RETURN.
+      ENDIF.
+      mv_cgui_run_wait = abap_false.
+      run_done( run( end = abap_true ) ).
+      RETURN.
+    ENDIF.
 
     IF mv_cgui_nav = abap_false
         AND ( mo_cgui_alv IS BOUND OR mo_cgui_tree IS BOUND OR z2ui5_cl_cgui_view=>on_list( gui_ctx( ) ) = abap_true
@@ -5192,7 +5444,22 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
 
   METHOD on_execute.
 
-    IF run( ) = abap_true.
+    run_done( run( ) ).
+
+  ENDMETHOD.
+
+  METHOD run_waits.
+
+    result = xsdbool( mv_cgui_screen = cs_screen-dynpro
+                      OR ( mv_cgui_nav = abap_true
+                       AND ( mv_cgui_pending_ucomm IS NOT INITIAL OR mv_cgui_pending_kind = cs_pending-screen ) ) ).
+
+  ENDMETHOD.
+
+  METHOD run_done.
+
+    IF ok = abap_true.
+      CLEAR mv_cgui_restart.
       mv_cgui_screen = cs_screen-output.
       IF mv_cgui_draft = abap_true.
         draft_drop( ).
@@ -5200,6 +5467,76 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
     ELSEIF mv_cgui_skipped = abap_true.
       " a run without selection screen that stopped shows the screen
       mv_cgui_skipped = abap_false.
+    ENDIF.
+    restart_pending( ).
+
+  ENDMETHOD.
+
+  METHOD gui_release.
+
+    DATA lt_dead TYPE STANDARD TABLE OF i WITH EMPTY KEY.
+
+    LOOP AT mt_cgui_gui ASSIGNING FIELD-SYMBOL(<control>).
+      DATA(lv_id) = sy-tabix.
+      IF gui_alive( lv_id ) = abap_true.
+        CONTINUE.
+      ENDIF.
+      READ TABLE mt_cgui_gui_obj ASSIGNING FIELD-SYMBOL(<object>) INDEX lv_id.
+      IF sy-subrc = 0 AND <object> IS BOUND.
+        CLEAR <object>.
+        INSERT lv_id INTO TABLE lt_dead.
+      ENDIF.
+      CLEAR: <control>-text, <control>-html, <control>-url, <control>-buttons.
+    ENDLOOP.
+    IF lt_dead IS INITIAL.
+      RETURN.
+    ENDIF.
+
+    LOOP AT lt_dead INTO lv_id.
+      DELETE mt_cgui_grid WHERE id = lv_id.
+    ENDLOOP.
+    " the handlers of the controls left - their objects once each again
+    DATA(lt_handler) = z2ui5_if_cgui_gui~handlers_get( ).
+    DATA(lv_before) = lines( lt_handler ).
+    LOOP AT lt_dead INTO lv_id.
+      DELETE lt_handler WHERE id = lv_id.
+    ENDLOOP.
+    IF lines( lt_handler ) < lv_before.
+      z2ui5_if_cgui_gui~handlers_set( lt_handler ).
+    ENDIF.
+
+  ENDMETHOD.
+
+  METHOD restart_pending.
+
+    IF mv_cgui_restart = abap_false.
+      RETURN.
+    ENDIF.
+    CLEAR: mv_cgui_restart, mv_cgui_run_wait.
+    IF mv_cgui_screen <> cs_screen-selection.
+      RETURN.
+    ENDIF.
+    " the classic report starts anew after its run: an E message, LEAVE
+    " LIST-PROCESSING, an empty list, Back - what the run collected is gone
+    output_clear( ).
+    fresh_restart( ).
+
+  ENDMETHOD.
+
+  METHOD output_clear.
+
+    CLEAR: mo_cgui_list, mo_cgui_tree, mt_cgui_tree_view, mt_cgui_list_input, mt_cgui_level,
+           mr_cgui_alv_page, mt_cgui_alv_index, mt_cgui_alv_order,
+           mv_cgui_window, mv_cgui_window_title, mv_cgui_window_cols, mv_cgui_window_lines,
+           mt_cgui_pf, mt_cgui_pf_keys, mt_cgui_excl_out.
+    " the controls of the list of the run before - the run creates its own
+    LOOP AT mt_cgui_gui ASSIGNING FIELD-SYMBOL(<control>) WHERE parent = 0 AND dynnr = `LIST`.
+      <control>-freed = abap_true.
+    ENDLOOP.
+    " the ALV - unless a grid on a screen of the report shows it
+    IF mv_cgui_grid IS INITIAL OR gui_alive( mv_cgui_grid ) = abap_false.
+      CLEAR: mo_cgui_alv, mr_cgui_alv, mr_cgui_alv_box, mv_cgui_alv_name,
+             mv_cgui_grid, mr_cgui_grid_fieldcat, mr_cgui_grid_layout.
     ENDIF.
 
   ENDMETHOD.
@@ -5220,16 +5557,11 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
       RETURN.
     ENDIF.
 
-    LOOP AT mt_cgui_field REFERENCE INTO DATA(lr_field) WHERE shown = abap_true.
-      mv_cgui_on_field = lr_field->name.
-      at_selection_screen_on( lr_field->name ).
-      CLEAR mv_cgui_on_field.
-      IF mv_cgui_stop = abap_true.
-        RETURN.
-      ENDIF.
-    ENDLOOP.
-
     IF check_values( ) = abap_false.
+      RETURN.
+    ENDIF.
+
+    IF check_events( ) = abap_false.
       RETURN.
     ENDIF.
 
@@ -5243,7 +5575,11 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
     " a run that stops for a dialog (z2ui5_cx_cgui_stop) starts again from it
     mv_cgui_in_run = abap_true.
     TRY.
-        result = run_steps( ).
+        IF end = abap_true.
+          result = run_end( ).
+        ELSE.
+          result = run_steps( ).
+        ENDIF.
       CATCH z2ui5_cx_cgui_stop.
         mv_cgui_stop = abap_true.
     ENDTRY.
@@ -5261,18 +5597,29 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
     memory_id_store( ).
     z2ui5_cl_cgui_memory=>history_store( memory_ctx( ) ).
 
-    CLEAR: mo_cgui_list, mo_cgui_alv, mr_cgui_alv, mr_cgui_alv_box, mv_cgui_alv_name, mt_cgui_level,
-           mr_cgui_alv_page, mt_cgui_alv_index, mt_cgui_alv_order, mo_cgui_tree, mt_cgui_tree_view,
-           mv_cgui_window, mv_cgui_window_title, mv_cgui_window_cols, mv_cgui_window_lines,
-           mt_cgui_grid, mv_cgui_grid, mr_cgui_grid_fieldcat, mr_cgui_grid_layout.
+    output_clear( ).
+    CLEAR: mo_cgui_alv, mr_cgui_alv, mr_cgui_alv_box, mv_cgui_alv_name,
+           mt_cgui_grid, mv_cgui_grid, mr_cgui_grid_fieldcat, mr_cgui_grid_layout,
+           mv_cgui_pending_ucomm, mv_cgui_run_wait.
     mv_cgui_left = abap_false.
-    " the controls of the list of the run before - the run creates its own
-    LOOP AT mt_cgui_gui ASSIGNING FIELD-SYMBOL(<control>) WHERE parent = 0 AND dynnr = `LIST`.
-      <control>-freed = abap_true.
-    ENDLOOP.
+    " from here on a run that ends on the selection screen restarts the report
+    mv_cgui_restart = abap_true.
     start_of_selection( ).
-    " CALL SCREEN: the dynpro shows, the rest follows when it is left
-    IF mv_cgui_stop = abap_true OR mv_cgui_left = abap_true OR mv_cgui_screen = cs_screen-dynpro.
+    " CALL SCREEN, a popup that answers with a user command: the dynpro or
+    " the popup shows, the rest of the run follows when it returns
+    IF mv_cgui_stop = abap_false AND mv_cgui_left = abap_false AND run_waits( ) = abap_true.
+      mv_cgui_run_wait = abap_true.
+      mv_cgui_restart = abap_false.
+      RETURN.
+    ENDIF.
+    result = run_end( ).
+
+  ENDMETHOD.
+
+  METHOD run_end.
+
+    mv_cgui_restart = abap_true.
+    IF mv_cgui_stop = abap_true OR mv_cgui_left = abap_true.
       RETURN.
     ENDIF.
     end_of_selection( ).
@@ -5367,7 +5714,6 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
   METHOD check_values.
 
     FIELD-SYMBOLS <field_val> TYPE any.
-    DATA lt_done TYPE string_table.
 
     result = abap_true.
 
@@ -5387,40 +5733,65 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
         result = abap_false.
       ENDIF.
     ENDLOOP.
-    IF result = abap_false.
-      RETURN.
-    ENDIF.
 
-    " ON BLOCK - a message belongs to the first field of the block
-    LOOP AT mt_cgui_field REFERENCE INTO lr_field WHERE block IS NOT INITIAL AND shown = abap_true.
-      IF line_exists( lt_done[ table_line = lr_field->block ] ).
-        CONTINUE.
-      ENDIF.
-      INSERT lr_field->block INTO TABLE lt_done.
-      mv_cgui_on_field = lr_field->name.
-      at_selection_screen_on_block( lr_field->block ).
+  ENDMETHOD.
+
+  METHOD check_events.
+
+    DATA lt_shown TYPE z2ui5_cl_cgui_selscreen=>ty_t_field.
+    DATA ls_next  TYPE z2ui5_cl_cgui_selscreen=>ty_s_field.
+
+    LOOP AT mt_cgui_field INTO DATA(ls_shown) WHERE shown = abap_true.
+      INSERT ls_shown INTO TABLE lt_shown.
+    ENDLOOP.
+
+    LOOP AT lt_shown INTO DATA(ls_field).
+      DATA(lv_index) = sy-tabix.
+      mv_cgui_on_field = ls_field-name.
+      at_selection_screen_on( ls_field-name ).
       CLEAR mv_cgui_on_field.
       IF mv_cgui_stop = abap_true.
-        result = abap_false.
         RETURN.
+      ENDIF.
+
+      CLEAR ls_next.
+      READ TABLE lt_shown INTO ls_next INDEX lv_index + 1.
+
+      " the blocks the field closes, the inner one first - a message belongs
+      " to the first field of the block
+      DATA(lv_block) = lines( ls_field-blocks ).
+      WHILE lv_block > 0.
+        DATA(lv_name) = ls_field-blocks[ lv_block ].
+        lv_block = lv_block - 1.
+        IF line_exists( ls_next-blocks[ table_line = lv_name ] ).
+          CONTINUE.
+        ENDIF.
+        LOOP AT lt_shown INTO DATA(ls_first).
+          IF line_exists( ls_first-blocks[ table_line = lv_name ] ).
+            EXIT.
+          ENDIF.
+        ENDLOOP.
+        mv_cgui_on_field = ls_first-name.
+        at_selection_screen_on_block( lv_name ).
+        CLEAR mv_cgui_on_field.
+        IF mv_cgui_stop = abap_true.
+          RETURN.
+        ENDIF.
+      ENDWHILE.
+
+      " the group the button closes - a message belongs to its first button
+      IF ls_field-group IS NOT INITIAL AND ls_next-group <> ls_field-group.
+        READ TABLE lt_shown INTO ls_first WITH KEY group = ls_field-group.
+        mv_cgui_on_field = ls_first-name.
+        at_selection_screen_on_radio( ls_field-group ).
+        CLEAR mv_cgui_on_field.
+        IF mv_cgui_stop = abap_true.
+          RETURN.
+        ENDIF.
       ENDIF.
     ENDLOOP.
 
-    " ON RADIOBUTTON GROUP - a message belongs to the first button
-    CLEAR lt_done.
-    LOOP AT mt_cgui_field REFERENCE INTO lr_field WHERE group IS NOT INITIAL AND shown = abap_true.
-      IF line_exists( lt_done[ table_line = lr_field->group ] ).
-        CONTINUE.
-      ENDIF.
-      INSERT lr_field->group INTO TABLE lt_done.
-      mv_cgui_on_field = lr_field->name.
-      at_selection_screen_on_radio( lr_field->group ).
-      CLEAR mv_cgui_on_field.
-      IF mv_cgui_stop = abap_true.
-        result = abap_false.
-        RETURN.
-      ENDIF.
-    ENDLOOP.
+    result = abap_true.
 
   ENDMETHOD.
 
@@ -6036,6 +6407,8 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
 
   METHOD list.
 
+    " the first output of at_user_command( ) is a secondary list
+    level_open( ).
     " a new list starts with its page header - TOP-OF-PAGE
     IF mo_cgui_list IS NOT BOUND.
       mo_cgui_list = z2ui5_cl_cgui_list=>factory( ).
@@ -6054,7 +6427,13 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
 
   METHOD read_list.
 
-    IF mv_cgui_on_line = abap_true AND mt_cgui_level IS NOT INITIAL.
+    " at_user_command( ) before it wrote: the list shown - an ALV or a
+    " tree has none, an empty one reads no line
+    IF mv_cgui_level_new = abap_true.
+      result = COND #( WHEN mo_cgui_list IS BOUND THEN mo_cgui_list ELSE z2ui5_cl_cgui_list=>factory( ) ).
+      RETURN.
+    ENDIF.
+    IF ( mv_cgui_on_line = abap_true OR mv_cgui_on_command = abap_true ) AND mt_cgui_level IS NOT INITIAL.
       result = mt_cgui_level[ lines( mt_cgui_level ) ]-list.
     ENDIF.
     IF result IS NOT BOUND.
@@ -6067,6 +6446,7 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
 
     FIELD-SYMBOLS <tab> TYPE STANDARD TABLE.
 
+    level_open( ).
     CLEAR: mr_cgui_alv, mr_cgui_alv_box, mr_cgui_alv_page, mt_cgui_alv_index, mt_cgui_alv_order.
     mv_cgui_alv_name = z2ui5_cl_cgui_context=>attri_name_by_ref( app = me
                                                                  val = tab ).
@@ -6084,6 +6464,7 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
 
   METHOD tree.
 
+    level_open( ).
     mo_cgui_tree = z2ui5_cl_cgui_tree=>factory( )->set_title( mv_cgui_title ).
     CLEAR: mt_cgui_tree_view, mo_cgui_tree_handler.
     result = mo_cgui_tree.
@@ -6115,14 +6496,7 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
       at_gui_event( ).
       mo_cgui_tree_handler->on_node( key ).
     ENDIF.
-    IF mv_cgui_screen <> cs_screen-output.
-      CLEAR mt_cgui_level.
-      RETURN.
-    ENDIF.
-    IF mo_cgui_alv IS NOT BOUND AND mo_cgui_tree IS NOT BOUND
-        AND ( mo_cgui_list IS NOT BOUND OR mo_cgui_list->has_content( ) = abap_false ).
-      level_pop( ).
-    ENDIF.
+    level_settle( ).
 
   ENDMETHOD.
 
@@ -6248,9 +6622,7 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
     DATA(lv_event) = popup_event( ucomm = ucomm
                                   then  = then ).
     mv_cgui_pending_kind = cs_pending-transport.
-    IF then IS NOT INITIAL.
-      mv_cgui_pending_ucomm = lv_event.
-    ENDIF.
+    mv_cgui_pending_ucomm = lv_event.
     mv_cgui_nav = abap_true.
     client->nav_app_call( z2ui5_cl_cgui_transport=>factory( event = lv_event
                                                             title = title ) ).
@@ -6354,11 +6726,12 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
     DATA(lv_event) = popup_event( ucomm = ucomm
                                   then  = then ).
     DATA(lv_cancel) = cs_ucomm-cancel.
+    " the user command the answer arrives with - a run waits for it
+    mv_cgui_pending_ucomm = lv_event.
     " with then both answers go to the method - the answer as of decide
     IF then IS NOT INITIAL.
       CLEAR mv_cgui_answer.
       mv_cgui_pending_kind = cs_pending-decide.
-      mv_cgui_pending_ucomm = lv_event.
       lv_cancel = lv_event.
     ENDIF.
     mv_cgui_nav = abap_true.
@@ -6371,7 +6744,7 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
 
   METHOD popup_to_decide.
 
-    CLEAR mv_cgui_answer.
+    CLEAR: mv_cgui_answer, mt_cgui_decide_line.
     DATA(lv_event) = popup_event( ucomm = ucomm
                                   then  = then ).
     mv_cgui_pending_kind = cs_pending-decide.
@@ -6403,16 +6776,31 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
   METHOD popup_to_decide_list.
 
     DATA lt_option TYPE string_table.
+    DATA lt_line   LIKE mt_cgui_decide_line.
     FIELD-SYMBOLS <line> TYPE any.
     FIELD-SYMBOLS <comp> TYPE any.
+    FIELD-SYMBOLS <flag> TYPE any.
 
     LOOP AT list ASSIGNING <line>.
+      DATA(lv_index) = sy-tabix.
+      " HIDE: not offered; INACTIVE: not to be picked - left out as well
+      UNASSIGN <flag>.
+      ASSIGN COMPONENT `HIDE` OF STRUCTURE <line> TO <flag>.
+      IF <flag> IS ASSIGNED AND <flag> IS NOT INITIAL.
+        CONTINUE.
+      ENDIF.
+      UNASSIGN <flag>.
+      ASSIGN COMPONENT `INACTIVE` OF STRUCTURE <line> TO <flag>.
+      IF <flag> IS ASSIGNED AND <flag> IS NOT INITIAL.
+        CONTINUE.
+      ENDIF.
       UNASSIGN <comp>.
       ASSIGN COMPONENT `VAROPTION` OF STRUCTURE <line> TO <comp>.
       IF <comp> IS NOT ASSIGNED.
         ASSIGN <line> TO <comp>.
       ENDIF.
       INSERT condense( CONV string( <comp> ) ) INTO TABLE lt_option.
+      INSERT lv_index INTO TABLE lt_line.
       UNASSIGN <comp>.
     ENDLOOP.
 
@@ -6421,6 +6809,8 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
                      ucomm    = ucomm
                      title    = title
                      then     = then ).
+    " the answer is the line of the table, not the number of the option
+    mt_cgui_decide_line = lt_line.
 
   ENDMETHOD.
 
@@ -6592,6 +6982,9 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
 
     mv_cgui_screen = cs_screen-selection.
     mv_cgui_left = abap_true.
+    " the report starts anew when the event is over (restart_pending( ))
+    mv_cgui_restart = abap_true.
+    mv_cgui_run_wait = abap_false.
     " LEAVE PROGRAM on a dynpro - the screens called are gone as well
     CLEAR: mt_cgui_level, mv_cgui_window, mt_cgui_dynpro_stack, mv_cgui_dynpro, mv_cgui_dynpro_next.
 
@@ -6617,8 +7010,27 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
 
   METHOD on_screen_ok.
 
-    " the required fields of the popup screen, then the report decides
+    " the input as on the selection screen, the required fields of the
+    " popup screen, then AT SELECTION-SCREEN ON field and AT SELECTION-SCREEN
+    " as for every selection screen - an error keeps the dialog
+    input_convert( mt_cgui_dynnr_field ).
     IF check_obligatory( mt_cgui_dynnr_field ) = abap_false.
+      RETURN.
+    ENDIF.
+    mv_cgui_stop = abap_false.
+    LOOP AT mt_cgui_dynnr_field REFERENCE INTO DATA(lr_field) WHERE shown = abap_true.
+      mv_cgui_on_field = lr_field->name.
+      at_selection_screen_on( lr_field->name ).
+      CLEAR mv_cgui_on_field.
+      IF mv_cgui_stop = abap_true.
+        EXIT.
+      ENDIF.
+    ENDLOOP.
+    IF mv_cgui_stop = abap_false.
+      at_selection_screen( ).
+    ENDIF.
+    IF mv_cgui_stop = abap_true.
+      mv_cgui_stop = abap_false.
       RETURN.
     ENDIF.
 
@@ -7188,6 +7600,7 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
 
   METHOD window.
 
+    level_open( ).
     mv_cgui_window       = abap_true.
     mv_cgui_window_title = title.
     mv_cgui_window_cols  = columns.
@@ -7647,6 +8060,10 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
     DATA(screen) = z2ui5_cl_cgui_selscreen=>factory( client ).
     selection_screen_dynnr( dynnr  = mv_cgui_dynnr
                             screen = screen ).
+    " its PBO: AT SELECTION-SCREEN OUTPUT, as for every selection screen
+    mo_cgui_screen = screen.
+    at_selection_screen_output( screen ).
+    CLEAR mo_cgui_screen.
     mt_cgui_dynnr_field = screen->get_fields( ).
 
     DATA(lo_dialog) = z2ui5_cl_ui5_view_builder=>factory(

@@ -202,6 +202,68 @@ release.
   abap2UI5's packages `src/00` to `src/02` only: `src/03` is its
   installation package (the ICF handler and the BSP), which nothing here
   uses.
+- The list levels follow the classic report: CALL SCREEN in
+  `at_line_selection( )` (or a tree node) returns to the list - what
+  follows the call is the secondary list, Back the list clicked - instead of
+  an empty page and the selection screen; what `at_user_command( )` writes,
+  shows as ALV or tree is a secondary list (`set_lsind( lsind( ) - 1 )`
+  replaces the list shown), not lines appended to the list; SET PF-STATUS
+  belongs to its list level and screen and comes back with them, a run
+  starts with none; Back from a secondary list with a grid drops that grid -
+  its double click and functions no longer took the events of the list
+  below.
+- A run that ends on the selection screen restarts the report as Back did:
+  an E message, LEAVE LIST-PROCESSING, an empty list, the upload dialog or a
+  cancelled popup kept what START-OF-SELECTION had collected, and the next
+  Execute added to it. The output of the run is dropped with it.
+- START-OF-SELECTION waits for CALL SCREEN and for a popup that answers
+  with a user command (POPUP_TO_CONFIRM, POPUP_TO_DECIDE, the values, the
+  transport request): END-OF-SELECTION, the page footer and "List contains
+  no data" follow the dynpro and the answer, instead of running before them
+  or never. `popup_to_confirm( )` and `popup_transport( )` without `then`
+  answer a run too.
+- The multiple selection and the F4 of the selection screen refuse a field
+  the user cannot change - NO-DISPLAY (a switch SUBMIT sets) or not ready
+  for input - and the multiple selection a parameter, as the URL does: a
+  crafted event set such a field, or ended in an assignment error.
+  `z2ui5_cl_cgui_selscreen=>ty_s_field` has `read_only`.
+- CALL SELECTION-SCREEN ... AS WINDOW runs AT SELECTION-SCREEN OUTPUT, ON
+  field and AT SELECTION-SCREEN for the screen called, as SAP GUI does for
+  every selection screen - an E message keeps the dialog; its parameters
+  are converted to upper case and ALPHA like those of the selection screen
+  (`mat1` stayed lower case and found nothing).
+- The checks of the selection screen run in the classic order: VALUE
+  CHECK with OBLIGATORY before any AT SELECTION-SCREEN ON field; ON BLOCK
+  after the last field of its block and ON RADIOBUTTON GROUP after the last
+  button of its group, not after all fields. A block in a block: ON BLOCK
+  of the outer one ran for none of its fields after the inner block (or not
+  at all) - `ty_s_field` has `blocks`, the named blocks a field is in.
+- The user command of a radio button group is wired from the selection AT
+  SELECTION-SCREEN OUTPUT left, not from the one the group was declared
+  with: a group the PBO switched raised no user command from the button
+  just deselected.
+- `popup_to_decide_list( )` leaves out the lines of its SPOPLI table with
+  HIDE or INACTIVE - they were offered and could be picked; the answer is
+  still the line of the table.
+- `z2ui5_cl_cgui_popup=>get_values( )`: a required multi listbox can be
+  confirmed - the check read its value, which a multi listbox never has,
+  and not the keys picked.
+- The CL_SALV_TABLE stand-in passes the sorts (`add_sort( )`, with their
+  subtotals), the totals (`add_aggregation( )`), the column order
+  (`set_column_position( )`), `set_zero( )`, `set_alignment( )` and the
+  tooltip of a column on to the grid - they were taken without effect, so
+  a kept SALV showed no totals and no initial sort. A minimum, maximum or
+  average and `set_color_column( )` still have no counterpart. The field
+  catalog of the ALV reads TOOLTIP.
+- A control that is freed (`free( )`, the controls of the list of the run
+  before, of a list level left, a custom control area filled anew) no
+  longer travels with the draft and every response: its object, its text,
+  HTML and buttons, its handlers and its grid are dropped - each Execute of
+  a report with controls added them for good.
+- The tree builds its view and takes the ticks over with an index, and the
+  chart finds the category of a row with a hashed lookup - both scanned
+  all nodes or categories per row, which a tree of thousands of nodes or a
+  chart over a large ALV felt on every roundtrip.
 
 **The value help and table controls in windows too**
 

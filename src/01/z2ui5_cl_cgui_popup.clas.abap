@@ -310,8 +310,10 @@ CLASS z2ui5_cl_cgui_popup IMPLEMENTATION.
   METHOD check_required.
 
     result = abap_true.
+    " a multi listbox holds its picks in keys, not in value
     LOOP AT mt_field REFERENCE INTO DATA(lr_field)
-         WHERE required = abap_true AND kind <> cs_kind-checkbox AND value IS INITIAL.
+         WHERE required = abap_true AND kind <> cs_kind-checkbox
+           AND ( ( kind = cs_kind-multi AND keys IS INITIAL ) OR ( kind <> cs_kind-multi AND value IS INITIAL ) ).
       mv_error = replace( val  = 'Fill in the required field &1'(003)
                           sub  = `&1`
                           with = lr_field->text ).
