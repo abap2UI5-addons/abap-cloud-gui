@@ -4280,9 +4280,6 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
   METHOD spro_open.
 
     DATA lt_field TYPE z2ui5_cl_cgui_popup=>ty_t_field.
-    DATA lt_line  TYPE string_table.
-    DATA lv_id    TYPE string.
-    DATA lv_val   TYPE string.
 
     IF authority_check_customizing( ) = abap_false.
       message( text = 'You are not authorized to maintain the customizing'(063)
@@ -4296,10 +4293,8 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
       RETURN.
     ENDIF.
 
-    SPLIT mv_cgui_spa_cust AT cl_abap_char_utilities=>newline INTO TABLE lt_line.
-    LOOP AT lt_line INTO DATA(lv_line) WHERE table_line IS NOT INITIAL.
-      SPLIT lv_line AT `=` INTO lv_id lv_val.
-      INSERT VALUE #( name = to_upper( lv_id ) text = to_upper( lv_id ) value = lv_val ) INTO TABLE lt_field.
+    LOOP AT z2ui5_cl_cgui_memory=>spa_pairs( mv_cgui_spa_cust ) INTO DATA(ls_pair).
+      INSERT VALUE #( name = ls_pair-n text = ls_pair-n value = ls_pair-v ) INTO TABLE lt_field.
     ENDLOOP.
     INSERT VALUE #( name = `%NEW_ID`    text = 'New parameter ID'(056) ) INTO TABLE lt_field.
     INSERT VALUE #( name = `%NEW_VALUE` text = 'Value'(057) ) INTO TABLE lt_field.

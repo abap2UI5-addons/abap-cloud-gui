@@ -240,6 +240,13 @@ CLASS z2ui5_cl_cgui_memory DEFINITION PUBLIC FINAL CREATE PUBLIC.
       RAISING
         z2ui5_cx_cgui_error.
 
+    "! the lines of ID=value as name and value
+    CLASS-METHODS spa_pairs
+      IMPORTING
+        lines         TYPE string
+      RETURNING
+        VALUE(result) TYPE z2ui5_if_client=>ty_t_name_value.
+
   PRIVATE SECTION.
     "! ID=value lines of the values of a variant
     CLASS-METHODS spa_lines
@@ -247,13 +254,6 @@ CLASS z2ui5_cl_cgui_memory DEFINITION PUBLIC FINAL CREATE PUBLIC.
         values        TYPE z2ui5_cl_cgui_variant=>ty_t_value
       RETURNING
         VALUE(result) TYPE string.
-
-    "! the lines of ID=value as name and value
-    CLASS-METHODS spa_pairs
-      IMPORTING
-        lines         TYPE string
-      RETURNING
-        VALUE(result) TYPE z2ui5_if_client=>ty_t_name_value.
 
     "! what the browser is told to keep - nothing before the first
     "! roundtrip, nothing in a batch run
