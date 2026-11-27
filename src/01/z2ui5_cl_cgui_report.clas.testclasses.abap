@@ -279,6 +279,7 @@ CLASS ltcl_test DEFINITION FINAL FOR TESTING
     METHODS f4_keeps_other_lines FOR TESTING.
     METHODS popups_of_the_project FOR TESTING.
     METHODS short_api FOR TESTING.
+    METHODS messages_after_popup FOR TESTING.
     METHODS input_history FOR TESTING.
     METHODS execute_in_background FOR TESTING.
     METHODS command_field FOR TESTING.
@@ -2492,6 +2493,49 @@ CLASS ltcl_test IMPLEMENTATION.
       CATCH cx_sy_move_cast_error.
         cl_abap_unit_assert=>fail( `not a z2ui5_cl_cgui_select` ).
     ENDTRY.
+
+  ENDMETHOD.
+
+  METHOD messages_after_popup.
+
+    DATA(lv_open) = |*{ z2ui5_cl_cgui_report=>cs_ucomm-messages_open }*|.
+
+    init( ).
+    " a warning of the roundtrip that opened a popup - the popup covers the
+    " screen, the popover waits for it
+    mo_cut->message( text = `Careful`
+                     type = `W` ).
+    mo_cut->mv_cgui_nav = abap_true.
+    mo_cut->messages_display( ).
+    LOOP AT mo_client->mt_action INTO DATA(lv_action).
+      cl_abap_unit_assert=>assert_false( xsdbool( lv_action CP lv_open ) ).
+    ENDLOOP.
+
+    " back on the screen: the warning is still in the log, the popover opens
+    CLEAR mo_client->mt_action.
+    mo_client->mv_navigated = abap_true.
+    mo_cut->z2ui5_if_app~main( mo_client ).
+    mo_client->mv_navigated = abap_false.
+    cl_abap_unit_assert=>assert_true( xsdbool( line_exists( mo_cut->mt_cgui_log[ text = `Careful` ] ) ) ).
+    DATA(lv_armed) = abap_false.
+    LOOP AT mo_client->mt_action INTO lv_action.
+      IF lv_action CP lv_open.
+        lv_armed = abap_true.
+      ENDIF.
+    ENDLOOP.
+    cl_abap_unit_assert=>assert_true( lv_armed ).
+
+    " an I message and a box of _msg_box( ) - one box with both
+    CLEAR: mo_cut->mt_cgui_msg, mo_cut->mt_cgui_box, mo_client->mv_box.
+    mo_cut->mv_cgui_nav = abap_false.
+    mo_cut->message( text = `Note`
+                     type = `I` ).
+    mo_cut->_msg_box( )->w( `Boxed` ).
+    mo_cut->messages_display( ).
+    cl_abap_unit_assert=>assert_char_cp( exp = `Note*Boxed`
+                                         act = mo_client->mv_box ).
+    cl_abap_unit_assert=>assert_equals( exp = `warning`
+                                        act = mo_client->mv_box_type ).
 
   ENDMETHOD.
 

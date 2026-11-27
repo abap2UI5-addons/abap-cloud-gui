@@ -1200,6 +1200,9 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
     " the messages of the run, I, W, E and A - what the message popover
     " lists; kept while the user picks one of them
     DATA mt_cgui_log           TYPE ty_t_cgui_msg.
+    " W, E or A came in a roundtrip that opened a popup - the popover opens
+    " when the screen shows again, the log stays until then
+    DATA mv_cgui_log_later     TYPE abap_bool.
     " every message of the run, S included - what cgui_run_in_background( )
     " returns
     DATA mt_cgui_run_msg       TYPE ty_t_cgui_msg.
@@ -2095,7 +2098,8 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
     mv_cgui_nav = abap_false.
     " the messages of the run stay while the popover opens and the user
     " picks one of them
-    IF client->get_event( ) <> cs_ucomm-message_focus AND client->get_event( ) <> cs_ucomm-messages_open.
+    IF client->get_event( ) <> cs_ucomm-message_focus AND client->get_event( ) <> cs_ucomm-messages_open
+        AND mv_cgui_log_later = abap_false.
       CLEAR mt_cgui_log.
     ENDIF.
 
@@ -7787,33 +7791,52 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
       ENDCASE.
     ENDLOOP.
 
-    IF lv_popover = abap_true AND mv_cgui_nav = abap_false AND mv_cgui_dynnr IS INITIAL.
-      " the popover is part of the screen, and opened in a roundtrip of its
-      " own: opened by the response that builds the screen, it stayed open
-      " without ever being rendered (the frontend holds the rendering back
-      " while it swaps the view). A timer of no time raises that roundtrip
-      client->follow_up_action( val   = client->cs_event-start_timer
-                                t_arg = VALUE #( ( cs_ucomm-messages_open ) ( `0` ) ( `X` ) ) ).
-    ELSEIF lv_text IS NOT INITIAL.
-      client->message_box_display( text = lv_text
-                                   type = `information` ).
+    " a popup opened in this roundtrip covers the screen - the popover waits
+    " for the screen to show again
+    DATA(lv_listed) = abap_false.
+    IF lv_popover = abap_true AND mv_cgui_nav = abap_true.
+      mv_cgui_log_later = abap_true.
+      lv_listed = abap_true.
+    ELSEIF mv_cgui_nav = abap_false AND mv_cgui_dynnr IS INITIAL.
+      IF mv_cgui_log_later = abap_true AND mt_cgui_log IS NOT INITIAL.
+        lv_popover = abap_true.
+      ENDIF.
+      mv_cgui_log_later = abap_false.
+      IF lv_popover = abap_true.
+        lv_listed = abap_true.
+        " the popover is part of the screen, and opened in a roundtrip of its
+        " own: opened by the response that builds the screen, it stayed open
+        " without ever being rendered (the frontend holds the rendering back
+        " while it swaps the view). A timer of no time raises that roundtrip
+        client->follow_up_action( val   = client->cs_event-start_timer
+                                  t_arg = VALUE #( ( cs_ucomm-messages_open ) ( `0` ) ( `X` ) ) ).
+      ENDIF.
+    ENDIF.
+    " the I messages - in the popover when it opens, else in a box
+    IF lv_listed = abap_true.
+      CLEAR lv_text.
     ENDIF.
 
-    " _msg_box( ): one box, its type the worst of the messages
-    IF mt_cgui_box IS NOT INITIAL AND lv_text IS INITIAL.
-      CLEAR lv_text.
-      DATA(lv_box) = `information`.
-      LOOP AT mt_cgui_box INTO DATA(ls_box).
-        lv_text = COND #( WHEN lv_text IS INITIAL THEN ls_box-text ELSE lv_text && cl_abap_char_utilities=>newline && ls_box-text ).
-        lv_box = SWITCH #( ls_box-type
-                           WHEN `E` OR `A` THEN `error`
-                           WHEN `W` THEN COND #( WHEN lv_box = `error` THEN lv_box ELSE `warning` )
-                           WHEN `S` THEN COND #( WHEN lv_box = `information` THEN `success` ELSE lv_box )
-                           ELSE lv_box ).
-      ENDLOOP.
-      client->message_box_display( text = lv_text
-                                   type = lv_box ).
+    " _msg_box( ): one box, its type the worst of the messages - the I
+    " messages of the run in it as well, a second box would replace the first
+    IF mt_cgui_box IS INITIAL.
+      IF lv_text IS NOT INITIAL.
+        client->message_box_display( text = lv_text
+                                     type = `information` ).
+      ENDIF.
+      RETURN.
     ENDIF.
+    DATA(lv_box) = `information`.
+    LOOP AT mt_cgui_box INTO DATA(ls_box).
+      lv_text = COND #( WHEN lv_text IS INITIAL THEN ls_box-text ELSE lv_text && cl_abap_char_utilities=>newline && ls_box-text ).
+      lv_box = SWITCH #( ls_box-type
+                         WHEN `E` OR `A` THEN `error`
+                         WHEN `W` THEN COND #( WHEN lv_box = `error` THEN lv_box ELSE `warning` )
+                         WHEN `S` THEN COND #( WHEN lv_box = `information` THEN `success` ELSE lv_box )
+                         ELSE lv_box ).
+    ENDLOOP.
+    client->message_box_display( text = lv_text
+                                 type = lv_box ).
 
   ENDMETHOD.
 
