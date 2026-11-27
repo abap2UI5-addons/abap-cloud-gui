@@ -694,7 +694,8 @@ export const guiMethods = {
       this.refuse(h.stmt, `${h.method}: the handler uses me-> - in the report class me is the report; port it by hand`);
       return [];
     }
-    const body = this.convertBody(h.body, ctx);
+    // a method of a handler class: its EXIT left the method already
+    const body = this.convertBody(h.body, { ...ctx, handler: true });
     const out = [];
     for (const l of body) {
       let t = l;

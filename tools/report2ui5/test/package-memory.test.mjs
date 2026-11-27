@@ -8,7 +8,7 @@ import { execFileSync } from "node:child_process";
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { convertPackage } from "../lib/package.mjs";
+import { convertPackage, uniqueClassNames } from "../lib/package.mjs";
 import { unzipTexts } from "../../../site/unzip.mjs";
 import { zip } from "../../../site/zip.mjs";
 
@@ -70,4 +70,44 @@ test("the zip reader: what the site's writer wrote, and a deflated zip of a zip 
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
+});
+
+test("two reports that would give the same class - ZREPORT and Z_REPORT, two long names cut alike - get a name each, SUBMIT starts the right one", () => {
+  const report = (name, text, more = "") => `REPORT ${name}.\nSTART-OF-SELECTION.\n  WRITE / '${text}'.\n${more}`;
+  const { rows, summary, output } = convertPackage({
+    "src/zreport.prog.abap": report("zreport", "one", "  SUBMIT z_report AND RETURN.\n"),
+    "src/z_report.prog.abap": report("z_report", "two", "  SUBMIT zreport AND RETURN.\n"),
+    "src/zsales_order_overview_report_a.prog.abap": report("zsales_order_overview_report_a", "A"),
+    "src/zsales_order_overview_report_b.prog.abap": report("zsales_order_overview_report_b", "B"),
+  });
+  assert.deepEqual(rows.map((r) => [r.name, r.className, r.ok]), [
+    ["Z_REPORT", "zcl_report", true],
+    ["ZREPORT", "zcl_report2", true],
+    ["ZSALES_ORDER_OVERVIEW_REPORT_A", "zcl_sales_order_overview_repor", true],
+    ["ZSALES_ORDER_OVERVIEW_REPORT_B", "zcl_sales_order_overview_repo2", true],
+  ]);
+  // a class and a migration report each - none written over another
+  const classes = Object.keys(output).filter((f) => f.endsWith(".clas.abap"));
+  assert.equal(classes.length, 4);
+  assert.equal(Object.keys(output).filter((f) => f.endsWith(".migration.md")).length, 4);
+  assert.match(output["zcl_report.clas.abap"], /write\( 'two' \)/);
+  assert.match(output["zcl_report2.clas.abap"], /write\( 'one' \)/);
+  assert.match(output["zcl_report2.clas.abap"], /^CLASS zcl_report2 DEFINITION/);
+  assert.match(output["zcl_sales_order_overview_repo2.clas.abap"], /write\( 'B' \)/);
+  // SUBMIT starts the class the report it names got
+  assert.match(output["zcl_report2.clas.abap"], /submit\( report = `ZCL_REPORT`/i);
+  assert.match(output["zcl_report.clas.abap"], /submit\( report = `ZCL_REPORT2`/i);
+  assert.match(summary, /4 report\(s\) - 4 converted/);
+  assert.match(summary, /ZREPORT -> zcl_report2 \(zcl_report is Z_REPORT's\)/);
+});
+
+test("uniqueClassNames: the first keeps its name, the next a number, never a name another report has", () => {
+  assert.deepEqual(uniqueClassNames(["zcl_a", "zcl_a", "zcl_a2", "zcl_a"]), ["zcl_a", "zcl_a3", "zcl_a2", "zcl_a4"]);
+  assert.deepEqual(uniqueClassNames(["z".repeat(30), "z".repeat(30)]), ["z".repeat(30), `${"z".repeat(29)}2`]);
+});
+
+test("a namespaced report of a package: its files named #abc#, no folder in the zip", () => {
+  const { rows, output } = convertPackage({ "src/#abc#zrep.prog.abap": "REPORT /abc/zrep.\nSTART-OF-SELECTION.\n  WRITE / 'x'.\n" });
+  assert.deepEqual(rows.map((r) => [r.name, r.className, r.ok]), [["/ABC/ZREP", "/abc/cl_zrep", true]]);
+  assert.deepEqual(Object.keys(output).sort(), ["#abc#cl_zrep.clas.abap", "#abc#cl_zrep.clas.xml", "#abc#cl_zrep.migration.md", "summary.md"]);
 });

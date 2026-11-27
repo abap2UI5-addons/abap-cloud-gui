@@ -247,6 +247,30 @@ INITIALIZATION.
 `),
   },
   {
+    id: "global-field-symbol",
+    title: "A global field symbol assigned in one block and read in another",
+    match: /^FIELD-SYMBOLS \S+ is global and used in /,
+    why: "The globals of a report become attributes of the class - a field symbol cannot be one. The converter declares a global field symbol in every method that uses it, which is right where each event block, FORM or method assigns it before it uses it. Where one assigns it and another reads what it points to, the field symbol of the second is a local one, not assigned (GETWA_NOT_ASSIGNED at runtime) - the converter refuses rather than write that class.",
+    rewrite: abap(`
+* before
+FIELD-SYMBOLS <line> TYPE ty_line.
+START-OF-SELECTION.
+  READ TABLE gt_lines ASSIGNING <line> INDEX 1.
+  PERFORM bump.
+FORM bump.
+  <line>-count = <line>-count + 1.
+ENDFORM.
+
+* after - the line passed to the FORM
+START-OF-SELECTION.
+  READ TABLE gt_lines ASSIGNING FIELD-SYMBOL(<line>) INDEX 1.
+  PERFORM bump CHANGING <line>.
+FORM bump CHANGING cs_line TYPE ty_line.
+  cs_line-count = cs_line-count + 1.
+ENDFORM.
+`),
+  },
+  {
     id: "dynamic-screen-type",
     title: "A field of the selection screen typed at runtime (TYPE (name), FOR (name)) or with a local type",
     match: /is typed (at runtime \(TYPE \(name\) \/ FOR \(name\)\)|with a local type of the report)/,
@@ -404,6 +428,20 @@ FORM add TABLES tt_log TYPE ty_t_log USING iv_text TYPE string.
     match: /^AT PF\d+ - /,
     why: "`AT PFnn` becomes a `WHEN` of `at_user_command( )` for the keys F1 to Ctrl+Shift+F12 (PF01 to PF48), one block per key.",
     rewrite: "Merge the blocks of the same key; use a key from PF01 to PF48.",
+  },
+  {
+    id: "long-line",
+    title: "A line over 255 characters with no place to break it",
+    match: /^a line over 255 characters: /,
+    why: "abapGit imports at most 255 characters per line - a longer one ends the import and leaves an empty class behind. The converter breaks a long line of the class at a blank between two tokens, in front of a comment, or in a character literal (two literals joined with `&`, the same literal). A string template or a single token longer than that cannot be broken.",
+    rewrite: abap(`
+* before
+gv_text = |{ a } ... a template of 300 characters ... { b }|.
+
+* after
+gv_text = |{ a } ... the first part ...|
+       && |... the second part ... { b }|.
+`),
   },
   {
     id: "syntax",

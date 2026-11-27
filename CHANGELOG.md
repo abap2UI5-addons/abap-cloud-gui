@@ -8,6 +8,23 @@ release.
 
 **Fixes**
 
+- report2UI5: a global field symbol that one event block, FORM or method
+  assigns and another one reads is refused (`global-field-symbol`) - the
+  class declared a local one in each, and the second read an unassigned
+  one. A report `/abc/zrep` writes `#abc#cl_zrep.*`, as abapGit names the
+  files, not a folder. A line over 255 characters is broken at a token
+  boundary (a character literal in two joined with `&`), and refused
+  (`long-line`) where it cannot be - it was a TODO, and abapGit's import
+  left an empty class. A global renamed for a component of the runtime
+  (`message`) is renamed in the bodies of the macros too. A FORM's USING
+  parameter a field symbol or a reference is set to (ASSIGN, GET REFERENCE
+  OF, REF #( )) is CHANGING. EXIT outside of a loop in an event block gets
+  a TODO to check what runs after it. A long report converts in linear
+  time. In a package, two reports that would give the same class
+  (`ZREPORT`, `Z_REPORT`) get a name each, and SUBMIT starts the right one.
+- The playground: a Run started while another one waits settles that one -
+  its timer no longer reports two minutes later over the newer Run; a
+  `?github=` link asks before it replaces your own report in the editor.
 - The value help (`z2ui5_cl_cgui_select`) shows a column with a namespace
   (`/SCWM/...`) again: its cell bound `{/SCWM/...}`, an absolute path read
   from the model root, and stayed empty. The column name now goes through

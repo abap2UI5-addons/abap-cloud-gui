@@ -11,6 +11,24 @@ import {
   renderScreenChain, salvTokens, sameColon, selectTargetType, tokenParents,
 } from "./convert-shared.mjs";
 
+/** the sources of a statement a field symbol or a data reference is set
+ *  to: ASSIGN x TO <fs> (and ASSIGN COMPONENT c OF STRUCTURE x), GET
+ *  REFERENCE OF x, REF #( x ) */
+function referenced(s) {
+  const k = kind(s);
+  const out = [];
+  if (k === "Assign") {
+    const src = child(s, "AssignSource");
+    if (src) out.push(...children(src, "Source"));
+  }
+  if (k === "GetReference") out.push(...children(s, "Source"));
+  for (const src of findAll(s, "Source")) {
+    const first = src.getChildren()[0];
+    if (first && isToken(first) && uc(first.get().getStr()) === "REF" && child(src, "TypeNameOrInfer")) out.push(...children(src, "Source"));
+  }
+  return out;
+}
+
 export const declMethods = {
 
   /** the types abaplint's syntax check gives the variables of the program
@@ -141,7 +159,9 @@ export const declMethods = {
       f.name = name;
       f.method = method;
       f.params = [];
-      const written = new Set(f.body.flatMap((s) => findAll(s, "Target").map((t) => lc(t.getFirstToken().getStr()))));
+      // written: a target - and a field a field symbol or a reference is
+      // set to (ASSIGN, GET REFERENCE OF, REF #( )), which can write it
+      const written = new Set(f.body.flatMap((s) => [...findAll(s, "Target"), ...referenced(s)].map((t) => lc(t.getFirstToken().getStr()))));
       for (const [section, k] of [["FormTables", "tables"], ["FormUsing", "using"], ["FormChanging", "changing"]]) {
         const sec = child(f.stmt, section);
         if (!sec) continue;

@@ -15,7 +15,7 @@
 // statements marked). 1: wrong call.
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
-import { convert, defaultClassName } from "./lib/convert.mjs";
+import { classFileBase, convert, defaultClassName } from "./lib/convert.mjs";
 import { inlineIncludes } from "./lib/includes.mjs";
 import { includesFrom } from "./lib/includes-fs.mjs";
 import { dependenciesOf, dependencyIndex } from "./lib/deps.mjs";
@@ -122,7 +122,8 @@ async function main() {
     const o = includes.origin(row);
     return `${o.file === basename(file) ? file : join(dirname(file), o.file)}:${o.row}:${col}`;
   };
-  for (const r of result.refusals) console.error(`${where(r.row, r.col)} - ${r.message}`);
+  // a refusal of a generated file (a line too long to break) names that file
+  for (const r of result.refusals) console.error(`${r.row || !r.file ? where(r.row, r.col) : r.file} - ${r.message}`);
 
   const out = resolve(opts.out ?? ".");
   mkdirSync(out, { recursive: true });
@@ -136,7 +137,7 @@ async function main() {
     lint = { v750: run({ files: write, target: "v750", ddic, naming: false }).generated };
   }
 
-  const reportFile = opts.report ? resolve(opts.report) : join(out, `${result.className}.migration.md`);
+  const reportFile = opts.report ? resolve(opts.report) : join(out, `${classFileBase(result.className)}.migration.md`);
   mkdirSync(dirname(reportFile), { recursive: true });
   writeFileSync(reportFile, migrationReport(result, { source: file, texts, lint, includes }));
 
