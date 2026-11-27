@@ -8,6 +8,47 @@ release.
 
 **Fixes**
 
+- The command field (`/nCLASS`, a transaction of the catalog) creates a
+  class only when it inherits from `z2ui5_cl_cgui_report` - a class whose
+  constructor wants parameters ended the app. The command field, the
+  palette and `call_transaction( )` find a code of the catalog in any case,
+  by one resolver (`z2ui5_cl_cgui_command=>tcode_find( )`).
+- Variants and layouts: a user who saves over a shared variant or layout
+  of another user keeps its sharing (it vanished for everyone with his
+  unchecked box); Save as Variant refuses names of the draft scheme
+  (`%...`) and names over 40 characters, and a draft is restored only for
+  its owner; a saved layout picked in Change Layout and taken unchanged is
+  applied, not saved again; OK in Change Layout keeps the sort order.
+- Messages: W, E and A of a roundtrip that opened a popup open the
+  message popover when the screen shows again; I messages and a box of
+  `_msg_box( )` share the one box.
+- The list counts and prints `SKIP n` as n lines; the ALV selection stays
+  through a line selection and Back; the text of a transport request is
+  read in the logon language; the intent navigation escapes control
+  characters.
+- ALV: `EDIT` of one column of a classic field catalog no longer makes
+  the whole grid editable; a field catalog or sort table set again on the
+  shown grid replaces the old one (flags switched off, old sort gone);
+  `COLTEXT` heads a column before the DDIC texts; the tooltip of a column
+  is on the column; namespaced columns (`/ABC/FIELD`) are bound relative to
+  the row; dropdown texts are escaped once; subtotals follow the sort
+  order; the CSV export is sorted as the layout; `to_text( )` prints the
+  aggregation of a column, not always its total. The page buttons
+  (`cs_page`, `get_page( )`, `get_page_offset( )`, `page_turn( )`) are
+  deprecated - the grid scrolls through a window of rows.
+- SAP GUI stand-ins: the SALV columns list the columns of an `.INCLUDE`;
+  an expander of the SALV tree raises `EXPAND_EMPTY_FOLDER`; the SALV table
+  finds its table by the attribute name after the draft; the text editor
+  wraps a line longer than the field of the table instead of cutting it;
+  the state of the tree, the SALV stand-ins, the text editor, the HTML
+  viewer, the container, the demo output and the application log is
+  PROTECTED, so the transpiled runtime restores it from the draft.
+- The helpers of `z2ui5_cl_cgui_context` copied from abap-util follow
+  its fixes: on ABAP Cloud the labels of a data element are read again
+  (the XCO call failed on its parameter types, so every column and field
+  fell back to its name), and an `INT8` is typed for the model without
+  the typekind constant 7.02 lacks.
+
 - The value help (`z2ui5_cl_cgui_select`) shows a column with a namespace
   (`/SCWM/...`) again: its cell bound `{/SCWM/...}`, an absolute path read
   from the model root, and stayed empty. The column name now goes through

@@ -9,8 +9,13 @@ CLASS ltcl_test DEFINITION FINAL FOR TESTING
         name   TYPE c LENGTH 20,
         weight TYPE i,
       END OF ty_s_item.
+    TYPES BEGIN OF ty_s_order.
+    INCLUDE TYPE ty_s_item.
+    TYPES   amount TYPE i.
+    TYPES END OF ty_s_order.
 
     METHODS columns_of_the_line FOR TESTING.
+    METHODS columns_of_an_include FOR TESTING.
     METHODS column_settings FOR TESTING.
     METHODS no_such_column FOR TESTING.
     METHODS settings_of_the_table FOR TESTING.
@@ -32,6 +37,18 @@ CLASS ltcl_test IMPLEMENTATION.
                                         act = lt_column[ 3 ]-columnname ).
     cl_abap_unit_assert=>assert_equals( exp = `NAME`
                                         act = lt_column[ 2 ]-r_column->get_columnname( ) ).
+
+  ENDMETHOD.
+
+  METHOD columns_of_an_include.
+
+    DATA ls_order TYPE ty_s_order.
+
+    DATA(lo_columns) = NEW z2ui5_cl_cgui_salv_cols( ls_order ).
+    cl_abap_unit_assert=>assert_equals( exp = 4
+                                        act = lines( lo_columns->get( ) ) ).
+    cl_abap_unit_assert=>assert_equals( exp = `NAME`
+                                        act = lo_columns->get_column( 'NAME' )->get_columnname( ) ).
 
   ENDMETHOD.
 

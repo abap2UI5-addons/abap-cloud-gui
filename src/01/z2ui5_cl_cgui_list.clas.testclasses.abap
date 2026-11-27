@@ -42,6 +42,7 @@ CLASS ltcl_test DEFINITION FINAL FOR TESTING
     METHODS write_options_r10 FOR TESTING.
     METHODS pages_and_lines FOR TESTING.
     METHODS cut_from_a_line FOR TESTING.
+    METHODS skip_lines FOR TESTING.
 
 ENDCLASS.
 
@@ -438,6 +439,34 @@ CLASS ltcl_test IMPLEMENTATION.
     cl_abap_unit_assert=>assert_true( xsdbool( line_exists( lt_text[ table_line = `  -----` ] ) ) ).
     cl_abap_unit_assert=>assert_equals( act = lo_list->describe_lines( )
                                         exp = 7 ).
+
+  ENDMETHOD.
+
+  METHOD skip_lines.
+
+    " SKIP 2: two empty lines in the text and two lines of the page
+    DATA(lo_list) = z2ui5_cl_cgui_list=>factory( ).
+    lo_list->write( `a` ).
+    lo_list->skip( 2 ).
+    lo_list->write( `b` ).
+    cl_abap_unit_assert=>assert_equals( exp = VALUE string_table( ( `a` ) ( `` ) ( `` ) ( `b` ) )
+                                        act = lo_list->to_text( ) ).
+
+    lo_list = z2ui5_cl_cgui_list=>factory( ).
+    lo_list->set_line_count( 3 ).
+    lo_list->write( `a` ).
+    lo_list->skip( 2 ).
+    lo_list->write( `b` ).
+    cl_abap_unit_assert=>assert_equals( act = lo_list->current_page( )
+                                        exp = 2 ).
+
+    " SKIP TO LINE 4 after one line: two lines skipped
+    lo_list = z2ui5_cl_cgui_list=>factory( ).
+    lo_list->write( `a` ).
+    lo_list->skip_to_line( 4 ).
+    lo_list->write( `d` ).
+    cl_abap_unit_assert=>assert_equals( exp = VALUE string_table( ( `a` ) ( `` ) ( `` ) ( `d` ) )
+                                        act = lo_list->to_text( ) ).
 
   ENDMETHOD.
 

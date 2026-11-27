@@ -98,12 +98,22 @@ CLASS z2ui5_cl_cgui_salv_tree DEFINITION PUBLIC
       RETURNING
         VALUE(result) TYPE REF TO z2ui5_cl_cgui_tree.
 
+    "! an expander node was opened the first time, without children - the
+    "! report passes it on as EXPAND_EMPTY_FOLDER
+    METHODS on_expand
+      IMPORTING
+        key TYPE i.
+
   PROTECTED SECTION.
-  PRIVATE SECTION.
+    " PROTECTED, not PRIVATE: the object is kept with the report between
+    " the roundtrips, and the transpiled runtime restores PROTECTED
+    " attributes of the draft but not PRIVATE ones
     DATA mo_tree     TYPE REF TO z2ui5_cl_cgui_tree.
     DATA mo_nodes    TYPE REF TO z2ui5_cl_cgui_salv_nodes.
     DATA mo_columns  TYPE REF TO z2ui5_cl_cgui_salv_cols.
     DATA mo_settings TYPE REF TO z2ui5_cl_cgui_salv_config.
+
+  PRIVATE SECTION.
 ENDCLASS.
 
 
@@ -147,9 +157,7 @@ CLASS z2ui5_cl_cgui_salv_tree IMPLEMENTATION.
     ENDIF.
     LOOP AT mo_columns->get( ) INTO DATA(ls_ref).
       DATA(lo_column) = ls_ref-r_column.
-      DATA(lv_text) = COND string( WHEN lo_column->mv_long IS NOT INITIAL THEN lo_column->mv_long
-                                   WHEN lo_column->mv_medium IS NOT INITIAL THEN lo_column->mv_medium
-                                   ELSE lo_column->mv_short ).
+      DATA(lv_text) = lo_column->get_text( ).
       IF lv_text IS NOT INITIAL.
         mo_tree->set_column_text( name = lo_column->mv_name
                                   text = lv_text ).
@@ -238,6 +246,14 @@ CLASS z2ui5_cl_cgui_salv_tree IMPLEMENTATION.
     raise_event( event  = `DOUBLE_CLICK`
                  params = VALUE #( ( name = `NODE_KEY`   kind = cl_abap_objectdescr=>exporting value = REF #( lv_key ) )
                                    ( name = `COLUMNNAME` kind = cl_abap_objectdescr=>exporting value = REF #( lv_column ) ) ) ).
+
+  ENDMETHOD.
+
+  METHOD on_expand.
+
+    DATA(lv_key) = z2ui5_cl_cgui_salv_node=>to_key( key ).
+    raise_event( event  = `EXPAND_EMPTY_FOLDER`
+                 params = VALUE #( ( name = `NODE_KEY` kind = cl_abap_objectdescr=>exporting value = REF #( lv_key ) ) ) ).
 
   ENDMETHOD.
 

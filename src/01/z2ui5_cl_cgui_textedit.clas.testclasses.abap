@@ -340,6 +340,15 @@ CLASS ltcl_test IMPLEMENTATION.
     lo_edit->get_text_as_r3table( IMPORTING table = lt_out ).
     cl_abap_unit_assert=>assert_initial( lt_out ).
 
+    " a line longer than the field of the table goes on in the next line
+    TYPES ty_short TYPE c LENGTH 10.
+    TYPES ty_t_short TYPE STANDARD TABLE OF ty_short WITH EMPTY KEY.
+    DATA lt_short TYPE ty_t_short.
+    mo_gui->mt_control[ 2 ]-text = |abcdefghijklmnopqrstuvw\nend|.
+    lo_edit->get_text_as_r3table( IMPORTING table = lt_short ).
+    cl_abap_unit_assert=>assert_equals( act = lt_short
+                                        exp = VALUE ty_t_short( ( `abcdefghij` ) ( `klmnopqrst` ) ( `uvw` ) ( `end` ) ) ).
+
   ENDMETHOD.
 
   METHOD modified_and_modes.

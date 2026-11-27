@@ -135,6 +135,23 @@ CLASS ltcl_test IMPLEMENTATION.
     cl_abap_unit_assert=>assert_false( lt_layout[ 2 ]-subtotal ).
     cl_abap_unit_assert=>assert_true( lt_layout[ 3 ]-sum ).
 
+    " sorted by PRICE, then CARRID - the rows moved in the dialog keep that
+    " rank; a column sorted in the dialog comes after
+    DATA(lt_sorted) = mt_base.
+    lt_sorted[ 3 ]-sort = z2ui5_cl_cgui_alv=>cs_sort-ascending.
+    lt_sorted[ 3 ]-sort_seq = 1.
+    lt_sorted[ 1 ]-sort = z2ui5_cl_cgui_alv=>cs_sort-ascending.
+    lt_sorted[ 1 ]-sort_seq = 2.
+    lt_row = z2ui5_cl_cgui_layout=>layout_to_rows( lt_sorted ).
+    lt_row[ 2 ]-sort = z2ui5_cl_cgui_alv=>cs_sort-descending.
+    lt_layout = z2ui5_cl_cgui_layout=>rows_to_layout( lt_row ).
+    cl_abap_unit_assert=>assert_equals( act = lt_layout[ name = `PRICE` ]-sort_seq
+                                        exp = 1 ).
+    cl_abap_unit_assert=>assert_equals( act = lt_layout[ name = `CARRID` ]-sort_seq
+                                        exp = 2 ).
+    cl_abap_unit_assert=>assert_equals( act = lt_layout[ name = `FLDATE` ]-sort_seq
+                                        exp = 3 ).
+
   ENDMETHOD.
 
   METHOD variant_roundtrip.
@@ -239,9 +256,20 @@ CLASS ltcl_test IMPLEMENTATION.
     cl_abap_unit_assert=>assert_equals( act = lo_popup->mv_name
                                         exp = `NARROW` ).
 
+    " OK as it was loaded: applied, not saved again
     run( popup = lo_popup
          event = z2ui5_cl_cgui_layout=>cs_event-ok ).
     DATA(ls_result) = lo_popup->result( ).
+    cl_abap_unit_assert=>assert_equals( act = ls_result-action
+                                        exp = z2ui5_cl_cgui_layout=>cs_action-apply ).
+    cl_abap_unit_assert=>assert_equals( act = ls_result-name
+                                        exp = `NARROW` ).
+
+    " changed, it is saved under its name
+    lo_popup->mt_row[ 2 ]-visible = abap_true.
+    run( popup = lo_popup
+         event = z2ui5_cl_cgui_layout=>cs_event-ok ).
+    ls_result = lo_popup->result( ).
     cl_abap_unit_assert=>assert_equals( act = ls_result-action
                                         exp = z2ui5_cl_cgui_layout=>cs_action-save ).
     cl_abap_unit_assert=>assert_equals( act = ls_result-name

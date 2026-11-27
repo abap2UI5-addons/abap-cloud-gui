@@ -83,6 +83,7 @@ CLASS ltcl_test DEFINITION FINAL FOR TESTING
     METHODS aggregates_search_single FOR TESTING.
     METHODS f4_in_cells FOR TESTING.
     METHODS classic_fieldcat_layout_sort FOR TESTING.
+    METHODS classic_fieldcat_again FOR TESTING.
 
 ENDCLASS.
 
@@ -443,6 +444,27 @@ CLASS ltcl_test IMPLEMENTATION.
                                        tab    = mo_app->mt_row ).
     cl_abap_unit_assert=>assert_true( xsdbool( lv_view CS `headerText="Subtotals"` ) ).
 
+    " the groups in the order of the sorting, not of their texts: 9 before 10
+    mo_app->mt_plain = VALUE #( ( carrid = `LH` seats = 10 )
+                                ( carrid = `AA` seats = 9 )
+                                ( carrid = `UA` seats = 10 ) ).
+    lt_subtotal = z2ui5_cl_cgui_alv=>factory(
+        )->set_sort( name     = `SEATS`
+                     subtotal = abap_true
+        )->set_column_sum( `SEATS` )->get_subtotals( mo_app->mt_plain ).
+    cl_abap_unit_assert=>assert_equals( act = lines( lt_subtotal )
+                                        exp = 2 ).
+    cl_abap_unit_assert=>assert_equals( act = lt_subtotal[ 1 ]-value
+                                        exp = CONV decfloat34( 9 ) ).
+    cl_abap_unit_assert=>assert_equals( act = lt_subtotal[ 2 ]-value
+                                        exp = CONV decfloat34( 20 ) ).
+
+    " the CSV export in the order of the layout as well
+    DATA(lv_csv) = z2ui5_cl_cgui_alv=>factory( )->set_sort( `CARRID` )->to_csv( mo_app->mt_row ).
+    FIND `AA` IN lv_csv MATCH OFFSET DATA(lv_aa).
+    FIND `LH` IN lv_csv MATCH OFFSET DATA(lv_lh).
+    cl_abap_unit_assert=>assert_true( xsdbool( lv_aa < lv_lh ) ).
+
   ENDMETHOD.
 
   METHOD xlsx_export.
@@ -480,6 +502,14 @@ CLASS ltcl_test IMPLEMENTATION.
                                          exp = `UA *` ).
     cl_abap_unit_assert=>assert_false( xsdbool( lt_text[ 3 ] CS `say` ) ).
     cl_abap_unit_assert=>assert_true( xsdbool( lt_text[ 7 ] CS `600` ) ).
+
+    " the aggregation of the column, not always a total: the maximum
+    lt_text = z2ui5_cl_cgui_alv=>factory(
+        )->set_column_aggregation( name        = `PRICE`
+                                   aggregation = z2ui5_cl_cgui_alv=>cs_aggregation-maximum
+        )->to_text( mo_app->mt_row ).
+    cl_abap_unit_assert=>assert_true( xsdbool( lt_text[ lines( lt_text ) ] CS `300` ) ).
+    cl_abap_unit_assert=>assert_false( xsdbool( lt_text[ lines( lt_text ) ] CS `600` ) ).
 
   ENDMETHOD.
 
@@ -679,7 +709,14 @@ CLASS ltcl_test IMPLEMENTATION.
     " the event on the table, not on the row settings
     cl_abap_unit_assert=>assert_char_cp( act = lv_view
                                          exp = `*<table:Table *cellClick=*fixedColumnCount="1"*<table:rowSettingsTemplate*` ).
-    cl_abap_unit_assert=>assert_true( xsdbool( lv_view CS `The airline` ) ).
+    " the tooltip on the column, not on its label
+    DATA(lv_before) = substring_before( val = lv_view
+                                        sub = `tooltip="The airline"` ).
+    cl_abap_unit_assert=>assert_char_cp( act = substring( val = lv_before
+                                                          off = find( val = lv_before
+                                                                      sub = `<`
+                                                                      occ = -1 ) )
+                                         exp = `<table:Column *` ).
     cl_abap_unit_assert=>assert_true( xsdbool( lv_view CS `Number(${PRICE}) !== 0` ) ).
     cl_abap_unit_assert=>assert_false( xsdbool( lv_view CS `FLDATE` ) ).
     cl_abap_unit_assert=>assert_true( xsdbool( lv_view CS `hAlign="Center"` ) ).
@@ -698,12 +735,15 @@ CLASS ltcl_test IMPLEMENTATION.
     DATA(lo_edit) = z2ui5_cl_cgui_alv=>factory(
         )->set_column_dropdown( name   = `CARRID`
                                 values = VALUE #( ( key = `LH` text = `Lufthansa` )
+                                                  ( key = `UA` text = `United & Co` )
                                                   ( key = `AA` text = `American` ) ) ).
     lo_view = z2ui5_cl_ui5_view_builder=>factory( )->ele( `VBox` ).
     lo_edit->render( node   = lo_view
                      client = mo_client
                      tab    = mo_app->mt_row ).
     cl_abap_unit_assert=>assert_true( xsdbool( lo_view->stringify( ) CS `'LH' ? 'Lufthansa'` ) ).
+    " escaped once, by the builder - the text shows A &amp; B, not A &amp;amp; B
+    cl_abap_unit_assert=>assert_true( xsdbool( lo_view->stringify( ) CS `'United &amp; Co'` ) ).
     lo_edit->set_edit( )->set_edit_field( `ZZSELKZ` ).
     lo_view = z2ui5_cl_ui5_view_builder=>factory( )->ele( `VBox` ).
     lo_edit->render( node   = lo_view
@@ -855,6 +895,58 @@ CLASS ltcl_test IMPLEMENTATION.
     cl_abap_unit_assert=>assert_true( xsdbool( lv_aa < lv_lh ) ).
     cl_abap_unit_assert=>assert_char_cp( act = lv_text
                                          exp = `*30*` ).
+
+  ENDMETHOD.
+
+  METHOD classic_fieldcat_again.
+
+    TYPES:
+      BEGIN OF ty_s_flight,
+        carrid TYPE c LENGTH 3,
+        price  TYPE p LENGTH 8 DECIMALS 2,
+      END OF ty_s_flight.
+    TYPES:
+      BEGIN OF ty_s_fcat,
+        fieldname TYPE c LENGTH 30,
+        scrtext_l TYPE c LENGTH 40,
+        coltext   TYPE c LENGTH 40,
+        no_out    TYPE c LENGTH 1,
+        edit      TYPE c LENGTH 1,
+      END OF ty_s_fcat.
+    TYPES:
+      BEGIN OF ty_s_sort,
+        fieldname TYPE c LENGTH 30,
+        down      TYPE c LENGTH 1,
+      END OF ty_s_sort.
+    DATA lt_flight TYPE STANDARD TABLE OF ty_s_flight WITH EMPTY KEY.
+    DATA lt_fcat   TYPE STANDARD TABLE OF ty_s_fcat WITH EMPTY KEY.
+    DATA lt_sort   TYPE STANDARD TABLE OF ty_s_sort WITH EMPTY KEY.
+
+    " COLTEXT is the text the report gave the column - before the DDIC's;
+    " EDIT of one column makes that column an input, not the grid
+    lt_fcat = VALUE #( ( fieldname = 'CARRID' no_out = abap_true )
+                       ( fieldname = 'PRICE'  scrtext_l = 'Price' coltext = 'Fare' edit = abap_true ) ).
+    lt_sort = VALUE #( ( fieldname = 'PRICE' down = abap_true ) ).
+    DATA(lo_alv) = z2ui5_cl_cgui_alv=>factory( )->set_fieldcat( lt_fcat
+        )->set_sort_classic( lt_sort ).
+    DATA(lt_layout) = lo_alv->get_layout( lt_flight ).
+    cl_abap_unit_assert=>assert_equals( act = lt_layout[ name = `PRICE` ]-text
+                                        exp = `Fare` ).
+    cl_abap_unit_assert=>assert_true( lt_layout[ name = `CARRID` ]-hidden ).
+    cl_abap_unit_assert=>assert_true( lo_alv->is_editable( ) ).
+
+    " the catalog and the sort set again on the grid that shows: what is
+    " off now is off - the grid is no input grid -, the old sort is gone
+    lt_fcat = VALUE #( ( fieldname = 'CARRID' )
+                       ( fieldname = 'PRICE' ) ).
+    lt_sort = VALUE #( ( fieldname = 'CARRID' ) ).
+    lo_alv->set_fieldcat( lt_fcat )->set_sort_classic( lt_sort ).
+    lt_layout = lo_alv->get_layout( lt_flight ).
+    cl_abap_unit_assert=>assert_false( lt_layout[ name = `CARRID` ]-hidden ).
+    cl_abap_unit_assert=>assert_false( lo_alv->is_editable( ) ).
+    cl_abap_unit_assert=>assert_initial( lt_layout[ name = `PRICE` ]-sort ).
+    cl_abap_unit_assert=>assert_equals( act = lt_layout[ name = `CARRID` ]-sort_seq
+                                        exp = 1 ).
 
   ENDMETHOD.
 

@@ -121,6 +121,26 @@ CLASS z2ui5_cl_cgui_tree DEFINITION PUBLIC FINAL CREATE PUBLIC.
       RETURNING
         VALUE(result) TYPE i.
 
+    "! the parent of a node added related to the node related -
+    "! relationship as z2ui5_if_cgui_salv_c=>node_relation (the relat_* of
+    "! the classic trees): a child below it, a sibling beside it; 0 without
+    "! a related node
+    METHODS parent_of_related
+      IMPORTING
+        related       TYPE i
+        relationship  TYPE i
+      RETURNING
+        VALUE(result) TYPE i.
+
+    "! open a closed node, close an open one with children - abap_true when
+    "! it was a lazy node opened the first time, without children: it counts
+    "! as loaded now, its children are the caller's to add
+    METHODS toggle
+      IMPORTING
+        key           TYPE i
+      RETURNING
+        VALUE(result) TYPE abap_bool.
+
     "! a lazy node was opened and has no children yet - its key, once: the
     "! report loads the children (at_tree_expand_no_children)
     METHODS take_expand_request
@@ -294,11 +314,9 @@ CLASS z2ui5_cl_cgui_tree DEFINITION PUBLIC FINAL CREATE PUBLIC.
         VALUE(result) TYPE string_table.
 
   PROTECTED SECTION.
-  PRIVATE SECTION.
-
-    " the number of a cell column, C01 ... C99
-    TYPES ty_cell_no TYPE n LENGTH 2.
-
+    " PROTECTED, not PRIVATE: the object is kept with the report between
+    " the roundtrips, and the transpiled runtime restores PROTECTED
+    " attributes of the draft but not PRIVATE ones
     DATA mt_node   TYPE ty_t_node.
     DATA mt_column TYPE ty_t_column.
     DATA mv_title  TYPE string.
@@ -309,6 +327,11 @@ CLASS z2ui5_cl_cgui_tree DEFINITION PUBLIC FINAL CREATE PUBLIC.
     DATA mv_check_branch TYPE abap_bool.
     DATA mv_expand_request TYPE i.
     DATA mt_function TYPE z2ui5_cl_cgui_alv=>ty_t_function.
+
+  PRIVATE SECTION.
+
+    " the number of a cell column, C01 ... C99
+    TYPES ty_cell_no TYPE n LENGTH 2.
 
     METHODS columns_from
       IMPORTING
@@ -668,16 +691,9 @@ CLASS z2ui5_cl_cgui_tree IMPLEMENTATION.
       DATA(lv_text) = z2ui5_cl_cgui_context=>rtti_get_label_by_descr( ls_comp-type ).
       INSERT VALUE #( name  = ls_comp-name
                       text  = COND #( WHEN lv_text IS NOT INITIAL THEN lv_text ELSE ls_comp-name )
-                      align = SWITCH #( ls_comp-type->type_kind
-                                        WHEN cl_abap_typedescr=>typekind_int
-                                          OR cl_abap_typedescr=>typekind_int1
-                                          OR cl_abap_typedescr=>typekind_int2
-                                          OR cl_abap_typedescr=>typekind_int8
-                                          OR cl_abap_typedescr=>typekind_packed
-                                          OR cl_abap_typedescr=>typekind_float
-                                          OR cl_abap_typedescr=>typekind_decfloat16
-                                          OR cl_abap_typedescr=>typekind_decfloat34 THEN `End`
-                                        ELSE `Begin` ) ) INTO TABLE mt_column.
+                      align = COND #( WHEN z2ui5_cl_cgui_alv=>is_numeric( ls_comp-type->type_kind ) = abap_true
+                                      THEN `End`
+                                      ELSE `Begin` ) ) INTO TABLE mt_column.
     ENDLOOP.
 
   ENDMETHOD.
@@ -780,13 +796,9 @@ CLASS z2ui5_cl_cgui_tree IMPLEMENTATION.
     lo_bar->tag( `Title`
         )->a( n = `text` t = mv_title ).
     lo_bar->tag( `ToolbarSpacer` ).
-    LOOP AT mt_function REFERENCE INTO DATA(lr_function).
-      lo_bar->tag( `Button`
-          )->a( n = `text`    t = lr_function->text
-          )->a( n = `icon`    v = lr_function->icon
-          )->a( n = `tooltip` t = lr_function->tooltip
-          )->a( n = `press`   v = client->_event( lr_function->name ) ).
-    ENDLOOP.
+    z2ui5_cl_cgui_alv=>render_functions( bar       = lo_bar
+                                         client    = client
+                                         functions = mt_function ).
     lo_bar->tag( `Button`
         )->a( n = `icon`    v = `sap-icon://expand-group`
         )->a( n = `tooltip` t = CONV #( 'Expand all'(001) )
@@ -852,22 +864,44 @@ CLASS z2ui5_cl_cgui_tree IMPLEMENTATION.
 
   ENDMETHOD.
 
+  METHOD parent_of_related.
+
+    IF related = 0.
+      RETURN.
+    ENDIF.
+    IF relationship = z2ui5_if_cgui_salv_c=>node_relation-first_child
+        OR relationship = z2ui5_if_cgui_salv_c=>node_relation-last_child.
+      result = related.
+    ELSE.
+      result = get_parent( related ).
+    ENDIF.
+
+  ENDMETHOD.
+
+  METHOD toggle.
+
+    DATA(ls_node) = get_node( key ).
+    IF ls_node-expanded = abap_true AND has_children( key ) = abap_true.
+      collapse( key ).
+      RETURN.
+    ENDIF.
+    expand( key ).
+    IF ls_node-lazy = abap_true AND has_children( key ) = abap_false.
+      " loaded once - empty afterwards, it is a folder without children
+      set_loaded( key ).
+      result = abap_true.
+    ENDIF.
+
+  ENDMETHOD.
+
   METHOD handle_event.
 
     result = abap_true.
     CASE client->get_event( ).
       WHEN cs_event-toggle.
         DATA(lv_key) = get_node_by_event( client ).
-        DATA(ls_node) = get_node( lv_key ).
-        IF ls_node-expanded = abap_true AND has_children( lv_key ) = abap_true.
-          collapse( lv_key ).
-        ELSE.
-          expand( lv_key ).
-          IF ls_node-lazy = abap_true AND has_children( lv_key ) = abap_false.
-            " loaded once - empty afterwards, it is a folder without children
-            set_loaded( lv_key ).
-            mv_expand_request = lv_key.
-          ENDIF.
+        IF toggle( lv_key ) = abap_true.
+          mv_expand_request = lv_key.
         ENDIF.
       WHEN cs_event-checkbox.
         " the tick is in the node already (sync) - the branch follows it

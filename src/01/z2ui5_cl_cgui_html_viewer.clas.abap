@@ -169,15 +169,15 @@ CLASS z2ui5_cl_cgui_html_viewer DEFINITION PUBLIC
     DATA mt_history  TYPE string_table.
     DATA mv_position TYPE i.
 
-  PRIVATE SECTION.
+    " the documents of load_data( ) - kept with the control as well
     TYPES:
       BEGIN OF ty_s_document,
         url  TYPE string,
         html TYPE string,
       END OF ty_s_document.
-
     DATA mt_document TYPE STANDARD TABLE OF ty_s_document WITH EMPTY KEY.
 
+  PRIVATE SECTION.
     "! the document of url into the control - from load_data( ), else a link
     METHODS display
       IMPORTING

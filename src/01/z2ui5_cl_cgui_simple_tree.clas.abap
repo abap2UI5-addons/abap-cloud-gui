@@ -275,12 +275,12 @@ CLASS z2ui5_cl_cgui_simple_tree IMPLEMENTATION.
       IF ls_node-node_key IS INITIAL OR ls_node-hidden = abap_true.
         CONTINUE.
       ENDIF.
-      " a child below its relatkey, a sibling beside it
-      DATA(lv_parent) = key_of( ls_node-relatkey ).
-      IF lv_parent <> 0 AND ls_node-relatship <> relat_first_child AND ls_node-relatship <> relat_last_child
-          AND ls_node-relatship <> 0.
-        lv_parent = mo_tree->get_parent( lv_parent ).
-      ENDIF.
+      " a child below its relatkey, a sibling beside it - no relationship
+      " is a child
+      DATA(lv_parent) = mo_tree->parent_of_related(
+                            related      = key_of( ls_node-relatkey )
+                            relationship = COND #( WHEN ls_node-relatship = 0 THEN relat_last_child
+                                                   ELSE ls_node-relatship ) ).
       IF lv_parent <> 0 AND mo_tree->get_node( lv_parent )-lazy = abap_true.
         mo_tree->set_loaded( lv_parent ).
       ENDIF.
@@ -429,17 +429,10 @@ CLASS z2ui5_cl_cgui_simple_tree IMPLEMENTATION.
 
     CASE lv_event.
       WHEN `EXPAND`.
-        DATA(ls_node) = mo_tree->get_node( lv_key ).
-        IF ls_node-expanded = abap_true AND mo_tree->has_children( lv_key ) = abap_true.
-          mo_tree->collapse( lv_key ).
-        ELSE.
-          mo_tree->expand( lv_key ).
-          " a node with expander: the handler adds its children now
-          IF ls_node-lazy = abap_true AND mo_tree->has_children( lv_key ) = abap_false.
-            mo_tree->set_loaded( lv_key ).
-            raise_node_event( event = `EXPAND_NO_CHILDREN`
-                              key   = lv_key ).
-          ENDIF.
+        " a node with expander: the handler adds its children now
+        IF mo_tree->toggle( lv_key ) = abap_true.
+          raise_node_event( event = `EXPAND_NO_CHILDREN`
+                            key   = lv_key ).
         ENDIF.
       WHEN `CLICK`.
         mv_selected = lv_key.

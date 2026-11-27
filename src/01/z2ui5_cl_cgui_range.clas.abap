@@ -128,6 +128,20 @@ CLASS z2ui5_cl_cgui_range DEFINITION PUBLIC FINAL CREATE PRIVATE.
       CHANGING
         range TYPE STANDARD TABLE.
 
+    "! a line SIGN, OPTION, LOW, HIGH appended to range, a table of a range
+    "! type - low and high converted as its components take them, left
+    "! initial when not supplied
+    CLASS-METHODS line_append
+      IMPORTING
+        sign   TYPE clike DEFAULT `I`
+        option TYPE clike DEFAULT `EQ`
+        low    TYPE any   OPTIONAL
+        high   TYPE any   OPTIONAL
+      CHANGING
+        range  TYPE STANDARD TABLE
+      RAISING
+        cx_sy_conversion_error.
+
     "! a text pasted from the clipboard as lines I EQ (I CP for a
     "! pattern) - the values separated by line breaks, tabs or semicolons
     CLASS-METHODS rows_from_text
@@ -275,6 +289,30 @@ CLASS z2ui5_cl_cgui_range IMPLEMENTATION.
       ENDIF.
       INSERT ls_row INTO TABLE result.
     ENDLOOP.
+
+  ENDMETHOD.
+
+  METHOD line_append.
+
+    FIELD-SYMBOLS <line> TYPE any.
+    FIELD-SYMBOLS <comp> TYPE any.
+    DATA lr_line TYPE REF TO data.
+
+    CREATE DATA lr_line LIKE LINE OF range.
+    ASSIGN lr_line->* TO <line>.
+    ASSIGN COMPONENT `SIGN` OF STRUCTURE <line> TO <comp>.
+    <comp> = sign.
+    ASSIGN COMPONENT `OPTION` OF STRUCTURE <line> TO <comp>.
+    <comp> = option.
+    IF low IS SUPPLIED.
+      ASSIGN COMPONENT `LOW` OF STRUCTURE <line> TO <comp>.
+      <comp> = low.
+    ENDIF.
+    IF high IS SUPPLIED.
+      ASSIGN COMPONENT `HIGH` OF STRUCTURE <line> TO <comp>.
+      <comp> = high.
+    ENDIF.
+    INSERT <line> INTO TABLE range.
 
   ENDMETHOD.
 
