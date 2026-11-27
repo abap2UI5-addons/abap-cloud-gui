@@ -27,6 +27,11 @@ release.
   total of 300; the grid stacks the numbers, the printout has a totals line
   each. A paged grid (`set_paging( )`) adds up all rows its filter lets
   through, not only the first rows it holds (`render( sums = )`).
+- `z2ui5_cl_cgui_frontend=>gui_upload( )` (GUI_UPLOAD) reads a date or a
+  time back as `gui_download( )` writes it - in the user's format (and as
+  `YYYYMMDD` / `HHMMSS`, 12-hour times too); a plain move took the first
+  eight characters (`05.01.20` of `05.01.2026`) and kept an invalid date.
+  A value that is no date stays initial.
 - report2UI5 no longer writes wrong code where it used to: `HIDE` is
   `list( )->hide( )` at the statement - the value when `HIDE` runs, not at
   the `WRITE` before it - and works for a table with a header line and in a

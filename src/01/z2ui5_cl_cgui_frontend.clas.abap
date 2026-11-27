@@ -485,6 +485,37 @@ CLASS z2ui5_cl_cgui_frontend DEFINITION PUBLIC FINAL CREATE PRIVATE.
 
   PRIVATE SECTION.
 
+    "! a cell of a file into cell - a date or a time as table_to_text( )
+    "! writes it, in the user's format, or in the internal one; a value of
+    "! another type stays initial, as bad_data_format would
+    CLASS-METHODS cell_from_text
+      IMPORTING
+        text TYPE string
+      CHANGING
+        cell TYPE any.
+
+    "! a date in the user's format (the order of the user's DATE = USER, a
+    "! four-digit year) or as YYYYMMDD - initial when it is none
+    CLASS-METHODS text_to_date
+      IMPORTING
+        text          TYPE string
+      RETURNING
+        VALUE(result) TYPE d.
+
+    "! a time as HH:MM:SS (AM/PM too) or HHMMSS - initial when it is none
+    CLASS-METHODS text_to_time
+      IMPORTING
+        text          TYPE string
+      RETURNING
+        VALUE(result) TYPE t.
+
+    "! the runs of digits of text, in their order
+    CLASS-METHODS digit_groups
+      IMPORTING
+        text          TYPE string
+      RETURNING
+        VALUE(result) TYPE string_table.
+
     " the report of the roundtrip - set by z2ui5_cl_cgui_report at its start
     CLASS-DATA go_report TYPE REF TO z2ui5_if_cgui_files.
 
@@ -842,7 +873,8 @@ CLASS z2ui5_cl_cgui_frontend IMPLEMENTATION.
       APPEND INITIAL LINE TO data_tab ASSIGNING FIELD-SYMBOL(<row>).
       DATA(lo_type) = cl_abap_typedescr=>describe_by_data( <row> ).
       IF lo_type->kind <> cl_abap_typedescr=>kind_struct.
-        <row> = lv_line.
+        cell_from_text( EXPORTING text = lv_line
+                        CHANGING  cell = <row> ).
         CONTINUE.
       ENDIF.
       IF separator = abap_true.
@@ -852,11 +884,8 @@ CLASS z2ui5_cl_cgui_frontend IMPLEMENTATION.
           IF sy-subrc <> 0.
             EXIT.
           ENDIF.
-          TRY.
-              <cell> = lv_cell.
-            CATCH cx_root ##NO_HANDLER.
-              " a value of another type stays initial, as bad_data_format would
-          ENDTRY.
+          cell_from_text( EXPORTING text = lv_cell
+                          CHANGING  cell = <cell> ).
         ENDLOOP.
       ELSE.
         " a flat character line: the text into its columns, as a move does
@@ -870,6 +899,141 @@ CLASS z2ui5_cl_cgui_frontend IMPLEMENTATION.
         ENDTRY.
       ENDIF.
     ENDLOOP.
+
+  ENDMETHOD.
+
+  METHOD cell_from_text.
+
+    " table_to_text( ) writes a date and a time in the user's format
+    " (z2ui5_cl_cgui_context=>conv_to_text( )) - a move takes their first
+    " characters (05.01.20 of 05.01.2026) and keeps an invalid date
+    CASE cl_abap_typedescr=>describe_by_data( cell )->type_kind.
+      WHEN cl_abap_typedescr=>typekind_date.
+        cell = text_to_date( text ).
+      WHEN cl_abap_typedescr=>typekind_time.
+        cell = text_to_time( text ).
+      WHEN OTHERS.
+        TRY.
+            cell = text.
+          CATCH cx_root ##NO_HANDLER.
+            " a value of another type stays initial, as bad_data_format would
+        ENDTRY.
+    ENDCASE.
+
+  ENDMETHOD.
+
+  METHOD text_to_date.
+
+    DATA lv_sample   TYPE d VALUE '20311225'.
+    DATA lv_year     TYPE string.
+    DATA lv_month    TYPE string.
+    DATA lv_day      TYPE string.
+    DATA lv_n2_month TYPE n LENGTH 2.
+    DATA lv_n2_day   TYPE n LENGTH 2.
+
+    DATA(lt_group) = digit_groups( text ).
+    DATA(lv_first) = VALUE string( lt_group[ 1 ] OPTIONAL ).
+    IF lines( lt_group ) = 1 AND strlen( lv_first ) = 8.
+      " the internal format, as DAT_MODE writes it
+      lv_year = substring( val = lv_first len = 4 ).
+      lv_month = substring( val = lv_first off = 4 len = 2 ).
+      lv_day = substring( val = lv_first off = 6 len = 2 ).
+    ELSEIF lines( lt_group ) = 3.
+      " the order of year, month and day as the user's format has them
+      DATA(lv_user) = |{ lv_sample DATE = USER }|.
+      DATA(lv_at_year) = find( val = lv_user sub = `2031` ).
+      DATA(lv_at_month) = find( val = lv_user sub = `12` ).
+      DATA(lv_at_day) = find( val = lv_user sub = `25` ).
+      IF lv_at_year < 0 OR lv_at_month < 0 OR lv_at_day < 0.
+        RETURN.
+      ENDIF.
+      DATA(lv_rank_year) = 1 + COND i( WHEN lv_at_month < lv_at_year THEN 1 ELSE 0 )
+                             + COND i( WHEN lv_at_day < lv_at_year THEN 1 ELSE 0 ).
+      DATA(lv_rank_month) = 1 + COND i( WHEN lv_at_year < lv_at_month THEN 1 ELSE 0 )
+                              + COND i( WHEN lv_at_day < lv_at_month THEN 1 ELSE 0 ).
+      DATA(lv_rank_day) = 6 - lv_rank_year - lv_rank_month.
+      lv_year = lt_group[ lv_rank_year ].
+      lv_month = lt_group[ lv_rank_month ].
+      lv_day = lt_group[ lv_rank_day ].
+    ELSE.
+      RETURN.
+    ENDIF.
+
+    IF strlen( lv_year ) <> 4 OR strlen( lv_month ) > 2 OR strlen( lv_day ) > 2
+        OR CONV i( lv_month ) NOT BETWEEN 1 AND 12 OR CONV i( lv_day ) NOT BETWEEN 1 AND 31.
+      RETURN.
+    ENDIF.
+    " NUMC pads - PAD of a string template is ignored in the transpiled runtime
+    lv_n2_month = lv_month.
+    lv_n2_day = lv_day.
+    result = |{ lv_year }{ lv_n2_month }{ lv_n2_day }|.
+
+  ENDMETHOD.
+
+  METHOD text_to_time.
+
+    DATA lv_hour      TYPE i.
+    DATA lv_minute    TYPE i.
+    DATA lv_second    TYPE i.
+    DATA lv_n2_hour   TYPE n LENGTH 2.
+    DATA lv_n2_minute TYPE n LENGTH 2.
+    DATA lv_n2_second TYPE n LENGTH 2.
+
+    DATA(lt_group) = digit_groups( text ).
+    DATA(lv_first) = VALUE string( lt_group[ 1 ] OPTIONAL ).
+    IF lines( lt_group ) = 1 AND strlen( lv_first ) = 6.
+      lv_hour = substring( val = lv_first len = 2 ).
+      lv_minute = substring( val = lv_first off = 2 len = 2 ).
+      lv_second = substring( val = lv_first off = 4 len = 2 ).
+    ELSEIF lines( lt_group ) = 2 OR lines( lt_group ) = 3.
+      LOOP AT lt_group INTO DATA(lv_group).
+        IF strlen( lv_group ) > 2.
+          RETURN.
+        ENDIF.
+      ENDLOOP.
+      lv_hour = lt_group[ 1 ].
+      lv_minute = lt_group[ 2 ].
+      IF lines( lt_group ) = 3.
+        lv_second = lt_group[ 3 ].
+      ENDIF.
+      " a 12-hour format
+      DATA(lv_upper) = to_upper( text ).
+      IF lv_upper CS `PM` AND lv_hour < 12.
+        lv_hour = lv_hour + 12.
+      ELSEIF lv_upper CS `AM` AND lv_hour = 12.
+        lv_hour = 0.
+      ENDIF.
+    ELSE.
+      RETURN.
+    ENDIF.
+
+    IF lv_hour > 23 OR lv_minute > 59 OR lv_second > 59.
+      RETURN.
+    ENDIF.
+    lv_n2_hour = lv_hour.
+    lv_n2_minute = lv_minute.
+    lv_n2_second = lv_second.
+    result = |{ lv_n2_hour }{ lv_n2_minute }{ lv_n2_second }|.
+
+  ENDMETHOD.
+
+  METHOD digit_groups.
+
+    DATA lv_group TYPE string.
+
+    DATA(lv_len) = strlen( text ).
+    DO lv_len TIMES.
+      DATA(lv_char) = substring( val = text off = sy-index - 1 len = 1 ).
+      IF lv_char CO `0123456789`.
+        lv_group = lv_group && lv_char.
+      ELSEIF lv_group IS NOT INITIAL.
+        INSERT lv_group INTO TABLE result.
+        CLEAR lv_group.
+      ENDIF.
+    ENDDO.
+    IF lv_group IS NOT INITIAL.
+      INSERT lv_group INTO TABLE result.
+    ENDIF.
 
   ENDMETHOD.
 
