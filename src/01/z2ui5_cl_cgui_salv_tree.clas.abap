@@ -98,6 +98,12 @@ CLASS z2ui5_cl_cgui_salv_tree DEFINITION PUBLIC
       RETURNING
         VALUE(result) TYPE REF TO z2ui5_cl_cgui_tree.
 
+    "! an expander node was opened the first time, without children - the
+    "! report passes it on as EXPAND_EMPTY_FOLDER
+    METHODS on_expand
+      IMPORTING
+        key TYPE i.
+
   PROTECTED SECTION.
   PRIVATE SECTION.
     DATA mo_tree     TYPE REF TO z2ui5_cl_cgui_tree.
@@ -238,6 +244,14 @@ CLASS z2ui5_cl_cgui_salv_tree IMPLEMENTATION.
     raise_event( event  = `DOUBLE_CLICK`
                  params = VALUE #( ( name = `NODE_KEY`   kind = cl_abap_objectdescr=>exporting value = REF #( lv_key ) )
                                    ( name = `COLUMNNAME` kind = cl_abap_objectdescr=>exporting value = REF #( lv_column ) ) ) ).
+
+  ENDMETHOD.
+
+  METHOD on_expand.
+
+    DATA(lv_key) = z2ui5_cl_cgui_salv_node=>to_key( key ).
+    raise_event( event  = `EXPAND_EMPTY_FOLDER`
+                 params = VALUE #( ( name = `NODE_KEY` kind = cl_abap_objectdescr=>exporting value = REF #( lv_key ) ) ) ).
 
   ENDMETHOD.
 

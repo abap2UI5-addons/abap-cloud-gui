@@ -75,17 +75,20 @@ CLASS z2ui5_cl_cgui_salv_nodes IMPLEMENTATION.
     DATA(lv_icon_ui5) = COND string( WHEN lv_icon CP `sap-icon://*` THEN lv_icon ).
     " a folder has no data row - passed only when there is one
     DATA lv_key TYPE i.
+    " an expander opens without children - EXPAND_EMPTY_FOLDER adds them
     IF data_row IS SUPPLIED.
       lv_key = lo_tree->add_node( parent = lv_parent
                                   text   = text
                                   data   = data_row
                                   icon   = lv_icon_ui5
-                                  folder = lv_folder ).
+                                  folder = lv_folder
+                                  lazy   = expander ).
     ELSE.
       lv_key = lo_tree->add_node( parent = lv_parent
                                   text   = text
                                   icon   = lv_icon_ui5
-                                  folder = lv_folder ).
+                                  folder = lv_folder
+                                  lazy   = expander ).
     ENDIF.
     value = NEW #( tree = mo_tree
                    key  = lv_key ).

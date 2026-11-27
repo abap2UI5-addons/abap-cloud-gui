@@ -2075,6 +2075,12 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
       IMPORTING
         screen TYPE REF TO z2ui5_cl_cgui_selscreen.
 
+    "! a lazy node opened the first time: at_tree_expand_no_children( ),
+    "! and EXPAND_EMPTY_FOLDER of the stand-in of cl_salv_tree
+    METHODS tree_expand
+      IMPORTING
+        key TYPE i.
+
 ENDCLASS.
 
 
@@ -3390,6 +3396,23 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
     ENDIF.
   ENDMETHOD.
 
+  METHOD tree_expand.
+
+    at_tree_expand_no_children( key ).
+    IF mo_cgui_tree_handler IS NOT BOUND.
+      RETURN.
+    ENDIF.
+    TRY.
+        DATA(lo_salv) = CAST z2ui5_cl_cgui_salv_tree( mo_cgui_tree_handler ).
+      CATCH cx_sy_move_cast_error.
+        RETURN.
+    ENDTRY.
+    " the handlers of the stand-in of cl_salv_tree - an event of a control
+    at_gui_event( ).
+    lo_salv->on_expand( key ).
+
+  ENDMETHOD.
+
   METHOD on_event_tree.
 
     IF mo_cgui_tree IS BOUND.
@@ -3400,7 +3423,7 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
       ELSEIF mo_cgui_tree->handle_event( client ) = abap_true.
         DATA(lv_lazy) = mo_cgui_tree->take_expand_request( ).
         IF lv_lazy IS NOT INITIAL.
-          at_tree_expand_no_children( lv_lazy ).
+          tree_expand( lv_lazy ).
         ENDIF.
         result = abap_true.
         RETURN.
@@ -5288,7 +5311,7 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
         ENDIF.
         LOOP AT lt_lazy INTO DATA(lv_lazy).
           mo_cgui_tree->set_loaded( lv_lazy ).
-          at_tree_expand_no_children( lv_lazy ).
+          tree_expand( lv_lazy ).
         ENDLOOP.
       ENDDO.
       mo_cgui_tree->expand_all( ).
