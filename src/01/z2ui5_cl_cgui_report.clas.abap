@@ -2075,6 +2075,10 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
       IMPORTING
         screen TYPE REF TO z2ui5_cl_cgui_selscreen.
 
+    "! the start variant (set_variant( ), the URL, a transaction) onto the
+    "! screen - once; one of the URL that does not exist is a warning
+    METHODS variant_start_apply.
+
     "! a lazy node opened the first time: at_tree_expand_no_children( ),
     "! and EXPAND_EMPTY_FOLDER of the stand-in of cl_salv_tree
     METHODS tree_expand
@@ -2652,16 +2656,7 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
       draft_restore( ).
     ENDIF.
     IF mv_cgui_variant_start IS NOT INITIAL AND mo_cgui_store IS BOUND.
-      DATA(lv_start) = mv_cgui_variant_start.
-      CLEAR mv_cgui_variant_start.
-      IF z2ui5_cl_cgui_memory=>variant_apply( ctx    = memory_ctx( )
-                                              fields = screen_fields( )
-                                              name   = lv_start ) = abap_false AND mv_cgui_variant_url = abap_true.
-        message( text = replace( val  = 'Variant &1 does not exist'(002)
-                                 sub  = `&1`
-                                 with = lv_start )
-                 type = `W` ).
-      ENDIF.
+      variant_start_apply( ).
     ENDIF.
 
   ENDMETHOD.
@@ -4818,20 +4813,26 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
     ENDIF.
 
     IF mv_cgui_variant_start IS NOT INITIAL.
-      DATA(lv_start) = mv_cgui_variant_start.
-      CLEAR mv_cgui_variant_start.
-      IF z2ui5_cl_cgui_memory=>variant_apply( ctx    = memory_ctx( )
-                                              fields = screen_fields( )
-                                              name   = lv_start ) = abap_false AND mv_cgui_variant_url = abap_true.
-        message( text = replace( val  = 'Variant &1 does not exist'(002)
-                                 sub  = `&1`
-                                 with = lv_start )
-                 type = `W` ).
-      ENDIF.
+      variant_start_apply( ).
       z2ui5_cl_cgui_command=>url_values_apply( command_ctx( ) ).
     ENDIF.
 
     auto_execute( ).
+
+  ENDMETHOD.
+
+  METHOD variant_start_apply.
+
+    DATA(lv_start) = mv_cgui_variant_start.
+    CLEAR mv_cgui_variant_start.
+    IF z2ui5_cl_cgui_memory=>variant_apply( ctx    = memory_ctx( )
+                                            fields = screen_fields( )
+                                            name   = lv_start ) = abap_false AND mv_cgui_variant_url = abap_true.
+      message( text = replace( val  = 'Variant &1 does not exist'(002)
+                               sub  = `&1`
+                               with = lv_start )
+               type = `W` ).
+    ENDIF.
 
   ENDMETHOD.
 
