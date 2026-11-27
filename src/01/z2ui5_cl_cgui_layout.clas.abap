@@ -43,6 +43,9 @@ CLASS z2ui5_cl_cgui_layout DEFINITION PUBLIC FINAL CREATE PRIVATE.
         text     TYPE string,
         visible  TYPE abap_bool,
         sort     TYPE string,
+        " the rank among the sorted columns the row came with - kept when
+        " the rows move, a column sorted in the dialog comes after them
+        sort_seq TYPE i,
         sum      TYPE abap_bool,
         subtotal TYPE abap_bool,
         numeric  TYPE abap_bool,
@@ -102,8 +105,9 @@ CLASS z2ui5_cl_cgui_layout DEFINITION PUBLIC FINAL CREATE PRIVATE.
       RETURNING
         VALUE(result) TYPE ty_s_result.
 
-    "! the rows of the dialog as a layout - position and sort rank in the
-    "! order of the rows
+    "! the rows of the dialog as a layout - position in the order of the
+    "! rows, the sort rank as the rows came (sort_seq), the columns sorted
+    "! in the dialog after them in the order of the rows
     CLASS-METHODS rows_to_layout
       IMPORTING
         rows          TYPE ty_t_row
@@ -194,19 +198,34 @@ CLASS z2ui5_cl_cgui_layout IMPLEMENTATION.
 
   METHOD rows_to_layout.
 
-    DATA lv_seq TYPE i.
+    TYPES:
+      BEGIN OF ty_s_rank,
+        rank TYPE i,
+        name TYPE string,
+      END OF ty_s_rank.
+    DATA lt_rank TYPE STANDARD TABLE OF ty_s_rank WITH EMPTY KEY.
 
-    LOOP AT rows INTO DATA(ls_row).
+    " the sort rank: the one a row came with first, then the rows sorted in
+    " the dialog in their order
+    LOOP AT rows INTO DATA(ls_row) WHERE sort IS NOT INITIAL.
+      INSERT VALUE #( rank = COND #( WHEN ls_row-sort_seq > 0 THEN ls_row-sort_seq ELSE 100000 + sy-tabix )
+                      name = ls_row-name ) INTO TABLE lt_rank.
+    ENDLOOP.
+    SORT lt_rank BY rank.
+
+    LOOP AT rows INTO ls_row.
       DATA(lv_index) = sy-tabix.
+      DATA(lv_seq) = 0.
       IF ls_row-sort IS NOT INITIAL.
-        lv_seq = lv_seq + 1.
+        READ TABLE lt_rank TRANSPORTING NO FIELDS WITH KEY name = ls_row-name.
+        lv_seq = sy-tabix.
       ENDIF.
       INSERT VALUE #( name     = ls_row-name
                       text     = ls_row-text
                       hidden   = xsdbool( ls_row-visible = abap_false )
                       position = lv_index
                       sort     = ls_row-sort
-                      sort_seq = COND #( WHEN ls_row-sort IS NOT INITIAL THEN lv_seq )
+                      sort_seq = lv_seq
                       sum      = xsdbool( ls_row-sum = abap_true AND ls_row-numeric = abap_true )
                       subtotal = xsdbool( ls_row-subtotal = abap_true AND ls_row-sort IS NOT INITIAL )
                       numeric  = ls_row-numeric ) INTO TABLE result.
@@ -223,6 +242,7 @@ CLASS z2ui5_cl_cgui_layout IMPLEMENTATION.
                       text     = ls_layout-text
                       visible  = xsdbool( ls_layout-hidden = abap_false )
                       sort     = ls_layout-sort
+                      sort_seq = COND #( WHEN ls_layout-sort IS NOT INITIAL THEN ls_layout-sort_seq )
                       sum      = ls_layout-sum
                       subtotal = ls_layout-subtotal
                       numeric  = ls_layout-numeric ) INTO TABLE result.
