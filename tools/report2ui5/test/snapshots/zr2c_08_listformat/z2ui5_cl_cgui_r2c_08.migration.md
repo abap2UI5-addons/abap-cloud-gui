@@ -16,8 +16,6 @@
 
 Layout, formatting and behaviour of the classic report that the list, the ALV or the selection screen of abap-cloud-gui do not have:
 
-- FORMAT INTENSIFIED / INVERSE / INPUT - the list knows only the color and hotspots
-- WRITE ... DD/MM/YYYY - the list writes the value in its default format
 - ULINE AT pos(len) - the line spans the list
 
 ## Mapped
@@ -42,7 +40,7 @@ Layout, formatting and behaviour of the classic report that the list, the ALV or
 | 44 | `WRITE 12 gs_task-title HOTSPOT ON` | `write( )`, color, hotspot |
 | 45 | `WRITE 45 gs_task-due` | `write( )`, color |
 | 46 | `FORMAT COLOR OFF` | `lv_color`, passed to every `write( )` of the method |
-| 47 | `HIDE gs_task-id` | `hide = gs_task-id` at the hotspot of the line, restored in `at_line_selection( )` |
+| 47 | `HIDE gs_task-id` | `list( )->hide( )` - the value of the current line, its texts hotspots; restored in `at_line_selection( )` |
 | 50 | `SKIP 2` | `list( )->skip( )` |
 | 51 | `FORMAT HOTSPOT OFF` | `lv_color`, passed to every `write( )` of the method |
 | 52 | `WRITE / 'Open tasks:'` | `write( )` |

@@ -7,7 +7,7 @@ import {
   stmtTokens, uc, unquote,
 } from "./abap.mjs";
 import {
-  FRONTEND, FRONTEND_FUNCTIONS, FRONTEND_TABLES_OUT, GUI, POPUPS, REFUSED_FUNCTIONS,
+  CLOSERS, FRONTEND, FRONTEND_FUNCTIONS, OPENERS, FRONTEND_TABLES_OUT, GUI, POPUPS, REFUSED_FUNCTIONS,
   frontendMember, frontendName, functionParams, renderNamedCall,
 } from "./convert-shared.mjs";
 
@@ -79,6 +79,38 @@ export const functionsMethods = {
     else if (fm === "DP_CREATE_URL") this.note("DP_CREATE_URL is z2ui5_cl_cgui_frontend=>dp_create_url( ) - the URL names a data URI of the bytes, which the picture and the HTML viewer of the browser show");
     else this.note("cl_gui_frontend_services is z2ui5_cl_cgui_frontend - a file the user picks is uploaded in the browser (file_open_dialog( ) in an F4 opens the upload, the F4 runs again with the file), gui_download( ) is a download of the browser");
     this.map(s, `\`z2ui5_cl_cgui_frontend=>${method}( )\` - the function module as the method of the frontend services, its EXCEPTIONS kept`);
+  },
+
+
+  /**
+   * F4IF_INT_TABLE_VALUE_REQUEST with RETURN_TAB: value_help_popup( ) writes
+   * the picked value into the field itself, and RETURN_TAB stays empty. The
+   * IF sy-subrc ... ENDIF after the call that reads it would clear the field
+   * (sy-subrc is the previous statement's) - it is dropped; any other
+   * handling of RETURN_TAB is left with a TODO.
+   */
+  f4ReturnTab(s, b, ret) {
+    const { branch } = this.tailOf(b);
+    const first = branch.findIndex((x) => kind(x) !== "Comment");
+    const block = [];
+    if (first >= 0 && kind(branch[first]) === "If" && /\bsy\s*-\s*subrc\b/i.test(renderTokens(stmtTokens(branch[first])))) {
+      let depth = 0;
+      for (const x of branch.slice(first)) {
+        block.push(x);
+        if (OPENERS.has(kind(x))) depth++;
+        if (CLOSERS.has(kind(x))) depth--;
+        if (depth === 0) break;
+      }
+    }
+    const reads = (x) => stmtTokens(x).some((t) => lc(t.getStr()) === ret);
+    const nested = block.slice(1).some((x) => ["Else", "ElseIf"].includes(kind(x)));
+    if (block.length && block.some(reads) && !nested && kind(block[block.length - 1]) === "EndIf") {
+      this.skipStmts ??= new Set();
+      for (const x of block) this.skipStmts.add(x);
+      this.map(block[0], `dropped - the IF sy-subrc after F4IF_INT_TABLE_VALUE_REQUEST read RETURN_TAB ${ret}, value_help_popup( ) writes the field itself`);
+      return;
+    }
+    this.todo(s, `F4IF_INT_TABLE_VALUE_REQUEST: value_help_popup( ) writes the picked value into the field itself - RETURN_TAB ${ret} stays empty; drop the code after the call that reads it, or it clears the field`);
   },
 
 
@@ -194,7 +226,7 @@ export const functionsMethods = {
       const title = p.get("window_title");
       if (title) params.push({ name: "title", value: nodeText(title.node, ov) });
       b.out.push(renderNamedCall("value_help_popup", params));
-      if (p.has("return_tab")) this.todo(s, "F4IF_INT_TABLE_VALUE_REQUEST: value_help_popup( ) writes the picked value into the field itself - the handling of RETURN_TAB after it has nothing to read any more");
+      if (p.has("return_tab")) this.f4ReturnTab(s, b, lc(nodeText(p.get("return_tab").node)).replace(/\[\]$/, ""));
       this.map(s, "`value_help_popup( )` - the picked value is written into the field");
       return true;
     }

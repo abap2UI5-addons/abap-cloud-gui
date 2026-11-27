@@ -32,7 +32,7 @@ Layout, formatting and behaviour of the classic report that the list, the ALV or
 | 28 | `WRITE AT 25(8) gs_flight-seatsocc` | `write( )` |
 | 29 | `WRITE AT gv_col(6) gs_flight-seatsmax NO-GAP` | `write( )` |
 | 29 | `WRITE '-'` | `write( )` |
-| 30 | `HIDE gs_flight` | `hide = gs_flight` at the hotspot of the line, restored in `at_line_selection( )` |
+| 30 | `HIDE gs_flight` | `list( )->hide( )` - the value of the current line, its texts hotspots; restored in `at_line_selection( )` |
 | 33 | `ULINE` | `list( )->uline( )` |
 | 34 | `POSITION 25` | `list( )->position( )` - the next write( ) starts at that column |
 | 35 | `WRITE gv_total` | `write( )` |
@@ -49,7 +49,7 @@ Layout, formatting and behaviour of the classic report that the list, the ALV or
 | 47 | `WRITE AT 20(8) gs_flight-seatsocc` | `write( )` |
 | 48 | `WRITE /5 'Column after the value:'` | `write( )` |
 | 48 | `WRITE sy-colno` | `write( )` |
-| 49 | `HIDE gs_flight` | `hide = gs_flight` at the hotspot of the line, restored in `at_line_selection( )` |
+| 49 | `HIDE gs_flight` | `list( )->hide( )` - the value of the current line, its texts hotspots; restored in `at_line_selection( )` |
 
 ## Launchpad tile
 

@@ -53,7 +53,8 @@ CLASS z2ui5_cl_cgui_r2c_34 IMPLEMENTATION.
       ENDAT.
       AT NEW region.
         list( )->new_line(
-            )->write( ls_sale-region ).
+            )->write( val         = ls_sale-region
+                      intensified = abap_true ).
       ENDAT.
       list( )->new_line(
           )->write( val = ls_sale-month

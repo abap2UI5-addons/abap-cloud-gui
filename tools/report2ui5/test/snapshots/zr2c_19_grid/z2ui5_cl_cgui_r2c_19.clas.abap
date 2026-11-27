@@ -45,9 +45,10 @@ CLASS z2ui5_cl_cgui_r2c_19 IMPLEMENTATION.
 
   METHOD start_of_selection.
 
-    SELECT * FROM sflight INTO TABLE @gt_flight
+    SELECT * FROM sflight
       WHERE carrid = @p_carrid
-      ORDER BY PRIMARY KEY.
+      ORDER BY PRIMARY KEY
+      INTO TABLE @gt_flight.
 
     set_pf_status( functions = VALUE #( ( name = `REFRESH` icon = `sap-icon://refresh` tooltip = `Read the flights again (F5)` ) )
                    shortcuts = VALUE #( ( key = `F5` ucomm = `REFRESH` ) ) ).
@@ -96,9 +97,10 @@ CLASS z2ui5_cl_cgui_r2c_19 IMPLEMENTATION.
       WHEN 'BACK' OR 'EXIT' OR 'CANCEL'.
         leave_to_selection_screen( ).
       WHEN 'REFRESH'.
-        SELECT * FROM sflight INTO TABLE @gt_flight
+        SELECT * FROM sflight
           WHERE carrid = @p_carrid
-          ORDER BY PRIMARY KEY.
+          ORDER BY PRIMARY KEY
+          INTO TABLE @gt_flight.
     ENDCASE.
 
     " the USER_COMMAND handler of the grid - lcl_handler->on_user_command

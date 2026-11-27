@@ -1170,7 +1170,8 @@ class Converter {
       out: [],                    // lines (strings) and write chains (objects)
       ctx,
       color: "none",
-      hotspot: false,
+      fmt: {},                    // FORMAT HOTSPOT / INTENSIFIED / INVERSE / INPUT: "abap_true" or an expression
+      fmtSet: new Set(),          // in a FORM: what its own FORMAT set, passed even when off
       line: [],                   // the write items of the current list line
       msgDeclared: false,
       loopDepth: 0,
@@ -1301,6 +1302,7 @@ class Converter {
       }
     }
     if (prologue) b.out.push(...prologue);
+    this.formatLeft(b);
     this.currentForm = undefined;
     return b.out.flatMap((o) => (typeof o === "string" ? [o] : renderChain(o)));
   }
@@ -1350,13 +1352,7 @@ class Converter {
         const settings = [];
         const title = plan.layoutVar && this.layoutTitle.get(plan.layoutVar);
         if (title) settings.push({ m: "set_title", arg: title });
-        for (const c of this.fcat.get(plan.fieldcatVar) ?? []) {
-          if (!c.name) continue;
-          if (c.text) settings.push({ m: "set_column_text", name: c.name, arg: c.text });
-          if (c.hidden) settings.push({ m: "set_column_hidden", name: c.name });
-          if (c.hotspot) settings.push({ m: "set_column_hotspot", name: c.name });
-          if (c.sum) settings.push({ m: "set_column_sum", name: c.name });
-        }
+        for (const c of this.fcat.get(plan.fieldcatVar) ?? []) settings.push(...this.fcatSettings(c));
         for (const h of this.gridHandlers.filter((x) => x.event === "toolbar")) settings.push(...this.gridToolbar(h));
         if (this.gridSelection) settings.push({ m: "set_selection_mode" });
         const lineSelection = this.gridHandlers.some((x) => x.event === "double_click");
@@ -1370,13 +1366,8 @@ class Converter {
       }
       if (plan.action === "reuse") {
         const settings = [...plan.settings];
-        for (const c of this.fcat.get(plan.fieldcatVar) ?? []) {
-          if (!c.name) continue;
-          if (c.text) settings.push({ m: "set_column_text", name: c.name, arg: c.text });
-          if (c.hidden) settings.push({ m: "set_column_hidden", name: c.name });
-          if (c.hotspot) settings.push({ m: "set_column_hotspot", name: c.name });
-          if (c.sum) settings.push({ m: "set_column_sum", name: c.name });
-        }
+        for (const c of this.fcat.get(plan.fieldcatVar) ?? []) settings.push(...this.fcatSettings(c));
+        settings.push(...this.sortSettings(plan, s));
         out.push(...this.alvChain(plan.table, plan.tableNode.getFirstToken(), settings, plan.lineSelection, s));
         for (const t of plan.todos ?? []) this.todo(s, t);
         if (plan.lineSelection) this.todo(s, `${plan.fm}: the USER_COMMAND callback is the row click now - its FORM is converted into at_line_selection( )`);

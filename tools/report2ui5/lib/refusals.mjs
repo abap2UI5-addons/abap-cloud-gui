@@ -180,8 +180,8 @@ gv_total = NEW lcl_calc( )->total( gt_items ).
     id: "hide",
     title: "HIDE that cannot be restored",
     match: /^HIDE\b/,
-    why: "A `HIDE` field is stored with the line and restored in `at_line_selection( )`. That needs a global field, a `WRITE` before it in the same block (the hotspot it is attached to), and one set of hidden fields for the report.",
-    rewrite: "Hide a global field right after the `WRITE` of its line, and hide the same fields wherever the report hides fields - or hide the key of the row and read the row in `AT LINE-SELECTION`.",
+    why: "A `HIDE` field is stored with the current line by `list( )->hide( )` and restored in `at_line_selection( )`. That needs a global field, the `HIDE` statements of a line one after the other (one call takes them all), and one set of hidden fields for the report.",
+    rewrite: "Hide global fields, the `HIDE` statements of a line together, and hide the same fields wherever the report hides fields - or hide the key of the row and read the row in `AT LINE-SELECTION`.",
   },
   {
     id: "message",

@@ -57,11 +57,12 @@ CLASS z2ui5_cl_cgui_r2c_04 IMPLEMENTATION.
 
   METHOD select_data.
 
-    SELECT * FROM spfli INTO TABLE @gt_spfli
-      UP TO @p_rows ROWS
+    SELECT * FROM spfli
       WHERE carrid   IN @s_carrid
         AND cityfrom IN @s_cityfr
-      ORDER BY carrid, connid.
+      ORDER BY carrid, connid
+      INTO TABLE @gt_spfli
+      UP TO @p_rows ROWS.
     IF gt_spfli IS INITIAL.
       message( text = 'No connections found'
                type = `W` ).

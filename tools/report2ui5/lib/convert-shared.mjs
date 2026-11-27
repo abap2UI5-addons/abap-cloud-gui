@@ -66,8 +66,6 @@ export const REFUSED_FUNCTIONS = {
   POPUP_TO_CONFIRM_WITH_MESSAGE: "POPUP_TO_CONFIRM_WITH_MESSAGE waits for the answer and shows a T100 message - use popup_to_decide( ) with the message text and go on in at_user_command( )",
   POPUP_TO_DECIDE_WITH_MESSAGE: "POPUP_TO_DECIDE_WITH_MESSAGE waits for the answer and shows a T100 message - use popup_to_decide( ) with the message text and go on in at_user_command( )",
   POPUP_GET_VALUES_DB_CHECKED: "POPUP_GET_VALUES_DB_CHECKED waits for the input and checks it against the DDIC - use popup_get_values( ) and check in at_user_command( )",
-  GUI_DOWNLOAD: "GUI_DOWNLOAD writes to the SAP GUI frontend; offer the file with an abap2UI5 download instead",
-  GUI_UPLOAD: "GUI_UPLOAD reads from the SAP GUI frontend; use an abap2UI5 file uploader instead",
   WS_DOWNLOAD: "WS_DOWNLOAD writes to the SAP GUI frontend",
   WS_UPLOAD: "WS_UPLOAD reads from the SAP GUI frontend",
   F4IF_FIELD_VALUE_REQUEST: "F4IF_FIELD_VALUE_REQUEST calls a search help; answer F4 with value_help_popup( ) on a table",
@@ -1546,6 +1544,9 @@ export function fcatColumn(text) {
     else if ((comp === "no_out" || comp === "tech") && /'x'|abap_true/i.test(p[2])) cur.hidden = true;
     else if (comp === "hotspot" && /'x'|abap_true/i.test(p[2])) cur.hotspot = true;
     else if (comp === "do_sum" && /'x'|abap_true/i.test(p[2])) cur.sum = true;
+    else if (comp === "key" && /'x'|abap_true/i.test(p[2])) cur.key = true;
+    else if (comp === "outputlen" && /^'?\d+'?$/.test(p[2])) cur.width = Number(p[2].replace(/'/g, ""));
+    else if (comp === "col_pos" && /^'?\d+'?$/.test(p[2])) cur.position = Number(p[2].replace(/'/g, ""));
   }
   return cur;
 }

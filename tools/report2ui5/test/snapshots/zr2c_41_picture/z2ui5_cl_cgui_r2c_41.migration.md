@@ -6,7 +6,11 @@
 | Text pool | `zr2c_41_picture.prog.xml` |
 | Result | **converted** - `z2ui5_cl_cgui_r2c_41.clas.abap`, `z2ui5_cl_cgui_r2c_41.clas.locals_def.abap`, `z2ui5_cl_cgui_r2c_41.clas.locals_imp.abap`, `z2ui5_cl_cgui_r2c_41.clas.xml` |
 | Mapped | 10 construct(s) |
-| TODO | 0 |
+| TODO | 1 |
+
+## TODO
+
+- `zr2c_41_picture.prog.abap:44:7` - MESSAGE TYPE E in method constructor of lcl_stamp: the classic message ended the event block, RETURN here only leaves the method - the runtime still stops the run, but the caller continues
 
 ## Not carried over
 

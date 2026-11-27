@@ -8,12 +8,6 @@
 | Mapped | 15 construct(s) |
 | TODO | 0 |
 
-## Not carried over
-
-Layout, formatting and behaviour of the classic report that the list, the ALV or the selection screen of abap-cloud-gui do not have:
-
-- FORMAT INTENSIFIED / INVERSE / INPUT - the list knows only the color and hotspots (2×)
-
 ## Mapped
 
 | Line | Classic | abap-cloud-gui |
@@ -22,9 +16,9 @@ Layout, formatting and behaviour of the classic report that the list, the ALV or
 | 21 | `START-OF-SELECTION` | `start_of_selection( )` |
 | 31 | `WRITE / 'Sales per region'` | `write( )` |
 | 32 | `ULINE` | `list( )->uline( )` |
-| 35 | `FORMAT INTENSIFIED ON` | applied to the following `write( )` calls of the method (color, hotspot) |
+| 35 | `FORMAT INTENSIFIED ON` | applied to the following `write( )` calls of the method (color, hotspot, intensified, inverse, input) |
 | 36 | `WRITE / ls_sale-region` | `write( )` |
-| 37 | `FORMAT INTENSIFIED OFF` | applied to the following `write( )` calls of the method (color, hotspot) |
+| 37 | `FORMAT INTENSIFIED OFF` | applied to the following `write( )` calls of the method (color, hotspot, intensified, inverse, input) |
 | 39 | `WRITE /5 ls_sale-month` | `write( )` |
 | 39 | `WRITE ls_sale-amount` | `write( )` |
 | 43 | `WRITE /5 'Total'` | `write( )` |

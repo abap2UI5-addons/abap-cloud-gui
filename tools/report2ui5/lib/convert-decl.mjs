@@ -11,6 +11,29 @@ import {
   renderScreenChain, salvTokens, sameColon, selectTargetType, tokenParents,
 } from "./convert-shared.mjs";
 
+/**
+ * The names a statement of a FORM may write to: its targets, and what it
+ * hands out for writing - the table of LOOP AT / READ TABLE ... ASSIGNING
+ * or REFERENCE INTO, the operand of ASSIGN, GET REFERENCE OF and REF #( ).
+ * A USING parameter among them is a CHANGING parameter of the method: an
+ * IMPORTING one cannot be written, through a field symbol neither.
+ */
+function formWrites(s) {
+  const first = (n) => (n ? lc(n.getFirstToken().getStr()) : undefined);
+  const out = findAll(s, "Target").map(first);
+  const k = kind(s);
+  const handsOut = (target) => target && /^(ASSIGNING|REFERENCE)\b/i.test(nodeText(target).trim());
+  if (k === "Loop" && handsOut(child(s, "LoopTarget"))) out.push(first(child(s, "LoopSource")));
+  if (k === "ReadTable" && handsOut(child(s, "ReadTableTarget"))) out.push(first(child(s, "SimpleSource2")));
+  if (k === "Assign") out.push(...children(child(s, "AssignSource") ?? s, "Source").map(first));
+  if (k === "GetReference") out.push(first(child(s, "Source")));
+  for (const src of findAll(s, "Source")) {
+    if (lc(src.getFirstToken().getStr()) === "ref") out.push(...children(src, "Source").map(first));
+  }
+  return out.filter(Boolean);
+}
+
+
 export const declMethods = {
 
   /** the types abaplint's syntax check gives the variables of the program
@@ -141,7 +164,7 @@ export const declMethods = {
       f.name = name;
       f.method = method;
       f.params = [];
-      const written = new Set(f.body.flatMap((s) => findAll(s, "Target").map((t) => lc(t.getFirstToken().getStr()))));
+      const written = new Set(f.body.flatMap((s) => formWrites(s)));
       for (const [section, k] of [["FormTables", "tables"], ["FormUsing", "using"], ["FormChanging", "changing"]]) {
         const sec = child(f.stmt, section);
         if (!sec) continue;
@@ -269,8 +292,9 @@ export const declMethods = {
         if (def) {
           let value = nodeText(def, this.rewrites(s, {}));
           if (checkbox || radio) {
-            if (/^'X'$|^`X`$/i.test(value)) value = "abap_true";
-            else value = undefined;
+            // 'X', abap_true or a constant that holds it - blank is the default
+            if (/^'X'$|^`X`$|^abap_true$/i.test(value)) value = "abap_true";
+            else if (/^(space|' '|``|''|` `|abap_false)$/i.test(value)) value = undefined;
             if (radio && value) radioGroups.get(uc(nodeText(child(s, "RadioGroupName")))).defaulted = true;
           } else if (/^(space|' '|``|'')$/i.test(value)) value = undefined;
           if (value) defaults.push(`${name} = ${value}.`);
@@ -380,7 +404,7 @@ export const declMethods = {
           heading("global data of the report");
           push(`DATA ${name} TYPE ${name}.`);
           this.map(s, `typed work area \`DATA ${name} TYPE ${name}\``);
-          this.todo(s, `TABLES ${name} is now a work area of type ${uc(name)} - on ABAP Cloud the table must be replaced by a released CDS view (see the release TODOs)`);
+          this.todo(s, `TABLES ${name} is now a work area of type ${uc(name)}, an attribute of the class`);
         } else {
           this.map(s, "dropped - it only typed the select-options and parameters, which now refer to the DDIC type");
         }
@@ -915,6 +939,15 @@ export const declMethods = {
   },
 
 
+  /** a global of the report as body `b` reaches it - through the instance
+   *  in a method of a local class */
+  reportRef(b, name) {
+    const root = lc(name.split("-")[0]);
+    if (!b?.ctx?.local || b.ctx.local.declared.has(root) || this.currentLocals?.has(root) || !this.globalData.has(root)) return name;
+    return `${this.appRef}->${name}`;
+  },
+
+
   /** the work area that stands for the header line of `tab` in body `b` */
   headerWa(b, tab) {
     if (b.localWa?.has(tab)) return b.localWa.get(tab);
@@ -955,14 +988,16 @@ export const declMethods = {
     const ov = this.rewrites(s, b.ctx, b);
     const text = () => renderTokens(toks, ov, s.getColon()).replace(/^([\w-]+)(\s*):\s*/, "$1 ");
     const has = (...w) => w.some((x) => names.includes(x));
-    const wa = () => this.headerWa(b, tab);
+    // in a method of a local class the report's table and work area are the instance's
+    const wa = () => this.reportRef(b, this.headerWa(b, tab));
+    const tabRef = this.reportRef(b, tab);
     if (k === "Append" && names.length === 2 && names[1] === tab) {
-      b.out.push(`APPEND ${wa()} TO ${tab}.`);
+      b.out.push(`APPEND ${wa()} TO ${tabRef}.`);
       this.map(s, `\`APPEND ${wa()} TO ${tab}\` - the header line is a work area`);
       return true;
     }
     if (k === "Refresh" && names.length === 2 && names[1] === tab) {
-      b.out.push(`CLEAR ${tab}.`);
+      b.out.push(`CLEAR ${tabRef}.`);
       return true;
     }
     if (k === "Clear" && names.length === 2 && names[1] === tab) {
@@ -974,7 +1009,7 @@ export const declMethods = {
       const src = child(s, k === "Loop" ? "LoopSource" : "SimpleSource2");
       if (src && lc(nodeText(src)) === tab) {
         const last = src.getLastToken();
-        if (k === "Loop") ov.set(key(last), `${last.getStr()} INTO ${wa()}`);
+        if (k === "Loop") ov.set(key(last), `${ov.has(key(last)) ? ov.get(key(last)) : last.getStr()} INTO ${wa()}`);
         b.out.push(k === "Loop" ? `${text()}.` : `${text()} INTO ${wa()}.`);
         this.map(s, `\`INTO ${wa()}\` - the header line is a work area`);
         return true;
@@ -982,14 +1017,14 @@ export const declMethods = {
     }
     // COLLECT itab. -> COLLECT wa INTO itab.
     if (k === "Collect" && names.length === 2 && names[1] === tab) {
-      b.out.push(`COLLECT ${wa()} INTO ${tab}.`);
+      b.out.push(`COLLECT ${wa()} INTO ${tabRef}.`);
       this.map(s, `\`COLLECT ${wa()} INTO ${tab}\` - the header line is a work area`);
       return true;
     }
     // MODIFY itab [INDEX n] [TRANSPORTING ...]. -> MODIFY itab FROM wa ... (the
     // short form in a LOOP changes the current line, as it did)
     if (k === "ModifyInternal" && names[1] === tab && !has("from")) {
-      ov.set(key(toks[1]), `${tab} FROM ${wa()}`);
+      ov.set(key(toks[1]), `${tabRef} FROM ${wa()}`);
       b.out.push(`${text()}.`);
       this.map(s, `\`MODIFY ${tab} FROM ${wa()}\` - the header line is a work area`);
       return true;
@@ -1000,7 +1035,7 @@ export const declMethods = {
     if ((k === "InsertInternal" || (k === "InsertDatabase" && names.length === 2)) && names[1] === tab && !has("into", "lines")) {
       const at = names.indexOf("index");
       const index = at >= 0 ? renderTokens(toks.slice(at + 1), ov) : (b.loopDepth > 0 ? "sy-tabix" : undefined);
-      b.out.push(index ? `INSERT ${wa()} INTO ${tab} INDEX ${index}.` : `INSERT ${wa()} INTO TABLE ${tab}.`);
+      b.out.push(index ? `INSERT ${wa()} INTO ${tabRef} INDEX ${index}.` : `INSERT ${wa()} INTO TABLE ${tabRef}.`);
       this.map(s, `\`INSERT ${wa()} INTO ${tab}\` - the header line is a work area`);
       return true;
     }

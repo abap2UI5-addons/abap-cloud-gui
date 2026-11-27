@@ -36,7 +36,7 @@ const SAMPLES = {
   "perform-mismatch": ["PERFORM fill - no FORM fill in this report", "PERFORM fill passes 3 parameter(s)", "PERFORM fill: 'X' is passed to cv_x, which the FORM changes", "PERFORM top - the FORM is a callback of the ALV and is not converted"],
   "reserved-name": ["LIST is the name of a component of z2ui5_cl_cgui_report - a global of the report becomes an attribute"],
   "local-class": ["WRITE in a local class - the class has no list and no FORMs of the report", "the local class uses gt_x, a global of the report - a local class of the generated class cannot reach it"],
-  "hide": ["HIDE gs_x - the field is not a global field", "HIDE without a WRITE before it in the same block", "HIDE of other fields (a, b) than elsewhere (c)"],
+  "hide": ["HIDE gs_x - the field is not a global field", "HIDE gv_x apart from the HIDE before it on the same line", "HIDE of other fields (a, b) than elsewhere (c)"],
   "message": ["MESSAGE without a message class - neither in the statement nor MESSAGE-ID of REPORT", "MESSAGE ... RAISING - classic exceptions"],
   "screen-loop": ["LOOP AT SCREEN inside of LOOP AT SCREEN - the screen has one loop at a time", "MODIFY SCREEN outside of LOOP AT SCREEN", "SCREEN-COLOR has no counterpart - loop_at_screen( ) has name"],
   "page-events": ["a second TOP-OF-PAGE", "a second END-OF-PAGE", "TOP-OF-PAGE with other statements than WRITE, ULINE, SKIP, NEW-LINE and FORMAT - the runtime writes"],

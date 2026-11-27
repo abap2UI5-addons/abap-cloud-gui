@@ -8,6 +8,28 @@ release.
 
 **Fixes**
 
+- report2UI5 no longer writes wrong code where it used to: `HIDE` is
+  `list( )->hide( )` at the statement - the value when `HIDE` runs, not at
+  the `WRITE` before it - and works for a table with a header line and in a
+  method of a local class (both did not compile); the one set of hidden
+  fields is compared field by field (`gv_id2` was taken for `gv_id`). A
+  `FORMAT` before a `PERFORM` is the FORM's too, and one left on at the end
+  of a FORM is a TODO. `WRITE` passes `CURRENCY`, `UNIT`, `DECIMALS`,
+  `ROUND`, `NO-ZERO`, `NO-SIGN`, `NO-GROUPING`, the justification, the
+  edit mask, the date formats, `TIME ZONE`, `QUICKINFO`, `INTENSIFIED`,
+  `INVERSE` and `INPUT` to `write( )` instead of dropping them.
+  `DEFAULT abap_true` (or a constant) of a checkbox or radio button is
+  kept; a `USING` parameter written through a field symbol or a reference
+  is `CHANGING`; `sy-lisel` / `sy-lilli` in a FORM called from `AT
+  LINE-SELECTION` read the clicked line, `sy-lisel(n)` compiles; `MESSAGE
+  ... TYPE <variable>` returns on E and A; the `IF sy-subrc` after
+  `F4IF_INT_TABLE_VALUE_REQUEST` that read `RETURN_TAB` (and cleared the
+  field) is dropped; the SLIS / LVC line types are dropped with their
+  tables. Sorts, aggregations, keys, widths, `set_optimize` and the stripes
+  of `CL_SALV_TABLE`, and `IT_SORT`, `KEY`, `OUTPUTLEN`, `COL_POS` of
+  `REUSE_ALV_*` are mapped. ABAP SQL puts `INTO` behind `WHERE` and `ORDER
+  BY`, as strict mode wants; a dynamic `WHERE` is a TODO. The corpus report
+  `zr2c_54_listdetails` (test set `src/03`) covers them.
 - The command field (`/nCLASS`, a transaction of the catalog) creates a
   class only when it inherits from `z2ui5_cl_cgui_report` - a class whose
   constructor wants parameters ended the app. The command field, the

@@ -82,9 +82,10 @@ CLASS z2ui5_cl_cgui_r2c_17 IMPLEMENTATION.
 
   METHOD show.
 
-    SELECT * FROM sflight INTO TABLE @gt_flight
+    SELECT * FROM sflight
       WHERE carrid = @p_carrid
-      ORDER BY PRIMARY KEY.
+      ORDER BY PRIMARY KEY
+      INTO TABLE @gt_flight.
     LOOP AT gt_flight INTO gs_flight.
       list( )->new_line(
           )->write( gs_flight-connid

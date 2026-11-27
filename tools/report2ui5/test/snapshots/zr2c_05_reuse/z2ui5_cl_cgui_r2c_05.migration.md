@@ -11,7 +11,7 @@
 ## TODO
 
 - no selection text in the text pool for P_CURR - the label is the DDIC label of the type or the field name; pass the .prog.xml (--texts) or set text = in selection_screen( )
-- `zr2c_05_reuse.prog.abap:11:1` - TABLES scarr is now a work area of type SCARR - on ABAP Cloud the table must be replaced by a released CDS view (see the release TODOs)
+- `zr2c_05_reuse.prog.abap:11:1` - TABLES scarr is now a work area of type SCARR, an attribute of the class
 - `zr2c_05_reuse.prog.abap:33:3` - REUSE_ALV_GRID_DISPLAY: IS_LAYOUT has no counterpart in the alv( ) chain and is dropped
 - `zr2c_05_reuse.prog.abap:33:3` - REUSE_ALV_GRID_DISPLAY: the IF sy-subrc after the call checked its EXCEPTIONS - alv( ) raises none, the check is dropped
 - `zr2c_05_reuse.prog.abap:33:3` - REUSE_ALV_GRID_DISPLAY: the USER_COMMAND callback is the row click now - its FORM is converted into at_line_selection( )
@@ -21,7 +21,6 @@
 Layout, formatting and behaviour of the classic report that the list, the ALV or the selection screen of abap-cloud-gui do not have:
 
 - ALV layout: zebra stripes and optimized column widths - the grid of the runtime lays itself out (2×)
-- field catalog settings without a counterpart (output length, key, sums, column position) - the grid takes columns and widths from the table (2×)
 
 ## Mapped
 

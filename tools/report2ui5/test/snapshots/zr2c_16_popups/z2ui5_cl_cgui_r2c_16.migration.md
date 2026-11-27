@@ -29,7 +29,7 @@ Layout, formatting and behaviour of the classic report that the list, the ALV or
 | 31 | `WRITE gs_flight-connid` | `write( )` |
 | 31 | `WRITE gs_flight-fldate` | `write( )` |
 | 31 | `WRITE gs_flight-seatsocc` | `write( )` |
-| 32 | `HIDE gs_flight` | `hide = gs_flight` at the hotspot of the line, restored in `at_line_selection( )` |
+| 32 | `HIDE gs_flight` | `list( )->hide( )` - the value of the current line, its texts hotspots; restored in `at_line_selection( )` |
 | 35 | `AT LINE-SELECTION` | `at_line_selection( row hide )` - HIDE fields restored from `hide` |
 | 37 | `CALL FUNCTION 'POPUP_TO_DECIDE' EXPORTING textline1 = 'Book the fli...` | `popup_to_decide( )` - the answer arrives in `on_popup_1( answer )`, where the statements after the call go on |
 | 46 | `CASE lv_answer` | `on_popup_1( answer )` - the statements after CALL FUNCTION 'POPUP_TO_DECIDE' |

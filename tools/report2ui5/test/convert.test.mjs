@@ -129,15 +129,19 @@ test("TOP-OF-PAGE, END-OF-SELECTION, HIDE and AT LINE-SELECTION", () => {
   assert.match(abap, /message\( lv_message \)\.\n {6}RETURN\./);
   assert.doesNotMatch(abap, /end_of_selection\( \)/);
   assert.match(abap, /METHOD end_of_selection\.\n\n {4}list\( \)->skip\( \)\./);
-  assert.match(abap, /hide {4}= \|\{ gs_flight-carrid \}\\t\{ gs_flight-connid \}\\t\{ gs_flight-fldate \}\|/);
+  // HIDE: a, b, c. is one call at the statement - the values as they are then
+  assert.match(abap, /ENDIF\.\n {6}list\( \)->hide\( \|\{ gs_flight-carrid \}\\t\{ gs_flight-connid \}\\t\{ gs_flight-fldate \}\| \)\.\n {6}gv_total = /);
+  assert.doesNotMatch(abap, /hide {4}=/);
   assert.match(abap, /SPLIT hide AT \|\\t\| INTO TABLE DATA\(lt_hide\)\.\n {4}gs_flight-carrid = VALUE #\( lt_hide\[ 1 \] OPTIONAL \)\./);
 });
 
 test("ABAP SQL in strict mode: host variables escaped, the lists separated", () => {
   const abap = classOf("zr2c_02_flights");
   assert.match(abap, /SELECT carrid, connid, fldate, price, currency, seatsmax, seatsocc/);
-  assert.match(abap, /INTO TABLE @gt_flight\n {6}UP TO @p_max ROWS\n {6}WHERE carrid = @p_carrid\n {8}AND fldate IN @s_fldate\./);
-  assert.match(classOf("zr2c_04_salv"), /ORDER BY carrid, connid\./, "ORDER BY is a list as well");
+  // INTO and UP TO behind WHERE and ORDER BY, as strict mode wants them
+  assert.match(abap, /\n {6}WHERE carrid = @p_carrid\n {8}AND fldate IN @s_fldate\n {6}INTO TABLE @gt_flight\n {6}UP TO @p_max ROWS\./);
+  assert.match(classOf("zr2c_04_salv"), /ORDER BY carrid, connid\n {6}INTO TABLE @gt_spfli\n {6}UP TO @p_rows ROWS\./, "ORDER BY is a list as well");
+  assert.match(classOf("zr2c_05_reuse"), /SELECT \* FROM scarr WHERE currcode = @p_curr INTO TABLE @gt_scarr\./, "one line stays one line");
 });
 
 test("MESSAGE: literal, text symbol, message class short and long form, DISPLAY LIKE, sy-msgty", () => {
@@ -792,7 +796,7 @@ test("cl_gui_alv_grid on a screen: alv( ) with the field catalog, the handlers a
   assert.ok(!/cl_gui_|TYPE REF TO lcl_handler|go_grid|go_cont|ok_code|save_ok|\blvc_[ts]_/i.test(cls), "no grid, container, handler, OK code or LVC type is left");
   assert.equal(result.draft["z2ui5_cl_cgui_r2c_19.clas.locals_imp.abap"], undefined, "the handler class is gone");
   // the PBO module in place of CALL SCREEN, the chain from the field catalog, the layout and the toolbar handler
-  assert.match(cls, /ORDER BY PRIMARY KEY\.\n\n\s+set_pf_status\( functions = VALUE #\( \( name = `REFRESH`/);
+  assert.match(cls, /ORDER BY PRIMARY KEY\n\s+INTO TABLE @gt_flight\.\n\n\s+set_pf_status\( functions = VALUE #\( \( name = `REFRESH`/);
   assert.match(cls, /alv\( gt_flight\n\s+\)->set_title\( 'Flights'\n\s+\)->set_column_text\( name = `CONNID`\n\s+text = 'Flight'/);
   assert.match(cls, /\)->set_column_hidden\( `MANDT`\n\s+\)->set_column_hotspot\( `CONNID`\n\s+\)->set_column_sum\( `SEATSOCC`\n\s+\)->add_function\( name    = `FULL`\n\s+text    = 'Full flights'\n\s+icon    = `sap-icon:\/\/accept`\n\s+tooltip = 'Count the full flights'\n\s+\)->add_function\( name = `ALL`\n\s+text = 'All flights'\n\s+\)->set_line_selection\( \)\./);
   // the handlers
@@ -859,7 +863,7 @@ test("WRITE AT pos(len), UNDER, NO-GAP, POSITION, RESERVE, sy-linno / sy-colno, 
   const { result } = converted.get("zr2c_18_columns");
   assert.equal(result.ok, true);
   assert.match(cls, /write\( val  = 'Flight'\n\s+pos  = 1\n\s+name = `Flight`/);
-  assert.match(cls, /write\( val     = gs_flight-connid\n\s+under   = `Flight`/);
+  assert.match(cls, /write\( val   = gs_flight-connid\n\s+under = `Flight`/);
   assert.match(cls, /write\( val    = gs_flight-seatsmax\n\s+pos    = gv_col\n\s+len    = 6\n\s+no_gap = abap_true/);
   assert.match(cls, /list\( \)->reserve\( 2 \)\./);
   assert.match(cls, /list\( \)->position\( 25 \)\./);
@@ -987,6 +991,160 @@ test("a global table with a header line is a table and a work area attribute, an
   assert.match(cls, /CLEAR wa_gt_sum\.\n\s+CLEAR gt_sum\./);
   // a FORM's own table: the work area right after it
   assert.match(cls, /DATA lt TYPE STANDARD TABLE OF i WITH DEFAULT KEY\.\n\s+DATA ls_lt LIKE LINE OF lt\.\n\s+ls_lt = 1\.\n\s+APPEND ls_lt TO lt\.\n\s+LOOP AT lt INTO ls_lt\.\n\s+write\( ls_lt \)/);
+});
+
+// ------------------------------------- the list, the FORMs and the ALV in detail
+
+const conv = (src) => convert(src, { file: "zt.prog.abap", className: "zcl_t" });
+const todos = (r) => r.todos.map((x) => x.message).join("\n");
+
+test("HIDE: list( )->hide( ) where HIDE runs, a header line as its work area, in a local class through the instance", () => {
+  const abap = classOf("zr2c_54_listdetails");
+  const locals = converted.get("zr2c_54_listdetails").result.draft["z2ui5_cl_cgui_r2c_54.clas.locals_imp.abap"];
+  assert.equal(converted.get("zr2c_54_listdetails").result.ok, true);
+  assert.match(abap, /quickinfo {3}= 'Due date' \)\.\n {6}list\( \)->hide\( \|\{ wa_gt_item-id \}\\t\{ wa_gt_item-name \}\| \)\./);
+  assert.match(abap, /SPLIT hide AT \|\\t\| INTO TABLE DATA\(lt_hide\)\.\n {4}wa_gt_item-id = VALUE #\( lt_hide\[ 1 \] OPTIONAL \)\.\n {4}wa_gt_item-name = VALUE/);
+  assert.match(locals, /LOOP AT lcl_r2c=>app->gt_item INTO lcl_r2c=>app->wa_gt_item\./);
+  assert.match(locals, /lcl_r2c=>app->list\( \)->hide\( \|\{ lcl_r2c=>app->wa_gt_item-id \}\\t\{ lcl_r2c=>app->wa_gt_item-name \}\| \)\./);
+  // the value when HIDE runs - not the one of the WRITE before it
+  const r = conv("REPORT zt.\nDATA gv_line TYPE i.\nSTART-OF-SELECTION.\n  DO 5 TIMES.\n    WRITE: / 'Line', sy-index.\n    gv_line = sy-index.\n    HIDE gv_line.\n  ENDDO.\nAT LINE-SELECTION.\n  WRITE gv_line.\n");
+  assert.match(r.files["zcl_t.clas.abap"], /gv_line = sy-index\.\n {6}list\( \)->hide\( gv_line \)\./);
+  assert.doesNotMatch(r.files["zcl_t.clas.abap"], /hide {4}=/);
+  // HIDE after a PERFORM that writes the line
+  const p = conv("REPORT zt.\nDATA gv_id TYPE i.\nSTART-OF-SELECTION.\n  PERFORM line.\n  HIDE gv_id.\nAT LINE-SELECTION.\n  WRITE gv_id.\nFORM line.\n  WRITE / gv_id.\nENDFORM.\n");
+  assert.equal(p.ok, true, p.refusals.map((x) => x.message).join("\n"));
+});
+
+test("HIDE: one set of fields compared field by field, the HIDEs of a line together", () => {
+  const prefix = conv("REPORT zt.\nDATA: gv_id TYPE i, gv_id2 TYPE i.\nSTART-OF-SELECTION.\n  WRITE / gv_id.\n  HIDE gv_id.\n  WRITE / gv_id2.\n  HIDE gv_id2.\n");
+  assert.ok(prefix.refusals.some((x) => /HIDE of other fields \(gv_id2\) than elsewhere \(gv_id\)/.test(x.message)), "gv_id2 is not gv_id");
+  const apart = conv("REPORT zt.\nDATA: gv_a TYPE i, gv_b TYPE i.\nSTART-OF-SELECTION.\n  WRITE / gv_a.\n  HIDE gv_a.\n  WRITE gv_b.\n  HIDE gv_b.\n");
+  assert.ok(apart.refusals.some((x) => /HIDE gv_b apart from the HIDE before it on the same line/.test(x.message)));
+  const local = conv("REPORT zt.\nSTART-OF-SELECTION.\n  PERFORM x.\nFORM x.\n  DATA lv TYPE i.\n  WRITE / lv.\n  HIDE lv.\nENDFORM.\n");
+  assert.ok(local.refusals.some((x) => /HIDE lv - the field is not a global field/.test(x.message)));
+});
+
+test("FORMAT before a PERFORM is the FORM's too; FORMAT left on at the end of a FORM is a TODO", () => {
+  const abap = classOf("zr2c_54_listdetails");
+  assert.match(abap, /list\( \)->format\( color = z2ui5_cl_cgui_list=>cs_color-key \)\.\n {4}header\( \)\.\n {4}list\( \)->format\( reset = abap_true \)\./);
+  const r = conv("REPORT zt.\nSTART-OF-SELECTION.\n  FORMAT COLOR COL_HEADING.\n  PERFORM header.\n  WRITE / 'body'.\n  PERFORM set_red.\n  WRITE / 'red in classic'.\nFORM header.\n  FORMAT INTENSIFIED.\n  WRITE / 'Header'.\n  FORMAT COLOR OFF.\n  WRITE 'plain'.\n  FORMAT INTENSIFIED OFF.\nENDFORM.\nFORM set_red.\n  FORMAT COLOR COL_NEGATIVE.\nENDFORM.\n");
+  const cls = r.files["zcl_t.clas.abap"];
+  // the FORM's own FORMAT is passed even when off - the caller's is on the list
+  assert.match(cls, /write\( val {9}= 'Header'\n {18}intensified = abap_true \)/);
+  assert.match(cls, /write\( val {9}= 'plain'\n\s+color {7}= z2ui5_cl_cgui_list=>cs_color-none\n\s+intensified = abap_true \)/);
+  // a FORM that writes nothing needs no format around its call
+  assert.match(cls, /\n {4}set_red\( \)\.\n/);
+  assert.match(todos(r), /FORMAT is still in effect at the end of FORM set_red/);
+  assert.doesNotMatch(todos(r), /end of FORM header/);
+});
+
+test("WRITE: the format additions are parameters of write( ), INTENSIFIED / INVERSE / INPUT of FORMAT too", () => {
+  const r = conv("REPORT zt.\nDATA: gv_amount TYPE p LENGTH 8 DECIMALS 2, gv_cur TYPE c LENGTH 5, gv_n TYPE i, gv_t TYPE t, gv_tz TYPE c LENGTH 6.\nSTART-OF-SELECTION.\n"
+    + "  FORMAT INVERSE INPUT ON.\n"
+    + "  WRITE: / gv_amount CURRENCY gv_cur NO-SIGN LEFT-JUSTIFIED, gv_n NO-ZERO NO-GROUPING DECIMALS 1 ROUND 2 CENTERED, sy-datum MM/DD/YY, gv_n USING EDIT MASK '__:__', gv_t TIME ZONE gv_tz, gv_n INPUT OFF.\n"
+    + "  FORMAT RESET.\n  WRITE gv_n EXPONENT 2.\n");
+  const cls = r.files["zcl_t.clas.abap"];
+  assert.match(cls, /currency = gv_cur\n\s+no_sign {2}= abap_true\n\s+justify {2}= z2ui5_cl_cgui_list=>cs_justify-left/);
+  assert.equal(r.todos.length, 0);
+  assert.match(cls, /no_zero {5}= abap_true\n\s+no_grouping = abap_true\n\s+decimals {4}= 1\n\s+round {7}= 2\n\s+justify {5}= z2ui5_cl_cgui_list=>cs_justify-center/);
+  assert.match(cls, /date_format = z2ui5_cl_cgui_list=>cs_date_format-mm_dd_yy/);
+  assert.match(cls, /edit_mask = '__:__'/);
+  assert.match(cls, /time_zone = gv_tz/);
+  assert.match(cls, /inverse {2}= abap_true\n\s+input {4}= abap_true\n\s+currency = gv_cur/, "FORMAT INVERSE INPUT ON");
+  assert.match(cls, /val {5}= gv_n\n\s+inverse = abap_true\n\s+input {3}= abap_false \)/, "INPUT OFF of the WRITE wins over FORMAT");
+  assert.match(cls, /\n {4}write\( gv_n \)\./, "FORMAT RESET");
+  assert.ok(r.notes.some((n) => n.text === "WRITE ... EXPONENT - the list writes the value in its default format"));
+  assert.ok(!r.notes.some((n) => /CURRENCY|DD\/MM|INTENSIFIED \/ INVERSE/.test(n.text)));
+});
+
+test("sy-lisel / sy-lilli in a FORM called from AT LINE-SELECTION, sy-lisel with an offset", () => {
+  const abap = classOf("zr2c_54_listdetails");
+  assert.match(abap, /METHOD detail\.\n\n {4}DATA lv_lisel TYPE c LENGTH 1023\.\n\n {4}lv_lisel = lisel\( \)\.\n {4}gv_key = lv_lisel\(4\)\./);
+  assert.match(abap, /write\( get_cursor\( \)-line/);
+  const r = conv("REPORT zt.\nDATA gv TYPE c LENGTH 10.\nSTART-OF-SELECTION.\n  WRITE / 'x'.\nAT LINE-SELECTION.\n  gv = sy-lisel+2(3).\n  WRITE: / sy-lisel, sy-lilli.\n");
+  assert.match(r.files["zcl_t.clas.abap"], /gv = lv_lisel\+2\(3\)\./);
+  assert.match(r.files["zcl_t.clas.abap"], /write\( lisel\( \)\n\s+\)->write\( row \)/);
+});
+
+test("PARAMETERS AS CHECKBOX / RADIOBUTTON DEFAULT abap_true or a constant", () => {
+  const abap = classOf("zr2c_54_listdetails");
+  assert.match(abap, /p_cb = abap_true\.\n {4}p_total = abap_true\./);
+  assert.doesNotMatch(abap, /p_list = /, "the radio group has its default - not its first button");
+  const r = conv("REPORT zt.\nCONSTANTS gc_on TYPE abap_bool VALUE abap_true.\nPARAMETERS: p_a AS CHECKBOX DEFAULT gc_on, p_b AS CHECKBOX DEFAULT abap_false, p_c AS CHECKBOX DEFAULT space.\nSTART-OF-SELECTION.\n  WRITE p_a.\n");
+  assert.match(r.files["zcl_t.clas.abap"], /p_a = gc_on\./);
+  assert.doesNotMatch(r.files["zcl_t.clas.abap"], /p_[bc] = /);
+});
+
+test("FORM USING written through a field symbol, a reference, ASSIGN: a CHANGING parameter", () => {
+  assert.match(classOf("zr2c_54_listdetails"), /METHODS mark_due\n {6}CHANGING\n {8}ut_item TYPE ty_t_item\./);
+  const r = conv("REPORT zt.\nTYPES ty_t TYPE STANDARD TABLE OF i WITH DEFAULT KEY.\nDATA: gt TYPE ty_t, gv TYPE i, gr TYPE REF TO i.\nSTART-OF-SELECTION.\n  PERFORM a USING gt gv gv gt.\n"
+    + "FORM a USING ut TYPE ty_t uv TYPE i uw TYPE i ur TYPE ty_t.\n  READ TABLE ut ASSIGNING FIELD-SYMBOL(<l>) INDEX 1.\n  GET REFERENCE OF uv INTO gr.\n  ASSIGN uw TO FIELD-SYMBOL(<w>).\n  LOOP AT ur INTO DATA(lv).\n  ENDLOOP.\nENDFORM.\n");
+  const cls = r.files["zcl_t.clas.abap"];
+  assert.match(cls, /METHODS a\n {6}IMPORTING\n {8}ur TYPE ty_t\n {6}CHANGING\n {8}ut TYPE ty_t\n {8}uv TYPE i\n {8}uw TYPE i\./, "LOOP AT ... INTO only reads");
+});
+
+test("MESSAGE: a type in a variable returns on E and A; E in a method of a local class is a TODO", () => {
+  assert.match(classOf("zr2c_54_listdetails"), /type = gv_type \)\.\n {4}IF gv_type CA 'EA'\.\n {6}RETURN\.\n {4}ENDIF\./);
+  const r = conv("REPORT zt.\nCLASS lcl DEFINITION.\n  PUBLIC SECTION.\n    METHODS run.\nENDCLASS.\nSTART-OF-SELECTION.\n  NEW lcl( )->run( ).\nCLASS lcl IMPLEMENTATION.\n  METHOD run.\n    MESSAGE 'too big' TYPE 'E'.\n  ENDMETHOD.\nENDCLASS.\n");
+  assert.match(todos(r), /MESSAGE TYPE E in method run of lcl: the classic message ended the event block/);
+});
+
+test("F4IF_INT_TABLE_VALUE_REQUEST: the IF sy-subrc after it that reads RETURN_TAB is dropped", () => {
+  const abap = classOf("zr2c_54_listdetails");
+  assert.match(abap, /value_help_popup\( tab = gt_value\n {26}col = `ID` \)\.\n {6}WHEN OTHERS\./);
+  assert.doesNotMatch(abap, /ls_ret-id/);
+  const r = conv("REPORT zt.\nTYPES: BEGIN OF ty, id TYPE c LENGTH 3, END OF ty.\nDATA: gt TYPE STANDARD TABLE OF ty, gt_ret TYPE STANDARD TABLE OF ty.\nPARAMETERS p TYPE c LENGTH 3.\nAT SELECTION-SCREEN ON VALUE-REQUEST FOR p.\n"
+    + "  CALL FUNCTION 'F4IF_INT_TABLE_VALUE_REQUEST' EXPORTING retfield = 'ID' TABLES value_tab = gt return_tab = gt_ret.\n  p = gt_ret[ 1 ]-id.\n");
+  assert.match(todos(r), /RETURN_TAB gt_ret stays empty; drop the code after the call that reads it/);
+});
+
+test("ABAP SQL: a dynamic WHERE in strict mode is a TODO", () => {
+  const r = conv("REPORT zt.\nDATA: gt TYPE STANDARD TABLE OF sflight, gv_where TYPE string.\nSTART-OF-SELECTION.\n  SELECT * FROM sflight INTO TABLE gt WHERE (gv_where).\n");
+  assert.match(r.files["zcl_t.clas.abap"], /SELECT \* FROM sflight WHERE \(gv_where\) INTO TABLE @gt\./);
+  assert.equal(r.todos.filter((x) => /dynamic WHERE/.test(x.message)).length, 1);
+});
+
+test("CL_SALV_TABLE: sorts, aggregations, optimize, striped, key and output length in the alv( ) chain", () => {
+  const src = "REPORT zt.\nTYPES: BEGIN OF ty, a TYPE c LENGTH 3, b TYPE i, END OF ty.\nDATA gt TYPE STANDARD TABLE OF ty WITH DEFAULT KEY.\nDATA go TYPE REF TO cl_salv_table.\nSTART-OF-SELECTION.\n"
+    + "  cl_salv_table=>factory( IMPORTING r_salv_table = go CHANGING t_table = gt ).\n"
+    + "  go->get_sorts( )->add_sort( columnname = 'A' sequence = if_salv_c_sort=>sort_down subtotal = abap_true ).\n"
+    + "  DATA(lo_aggr) = go->get_aggregations( ).\n"
+    + "  lo_aggr->add_aggregation( columnname = 'B' ).\n"
+    + "  go->get_aggregations( )->add_aggregation( columnname = 'A' aggregation = if_salv_c_aggregation=>count ).\n"
+    + "  go->get_columns( )->set_optimize( abap_false ).\n"
+    + "  go->get_display_settings( )->set_striped_pattern( abap_true ).\n"
+    + "  DATA(lo_col) = CAST cl_salv_column_table( go->get_columns( )->get_column( 'A' ) ).\n"
+    + "  lo_col->set_key( ).\n"
+    + "  lo_col->set_output_length( 10 ).\n"
+    + "  go->display( ).\n";
+  const r = conv(src);
+  assert.deepEqual(r.refusals.map((x) => x.message), []);
+  assert.deepEqual(r.todos.map((x) => x.message), []);
+  const cls = r.files["zcl_t.clas.abap"];
+  assert.match(cls, /set_sort\( name {7}= `A`\n\s+descending = abap_true\n\s+subtotal {3}= abap_true/);
+  assert.match(cls, /set_column_sum\( `B`\n/);
+  assert.match(cls, /set_column_aggregation\( name {8}= `A`\n\s+aggregation = z2ui5_cl_cgui_alv=>cs_aggregation-count/);
+  assert.match(cls, /set_optimize\( abap_false\n/);
+  assert.doesNotMatch(cls, /set_striped/, "striped is the default");
+  assert.match(cls, /set_column_key\( `A`\n/);
+  assert.match(cls, /set_column_width\( name {2}= `A`\n\s+width = `6\.0em` \)/);
+  assert.doesNotMatch(cls, /lo_aggr|lo_col/);
+});
+
+test("REUSE_ALV_GRID_DISPLAY: IT_SORT as set_sort( ), the SLIS line types dropped with their tables, KEY / OUTPUTLEN / COL_POS", () => {
+  const abap = classOf("zr2c_05_reuse");
+  assert.match(abap, /set_column_key\( `CARRID`/);
+  assert.match(abap, /set_column_width\( name {2}= `CARRNAME`\n\s+width = `15\.0em`\n/);
+  const src = "REPORT zt.\nTYPE-POOLS slis.\nTYPES: BEGIN OF ty, a TYPE c LENGTH 3, b TYPE i, END OF ty.\nDATA: gt TYPE STANDARD TABLE OF ty WITH DEFAULT KEY,\n      gt_sort TYPE slis_t_sortinfo_alv,\n      gs_sort LIKE LINE OF gt_sort,\n      gs_head TYPE slis_listheader,\n      gt_head TYPE slis_t_listheader.\nSTART-OF-SELECTION.\n"
+    + "  gs_sort-fieldname = 'A'.\n  gs_sort-down = 'X'.\n  gs_sort-subtot = 'X'.\n  APPEND gs_sort TO gt_sort.\n  CLEAR gs_sort.\n  gs_sort-fieldname = 'B'.\n  gs_sort-up = 'X'.\n  APPEND gs_sort TO gt_sort.\n"
+    + "  gs_head-typ = 'H'.\n  APPEND gs_head TO gt_head.\n"
+    + "  CALL FUNCTION 'REUSE_ALV_GRID_DISPLAY' EXPORTING it_sort = gt_sort TABLES t_outtab = gt.\n";
+  const r = conv(src);
+  assert.deepEqual(r.refusals.map((x) => x.message), []);
+  const cls = r.files["zcl_t.clas.abap"];
+  assert.match(cls, /set_sort\( name {7}= `A`\n\s+descending = abap_true\n\s+subtotal {3}= abap_true\n\s+\)->set_sort\( `B` \)/);
+  assert.doesNotMatch(cls, /gs_sort|gt_sort|gs_head|slis/i);
+  assert.doesNotMatch(todos(r), /IT_SORT/);
 });
 
 // ------------------------------------------- the catalogue of refusals

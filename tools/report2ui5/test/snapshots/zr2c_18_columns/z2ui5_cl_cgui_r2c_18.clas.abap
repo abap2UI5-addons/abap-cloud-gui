@@ -46,9 +46,10 @@ CLASS z2ui5_cl_cgui_r2c_18 IMPLEMENTATION.
 
   METHOD start_of_selection.
 
-    SELECT * FROM sflight INTO TABLE @gt_flight
+    SELECT * FROM sflight
       WHERE carrid = @p_carrid
-      ORDER BY PRIMARY KEY.
+      ORDER BY PRIMARY KEY
+      INTO TABLE @gt_flight.
 
     list( )->new_line(
         )->write( val  = 'Flight'
@@ -65,10 +66,8 @@ CLASS z2ui5_cl_cgui_r2c_18 IMPLEMENTATION.
     LOOP AT gt_flight INTO gs_flight.
       list( )->reserve( 2 ).
       list( )->new_line(
-          )->write( val     = gs_flight-connid
-                    under   = `Flight`
-                    hotspot = abap_true
-                    hide    = gs_flight
+          )->write( val   = gs_flight-connid
+                    under = `Flight`
           )->write( val   = gs_flight-fldate
                     under = `Date`
           )->write( val = gs_flight-seatsocc
@@ -79,6 +78,7 @@ CLASS z2ui5_cl_cgui_r2c_18 IMPLEMENTATION.
                     len    = 6
                     no_gap = abap_true
           )->write( '-' ).
+      list( )->hide( gs_flight ).
       gv_total = gv_total + gs_flight-seatsocc.
     ENDLOOP.
     list( )->uline( ).
@@ -116,11 +116,10 @@ CLASS z2ui5_cl_cgui_r2c_18 IMPLEMENTATION.
                   pos = 20
                   len = 8 ).
     list( )->new_line(
-        )->write( val     = 'Column after the value:'
-                  pos     = 5
-                  hotspot = abap_true
-                  hide    = gs_flight
+        )->write( val = 'Column after the value:'
+                  pos = 5
         )->write( list( )->current_column( ) ).
+    list( )->hide( gs_flight ).
 
   ENDMETHOD.
 
