@@ -10,6 +10,13 @@ CLASS ltcl_test DEFINITION FINAL FOR TESTING
         seats  TYPE i,
       END OF ty_s_air.
     TYPES ty_t_air TYPE STANDARD TABLE OF ty_s_air WITH EMPTY KEY.
+    TYPES:
+      BEGIN OF ty_s_flight,
+        carrid TYPE c LENGTH 3,
+        fldate TYPE d,
+        deptime TYPE t,
+      END OF ty_s_flight.
+    TYPES ty_t_flight TYPE STANDARD TABLE OF ty_s_flight WITH EMPTY KEY.
 
     METHODS file_name_without_folder FOR TESTING.
     METHODS text_into_columns FOR TESTING.
@@ -18,6 +25,7 @@ CLASS ltcl_test DEFINITION FINAL FOR TESTING
     METHODS url_of_bytes FOR TESTING.
     METHODS bytes_lines_base64 FOR TESTING.
     METHODS no_gui_version FOR TESTING.
+    METHODS dates_and_times_round_trip FOR TESTING.
 
 ENDCLASS.
 
@@ -36,6 +44,35 @@ CLASS ltcl_test IMPLEMENTATION.
                                                         OTHERS         = 9 ).
     cl_abap_unit_assert=>assert_subrc( exp = 3 ).
     cl_abap_unit_assert=>assert_initial( lt_version ).
+
+  ENDMETHOD.
+
+  METHOD dates_and_times_round_trip.
+
+    DATA lt_back TYPE ty_t_flight.
+
+    " a file written with GUI_DOWNLOAD and read back: the date and the time
+    " in the user's format come back as they were, not cut to 8 characters
+    DATA(lt_flight) = VALUE ty_t_flight( ( carrid = `LH` fldate = `20260105` deptime = `123000` )
+                                         ( carrid = `AA` ) ).
+    z2ui5_cl_cgui_frontend=>text_to_table( EXPORTING text      = z2ui5_cl_cgui_frontend=>table_to_text( data_tab  = lt_flight
+                                                                                                         separator = abap_true )
+                                                     separator = abap_true
+                                           CHANGING  data_tab  = lt_back ).
+    cl_abap_unit_assert=>assert_equals( exp = lt_flight
+                                        act = lt_back ).
+
+    " the internal format, a 12-hour time; no date stays initial
+    CLEAR lt_back.
+    z2ui5_cl_cgui_frontend=>text_to_table( EXPORTING text      = |LH\t20261231\t01:15:00 PM\r\nAA\tno date\t25:00:00|
+                                                     separator = abap_true
+                                           CHANGING  data_tab  = lt_back ).
+    cl_abap_unit_assert=>assert_equals( exp = CONV d( `20261231` )
+                                        act = lt_back[ 1 ]-fldate ).
+    cl_abap_unit_assert=>assert_equals( exp = CONV t( `131500` )
+                                        act = lt_back[ 1 ]-deptime ).
+    cl_abap_unit_assert=>assert_initial( lt_back[ 2 ]-fldate ).
+    cl_abap_unit_assert=>assert_initial( lt_back[ 2 ]-deptime ).
 
   ENDMETHOD.
 

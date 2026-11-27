@@ -8,6 +8,44 @@ release.
 
 **Fixes**
 
+- Selection variants, ALV layouts, the default layout and the SU3 / SPRO
+  parameters are saved and deleted for good: abap2UI5 rolls back what an
+  app leaves open after `main( )`, and the two stores never committed. The
+  report runtime now commits at the end of every roundtrip, as the classic
+  implicit commit at the end of a dialog step does, so a report's own
+  database changes are kept too - not after a message of type `A` or `X`.
+- ALV: Select All, print and export take the rows a filter of a column menu
+  lets through. Paged (`set_paging( )`), that filter is a filter of the grid
+  like the one of the toolbar - Delete Filter ends it; without paging the
+  column menus offer no filter any more (it filtered the rows of the browser
+  alone, the backend never heard of it) - the toolbar's filter is the one.
+- The ALV and the list activate on NW 7.02 - 7.40 again: they named
+  `cl_abap_typedescr=>typekind_int8`, which these releases do not have.
+- ALV totals and subtotals: a column with a currency or unit
+  (`set_column_currency( )`, `set_column_quantity( )`) is totalled per
+  currency or unit, as the classic ALV does - 100 EUR and 200 USD were a
+  total of 300; the grid stacks the numbers, the printout has a totals line
+  each. A paged grid (`set_paging( )`) adds up all rows its filter lets
+  through, not only the first rows it holds (`render( sums = )`).
+- `z2ui5_cl_cgui_frontend=>gui_upload( )` (GUI_UPLOAD) reads a date or a
+  time back as `gui_download( )` writes it - in the user's format (and as
+  `YYYYMMDD` / `HHMMSS`, 12-hour times too); a plain move took the first
+  eight characters (`05.01.20` of `05.01.2026`) and kept an invalid date.
+  A value that is no date stays initial.
+- The multiple selection (a select-option, the ALV filter) takes a number
+  as the user writes it: `1,5` and `1.234,50` with a decimal comma were
+  refused as "enter a valid value".
+- The standard F4 of a value table and of a CDS entity: the hit list is the
+  first 500 values by the key, not any 500, and a value typed with `*` or
+  `+` (`47*`) restricts it as in SAP GUI. The texts are read for the values
+  shown only - the whole text table of the language was read and matched
+  in a nested loop - and matched on every field the text table shares with
+  the value table (a region's text belongs to its country too).
+- The conversion exit `ALPHA` runs on input, as in SAP GUI: `4711` typed
+  into a parameter or select-option of a data element with `ALPHA`
+  (`KUNNR`, `MATNR`, `VBELN`, ...), into the multiple selection or the ALV
+  filter of such a column is `0000004711`, so `WHERE kunnr = p_kunnr` finds
+  it. The value is shown with its leading zeros afterwards.
 - report2UI5 no longer writes wrong code where it used to: `HIDE` is
   `list( )->hide( )` at the statement - the value when `HIDE` runs, not at
   the `WRITE` before it - and works for a table with a header line and in a

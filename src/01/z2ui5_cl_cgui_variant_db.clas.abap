@@ -131,6 +131,8 @@ CLASS z2ui5_cl_cgui_variant_db IMPLEMENTATION.
                            RESULT XML ls_db-data.
 
     MODIFY z2ui5_t_19 FROM @ls_db.
+    " abap2UI5 rolls back what an app leaves open after its main( )
+    COMMIT WORK.
 
   ENDMETHOD.
 
@@ -158,6 +160,7 @@ CLASS z2ui5_cl_cgui_variant_db IMPLEMENTATION.
     ENDIF.
 
     DELETE FROM z2ui5_t_19 WHERE report = @lv_report AND variant = @lv_name.
+    COMMIT WORK.
 
   ENDMETHOD.
 

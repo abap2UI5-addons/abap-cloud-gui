@@ -76,7 +76,8 @@ Three release targets and one runtime, every one a CI gate with no excludes:
 - **ABAP Cloud** - released APIs only, `npm run check:cloud`;
 - **Standard ABAP** - 7.50 syntax that downports, `npm run lint` (its
   API set is the intersection of ABAP Cloud and 7.02);
-- **NW 7.02** - a downported copy, `npm run check:702`;
+- **NW 7.02** - a downported copy, `npm run check:702` (it also refuses
+  `=>typekind_int8`, which its API set has and 7.02 does not - write `` `8` ``);
 - **the transpiled Node runtime** - `npm run unit` runs every ABAP Unit test
   there, the DANGEROUS ones of the two stores against SQLite.
 
@@ -157,6 +158,15 @@ toolbar and the grid are not frozen.
   empty VALUE deletes the key. Keep bound and stored value equal after a
   write, or the control reports again on the next render. A variant in the
   URL is read after `initialization( )`, so it wins over `set_variant( )`.
+- **The report commits at the end of its `main( )`.** abap2UI5 runs
+  `ROLLBACK WORK` before and after `main( )` of an app that is not
+  stateful, so nothing a report writes survives the roundtrip unless it is
+  committed. `z2ui5_if_app~main` of the report runtime ends with `COMMIT
+  WORK` - the classic implicit commit at the end of a dialog step - except
+  after a message of type `A` or `X` (an exception never gets there, the
+  core rolls back). The two stores commit after their own `MODIFY` /
+  `DELETE` as well, so they stay persistent when used without the report;
+  their DANGEROUS tests commit the cleanup in `teardown`.
 - **ALV layouts live in table `Z2UI5_T_18` by default**
   (`z2ui5_cl_cgui_layout_db`, one namespace per report class and ALV handle -
   the attribute `alv( )` shows): shared and protected like the variants, and

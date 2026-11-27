@@ -1712,6 +1712,7 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
     METHODS value_help_entity
       IMPORTING
         field         TYPE string
+        pattern       TYPE string OPTIONAL
       RETURNING
         VALUE(result) TYPE abap_bool.
 
@@ -1728,6 +1729,7 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
       IMPORTING
         field         TYPE string
         descr         TYPE REF TO cl_abap_typedescr
+        pattern       TYPE string OPTIONAL
       RETURNING
         VALUE(result) TYPE abap_bool.
 
@@ -1895,6 +1897,15 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
       IMPORTING
         skip TYPE i
         top  TYPE i.
+
+    "! the rows of tab the order of the paged grid holds (mt_cgui_alv_order)
+    "! - tab itself when no filter leaves one out; a copy of this
+    "! roundtrip, not kept in the draft
+    METHODS alv_order_rows
+      IMPORTING
+        tab           TYPE REF TO data
+      RETURNING
+        VALUE(result) TYPE REF TO data.
 
     "! the row of the table behind row of the grid
     METHODS alv_row
@@ -2139,6 +2150,15 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
 
     messages_display( ).
     cgui_statics_keep( ).
+
+    " the end of the dialog step: a classic report's database changes are
+    " committed here implicitly, and abap2UI5 rolls back what an app that is
+    " not stateful leaves open after main( ) - so the report commits, unless
+    " a termination message (A, X) rolled the step back as it does in SAP GUI.
+    " An exception never gets here: abap2UI5 rolls the LUW back
+    IF NOT line_exists( mt_cgui_msg[ type = `A` ] ) AND NOT line_exists( mt_cgui_msg[ type = `X` ] ).
+      COMMIT WORK.
+    ENDIF.
 
   ENDMETHOD.
 
@@ -3136,17 +3156,24 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
     ENDIF.
     ASSIGN lr_val->* TO <field_val>.
     DATA(lo_descr) = z2ui5_cl_cgui_context=>rtti_get_value_descr( <field_val> ).
+    " what the user typed with a * or + restricts the hit list, as in SAP GUI
+    DATA(lv_pattern) = ``.
+    IF cl_abap_typedescr=>describe_by_data( <field_val> )->kind = cl_abap_typedescr=>kind_elem.
+      lv_pattern = |{ <field_val> }|.
+    ENDIF.
 
     " a CDS entity named as the value help comes first, then MATCHCODE
     " OBJECT, then what the type of the field knows
-    IF value_help_entity( field ) = abap_true.
+    IF value_help_entity( field   = field
+                          pattern = lv_pattern ) = abap_true.
       RETURN.
     ENDIF.
     IF value_help_matchcode( field ) = abap_true.
       RETURN.
     ENDIF.
-    IF value_help_descr( field = field
-                         descr = lo_descr ) = abap_true.
+    IF value_help_descr( field   = field
+                         descr   = lo_descr
+                         pattern = lv_pattern ) = abap_true.
       RETURN.
     ENDIF.
 
@@ -3166,7 +3193,9 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
     IF sy-subrc <> 0 OR lr_mc->entity IS INITIAL.
       RETURN.
     ENDIF.
-    DATA(lr_entity) = z2ui5_cl_cgui_context=>entity_select( lr_mc->entity ).
+    DATA(lr_entity) = z2ui5_cl_cgui_context=>entity_select( entity  = lr_mc->entity
+                                                            column  = lr_mc->entity_elem
+                                                            pattern = pattern ).
     IF lr_entity IS NOT BOUND.
       RETURN.
     ENDIF.
@@ -3255,7 +3284,8 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
     " the value table with the texts of its text table
     DATA(ls_table) = z2ui5_cl_cgui_context=>rtti_get_value_table( descr ).
     IF ls_table-table IS NOT INITIAL.
-      DATA(lr_rows) = z2ui5_cl_cgui_context=>value_table_select( ls_table ).
+      DATA(lr_rows) = z2ui5_cl_cgui_context=>value_table_select( table   = ls_table
+                                                                 pattern = pattern ).
       IF lr_rows IS BOUND.
         ASSIGN lr_rows->* TO <tab>.
         IF <tab> IS NOT INITIAL.
@@ -4055,6 +4085,8 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
 
     FIELD-SYMBOLS <range> TYPE STANDARD TABLE.
     FIELD-SYMBOLS <field_val>   TYPE clike.
+    FIELD-SYMBOLS <alpha_val>   TYPE any.
+    DATA lr_val TYPE REF TO data.
 
     IF mv_cgui_screen <> cs_screen-selection.
       RETURN.
@@ -4098,12 +4130,24 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
     " PARAMETERS without LOWER CASE
     LOOP AT mt_cgui_field REFERENCE INTO lr_field
          WHERE upper = abap_true AND kind = z2ui5_cl_cgui_selscreen=>cs_field_kind-parameter.
-      DATA(lr_val) = attri_assign( lr_field->name ).
+      lr_val = attri_assign( lr_field->name ).
       IF lr_val IS NOT BOUND.
         CONTINUE.
       ENDIF.
       ASSIGN lr_val->* TO <field_val>.
       <field_val> = to_upper( <field_val> ).
+    ENDLOOP.
+
+    " the conversion exit ALPHA of a parameter's data element - 4711 into a
+    " KUNNR is 0000004711, as SAP GUI stores it
+    LOOP AT mt_cgui_field REFERENCE INTO lr_field
+         WHERE kind = z2ui5_cl_cgui_selscreen=>cs_field_kind-parameter.
+      lr_val = attri_assign( lr_field->name ).
+      IF lr_val IS NOT BOUND.
+        CONTINUE.
+      ENDIF.
+      ASSIGN lr_val->* TO <alpha_val>.
+      z2ui5_cl_cgui_context=>conv_alpha_in( CHANGING val = <alpha_val> ).
     ENDLOOP.
 
   ENDMETHOD.
@@ -7013,6 +7057,29 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
 
   ENDMETHOD.
 
+  METHOD alv_order_rows.
+
+    FIELD-SYMBOLS <tab>  TYPE STANDARD TABLE.
+    FIELD-SYMBOLS <rows> TYPE STANDARD TABLE.
+
+    ASSIGN tab->* TO <tab>.
+    IF mo_cgui_alv->is_filtered( ) = abap_false.
+      result = tab.
+      RETURN.
+    ENDIF.
+    CREATE DATA result LIKE <tab>.
+    ASSIGN result->* TO <rows>.
+    " empty - the transpiled runtime copies the rows along with LIKE
+    CLEAR <rows>.
+    LOOP AT mt_cgui_alv_order INTO DATA(lv_row).
+      READ TABLE <tab> ASSIGNING FIELD-SYMBOL(<row>) INDEX lv_row.
+      IF sy-subrc = 0.
+        INSERT <row> INTO TABLE <rows>.
+      ENDIF.
+    ENDLOOP.
+
+  ENDMETHOD.
+
   METHOD alv_visible_source.
 
     result = alv_source( ).
@@ -7641,6 +7708,9 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
         CLEAR: mr_cgui_alv_page, mt_cgui_alv_index, mt_cgui_alv_order.
         IF mo_cgui_alv->get_page_size( ) > 0.
           mt_cgui_alv_order = mo_cgui_alv->window_order( <tab> ).
+          " the totals add up every row of the order, not the first ones
+          " the page holds
+          DATA(lr_sums) = alv_order_rows( lr_tab ).
           CREATE DATA mr_cgui_alv_page LIKE <tab>.
           alv_window_load( skip = 0
                            top  = mo_cgui_alv->get_page_size( ) ).
@@ -7649,7 +7719,8 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
                                client = client
                                tab    = <tab>
                                total  = mv_cgui_alv_total
-                               all    = lv_all ).
+                               all    = lv_all
+                               sums   = lr_sums ).
           RETURN.
         ENDIF.
         DATA(lt_index) = mo_cgui_alv->filter_index( <tab> ).

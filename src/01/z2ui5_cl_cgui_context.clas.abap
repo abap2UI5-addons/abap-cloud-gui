@@ -94,22 +94,38 @@ CLASS z2ui5_cl_cgui_context DEFINITION PUBLIC FINAL CREATE PUBLIC.
     "! the rows of entity - a CDS view entity, or a table or view of the
     "! DDIC - as the value help of a field:
     "! what @Consumption.valueHelpDefinition names. On ABAP Cloud as on premise;
-    "! unbound when it cannot be read
+    "! unbound when it cannot be read. Sorted by column (else the first
+    "! one), and restricted by pattern on it - what the user typed with a
+    "! * or + - as the classic F4 does
     CLASS-METHODS entity_select
       IMPORTING
         entity        TYPE clike
         max           TYPE i DEFAULT 500
+        column        TYPE clike OPTIONAL
+        pattern       TYPE clike OPTIONAL
       RETURNING
         VALUE(result) TYPE REF TO data.
 
     "! the rows of value table table with the text of its text table in
-    "! the logon language as last column - unbound when it cannot be read
+    "! the logon language as last column - unbound when it cannot be read;
+    "! sorted by its key field and restricted by pattern on it
     CLASS-METHODS value_table_select
       IMPORTING
         table         TYPE ty_s_value_table
         max           TYPE i DEFAULT 500
+        pattern       TYPE clike OPTIONAL
       RETURNING
         VALUE(result) TYPE REF TO data.
+
+    "! a condition column LIKE pattern for a dynamic WHERE: * and + of
+    "! pattern are the wildcards, % _ # and quotes are escaped - empty
+    "! without a * or + in pattern
+    CLASS-METHODS sql_like
+      IMPORTING
+        column        TYPE clike
+        pattern       TYPE clike
+      RETURNING
+        VALUE(result) TYPE string.
 
     CLASS-METHODS rtti_check_boolean_descr
       IMPORTING
@@ -122,6 +138,12 @@ CLASS z2ui5_cl_cgui_context DEFINITION PUBLIC FINAL CREATE PUBLIC.
         val           TYPE any
       RETURNING
         VALUE(result) TYPE string.
+
+    "! the conversion exit ALPHA of the data element of val, as SAP GUI
+    "! runs it on input: 4711 into a KUNNR is 0000004711 - else val stays
+    CLASS-METHODS conv_alpha_in
+      CHANGING
+        val TYPE any.
 
     " the elementary components of the line type of a table of structures,
     " with their DDIC label (or the component name) - the ALV field catalog
@@ -417,6 +439,15 @@ CLASS z2ui5_cl_cgui_context DEFINITION PUBLIC FINAL CREATE PUBLIC.
 
   PROTECTED SECTION.
   PRIVATE SECTION.
+
+    "! the values of fields of row, one text - a row of a value table and
+    "! a row of its text table compared on the fields they share
+    CLASS-METHODS row_key
+      IMPORTING
+        row           TYPE any
+        fields        TYPE string_table
+      RETURNING
+        VALUE(result) TYPE string.
 
     " the character set c_escape_xml guards against, built on first use (a
     " class_constructor is the alternative, and a known trap)
@@ -1669,7 +1700,16 @@ CLASS z2ui5_cl_cgui_context IMPLEMENTATION.
         DATA(lo_table) = cl_abap_tabledescr=>create( lo_struct ).
         CREATE DATA result TYPE HANDLE lo_table.
         ASSIGN result->* TO <tab>.
-        SELECT * FROM (lv_entity) INTO TABLE @<tab> UP TO @max ROWS.
+        " the first rows of the sort order, not any - and those the user
+        " asked for with a pattern
+        DATA(lv_order) = to_upper( column ).
+        IF lv_order IS INITIAL.
+          READ TABLE lo_struct->components INTO DATA(ls_first) INDEX 1.
+          lv_order = ls_first-name.
+        ENDIF.
+        DATA(lv_where) = sql_like( column  = lv_order
+                                   pattern = pattern ).
+        SELECT * FROM (lv_entity) WHERE (lv_where) ORDER BY (lv_order) INTO TABLE @<tab> UP TO @max ROWS.
       CATCH cx_root.
         " no such entity, no structure, or no read access
         CLEAR result.
@@ -1679,18 +1719,29 @@ CLASS z2ui5_cl_cgui_context IMPLEMENTATION.
 
   METHOD value_table_select.
 
-    DATA lt_comp TYPE cl_abap_structdescr=>component_table.
-    DATA lr_text TYPE REF TO data.
+    TYPES:
+      BEGIN OF ty_s_text,
+        key  TYPE string,
+        text TYPE string,
+      END OF ty_s_text.
+    DATA lt_comp       TYPE cl_abap_structdescr=>component_table.
+    DATA lt_text_comp  TYPE cl_abap_structdescr=>component_table.
+    DATA lt_join       TYPE string_table.
+    DATA lt_in         TYPE string_table.
+    DATA lt_text_by_key TYPE HASHED TABLE OF ty_s_text WITH UNIQUE KEY key.
+    DATA lr_text       TYPE REF TO data.
+    DATA lr_tcomp      TYPE REF TO abap_componentdescr.
+    DATA lo_text       TYPE REF TO cl_abap_structdescr.
     DATA lv_text_table TYPE c LENGTH 30.
     DATA lv_lang_field TYPE string.
     DATA lv_key_field  TYPE string.
     DATA lv_text_field TYPE string.
+    DATA lv_where      TYPE string.
     FIELD-SYMBOLS <tab>   TYPE STANDARD TABLE.
     FIELD-SYMBOLS <texts> TYPE STANDARD TABLE.
     FIELD-SYMBOLS <row>   TYPE any.
     FIELD-SYMBOLS <key>   TYPE any.
     FIELD-SYMBOLS <cell>  TYPE any.
-    FIELD-SYMBOLS <tkey>  TYPE any.
     FIELD-SYMBOLS <ttext> TYPE any.
 
     IF table-table IS INITIAL.
@@ -1714,8 +1765,8 @@ CLASS z2ui5_cl_cgui_context IMPLEMENTATION.
               WHERE checktable = @lv_check AND frkart = 'TEXT' AND as4local = 'A'
               INTO @lv_text_table.
             IF sy-subrc = 0.
-              DATA(lo_text) = CAST cl_abap_structdescr( cl_abap_typedescr=>describe_by_name( lv_text_table ) ).
-              LOOP AT lo_text->get_components( ) REFERENCE INTO DATA(lr_tcomp).
+              lo_text = CAST cl_abap_structdescr( cl_abap_typedescr=>describe_by_name( lv_text_table ) ).
+              LOOP AT lo_text->get_components( ) REFERENCE INTO lr_tcomp.
                 DATA(lo_tcomp) = lr_tcomp->type.
                 IF lo_tcomp->type_kind = cl_abap_typedescr=>typekind_char
                     AND CAST cl_abap_elemdescr( lo_tcomp )->get_relative_name( ) = `SPRAS`.
@@ -1739,38 +1790,129 @@ CLASS z2ui5_cl_cgui_context IMPLEMENTATION.
         DATA(lo_tab) = cl_abap_tabledescr=>create( cl_abap_structdescr=>create( lt_comp ) ).
         CREATE DATA result TYPE HANDLE lo_tab.
         ASSIGN result->* TO <tab>.
-        SELECT (table-fields) FROM (table-table) INTO CORRESPONDING FIELDS OF TABLE @<tab> UP TO @max ROWS.
-
-        IF lv_text_field IS INITIAL OR <tab> IS INITIAL.
-          RETURN.
-        ENDIF.
-
-        DATA(lo_text_tab) = cl_abap_tabledescr=>create( cl_abap_structdescr=>create(
-            VALUE #( ( name = lv_key_field  type = CAST #( lo_text->get_component_type( lv_key_field ) ) )
-                     ( name = lv_text_field type = CAST #( lo_text->get_component_type( lv_text_field ) ) ) ) ) ).
-        CREATE DATA lr_text TYPE HANDLE lo_text_tab.
-        ASSIGN lr_text->* TO <texts>.
-        DATA(lt_fields) = VALUE string_table( ( lv_key_field ) ( lv_text_field ) ).
-        DATA(lv_where) = |{ lv_lang_field } = '{ sy-langu }'|.
-
-        SELECT (lt_fields) FROM (lv_text_table) WHERE (lv_where) INTO CORRESPONDING FIELDS OF TABLE @<texts>.
-
-        LOOP AT <tab> ASSIGNING <row>.
-          ASSIGN COMPONENT table-field OF STRUCTURE <row> TO <key>.
-          ASSIGN COMPONENT lv_text_field OF STRUCTURE <row> TO <cell>.
-          LOOP AT <texts> ASSIGNING FIELD-SYMBOL(<text>).
-            ASSIGN COMPONENT lv_key_field OF STRUCTURE <text> TO <tkey>.
-            IF <tkey> = <key>.
-              ASSIGN COMPONENT lv_text_field OF STRUCTURE <text> TO <ttext>.
-              <cell> = <ttext>.
-              EXIT.
-            ENDIF.
-          ENDLOOP.
-        ENDLOOP.
+        " the first rows by the key, not any - and those the user asked
+        " for with a pattern
+        lv_where = sql_like( column  = table-field
+                             pattern = pattern ).
+        SELECT (table-fields) FROM (table-table) WHERE (lv_where) ORDER BY (table-field)
+          INTO CORRESPONDING FIELDS OF TABLE @<tab> UP TO @max ROWS.
 
       CATCH cx_root.
         CLEAR result.
+        RETURN.
     ENDTRY.
+
+    IF lv_text_field IS INITIAL OR <tab> IS INITIAL.
+      RETURN.
+    ENDIF.
+
+    " the texts of the values read - not the whole text table - matched on
+    " every field the text table shares with the value table: a region's
+    " text belongs to its country too. Without them the values stay
+    TRY.
+        LOOP AT lo_text->get_components( ) REFERENCE INTO lr_tcomp.
+          IF lr_tcomp->name <> lv_lang_field AND lr_tcomp->name <> lv_text_field
+              AND line_exists( lt_comp[ name = lr_tcomp->name ] ).
+            INSERT CONV string( lr_tcomp->name ) INTO TABLE lt_join.
+            INSERT VALUE #( name = lr_tcomp->name
+                            type = CAST #( lr_tcomp->type ) ) INTO TABLE lt_text_comp.
+          ENDIF.
+        ENDLOOP.
+        IF NOT line_exists( lt_join[ table_line = lv_key_field ] ).
+          RETURN.
+        ENDIF.
+        INSERT VALUE #( name = lv_text_field
+                        type = CAST #( lo_text->get_component_type( lv_text_field ) ) ) INTO TABLE lt_text_comp.
+        DATA(lo_text_tab) = cl_abap_tabledescr=>create( cl_abap_structdescr=>create( lt_text_comp ) ).
+        CREATE DATA lr_text TYPE HANDLE lo_text_tab.
+        ASSIGN lr_text->* TO <texts>.
+        DATA(lt_fields) = lt_join.
+        INSERT lv_text_field INTO TABLE lt_fields.
+
+        " the key values as literals - a dynamic condition naming a host
+        " variable is written differently on 7.02 and in strict mode
+        LOOP AT <tab> ASSIGNING <row>.
+          ASSIGN COMPONENT table-field OF STRUCTURE <row> TO <key>.
+          DATA(lv_literal) = |'{ replace( val = |{ <key> }| sub = `'` with = `''` occ = 0 ) }'|.
+          IF NOT line_exists( lt_in[ table_line = lv_literal ] ).
+            INSERT lv_literal INTO TABLE lt_in.
+          ENDIF.
+        ENDLOOP.
+        lv_where = |{ lv_lang_field } = '{ sy-langu }' AND { lv_key_field } IN ( { concat_lines_of( table = lt_in sep = `, ` ) } )|.
+
+        SELECT (lt_fields) FROM (lv_text_table) WHERE (lv_where) INTO CORRESPONDING FIELDS OF TABLE @<texts>.
+
+        LOOP AT <texts> ASSIGNING FIELD-SYMBOL(<text>).
+          ASSIGN COMPONENT lv_text_field OF STRUCTURE <text> TO <ttext>.
+          INSERT VALUE #( key  = row_key( row    = <text>
+                                          fields = lt_join )
+                          text = <ttext> ) INTO TABLE lt_text_by_key.
+        ENDLOOP.
+        LOOP AT <tab> ASSIGNING <row>.
+          ASSIGN COMPONENT lv_text_field OF STRUCTURE <row> TO <cell>.
+          DATA(lv_row_key) = row_key( row    = <row>
+                                      fields = lt_join ).
+          READ TABLE lt_text_by_key INTO DATA(ls_text) WITH TABLE KEY key = lv_row_key.
+          IF sy-subrc = 0.
+            <cell> = ls_text-text.
+          ENDIF.
+        ENDLOOP.
+      CATCH cx_root ##NO_HANDLER.
+        " no texts - the values all the same
+    ENDTRY.
+
+  ENDMETHOD.
+
+  METHOD conv_alpha_in.
+
+    FIELD-SYMBOLS <char> TYPE c.
+
+    TRY.
+        DATA(lo_elem) = CAST cl_abap_elemdescr( cl_abap_typedescr=>describe_by_data( val ) ).
+        IF lo_elem->type_kind <> cl_abap_typedescr=>typekind_char OR lo_elem->is_ddic_type( ) = abap_false.
+          RETURN.
+        ENDIF.
+        IF lo_elem->get_ddic_field( )-convexit <> `ALPHA`.
+          RETURN.
+        ENDIF.
+        ASSIGN val TO <char>.
+        <char> = |{ <char> ALPHA = IN }|.
+      CATCH cx_root ##NO_HANDLER.
+        " no DDIC (ABAP Cloud, a type of the program) - no conversion
+    ENDTRY.
+
+  ENDMETHOD.
+
+  METHOD row_key.
+
+    DATA lt_value TYPE string_table.
+    FIELD-SYMBOLS <value> TYPE any.
+
+    LOOP AT fields INTO DATA(lv_field).
+      ASSIGN COMPONENT lv_field OF STRUCTURE row TO <value>.
+      IF sy-subrc = 0.
+        INSERT |{ <value> }| INTO TABLE lt_value.
+      ENDIF.
+    ENDLOOP.
+    result = concat_lines_of( table = lt_value sep = cl_abap_char_utilities=>horizontal_tab ).
+
+  ENDMETHOD.
+
+  METHOD sql_like.
+
+    DATA(lv_pattern) = condense( CONV string( pattern ) ).
+    IF lv_pattern NA `*+` OR column IS INITIAL.
+      RETURN.
+    ENDIF.
+    " the escape character first, then what LIKE reads as wildcards, then
+    " the wildcards of SAP GUI
+    lv_pattern = replace( val = lv_pattern sub = `#` with = `##` occ = 0 ).
+    lv_pattern = replace( val = lv_pattern sub = `%` with = `#%` occ = 0 ).
+    lv_pattern = replace( val = lv_pattern sub = `_` with = `#_` occ = 0 ).
+    lv_pattern = replace( val = lv_pattern sub = `'` with = `''` occ = 0 ).
+    lv_pattern = replace( val = lv_pattern sub = `*` with = `%` occ = 0 ).
+    lv_pattern = replace( val = lv_pattern sub = `+` with = `_` occ = 0 ).
+    result = |{ to_upper( column ) } LIKE '{ lv_pattern }' ESCAPE '#'|.
 
   ENDMETHOD.
 
