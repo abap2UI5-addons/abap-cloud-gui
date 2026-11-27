@@ -182,6 +182,20 @@ CLASS z2ui5_cl_cgui_range DEFINITION PUBLIC FINAL CREATE PRIVATE.
 
   PRIVATE SECTION.
 
+    "! val for a numeric cell as a move takes it: in the user's format
+    "! (1.234,50 - with the decimal character typed, the grouping
+    "! characters out and the decimal character a point); without the
+    "! decimal character as it is (1.5 stays 1.5). decimal and group are
+    "! the user's when not supplied
+    CLASS-METHODS number_text
+      IMPORTING
+        val           TYPE string
+        cell          TYPE any
+        decimal       TYPE string OPTIONAL
+        group         TYPE string OPTIONAL
+      RETURNING
+        VALUE(result) TYPE string.
+
     "! a value the cell - a date or a time - cannot take
     CLASS-METHODS value_invalid
       IMPORTING
@@ -388,6 +402,13 @@ CLASS z2ui5_cl_cgui_range IMPLEMENTATION.
       <comp> = ls_row-option.
       ASSIGN COMPONENT `LOW` OF STRUCTURE <line> TO <low>.
       ASSIGN COMPONENT `HIGH` OF STRUCTURE <line> TO <high>.
+      " a number as the user writes it (1,5 or 1.234,50)
+      IF ls_row-option <> `CP` AND ls_row-option <> `NP`.
+        ls_row-low = number_text( val  = ls_row-low
+                                  cell = <low> ).
+        ls_row-high = number_text( val  = ls_row-high
+                                   cell = <high> ).
+      ENDIF.
       TRY.
           IF ls_row-low IS NOT INITIAL.
             <low> = ls_row-low.
@@ -425,6 +446,55 @@ CLASS z2ui5_cl_cgui_range IMPLEMENTATION.
     ENDLOOP.
 
     range = <tab>.
+
+  ENDMETHOD.
+
+  METHOD number_text.
+
+    DATA lv_decimal TYPE string.
+    DATA lv_group   TYPE string.
+
+    result = val.
+    DATA(lv_kind) = z2ui5_cl_cgui_context=>rtti_get_type_kind( cell ).
+    IF val IS INITIAL OR NOT ( lv_kind = cl_abap_typedescr=>typekind_packed
+                            OR lv_kind = cl_abap_typedescr=>typekind_float
+                            OR lv_kind = cl_abap_typedescr=>typekind_decfloat16
+                            OR lv_kind = cl_abap_typedescr=>typekind_decfloat34
+                            OR lv_kind = cl_abap_typedescr=>typekind_int
+                            OR lv_kind = cl_abap_typedescr=>typekind_int1
+                            OR lv_kind = cl_abap_typedescr=>typekind_int2
+                            OR lv_kind = `8` ).
+      " `8`: typekind_int8, a constant lower releases do not have
+      RETURN.
+    ENDIF.
+
+    " the user's characters: 1.234,5 / 1,234.5 / 1 234,5
+    IF decimal IS SUPPLIED.
+      lv_decimal = decimal.
+      lv_group = group.
+    ELSE.
+      DATA(lv_sample) = |{ CONV decfloat34( `1234.5` ) NUMBER = USER DECIMALS = 1 }|.
+      DATA(lv_len) = strlen( lv_sample ).
+      IF lv_len >= 3.
+        lv_decimal = substring( val = lv_sample off = lv_len - 2 len = 1 ).
+      ENDIF.
+      IF lv_len = 7.
+        lv_group = substring( val = lv_sample off = 1 len = 1 ).
+      ENDIF.
+    ENDIF.
+
+    result = replace( val = result sub = ` ` with = `` occ = 0 ).
+    " without the decimal character the text is taken as it is - a value
+    " in the internal format (1.500) comes back unchanged
+    IF lv_decimal IS INITIAL OR lv_decimal = lv_group OR result NS lv_decimal.
+      RETURN.
+    ENDIF.
+    IF lv_group IS NOT INITIAL AND lv_group <> ` `.
+      result = replace( val = result sub = lv_group with = `` occ = 0 ).
+    ENDIF.
+    IF lv_decimal <> `.`.
+      result = replace( val = result sub = lv_decimal with = `.` occ = 0 ).
+    ENDIF.
 
   ENDMETHOD.
 

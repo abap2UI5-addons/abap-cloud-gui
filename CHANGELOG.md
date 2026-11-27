@@ -32,6 +32,9 @@ release.
   `YYYYMMDD` / `HHMMSS`, 12-hour times too); a plain move took the first
   eight characters (`05.01.20` of `05.01.2026`) and kept an invalid date.
   A value that is no date stays initial.
+- The multiple selection (a select-option, the ALV filter) takes a number
+  as the user writes it: `1,5` and `1.234,50` with a decimal comma were
+  refused as "enter a valid value".
 - report2UI5 no longer writes wrong code where it used to: `HIDE` is
   `list( )->hide( )` at the statement - the value when `HIDE` runs, not at
   the `WRITE` before it - and works for a table with a header line and in a

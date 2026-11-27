@@ -69,6 +69,9 @@ CLASS ltcl_client IMPLEMENTATION.
 ENDCLASS.
 
 
+CLASS ltcl_test DEFINITION DEFERRED.
+CLASS z2ui5_cl_cgui_range DEFINITION LOCAL FRIENDS ltcl_test.
+
 CLASS ltcl_test DEFINITION FINAL FOR TESTING
   DURATION SHORT
   RISK LEVEL HARMLESS.
@@ -99,11 +102,47 @@ CLASS ltcl_test DEFINITION FINAL FOR TESTING
     METHODS popup_add_delete_ok FOR TESTING.
     METHODS popup_f4_leaves FOR TESTING.
     METHODS popup_paste FOR TESTING.
+    METHODS numbers_in_user_format FOR TESTING.
 
 ENDCLASS.
 
 
 CLASS ltcl_test IMPLEMENTATION.
+
+  METHOD numbers_in_user_format.
+
+    DATA lv_amount TYPE p LENGTH 8 DECIMALS 2.
+
+    " a German user types 1,5 and 1.234,50; a value without the decimal
+    " character - an internal one such as 1.500 - is taken as it is
+    cl_abap_unit_assert=>assert_equals( exp = `1.5`
+                                        act = z2ui5_cl_cgui_range=>number_text( val     = `1,5`
+                                                                                cell    = lv_amount
+                                                                                decimal = `,`
+                                                                                group   = `.` ) ).
+    cl_abap_unit_assert=>assert_equals( exp = `1234.50`
+                                        act = z2ui5_cl_cgui_range=>number_text( val     = `1.234,50`
+                                                                                cell    = lv_amount
+                                                                                decimal = `,`
+                                                                                group   = `.` ) ).
+    cl_abap_unit_assert=>assert_equals( exp = `1.500`
+                                        act = z2ui5_cl_cgui_range=>number_text( val     = `1.500`
+                                                                                cell    = lv_amount
+                                                                                decimal = `,`
+                                                                                group   = `.` ) ).
+    " an English one 1,234.50; a text field keeps its commas
+    cl_abap_unit_assert=>assert_equals( exp = `1234.50`
+                                        act = z2ui5_cl_cgui_range=>number_text( val     = `1,234.50`
+                                                                                cell    = lv_amount
+                                                                                decimal = `.`
+                                                                                group   = `,` ) ).
+    cl_abap_unit_assert=>assert_equals( exp = `a,b`
+                                        act = z2ui5_cl_cgui_range=>number_text( val     = `a,b`
+                                                                                cell    = `text`
+                                                                                decimal = `,`
+                                                                                group   = `.` ) ).
+
+  ENDMETHOD.
 
   METHOD setup.
 
