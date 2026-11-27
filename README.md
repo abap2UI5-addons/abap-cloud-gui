@@ -44,7 +44,8 @@ What it is not:
   [report2UI5](#converting-existing-reports-report2ui5) does most of it.
 - **Not a SAP GUI clone.** It uses the classic *programming model*, the screens
   look like modern UI5. If you are looking for SE80, SE16N or SM37 in the
-  browser, that is [abap2UI5-addons/sapgui](https://github.com/abap2UI5-addons/sapgui).
+  browser, this is not it - for SE16N there is
+  [abap2UI5-addons/se16n](https://github.com/abap2UI5-addons/se16n).
 
 ## Installation
 
