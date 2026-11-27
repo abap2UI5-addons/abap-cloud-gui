@@ -343,12 +343,28 @@ CLASS z2ui5_cl_cgui_tree DEFINITION PUBLIC FINAL CREATE PUBLIC.
       RETURNING
         VALUE(result) TYPE string_table.
 
+    " the children of every node, by the row of mt_node - built once per
+    " view( ): a scan of all nodes per node grew with the square of a large
+    " tree
+    TYPES:
+      BEGIN OF ty_s_child,
+        parent TYPE i,
+        row    TYPE i,
+      END OF ty_s_child.
+    TYPES ty_t_child TYPE SORTED TABLE OF ty_s_child WITH NON-UNIQUE KEY parent row.
+    TYPES:
+      BEGIN OF ty_s_key_row,
+        key TYPE i,
+        row TYPE i,
+      END OF ty_s_key_row.
+
     METHODS view_add
       IMPORTING
-        parent TYPE i
-        level  TYPE i
+        parent   TYPE i
+        level    TYPE i
+        children TYPE ty_t_child
       CHANGING
-        rows   TYPE ty_t_view.
+        rows     TYPE ty_t_view.
 
     METHODS expand_branch
       IMPORTING
@@ -359,12 +375,6 @@ CLASS z2ui5_cl_cgui_tree DEFINITION PUBLIC FINAL CREATE PUBLIC.
       IMPORTING
         key TYPE i
         val TYPE abap_bool.
-
-    METHODS expandable
-      IMPORTING
-        node          TYPE ty_s_node
-      RETURNING
-        VALUE(result) TYPE abap_bool.
 
 ENDCLASS.
 
@@ -462,12 +472,6 @@ CLASS z2ui5_cl_cgui_tree IMPLEMENTATION.
       lr_node->lazy = abap_false.
       lr_node->folder = abap_true.
     ENDIF.
-
-  ENDMETHOD.
-
-  METHOD expandable.
-
-    result = xsdbool( has_children( node-key ) = abap_true OR node-lazy = abap_true ).
 
   ENDMETHOD.
 
@@ -610,13 +614,23 @@ CLASS z2ui5_cl_cgui_tree IMPLEMENTATION.
 
   METHOD sync.
 
+    DATA lt_row TYPE HASHED TABLE OF ty_s_key_row WITH UNIQUE KEY key.
+
     IF mv_checkbox = abap_false.
       RETURN.
     ENDIF.
-    " only the nodes shown - a collapsed branch keeps its ticks
+    " only the nodes shown - a collapsed branch keeps its ticks; the rows of
+    " the keys once, not a scan of the nodes per row
+    LOOP AT mt_node INTO DATA(ls_node).
+      DATA(lv_row) = sy-tabix.
+      " the first node of a key, as READ TABLE finds it
+      INSERT VALUE #( key = ls_node-key
+                      row = lv_row ) INTO TABLE lt_row.
+    ENDLOOP.
     LOOP AT view INTO DATA(ls_row).
-      READ TABLE mt_node REFERENCE INTO DATA(lr_node) WITH KEY key = ls_row-key.
+      READ TABLE lt_row INTO DATA(ls_key) WITH TABLE KEY key = ls_row-key.
       IF sy-subrc = 0.
+        READ TABLE mt_node REFERENCE INTO DATA(lr_node) INDEX ls_key-row.
         lr_node->checked = ls_row-checked.
       ENDIF.
     ENDLOOP.
@@ -723,9 +737,17 @@ CLASS z2ui5_cl_cgui_tree IMPLEMENTATION.
 
   METHOD view.
 
-    view_add( EXPORTING parent = 0
-                        level  = 0
-              CHANGING  rows   = result ).
+    DATA lt_child TYPE ty_t_child.
+
+    LOOP AT mt_node INTO DATA(ls_node).
+      DATA(lv_row) = sy-tabix.
+      INSERT VALUE #( parent = ls_node-parent
+                      row    = lv_row ) INTO TABLE lt_child.
+    ENDLOOP.
+    view_add( EXPORTING parent   = 0
+                        level    = 0
+                        children = lt_child
+              CHANGING  rows     = result ).
 
   ENDMETHOD.
 
@@ -734,9 +756,10 @@ CLASS z2ui5_cl_cgui_tree IMPLEMENTATION.
     DATA lv_cell_no TYPE ty_cell_no.
     FIELD-SYMBOLS <cell> TYPE string.
 
-    LOOP AT mt_node INTO DATA(ls_node) WHERE parent = parent.
-      DATA(lv_children) = has_children( ls_node-key ).
-      DATA(lv_expandable) = expandable( ls_node ).
+    LOOP AT children INTO DATA(ls_child) WHERE parent = parent.
+      READ TABLE mt_node INTO DATA(ls_node) INDEX ls_child-row.
+      DATA(lv_children) = xsdbool( line_exists( children[ parent = ls_node-key ] ) ).
+      DATA(lv_expandable) = xsdbool( lv_children = abap_true OR ls_node-lazy = abap_true ).
       " open: expanded with children - a lazy node waits for its first expand
       DATA(lv_open) = xsdbool( lv_children = abap_true AND ls_node-expanded = abap_true ).
       DATA(ls_row) = VALUE ty_s_view(
@@ -765,9 +788,10 @@ CLASS z2ui5_cl_cgui_tree IMPLEMENTATION.
       INSERT ls_row INTO TABLE rows.
 
       IF lv_children = abap_true AND ls_node-expanded = abap_true.
-        view_add( EXPORTING parent = ls_node-key
-                            level  = level + 1
-                  CHANGING  rows   = rows ).
+        view_add( EXPORTING parent   = ls_node-key
+                            level    = level + 1
+                            children = children
+                  CHANGING  rows     = rows ).
       ENDIF.
     ENDLOOP.
 
