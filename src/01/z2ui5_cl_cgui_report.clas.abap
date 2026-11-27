@@ -1629,7 +1629,11 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
       RETURNING
         VALUE(result) TYPE abap_bool.
 
+    "! every required field of fields filled - one message at each empty
+    "! one; without fields the ones of the selection screen
     METHODS check_obligatory
+      IMPORTING
+        fields        TYPE z2ui5_cl_cgui_selscreen=>ty_t_field OPTIONAL
       RETURNING
         VALUE(result) TYPE abap_bool.
 
@@ -5382,7 +5386,8 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
     FIELD-SYMBOLS <field_val> TYPE any.
 
     result = abap_true.
-    LOOP AT mt_cgui_field REFERENCE INTO DATA(lr_field) WHERE obligatory = abap_true.
+    DATA(lt_field) = COND #( WHEN fields IS SUPPLIED THEN fields ELSE mt_cgui_field ).
+    LOOP AT lt_field REFERENCE INTO DATA(lr_field) WHERE obligatory = abap_true.
       DATA(lr_val) = attri_assign( lr_field->name ).
       IF lr_val IS NOT BOUND.
         CONTINUE.
@@ -6569,22 +6574,9 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
   METHOD on_screen_ok.
 
     " the required fields of the popup screen, then the report decides
-    FIELD-SYMBOLS <field_val> TYPE any.
-
-    LOOP AT mt_cgui_dynnr_field REFERENCE INTO DATA(lr_field) WHERE obligatory = abap_true.
-      DATA(lr_val) = attri_assign( lr_field->name ).
-      IF lr_val IS NOT BOUND.
-        CONTINUE.
-      ENDIF.
-      ASSIGN lr_val->* TO <field_val>.
-      IF <field_val> IS INITIAL.
-        message( text = replace( val  = 'Fill in the required field &1'(023)
-                                 sub  = `&1`
-                                 with = lr_field->text )
-                 type = `E` ).
-        RETURN.
-      ENDIF.
-    ENDLOOP.
+    IF check_obligatory( mt_cgui_dynnr_field ) = abap_false.
+      RETURN.
+    ENDIF.
 
     DATA(lv_dynnr) = mv_cgui_dynnr.
     CLEAR mv_cgui_dynnr.
