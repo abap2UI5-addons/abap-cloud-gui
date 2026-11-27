@@ -1496,12 +1496,6 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
         action          TYPE clike
         values          TYPE z2ui5_cl_cgui_variant=>ty_t_value.
 
-    METHODS json_escape
-      IMPORTING
-        val           TYPE clike
-      RETURNING
-        VALUE(result) TYPE string.
-
     "! the values of the selection screen kept as the draft, when they
     "! changed since it was kept last
     METHODS draft_keep.
@@ -6726,22 +6720,15 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
       ENDIF.
       INSERT ls_value-name INTO TABLE lt_name.
       lv_params = |{ lv_params }{ COND #( WHEN lv_params IS NOT INITIAL THEN `,` ) }| &&
-                  |"{ json_escape( ls_value-name ) }":"{ json_escape( ls_value-low ) }"|.
+                  |"{ z2ui5_cl_cgui_variant=>json_escape( ls_value-name ) }":"{ z2ui5_cl_cgui_variant=>json_escape( ls_value-low ) }"|.
     ENDLOOP.
 
     mv_cgui_nav = abap_true.
     client->follow_up_action(
         val   = client->cs_event-cross_app_nav_to_ext
-        t_arg = VALUE #( ( |\{"semanticObject":"{ json_escape( semantic_object ) }",| &&
-                           |"action":"{ json_escape( COND string( WHEN action IS INITIAL THEN `display` ELSE action ) ) }"\}| )
+        t_arg = VALUE #( ( |\{"semanticObject":"{ z2ui5_cl_cgui_variant=>json_escape( CONV #( semantic_object ) ) }",| &&
+                           |"action":"{ z2ui5_cl_cgui_variant=>json_escape( COND string( WHEN action IS INITIAL THEN `display` ELSE action ) ) }"\}| )
                          ( |\{{ lv_params }\}| ) ) ).
-
-  ENDMETHOD.
-
-  METHOD json_escape.
-
-    result = replace( val = val sub = `\` with = `\\` occ = 0 ).
-    result = replace( val = result sub = `"` with = `\"` occ = 0 ).
 
   ENDMETHOD.
 
