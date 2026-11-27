@@ -2751,6 +2751,22 @@ CLASS ltcl_test IMPLEMENTATION.
     cl_abap_unit_assert=>assert_true( mo_client->mv_left ).
     CLEAR mo_client->mv_event.
 
+    " a required multi listbox: what is picked counts, not the value
+    DATA(lo_values) = z2ui5_cl_cgui_popup=>get_values(
+        fields  = VALUE #( ( name = `CARRIERS` text = `Carriers` kind = z2ui5_cl_cgui_popup=>cs_kind-multi required = abap_true ) )
+        listbox = VALUE #( ( name = `CARRIERS` key = `LH` text = `Lufthansa` ) )
+        event   = `PICKED` ).
+    " the popup binds its own attributes
+    mo_client->mo_app = lo_values.
+    mo_client->mv_left = abap_false.
+    mo_client->mv_event = `CGUI_POP_OK`.
+    lo_values->z2ui5_if_app~main( mo_client ).
+    cl_abap_unit_assert=>assert_false( mo_client->mv_left ).
+    lo_values->mt_field[ 1 ]-keys = VALUE #( ( `LH` ) ).
+    lo_values->z2ui5_if_app~main( mo_client ).
+    cl_abap_unit_assert=>assert_true( mo_client->mv_left ).
+    CLEAR mo_client->mv_event.
+    mo_client->mo_app = mo_report.
 
     mo_report->s_code = VALUE #( ( sign = `I` option = `EQ` low = `A` ) ).
     mo_cut->mv_cgui_value_field = `S_CODE`.

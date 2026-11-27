@@ -237,6 +237,9 @@ release.
 - `popup_to_decide_list( )` leaves out the lines of its SPOPLI table with
   HIDE or INACTIVE - they were offered and could be picked; the answer is
   still the line of the table.
+- `z2ui5_cl_cgui_popup=>get_values( )`: a required multi listbox can be
+  confirmed - the check read its value, which a multi listbox never has,
+  and not the keys picked.
 
 **The value help and table controls in windows too**
 
