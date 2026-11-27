@@ -86,6 +86,8 @@ CLASS z2ui5_cl_cgui_selscreen DEFINITION PUBLIC FINAL CREATE PRIVATE.
         matchcode    TYPE string,
         entity       TYPE string,
         entity_elem  TYPE string,
+        "! shown but not ready for input (read_only, screen-input = 0)
+        read_only    TYPE abap_bool,
       END OF ty_s_field.
 
     TYPES:
@@ -1187,7 +1189,8 @@ CLASS z2ui5_cl_cgui_selscreen IMPLEMENTATION.
                       group        = COND #( WHEN lr_item->kind = cs_kind-radiobutton THEN lr_item->group )
                       matchcode    = lr_item->matchcode
                       entity       = lr_item->entity
-                      entity_elem  = lr_item->entity_elem ) INTO TABLE result.
+                      entity_elem  = lr_item->entity_elem
+                      read_only    = lr_item->read_only ) INTO TABLE result.
     ENDLOOP.
 
   ENDMETHOD.

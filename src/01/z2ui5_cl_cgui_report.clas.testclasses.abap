@@ -83,6 +83,8 @@ CLASS ltcl_report DEFINITION INHERITING FROM z2ui5_cl_cgui_report FINAL.
     DATA p_hidden    TYPE c LENGTH 1.
     DATA s_date      TYPE RANGE OF d.
     DATA s_code      TYPE RANGE OF ty_c4.
+    " NO-DISPLAY - a switch only SUBMIT sets
+    DATA s_hidden    TYPE RANGE OF ty_c4.
     DATA mt_row      TYPE ty_t_row.
     DATA mv_alv      TYPE abap_bool.
     " SET PF-STATUS in START-OF-SELECTION - the status of the list
@@ -392,6 +394,8 @@ CLASS ltcl_report IMPLEMENTATION.
                           text = `Date`
         )->select_option( val  = s_code
                           text = `Code`
+        )->select_option( val        = s_hidden
+                          no_display = abap_true
         )->parameter( val                = p_var
                       text               = `Report of a variant`
                       value_help_entity  = `Z2UI5_T_19`
@@ -1768,6 +1772,14 @@ CLASS ltcl_test IMPLEMENTATION.
 
     event( name = z2ui5_cl_cgui_selscreen=>cs_event-value_request
            args = VALUE #( ( `MV_SECRET` ) ) ).
+    cl_abap_unit_assert=>assert_not_bound( mo_client->mo_called ).
+
+    " nor does a NO-DISPLAY field, or a parameter named as a select-option
+    event( name = z2ui5_cl_cgui_selscreen=>cs_event-select_option
+           args = VALUE #( ( `S_HIDDEN` ) ) ).
+    cl_abap_unit_assert=>assert_not_bound( mo_client->mo_called ).
+    event( name = z2ui5_cl_cgui_selscreen=>cs_event-select_option
+           args = VALUE #( ( `P_CARRID` ) ) ).
     cl_abap_unit_assert=>assert_not_bound( mo_client->mo_called ).
 
     " a field of the screen still does

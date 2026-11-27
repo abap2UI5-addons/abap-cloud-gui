@@ -1587,9 +1587,12 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
 
     "! abap_true when field is a field of the selection screen or of the
     "! popup screen - the attribute name an event argument carries
+    "! a field of the screen the user sees and may change - of kind
+    "! (z2ui5_cl_cgui_selscreen=>cs_field_kind) when given
     METHODS screen_field_check
       IMPORTING
         field         TYPE string
+        kind          TYPE string OPTIONAL
       RETURNING
         VALUE(result) TYPE abap_bool.
 
@@ -3625,7 +3628,8 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
       " the argument names the attribute - from the browser, so only a field
       " of the screen, never another attribute of the class
       WHEN z2ui5_cl_cgui_selscreen=>cs_event-select_option.
-        IF screen_field_check( client->get_event_arg( ) ) = abap_true.
+        IF screen_field_check( field = client->get_event_arg( )
+                               kind  = z2ui5_cl_cgui_selscreen=>cs_field_kind-select_option ) = abap_true.
           on_range_popup( client->get_event_arg( ) ).
         ENDIF.
 
@@ -4248,10 +4252,22 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
 
   METHOD screen_field_check.
 
+    " a NO-DISPLAY field (a switch SUBMIT sets), a field not ready for input
+    " or a parameter named as a select-option is no target of the browser
     DATA(lv_name) = to_upper( field ).
-    result = xsdbool( lv_name IS NOT INITIAL
-                      AND ( line_exists( mt_cgui_field[ name = lv_name ] )
-                         OR line_exists( mt_cgui_dynnr_field[ name = lv_name ] ) ) ).
+    IF lv_name IS INITIAL.
+      RETURN.
+    ENDIF.
+    READ TABLE mt_cgui_field INTO DATA(ls_field) WITH KEY name = lv_name.
+    IF sy-subrc <> 0.
+      READ TABLE mt_cgui_dynnr_field INTO ls_field WITH KEY name = lv_name.
+      IF sy-subrc <> 0.
+        RETURN.
+      ENDIF.
+    ENDIF.
+    result = xsdbool( ls_field-shown = abap_true AND ls_field-no_display = abap_false
+                      AND ls_field-read_only = abap_false
+                      AND ( kind IS INITIAL OR ls_field-kind = kind ) ).
 
   ENDMETHOD.
 

@@ -214,6 +214,11 @@ release.
   no data" follow the dynpro and the answer, instead of running before them
   or never. `popup_to_confirm( )` and `popup_transport( )` without `then`
   answer a run too.
+- The multiple selection and the F4 of the selection screen refuse a field
+  the user cannot change - NO-DISPLAY (a switch SUBMIT sets) or not ready
+  for input - and the multiple selection a parameter, as the URL does: a
+  crafted event set such a field, or ended in an assignment error.
+  `z2ui5_cl_cgui_selscreen=>ty_s_field` has `read_only`.
 
 **The value help and table controls in windows too**
 
