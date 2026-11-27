@@ -240,6 +240,13 @@ release.
 - `z2ui5_cl_cgui_popup=>get_values( )`: a required multi listbox can be
   confirmed - the check read its value, which a multi listbox never has,
   and not the keys picked.
+- The CL_SALV_TABLE stand-in passes the sorts (`add_sort( )`, with their
+  subtotals), the totals (`add_aggregation( )`), the column order
+  (`set_column_position( )`), `set_zero( )`, `set_alignment( )` and the
+  tooltip of a column on to the grid - they were taken without effect, so
+  a kept SALV showed no totals and no initial sort. A minimum, maximum or
+  average and `set_color_column( )` still have no counterpart. The field
+  catalog of the ALV reads TOOLTIP.
 
 **The value help and table controls in windows too**
 

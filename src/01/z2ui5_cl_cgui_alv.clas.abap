@@ -698,7 +698,7 @@ CLASS z2ui5_cl_cgui_alv DEFINITION PUBLIC FINAL CREATE PUBLIC.
     "! the classic field catalog - SLIS_T_FIELDCAT_ALV of REUSE_ALV_* or
     "! LVC_T_FCAT of the LVC functions and CL_GUI_ALV_GRID, read by the names
     "! of its fields: texts, NO_OUT, TECH, DO_SUM, HOTSPOT, KEY, EDIT,
-    "! OUTPUTLEN, COL_POS, ICON, CFIELDNAME, QFIELDNAME, NO_ZERO, JUST
+    "! OUTPUTLEN, COL_POS, ICON, CFIELDNAME, QFIELDNAME, NO_ZERO, JUST, TOOLTIP
     METHODS set_fieldcat
       IMPORTING
         fieldcat      TYPE ANY TABLE
@@ -1868,6 +1868,13 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
           set_column_alignment( name  = lv_name
                                 align = cs_align-left ).
       ENDCASE.
+
+      DATA(lv_tooltip) = classic_value( row  = <fcat>
+                                        name = `TOOLTIP` ).
+      IF lv_tooltip IS NOT INITIAL.
+        set_column_tooltip( name = lv_name
+                            text = lv_tooltip ).
+      ENDIF.
     ENDLOOP.
     result = me.
 

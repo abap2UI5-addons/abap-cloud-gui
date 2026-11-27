@@ -484,7 +484,7 @@ export const GUI = {
     },
     z2ui5_cl_cgui_salv_column: {
       constants: [],
-      attributes: ["mv_name", "mv_long", "mv_medium", "mv_short", "mv_hidden", "mv_technical", "mv_hotspot", "mv_key", "mv_length", "mv_tooltip"],
+      attributes: ["mv_name", "mv_long", "mv_medium", "mv_short", "mv_hidden", "mv_technical", "mv_hotspot", "mv_key", "mv_length", "mv_tooltip", "mv_no_zero", "mv_just"],
       events: [],
       methods: {
         constructor: { params: ["name"],
@@ -651,7 +651,7 @@ export const GUI = {
     },
     z2ui5_cl_cgui_salv_config: {
       constants: [],
-      attributes: ["mv_title", "mv_striped", "mv_selection_mode", "mt_function", "mv_header", "mv_hierarchy_header"],
+      attributes: ["mv_title", "mv_striped", "mv_selection_mode", "mt_function", "mt_sort", "mt_aggregation", "mv_header", "mv_hierarchy_header"],
       events: [],
       methods: {
         set_grid: { params: ["grid"],

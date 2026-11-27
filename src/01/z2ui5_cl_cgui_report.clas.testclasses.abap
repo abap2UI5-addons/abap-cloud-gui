@@ -271,6 +271,7 @@ CLASS ltcl_test DEFINITION FINAL FOR TESTING
     METHODS user_command_secondary_list FOR TESTING.
     METHODS empty_list_restarts FOR TESTING.
     METHODS screen_as_window_checks FOR TESTING.
+    METHODS salv_sorts_and_totals FOR TESTING.
     METHODS popup_in_the_run FOR TESTING.
     METHODS leave_during_the_run FOR TESTING.
     METHODS file_upload_and_download FOR TESTING.
@@ -1110,6 +1111,32 @@ CLASS ltcl_test IMPLEMENTATION.
                                         exp = 2 ).
     cl_abap_unit_assert=>assert_equals( act = mo_report->p_carrid
                                         exp = `LH` ).
+
+  ENDMETHOD.
+
+  METHOD salv_sorts_and_totals.
+
+    DATA lo_salv TYPE REF TO z2ui5_cl_cgui_salv_table.
+
+    init( ).
+    mo_report->mt_row = VALUE #( ( carrid = `LH` seats = 1 ) ( carrid = `AA` seats = 2 ) ( carrid = `LH` seats = 4 ) ).
+    " cl_salv_table: a total, a sort with subtotals, a column moved
+    z2ui5_cl_cgui_salv_table=>factory( IMPORTING r_salv_table = lo_salv
+                                       CHANGING  t_table      = mo_report->mt_row ).
+    lo_salv->get_aggregations( )->add_aggregation( 'SEATS' ).
+    lo_salv->get_sorts( )->add_sort( columnname = 'CARRID'
+                                     subtotal   = abap_true ).
+    lo_salv->get_columns( )->set_column_position( columnname = 'SEATS'
+                                                  position   = 1 ).
+    lo_salv->display( ).
+
+    cl_abap_unit_assert=>assert_bound( mo_cut->mo_cgui_alv ).
+    DATA(lt_layout) = mo_cut->mo_cgui_alv->get_layout( mo_report->mt_row ).
+    cl_abap_unit_assert=>assert_equals( act = lt_layout[ 1 ]-name
+                                        exp = `SEATS` ).
+    cl_abap_unit_assert=>assert_true( lt_layout[ name = `SEATS` ]-sum ).
+    cl_abap_unit_assert=>assert_not_initial( lt_layout[ name = `CARRID` ]-sort ).
+    cl_abap_unit_assert=>assert_true( lt_layout[ name = `CARRID` ]-subtotal ).
 
   ENDMETHOD.
 

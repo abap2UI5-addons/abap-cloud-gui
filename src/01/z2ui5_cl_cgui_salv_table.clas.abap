@@ -164,8 +164,23 @@ CLASS z2ui5_cl_cgui_salv_table DEFINITION PUBLIC
         hotspot   TYPE abap_bool,
         key       TYPE abap_bool,
         outputlen TYPE i,
+        do_sum    TYPE abap_bool,
+        no_zero   TYPE abap_bool,
+        col_pos   TYPE i,
+        tooltip   TYPE string,
+        just      TYPE c LENGTH 1,
       END OF ty_s_fcat.
     TYPES ty_t_fcat TYPE STANDARD TABLE OF ty_s_fcat WITH EMPTY KEY.
+    TYPES:
+      "! LVC_S_SORT - what set_sort_classic( ) of the grid reads
+      BEGIN OF ty_s_sort,
+        spos      TYPE i,
+        fieldname TYPE string,
+        up        TYPE abap_bool,
+        down      TYPE abap_bool,
+        subtot    TYPE abap_bool,
+      END OF ty_s_sort.
+    TYPES ty_t_sort TYPE STANDARD TABLE OF ty_s_sort WITH EMPTY KEY.
     TYPES:
       BEGIN OF ty_s_layout,
         grid_title TYPE string,
@@ -244,10 +259,27 @@ CLASS z2ui5_cl_cgui_salv_table IMPLEMENTATION.
                                WHEN z2ui5_if_cgui_salv_c=>selection_mode-single THEN `B`
                                ELSE `A` ) ).
     DATA(lt_fcat) = fieldcat( ).
-    mo_grid->set_table_for_first_display( EXPORTING  is_layout       = ls_layout
-                                          CHANGING   it_outtab       = <table>
-                                                     it_fieldcatalog = lt_fcat
-                                          EXCEPTIONS OTHERS          = 1 ).
+    " the sorts added - with them the subtotals
+    DATA(lt_sort) = VALUE ty_t_sort( ).
+    LOOP AT mo_settings->mt_sort INTO DATA(ls_sort).
+      INSERT VALUE #( spos      = sy-tabix
+                      fieldname = ls_sort-columnname
+                      up        = xsdbool( ls_sort-descending = abap_false )
+                      down      = ls_sort-descending
+                      subtot    = ls_sort-subtotal ) INTO TABLE lt_sort.
+    ENDLOOP.
+    IF lt_sort IS INITIAL.
+      mo_grid->set_table_for_first_display( EXPORTING  is_layout       = ls_layout
+                                            CHANGING   it_outtab       = <table>
+                                                       it_fieldcatalog = lt_fcat
+                                            EXCEPTIONS OTHERS          = 1 ).
+    ELSE.
+      mo_grid->set_table_for_first_display( EXPORTING  is_layout       = ls_layout
+                                            CHANGING   it_outtab       = <table>
+                                                       it_fieldcatalog = lt_fcat
+                                                       it_sort         = lt_sort
+                                            EXCEPTIONS OTHERS          = 1 ).
+    ENDIF.
     IF sy-subrc <> 0.
       RETURN.
     ENDIF.
@@ -267,7 +299,9 @@ CLASS z2ui5_cl_cgui_salv_table IMPLEMENTATION.
 
   METHOD fieldcat.
 
+    " the columns in the order of get( ) - set_column_position( ) moves them
     LOOP AT mo_columns->get( ) INTO DATA(ls_ref).
+      DATA(lv_position) = sy-tabix.
       DATA(lo_column) = ls_ref-r_column.
       INSERT VALUE #( fieldname = lo_column->mv_name
                       scrtext_l = lo_column->get_text( )
@@ -275,7 +309,12 @@ CLASS z2ui5_cl_cgui_salv_table IMPLEMENTATION.
                       tech      = lo_column->mv_technical
                       hotspot   = lo_column->mv_hotspot
                       key       = lo_column->mv_key
-                      outputlen = lo_column->mv_length ) INTO TABLE result.
+                      outputlen = lo_column->mv_length
+                      do_sum    = xsdbool( line_exists( mo_settings->mt_aggregation[ table_line = lo_column->mv_name ] ) )
+                      no_zero   = lo_column->mv_no_zero
+                      col_pos   = lv_position
+                      tooltip   = lo_column->mv_tooltip
+                      just      = lo_column->mv_just ) INTO TABLE result.
     ENDLOOP.
 
   ENDMETHOD.

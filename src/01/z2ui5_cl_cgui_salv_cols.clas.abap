@@ -108,7 +108,21 @@ CLASS z2ui5_cl_cgui_salv_cols IMPLEMENTATION.
   METHOD set_headers_visible ##NEEDED.
   ENDMETHOD.
 
-  METHOD set_column_position ##NEEDED.
+  METHOD set_column_position.
+
+    " the order of get( ) is the order of the columns of the grid
+    DATA(lv_name) = to_upper( condense( columnname ) ).
+    READ TABLE mt_column INTO DATA(ls_column) WITH KEY columnname = lv_name.
+    IF sy-subrc <> 0 OR position < 1.
+      RETURN.
+    ENDIF.
+    DELETE mt_column INDEX sy-tabix.
+    IF position > lines( mt_column ).
+      INSERT ls_column INTO TABLE mt_column.
+    ELSE.
+      INSERT ls_column INTO mt_column INDEX position.
+    ENDIF.
+
   ENDMETHOD.
 
 ENDCLASS.
