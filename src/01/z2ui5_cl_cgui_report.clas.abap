@@ -4055,10 +4055,7 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
   METHOD input_sync.
 
     FIELD-SYMBOLS <range> TYPE STANDARD TABLE.
-    FIELD-SYMBOLS <line>  TYPE any.
-    FIELD-SYMBOLS <comp>  TYPE any.
     FIELD-SYMBOLS <field_val>   TYPE clike.
-    DATA lr_line TYPE REF TO data.
 
     IF mv_cgui_screen <> cs_screen-selection.
       RETURN.
@@ -4083,24 +4080,13 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
       IF lr_so->low IS INITIAL AND lr_so->high IS INITIAL.
         CONTINUE.
       ENDIF.
-      CREATE DATA lr_line LIKE LINE OF <range>.
-      ASSIGN lr_line->* TO <line>.
       TRY.
-          ASSIGN COMPONENT `SIGN` OF STRUCTURE <line> TO <comp>.
-          <comp> = `I`.
-          ASSIGN COMPONENT `OPTION` OF STRUCTURE <line> TO <comp>.
-          IF lr_so->high IS NOT INITIAL.
-            <comp> = `BT`.
-          ELSEIF lr_so->low CA `*+`.
-            <comp> = `CP`.
-          ELSE.
-            <comp> = `EQ`.
-          ENDIF.
-          ASSIGN COMPONENT `LOW` OF STRUCTURE <line> TO <comp>.
-          <comp> = lr_so->low.
-          ASSIGN COMPONENT `HIGH` OF STRUCTURE <line> TO <comp>.
-          <comp> = lr_so->high.
-          INSERT <line> INTO TABLE <range>.
+          z2ui5_cl_cgui_range=>line_append( EXPORTING option = COND #( WHEN lr_so->high IS NOT INITIAL THEN `BT`
+                                                                       WHEN lr_so->low CA `*+` THEN `CP`
+                                                                       ELSE `EQ` )
+                                                      low    = lr_so->low
+                                                      high   = lr_so->high
+                                            CHANGING  range  = <range> ).
         CATCH cx_sy_conversion_error.
           message( text  = replace( val  = 'Enter a valid value for &1'(008)
                                     sub  = `&1`
@@ -5767,11 +5753,9 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
     FIELD-SYMBOLS <value> TYPE any.
     FIELD-SYMBOLS <range> TYPE STANDARD TABLE.
     FIELD-SYMBOLS <line>  TYPE any.
-    FIELD-SYMBOLS <comp>  TYPE any.
     FIELD-SYMBOLS <keep>  TYPE STANDARD TABLE.
     FIELD-SYMBOLS <sign>  TYPE any.
     FIELD-SYMBOLS <opt>   TYPE any.
-    DATA lr_line TYPE REF TO data.
     DATA lr_keep TYPE REF TO data.
     DATA lr_row  TYPE REF TO data.
 
@@ -5807,16 +5791,8 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
         CONTINUE.
       ENDIF.
       ASSIGN lr_value->* TO <value>.
-
-      CREATE DATA lr_line LIKE LINE OF <range>.
-      ASSIGN lr_line->* TO <line>.
-      ASSIGN COMPONENT `SIGN` OF STRUCTURE <line> TO <comp>.
-      <comp> = `I`.
-      ASSIGN COMPONENT `OPTION` OF STRUCTURE <line> TO <comp>.
-      <comp> = `EQ`.
-      ASSIGN COMPONENT `LOW` OF STRUCTURE <line> TO <comp>.
-      <comp> = <value>.
-      INSERT <line> INTO TABLE <range>.
+      z2ui5_cl_cgui_range=>line_append( EXPORTING low   = <value>
+                                        CHANGING  range = <range> ).
     ENDLOOP.
 
   ENDMETHOD.
