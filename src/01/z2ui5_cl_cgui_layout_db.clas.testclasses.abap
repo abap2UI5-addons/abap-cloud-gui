@@ -53,6 +53,8 @@ CLASS ltcl_test IMPLEMENTATION.
 
     DATA(lv_report) = CONV z2ui5_t_18-report( cv_report ).
     DELETE FROM z2ui5_t_18 WHERE report = @lv_report.
+    " the store commits its writes, so the cleanup commits too
+    COMMIT WORK.
 
   ENDMETHOD.
 

@@ -8,6 +8,12 @@ release.
 
 **Fixes**
 
+- Selection variants, ALV layouts, the default layout and the SU3 / SPRO
+  parameters are saved and deleted for good: abap2UI5 rolls back what an
+  app leaves open after `main( )`, and the two stores never committed. The
+  report runtime now commits at the end of every roundtrip, as the classic
+  implicit commit at the end of a dialog step does, so a report's own
+  database changes are kept too - not after a message of type `A` or `X`.
 - report2UI5 no longer writes wrong code where it used to: `HIDE` is
   `list( )->hide( )` at the statement - the value when `HIDE` runs, not at
   the `WRITE` before it - and works for a table with a header line and in a

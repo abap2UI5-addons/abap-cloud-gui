@@ -217,6 +217,16 @@ the popover, and a click on it puts the cursor into the field. Fields
 declared `obligatory` are checked before `at_selection_screen`, each empty
 one with a message of its own.
 
+**Database changes are committed at the end of every roundtrip**, as the
+classic implicit commit at the end of a dialog step does: abap2UI5 rolls
+back what an app that is not stateful leaves open after `main( )`, so the
+report runtime runs `COMMIT WORK` once the event blocks of the roundtrip are
+done - unless a message of type `A` or `X` was raised, which rolls the step
+back as in SAP GUI, and an exception, after which abap2UI5 rolls back. Unlike
+the implicit database commit of SAP GUI it is a `COMMIT WORK`: function
+modules registered `IN UPDATE TASK` and `PERFORM ... ON COMMIT` run with it.
+The variant and layout stores commit their own writes.
+
 The short API, in the style of abap2UI5, says the same in fewer words, and
 its calls chain:
 

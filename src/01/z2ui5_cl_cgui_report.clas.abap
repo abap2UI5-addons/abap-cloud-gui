@@ -2140,6 +2140,15 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
     messages_display( ).
     cgui_statics_keep( ).
 
+    " the end of the dialog step: a classic report's database changes are
+    " committed here implicitly, and abap2UI5 rolls back what an app that is
+    " not stateful leaves open after main( ) - so the report commits, unless
+    " a termination message (A, X) rolled the step back as it does in SAP GUI.
+    " An exception never gets here: abap2UI5 rolls the LUW back
+    IF NOT line_exists( mt_cgui_msg[ type = `A` ] ) AND NOT line_exists( mt_cgui_msg[ type = `X` ] ).
+      COMMIT WORK.
+    ENDIF.
+
   ENDMETHOD.
 
   METHOD z2ui5_if_cgui_gui~list.

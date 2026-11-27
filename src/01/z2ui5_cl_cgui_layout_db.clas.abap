@@ -164,6 +164,8 @@ CLASS z2ui5_cl_cgui_layout_db IMPLEMENTATION.
     ENDIF.
 
     MODIFY z2ui5_t_18 FROM @ls_db.
+    " abap2UI5 rolls back what an app leaves open after its main( )
+    COMMIT WORK.
 
   ENDMETHOD.
 
@@ -187,6 +189,7 @@ CLASS z2ui5_cl_cgui_layout_db IMPLEMENTATION.
     ENDIF.
 
     DELETE FROM z2ui5_t_18 WHERE report = @lv_report AND handle = @lv_handle AND layout = @lv_name.
+    COMMIT WORK.
 
   ENDMETHOD.
 
