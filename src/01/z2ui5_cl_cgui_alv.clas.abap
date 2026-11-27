@@ -1750,9 +1750,12 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
         CONTINUE.
       ENDIF.
 
-      " the longest text there is
-      LOOP AT VALUE string_table( ( `SCRTEXT_L` ) ( `SELTEXT_L` ) ( `COLTEXT` ) ( `REPTEXT` ) ( `REPTEXT_DDIC` )
-                                  ( `SCRTEXT_M` ) ( `SELTEXT_M` ) ( `SCRTEXT_S` ) ( `SELTEXT_S` ) ) INTO DATA(lv_text_field).
+      " the text the report gave the column first - COLTEXT of the LVC
+      " catalog, SELTEXT_* of the SLIS one -, then the texts of the DDIC,
+      " the longest first
+      LOOP AT VALUE string_table( ( `COLTEXT` ) ( `SELTEXT_L` ) ( `SELTEXT_M` ) ( `SELTEXT_S` )
+                                  ( `SCRTEXT_L` ) ( `REPTEXT` ) ( `REPTEXT_DDIC` )
+                                  ( `SCRTEXT_M` ) ( `SCRTEXT_S` ) ) INTO DATA(lv_text_field).
         DATA(lv_text) = classic_value( row  = <fcat>
                                        name = lv_text_field ).
         IF lv_text IS NOT INITIAL.
