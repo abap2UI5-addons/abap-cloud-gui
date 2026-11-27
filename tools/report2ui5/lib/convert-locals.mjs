@@ -3,7 +3,7 @@
 // Converter, and what they share with the other families is in
 // convert-shared.mjs.
 import {
-  abaplint, child, findAll, key, kind, lc, nodeText, renderTokens, stmtTokens, uc, words,
+  abaplint, child, children, findAll, key, kind, lc, nodeText, renderTokens, stmtTokens, uc, words,
 } from "./abap.mjs";
 import {
   BASE_METHODS, GUI, ICONS, REPORT_CALLS, declName, guiClass, indent, prefixCalls, salvTokens,
@@ -353,19 +353,58 @@ export const localsMethods = {
 
   /** the global field symbols a method uses, declared in it - and noted
    *  in fsUnits: which method uses which, and whether it assigns it itself
-   *  (generate( ) refuses one that a method reads without assigning it) */
+   *  (generate( ) refuses one that a method reads without assigning it).
+   *  Read from the statements of the method, not its text: a "." inside
+   *  an ASSIGN ('1.5', a dynamic name, ->('A.B')) ends no statement */
   fieldSymbolDecls(body, unit) {
     if (!this.globalFieldSymbols) return [];
-    const text = body.join("\n").toLowerCase();
-    // a field symbol the method declares itself shadows the global one
-    const own = (name) => new RegExp(`${name.replace(/[<>]/g, "\\$&")}\\s+(type|like|structure)\\b`).test(text);
-    const used = this.globalFieldSymbols.filter((s) => text.includes(lc(declName(s))) && !own(lc(declName(s))));
+    const reg = new abaplint.Registry().addFile(new abaplint.MemoryFile("zr2c_fs.prog.abap", body.join("\n")));
+    reg.parse();
+    const all = reg.getFirstObject()?.getABAPFiles()[0]?.getStatements() ?? [];
+    const fsName = (n) => lc(nodeText(child(n, "FieldSymbol") ?? n));
+    const usedNames = new Set();
+    const ownNames = new Set();
+    const assigned = new Set();
+    for (const s of all) {
+      if (kind(s) !== "Comment") continue;
+      // a refused statement stays as a comment - its ASSIGN still assigns
+      // as far as this check goes (the conversion is refused anyway, one
+      // reason is enough)
+      const m = /^" report2UI5 refused \([^)]*\): (.*)$/.exec(s.getFirstToken().getStr());
+      if (!m) continue;
+      const refused = lc(m[1]);
+      for (const r of refused.matchAll(/\b(?:assigning|to)\s+(<[^>\s]+>)/g)) {
+        if (r[0].startsWith("assigning") || /^assign\b/.test(refused)) assigned.add(r[1]);
+      }
+    }
+    const stmts = all.filter((s) => kind(s) !== "Comment");
+    for (const s of stmts) {
+      const toks = s.getTokens().map((t) => lc(t.getStr()));
+      for (const t of toks) if (t.startsWith("<")) usedNames.add(t);
+      if (kind(s) === "Unknown") {
+        // not parsed: the tokens of this one statement - ASSIGN ... TO <fs>,
+        // ... ASSIGNING <fs>, ... FIELD-SYMBOL(<fs>)
+        toks.forEach((t, i) => {
+          if (t === "assigning" || (t === "to" && toks[0] === "assign")) assigned.add(toks[i + 1]);
+          if (t === "symbol" && toks[i - 1] === "-" && toks[i - 2] === "field" && toks[i + 1] === "(") ownNames.add(toks[i + 2]);
+        });
+        continue;
+      }
+      // a field symbol the method declares itself shadows the global one:
+      // FIELD-SYMBOLS <fs> ..., and an inline ASSIGNING / TO FIELD-SYMBOL(<fs>)
+      if (kind(s) === "FieldSymbol") for (const f of children(s, "FieldSymbol")) ownNames.add(fsName(f));
+      for (const f of findAll(s, "InlineFS")) ownNames.add(fsName(child(f, "TargetFieldSymbol")));
+      // ASSIGN ... TO <fs>, LOOP / READ / INSERT / APPEND / MODIFY ... ASSIGNING <fs>:
+      // the target of each is an FSTarget
+      for (const f of findAll(s, "FSTarget")) {
+        const target = child(f, "TargetFieldSymbol");
+        if (target) assigned.add(fsName(target));
+      }
+    }
+    const used = this.globalFieldSymbols.filter((s) => usedNames.has(lc(declName(s))) && !ownNames.has(lc(declName(s))));
     this.fsUnits ??= new Map();
     for (const s of used) {
-      const esc = lc(declName(s)).replace(/[<>]/g, "\\$&");
-      // ASSIGN ... TO <fs>, LOOP / READ / INSERT / APPEND ... ASSIGNING <fs>
-      const assigns = new RegExp(`\\bassigning\\s+${esc}`).test(text) || new RegExp(`\\bassign\\b[^.]*?\\bto\\s+${esc}`).test(text);
-      this.fsUnits.set(s, [...(this.fsUnits.get(s) ?? []), { unit: unit ?? "?", assigns }]);
+      this.fsUnits.set(s, [...(this.fsUnits.get(s) ?? []), { unit: unit ?? "?", assigns: assigned.has(lc(declName(s))) }]);
     }
     return used.map((s) => `${renderTokens(stmtTokens(s), new Map(), s.getColon()).replace(/^([\w-]+)(\s*):\s*/, "$1 ")}.`);
   },
