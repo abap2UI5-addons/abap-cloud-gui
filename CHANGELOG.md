@@ -194,6 +194,26 @@ release.
   abap2UI5's packages `src/00` to `src/02` only: `src/03` is its
   installation package (the ICF handler and the BSP), which nothing here
   uses.
+- The list levels follow the classic report: CALL SCREEN in
+  `at_line_selection( )` (or a tree node) returns to the list - what
+  follows the call is the secondary list, Back the list clicked - instead of
+  an empty page and the selection screen; what `at_user_command( )` writes,
+  shows as ALV or tree is a secondary list (`set_lsind( lsind( ) - 1 )`
+  replaces the list shown), not lines appended to the list; SET PF-STATUS
+  belongs to its list level and screen and comes back with them, a run
+  starts with none; Back from a secondary list with a grid drops that grid -
+  its double click and functions no longer took the events of the list
+  below.
+- A run that ends on the selection screen restarts the report as Back did:
+  an E message, LEAVE LIST-PROCESSING, an empty list, the upload dialog or a
+  cancelled popup kept what START-OF-SELECTION had collected, and the next
+  Execute added to it. The output of the run is dropped with it.
+- START-OF-SELECTION waits for CALL SCREEN and for a popup that answers
+  with a user command (POPUP_TO_CONFIRM, POPUP_TO_DECIDE, the values, the
+  transport request): END-OF-SELECTION, the page footer and "List contains
+  no data" follow the dynpro and the answer, instead of running before them
+  or never. `popup_to_confirm( )` and `popup_transport( )` without `then`
+  answer a run too.
 
 **The value help and table controls in windows too**
 

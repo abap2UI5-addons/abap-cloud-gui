@@ -85,6 +85,17 @@ CLASS ltcl_report DEFINITION INHERITING FROM z2ui5_cl_cgui_report FINAL.
     DATA s_code      TYPE RANGE OF ty_c4.
     DATA mt_row      TYPE ty_t_row.
     DATA mv_alv      TYPE abap_bool.
+    " SET PF-STATUS in START-OF-SELECTION - the status of the list
+    DATA mv_status   TYPE abap_bool.
+    " START-OF-SELECTION writes nothing / asks first (POPUP_TO_CONFIRM, the
+    " rest follows in at_user_command( 'ASK' ))
+    DATA mv_empty    TYPE abap_bool.
+    DATA mv_ask      TYPE abap_bool.
+    " AT LINE-SELECTION: SET PF-STATUS, CALL SCREEN 100
+    DATA mv_line_status TYPE abap_bool.
+    DATA mv_line_dynpro TYPE abap_bool.
+    " AT USER-COMMAND writes a list
+    DATA mv_cmd_write TYPE abap_bool.
     DATA mv_starts   TYPE i.
     " a total of the runs - the classic report starts it at 100 every run
     DATA mv_total    TYPE i VALUE 100.
@@ -253,6 +264,10 @@ CLASS ltcl_test DEFINITION FINAL FOR TESTING
     METHODS select_option_buffer FOR TESTING.
     METHODS select_option_complex FOR TESTING.
     METHODS secondary_list_and_back FOR TESTING.
+    METHODS line_selection_calls_screen FOR TESTING.
+    METHODS user_command_secondary_list FOR TESTING.
+    METHODS empty_list_restarts FOR TESTING.
+    METHODS popup_in_the_run FOR TESTING.
     METHODS leave_during_the_run FOR TESTING.
     METHODS file_upload_and_download FOR TESTING.
     METHODS current_screen_afresh FOR TESTING.
@@ -541,6 +556,12 @@ CLASS ltcl_report IMPLEMENTATION.
 
     mv_total = mv_total + 1.
 
+    IF mv_status = abap_true.
+      set_pf_status( functions = VALUE #( ( name = `SAVE` text = `Save` ) ( name = `DELE` text = `Delete` ) )
+                     shortcuts = VALUE #( ( key = `F5` ucomm = `SAVE` ) ( key = `Shift+F2` ucomm = `DELE` ) )
+                     excluding = VALUE string_table( ( `dele` ) ) ).
+    ENDIF.
+
     " CALL SCREEN - the rest comes in after_call_screen( )
     IF mo_owner IS BOUND.
       mo_owner->p_carrid = p_carrid.
@@ -550,6 +571,15 @@ CLASS ltcl_report IMPLEMENTATION.
     ENDIF.
     IF mv_dynpro = abap_true.
       call_screen( `100` ).
+      RETURN.
+    ENDIF.
+
+    IF mv_ask = abap_true.
+      popup_to_confirm( question = `Go on?`
+                        ucomm    = `ASK` ).
+      RETURN.
+    ENDIF.
+    IF mv_empty = abap_true.
       RETURN.
     ENDIF.
 
@@ -601,6 +631,13 @@ CLASS ltcl_report IMPLEMENTATION.
   METHOD at_line_selection.
 
     mv_lsel_row = row.
+    IF mv_line_status = abap_true.
+      set_pf_status( VALUE #( ( name = `DETAIL` text = `Detail` ) ) ).
+    ENDIF.
+    IF mv_line_dynpro = abap_true.
+      call_screen( `100` ).
+      RETURN.
+    ENDIF.
     " sy-lsind = sy-lsind - 1: the detail replaces the list it comes from
     IF mv_replace = abap_true.
       set_lsind( lsind( ) - 1 ).
@@ -623,6 +660,18 @@ CLASS ltcl_report IMPLEMENTATION.
   METHOD at_user_command.
 
     mv_ucomm = ucomm.
+    " the rest of START-OF-SELECTION after the popup
+    IF ucomm = `ASK`.
+      write( `Answered` ).
+      RETURN.
+    ENDIF.
+    IF mv_cmd_write = abap_true.
+      " sy-lsind = sy-lsind - 1: the list written replaces the one shown
+      IF mv_replace = abap_true.
+        set_lsind( lsind( ) - 1 ).
+      ENDIF.
+      write( |Command { ucomm }| ).
+    ENDIF.
 
   ENDMETHOD.
 
@@ -1038,6 +1087,67 @@ CLASS ltcl_test IMPLEMENTATION.
     " the message of the report, and not the one of an empty list
     cl_abap_unit_assert=>assert_true( xsdbool( line_exists( mo_cut->mt_cgui_msg[ text = `Unknown airline` ] ) ) ).
     cl_abap_unit_assert=>assert_false( xsdbool( line_exists( mo_cut->mt_cgui_msg[ text = `List contains no data` ] ) ) ).
+    " the classic restart: the data as after INITIALIZATION, the input kept
+    cl_abap_unit_assert=>assert_equals( act = mo_report->mv_total
+                                        exp = 100 ).
+    cl_abap_unit_assert=>assert_equals( act = mo_report->mv_inits
+                                        exp = 2 ).
+    cl_abap_unit_assert=>assert_equals( act = mo_report->p_carrid
+                                        exp = `LH` ).
+
+  ENDMETHOD.
+
+  METHOD empty_list_restarts.
+
+    init( ).
+    mo_report->p_carrid = `LH`.
+    mo_report->mv_empty = abap_true.
+    event( z2ui5_cl_cgui_report=>cs_ucomm-execute ).
+    cl_abap_unit_assert=>assert_equals( act = mo_cut->mv_cgui_screen
+                                        exp = `SELECTION` ).
+    cl_abap_unit_assert=>assert_true( xsdbool( line_exists( mo_cut->mt_cgui_msg[ text = `List contains no data` ] ) ) ).
+    " the next Execute does not add to what this one collected
+    cl_abap_unit_assert=>assert_equals( act = mo_report->mv_total
+                                        exp = 100 ).
+    event( z2ui5_cl_cgui_report=>cs_ucomm-execute ).
+    cl_abap_unit_assert=>assert_equals( act = mo_report->mv_total
+                                        exp = 101 ).
+    cl_abap_unit_assert=>assert_equals( act = mo_cut->mv_cgui_screen
+                                        exp = `OUTPUT` ).
+
+  ENDMETHOD.
+
+  METHOD popup_in_the_run.
+
+    init( ).
+    mo_report->p_carrid = `LH`.
+    mo_report->mv_ask = abap_true.
+    event( z2ui5_cl_cgui_report=>cs_ucomm-execute ).
+    " the run waits for the answer: no END-OF-SELECTION, no empty list yet
+    cl_abap_unit_assert=>assert_bound( mo_client->mo_called ).
+    cl_abap_unit_assert=>assert_equals( act = mo_cut->mv_cgui_screen
+                                        exp = `SELECTION` ).
+    cl_abap_unit_assert=>assert_false( mo_report->mv_end ).
+    cl_abap_unit_assert=>assert_false( xsdbool( line_exists( mo_cut->mt_cgui_msg[ text = `List contains no data` ] ) ) ).
+
+    " the answer: the rest of START-OF-SELECTION, END-OF-SELECTION, the list
+    event( `ASK` ).
+    cl_abap_unit_assert=>assert_true( mo_report->mv_end ).
+    cl_abap_unit_assert=>assert_equals( act = mo_cut->mv_cgui_screen
+                                        exp = `OUTPUT` ).
+    cl_abap_unit_assert=>assert_true( xsdbool( mo_client->mv_view CS `Answered` ) ).
+
+    " Cancel ends the run on the selection screen - the report starts anew
+    event( z2ui5_cl_cgui_report=>cs_ucomm-back ).
+    mo_report->mv_ask = abap_true.
+    event( z2ui5_cl_cgui_report=>cs_ucomm-execute ).
+    cl_abap_unit_assert=>assert_equals( act = mo_report->mv_total
+                                        exp = 101 ).
+    event( z2ui5_cl_cgui_report=>cs_ucomm-cancel ).
+    cl_abap_unit_assert=>assert_equals( act = mo_cut->mv_cgui_screen
+                                        exp = `SELECTION` ).
+    cl_abap_unit_assert=>assert_equals( act = mo_report->mv_total
+                                        exp = 100 ).
 
   ENDMETHOD.
 
@@ -1196,13 +1306,17 @@ CLASS ltcl_test IMPLEMENTATION.
                                         exp = 1 ).
 
     " SAVE leaves: what followed CALL SCREEN runs - for the screen it
-    " called - and the list shows
+    " called - then END-OF-SELECTION, and the list shows without the
+    " status of the dynpro
+    cl_abap_unit_assert=>assert_false( mo_report->mv_end ).
     event( `SAVE` ).
     cl_abap_unit_assert=>assert_equals( act = mo_report->mv_after
                                         exp = `0100` ).
+    cl_abap_unit_assert=>assert_true( mo_report->mv_end ).
     cl_abap_unit_assert=>assert_equals( act = mo_cut->mv_cgui_screen
                                         exp = `OUTPUT` ).
     cl_abap_unit_assert=>assert_true( xsdbool( mo_client->mv_view CS `Seats 2` ) ).
+    cl_abap_unit_assert=>assert_false( xsdbool( mo_client->mv_view CS `EVENT:SAVE` ) ).
 
     " Back on the list - the selection screen, the dynpro stack is empty
     event( z2ui5_cl_cgui_report=>cs_ucomm-back ).
@@ -1413,6 +1527,84 @@ CLASS ltcl_test IMPLEMENTATION.
                                         exp = 1 ).
     event( z2ui5_cl_cgui_report=>cs_ucomm-back ).
     cl_abap_unit_assert=>assert_true( xsdbool( mo_client->mv_view CS `Detail H1` ) ).
+
+  ENDMETHOD.
+
+  METHOD line_selection_calls_screen.
+
+    init( ).
+    mo_report->p_carrid = `LH`.
+    event( z2ui5_cl_cgui_report=>cs_ucomm-execute ).
+
+    " AT LINE-SELECTION sets a status and calls a dynpro
+    mo_report->mv_line_status = abap_true.
+    mo_report->mv_line_dynpro = abap_true.
+    event( name = z2ui5_cl_cgui_list=>cs_event-line_selection
+           args = VALUE #( ( `2` ) ( `H1` ) ) ).
+    cl_abap_unit_assert=>assert_equals( act = mo_cut->mv_cgui_screen
+                                        exp = `DYNPRO` ).
+    mo_report->mv_line_dynpro = abap_false.
+    mo_report->mv_seats = 2.
+    event( `SAVE` ).
+
+    " back from the dynpro: what followed the call is the secondary list,
+    " with the status of the line selection, not the dynpro's
+    cl_abap_unit_assert=>assert_equals( act = mo_cut->mv_cgui_screen
+                                        exp = `OUTPUT` ).
+    cl_abap_unit_assert=>assert_equals( act = mo_cut->lsind( )
+                                        exp = 1 ).
+    cl_abap_unit_assert=>assert_true( xsdbool( mo_client->mv_view CS `Seats 2` ) ).
+    cl_abap_unit_assert=>assert_true( xsdbool( mo_client->mv_view CS `EVENT:DETAIL` ) ).
+    cl_abap_unit_assert=>assert_false( xsdbool( mo_client->mv_view CS `EVENT:SAVE` ) ).
+
+    " Back: the list clicked, with its own status
+    event( z2ui5_cl_cgui_report=>cs_ucomm-back ).
+    cl_abap_unit_assert=>assert_equals( act = mo_cut->mv_cgui_screen
+                                        exp = `OUTPUT` ).
+    cl_abap_unit_assert=>assert_equals( act = mo_cut->lsind( )
+                                        exp = 0 ).
+    cl_abap_unit_assert=>assert_true( xsdbool( mo_client->mv_view CS `row1` ) ).
+    cl_abap_unit_assert=>assert_false( xsdbool( mo_client->mv_view CS `EVENT:DETAIL` ) ).
+
+  ENDMETHOD.
+
+  METHOD user_command_secondary_list.
+
+    init( ).
+    mo_report->p_carrid = `LH`.
+    event( z2ui5_cl_cgui_report=>cs_ucomm-execute ).
+
+    " nothing written: the list stays
+    event( `NOTHING` ).
+    cl_abap_unit_assert=>assert_equals( act = mo_report->mv_ucomm
+                                        exp = `NOTHING` ).
+    cl_abap_unit_assert=>assert_equals( act = mo_cut->lsind( )
+                                        exp = 0 ).
+    cl_abap_unit_assert=>assert_true( xsdbool( mo_client->mv_view CS `row1` ) ).
+
+    " written: a secondary list
+    mo_report->mv_cmd_write = abap_true.
+    event( `DETAIL` ).
+    cl_abap_unit_assert=>assert_equals( act = mo_cut->lsind( )
+                                        exp = 1 ).
+    cl_abap_unit_assert=>assert_true( xsdbool( mo_client->mv_view CS `Command DETAIL` ) ).
+    cl_abap_unit_assert=>assert_false( xsdbool( mo_client->mv_view CS `row1` ) ).
+
+    " sy-lsind = sy-lsind - 1: the new list replaces it
+    mo_report->mv_replace = abap_true.
+    event( `AGAIN` ).
+    cl_abap_unit_assert=>assert_equals( act = mo_cut->lsind( )
+                                        exp = 1 ).
+    cl_abap_unit_assert=>assert_true( xsdbool( mo_client->mv_view CS `Command AGAIN` ) ).
+    cl_abap_unit_assert=>assert_false( xsdbool( mo_client->mv_view CS `Command DETAIL` ) ).
+
+    " Back: the basic list
+    event( z2ui5_cl_cgui_report=>cs_ucomm-back ).
+    cl_abap_unit_assert=>assert_equals( act = mo_cut->lsind( )
+                                        exp = 0 ).
+    cl_abap_unit_assert=>assert_equals( act = mo_cut->mv_cgui_screen
+                                        exp = `OUTPUT` ).
+    cl_abap_unit_assert=>assert_true( xsdbool( mo_client->mv_view CS `row1` ) ).
 
   ENDMETHOD.
 
@@ -2686,14 +2878,16 @@ CLASS ltcl_test IMPLEMENTATION.
                                         exp = `FC01` ).
 
     mo_report->p_carrid = `LH`.
-    mo_cut->set_pf_status( functions = VALUE #( ( name = `SAVE` text = `Save` ) ( name = `DELE` text = `Delete` ) )
-                           shortcuts = VALUE #( ( key = `F5` ucomm = `SAVE` ) ( key = `Shift+F2` ucomm = `DELE` ) )
-                           excluding = VALUE string_table( ( `dele` ) ) ).
+    " a status set before the run is the selection screen's - the list
+    " has the one START-OF-SELECTION sets
+    mo_cut->set_pf_status( VALUE #( ( name = `EARLY` text = `Early` ) ) ).
+    mo_report->mv_status = abap_true.
     CLEAR mo_client->mt_action.
     event( z2ui5_cl_cgui_report=>cs_ucomm-execute ).
 
     " EXCLUDING leaves out the button and the key of DELE
     cl_abap_unit_assert=>assert_false( xsdbool( mo_client->mv_view CS `EVENT:DELE` ) ).
+    cl_abap_unit_assert=>assert_false( xsdbool( mo_client->mv_view CS `EVENT:EARLY` ) ).
     cl_abap_unit_assert=>assert_true( xsdbool( line_exists( mo_client->mt_action[ table_line = `KEYBOARD_SHORTCUT:F5|SAVE|MAIN` ] ) ) ).
     cl_abap_unit_assert=>assert_false( xsdbool( line_exists( mo_client->mt_action[ table_line = `KEYBOARD_SHORTCUT:Shift+F2|DELE|MAIN` ] ) ) ).
 
