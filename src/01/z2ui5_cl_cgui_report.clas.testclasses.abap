@@ -191,7 +191,8 @@ CLASS ltcl_catalog IMPLEMENTATION.
     result = VALUE #( ( code = `ZFLY`  report = `z2ui5_cl_cgui_sample_04` text = `Flights` variant = `MINE` )
                       ( code = `ZGONE` report = `ZCL_NOT_THERE`           text = `Gone` )
                       ( code = `ZAIR`  report = `LTCL_REPORT`             text = `Airline`
-                        semantic_object = `Airline` action = `display` ) ).
+                        semantic_object = `Airline` action = `display` )
+                      ( code = `zlow`  report = `z2ui5_cl_cgui_sample_04` text = `Lower case` ) ).
   ENDMETHOD.
 ENDCLASS.
 
@@ -2133,6 +2134,22 @@ CLASS ltcl_test IMPLEMENTATION.
     mo_cut->okcode_execute( `/x` ).
     cl_abap_unit_assert=>assert_equals( act = mo_cut->mt_cgui_msg[ lines( mo_cut->mt_cgui_msg ) ]-type
                                         exp = `E` ).
+
+    " a class that is no report is not even created - its constructor wants
+    " parameters
+    mo_cut->okcode_execute( `/nZ2UI5_CL_CGUI_MSG` ).
+    cl_abap_unit_assert=>assert_not_bound( mo_client->mo_called ).
+    cl_abap_unit_assert=>assert_char_cp( act = mo_cut->mt_cgui_msg[ lines( mo_cut->mt_cgui_msg ) ]-text
+                                         exp = `*Z2UI5_CL_CGUI_MSG*` ).
+    cl_abap_unit_assert=>assert_not_bound( z2ui5_cl_cgui_command=>start_resolve( code    = `Z2UI5_CL_CGUI_LOG`
+                                                                                 catalog = mo_cut->mo_cgui_catalog )-app ).
+    cl_abap_unit_assert=>assert_bound( z2ui5_cl_cgui_command=>start_resolve( code    = `z2ui5_cl_cgui_sample_04`
+                                                                             catalog = mo_cut->mo_cgui_catalog )-app ).
+
+    " the code of the catalog in any case, as CALL TRANSACTION finds it
+    mo_cut->okcode_execute( `ZLOW` ).
+    cl_abap_unit_assert=>assert_bound( mo_client->mo_called ).
+    CLEAR mo_client->mo_called.
 
     " Ctrl+K: the palette - the transactions and Execute
     event( z2ui5_cl_cgui_report=>cs_ucomm-palette ).

@@ -4485,11 +4485,7 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
     " also for a new tab: what is no report fails here, not there
     DATA(ls_start) = z2ui5_cl_cgui_command=>start_resolve( code    = code
                                                            catalog = mo_cgui_catalog ).
-    TRY.
-        lo_app ?= ls_start-app.
-      CATCH cx_sy_move_cast_error.
-        CLEAR lo_app.
-    ENDTRY.
+    lo_app ?= ls_start-app.
     IF lo_app IS NOT BOUND.
       message( text = replace( val  = 'Transaction &1 does not exist'(051)
                                sub  = `&1`
@@ -6610,6 +6606,7 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
 
     DATA lo_app TYPE REF TO z2ui5_cl_cgui_report.
 
+    " typed: a class that is no report fails before it is created
     TRY.
         CREATE OBJECT lo_app TYPE (report).
       CATCH cx_sy_create_object_error cx_sy_move_cast_error.
@@ -6640,26 +6637,19 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
     DATA lo_app TYPE REF TO z2ui5_cl_cgui_report.
 
     DATA(lv_code) = to_upper( condense( CONV string( code ) ) ).
-    DATA(lv_report) = lv_code.
-    DATA(lv_variant) = ``.
-    IF mo_cgui_catalog IS BOUND.
-      DATA(lt_tcode) = mo_cgui_catalog->get( ).
-      LOOP AT lt_tcode INTO DATA(ls_tcode).
-        IF to_upper( ls_tcode-code ) = lv_code.
-          lv_report = to_upper( ls_tcode-report ).
-          lv_variant = ls_tcode-variant.
-          " the tile of the launchpad - its intent instead of the class
-          IF ls_tcode-semantic_object IS NOT INITIAL AND client->get( )-check_launchpad_active = abap_true.
-            intent_navigate( semantic_object = ls_tcode-semantic_object
-                             action          = ls_tcode-action
-                             values          = values ).
-            RETURN.
-          ENDIF.
-          EXIT.
-        ENDIF.
-      ENDLOOP.
+    DATA(ls_tcode) = z2ui5_cl_cgui_command=>tcode_find( code    = lv_code
+                                                        catalog = mo_cgui_catalog ).
+    " the tile of the launchpad - its intent instead of the class
+    IF ls_tcode-semantic_object IS NOT INITIAL AND client->get( )-check_launchpad_active = abap_true.
+      intent_navigate( semantic_object = ls_tcode-semantic_object
+                       action          = ls_tcode-action
+                       values          = values ).
+      RETURN.
     ENDIF.
+    DATA(lv_report) = COND string( WHEN ls_tcode IS INITIAL THEN lv_code ELSE to_upper( ls_tcode-report ) ).
+    DATA(lv_variant) = ls_tcode-variant.
 
+    " typed: a class that is no report fails before it is created
     TRY.
         CREATE OBJECT lo_app TYPE (lv_report).
       CATCH cx_sy_create_object_error cx_sy_move_cast_error.

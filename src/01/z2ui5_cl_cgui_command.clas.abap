@@ -160,6 +160,15 @@ CLASS z2ui5_cl_cgui_command DEFINITION PUBLIC FINAL CREATE PUBLIC.
       RETURNING
         VALUE(result) TYPE ty_s_start.
 
+    "! the transaction of the catalog with this code, the code compared in
+    "! upper case - initial when the catalog has none (or is unbound)
+    CLASS-METHODS tcode_find
+      IMPORTING
+        code          TYPE string
+        catalog       TYPE REF TO z2ui5_if_cgui_catalog
+      RETURNING
+        VALUE(result) TYPE z2ui5_if_cgui_catalog=>ty_s_transaction.
+
     "! the URL of this app with another report to start in a new tab - the
     "! client and the language stay
     CLASS-METHODS start_url
@@ -190,6 +199,15 @@ CLASS z2ui5_cl_cgui_command DEFINITION PUBLIC FINAL CREATE PUBLIC.
   PROTECTED SECTION.
 
   PRIVATE SECTION.
+    "! a report class, created by its name - unbound when no class of that
+    "! name inherits from z2ui5_cl_cgui_report: another class is not even
+    "! created, its constructor may want parameters or do anything
+    CLASS-METHODS report_create
+      IMPORTING
+        name          TYPE string
+      RETURNING
+        VALUE(result) TYPE REF TO object.
+
     "! the query of the URL, parameter by parameter
     CLASS-METHODS url_search
       IMPORTING
@@ -479,8 +497,6 @@ CLASS z2ui5_cl_cgui_command IMPLEMENTATION.
 
   METHOD okcode_parse.
 
-    DATA lt_tcode TYPE z2ui5_if_cgui_catalog=>ty_t_transaction.
-
     result-code = to_upper( code ).
 
     " /n and /o: a transaction here or in a new browser tab - alone, this
@@ -502,10 +518,8 @@ CLASS z2ui5_cl_cgui_command IMPLEMENTATION.
     ENDIF.
 
     " a transaction of the catalog
-    IF catalog IS BOUND.
-      lt_tcode = catalog->get( ).
-    ENDIF.
-    IF line_exists( lt_tcode[ code = result-code ] ).
+    IF tcode_find( code    = result-code
+                   catalog = catalog ) IS NOT INITIAL.
       result-kind = cs_okcode-start.
       result-target = result-code.
       RETURN.
@@ -519,27 +533,73 @@ CLASS z2ui5_cl_cgui_command IMPLEMENTATION.
   METHOD start_resolve.
 
     result-report = code.
-    IF catalog IS BOUND.
-      DATA(lt_tcode) = catalog->get( ).
-      READ TABLE lt_tcode INTO DATA(ls_tcode) WITH KEY code = code.
-      IF sy-subrc = 0.
-        result-report = to_upper( ls_tcode-report ).
-        result-variant = ls_tcode-variant.
-      ENDIF.
+    DATA(ls_tcode) = tcode_find( code    = code
+                                 catalog = catalog ).
+    IF ls_tcode IS NOT INITIAL.
+      result-report = to_upper( ls_tcode-report ).
+      result-variant = ls_tcode-variant.
     ENDIF.
 
-    " a class - nothing else starts from the command field
-    cl_abap_typedescr=>describe_by_name( EXPORTING  p_name         = result-report
+    " a report class - nothing else starts from the command field
+    result-app = report_create( result-report ).
+
+  ENDMETHOD.
+
+  METHOD tcode_find.
+
+    IF catalog IS NOT BOUND.
+      RETURN.
+    ENDIF.
+    DATA(lv_code) = to_upper( condense( code ) ).
+    LOOP AT catalog->get( ) INTO DATA(ls_tcode).
+      IF to_upper( condense( ls_tcode-code ) ) = lv_code.
+        result = ls_tcode.
+        RETURN.
+      ENDIF.
+    ENDLOOP.
+
+  ENDMETHOD.
+
+  METHOD report_create.
+
+    " unbound - only its type is read: the name of the report runtime is
+    " this class's own with REPORT for COMMAND, as a namespace rename
+    " rewrites a reference, never a literal naming a class
+    DATA lo_me    TYPE REF TO z2ui5_cl_cgui_command.
+    DATA lo_super TYPE REF TO cl_abap_classdescr.
+
+    DATA(lv_name) = to_upper( condense( name ) ).
+    IF lv_name IS INITIAL.
+      RETURN.
+    ENDIF.
+    cl_abap_typedescr=>describe_by_name( EXPORTING  p_name         = lv_name
                                          RECEIVING  p_descr_ref    = DATA(lo_type)
                                          EXCEPTIONS type_not_found = 1
                                                     OTHERS         = 2 ).
-    IF sy-subrc <> 0 OR lo_type->kind <> cl_abap_typedescr=>kind_class.
+    IF sy-subrc <> 0 OR lo_type IS NOT BOUND OR lo_type->kind <> cl_abap_typedescr=>kind_class.
       RETURN.
     ENDIF.
+
+    " a subclass of the report runtime - checked before anything is created
+    DATA(lv_me) = CAST cl_abap_refdescr( cl_abap_typedescr=>describe_by_data( lo_me )
+                                       )->get_referenced_type( )->get_relative_name( ).
+    DATA(lv_base) = |{ substring( val = lv_me
+                                  len = strlen( lv_me ) - strlen( `COMMAND` ) ) }REPORT|.
+    DATA(lo_class) = CAST cl_abap_classdescr( lo_type ).
+    WHILE lo_class->get_relative_name( ) <> lv_base.
+      lo_class->get_super_class_type( RECEIVING  p_descr_ref           = lo_super
+                                      EXCEPTIONS super_class_not_found = 1
+                                                 OTHERS                = 2 ).
+      IF sy-subrc <> 0 OR lo_super IS NOT BOUND.
+        RETURN.
+      ENDIF.
+      lo_class = lo_super.
+    ENDWHILE.
+
     TRY.
-        CREATE OBJECT result-app TYPE (result-report).
-      CATCH cx_sy_create_object_error.
-        CLEAR result-app.
+        CREATE OBJECT result TYPE (lv_name).
+      CATCH cx_root.
+        CLEAR result.
     ENDTRY.
 
   ENDMETHOD.
