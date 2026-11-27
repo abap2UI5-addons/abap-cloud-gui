@@ -1142,13 +1142,20 @@ CLASS z2ui5_cl_cgui_alv DEFINITION PUBLIC FINAL CREATE PUBLIC.
         typed   TYPE z2ui5_cl_cgui_range=>ty_t_row
         pattern TYPE z2ui5_cl_cgui_range=>ty_t_row.
 
-    "! whether val matches one line of range - the target of a data ref
+    "! whether val matches one line of range - the target of a data ref,
+    "! its lines signed I (filter_include( ))
     METHODS filter_match
       IMPORTING
         val           TYPE any
         range         TYPE REF TO data
       RETURNING
         VALUE(result) TYPE abap_bool.
+
+    "! every line of range signed I - an E line of a filter is asked as I,
+    "! the exclusion is filter_index( )'s
+    CLASS-METHODS filter_include
+      IMPORTING
+        range TYPE REF TO data.
 
     "! the expression binding of the color code in field
     CLASS-METHODS color_binding
@@ -2602,6 +2609,7 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
       BEGIN OF ty_s_check,
         name         TYPE string,
         has_incl     TYPE abap_bool,
+        has_pattern  TYPE abap_bool,
         incl_typed   TYPE REF TO data,
         incl_pattern TYPE REF TO data,
         excl_typed   TYPE REF TO data,
@@ -2614,6 +2622,7 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
     DATA lt_incl    TYPE z2ui5_cl_cgui_range=>ty_t_row.
     DATA lt_excl    TYPE z2ui5_cl_cgui_range=>ty_t_row.
     DATA lv_error   TYPE string.
+    DATA lv_text    TYPE string.
     FIELD-SYMBOLS <cell> TYPE any.
 
     " the filter of the grid and, paged, the one of the column menus - the
@@ -2662,6 +2671,12 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
                                                       tab     = tab
                                                       pattern = abap_true
                                             IMPORTING error   = lv_error ).
+      " the signs once per filter, not per row
+      filter_include( ls_check-incl_typed ).
+      filter_include( ls_check-excl_typed ).
+      filter_include( ls_check-incl_pattern ).
+      filter_include( ls_check-excl_pattern ).
+      ls_check-has_pattern = xsdbool( lt_pattern IS NOT INITIAL ).
       IF ls_check-incl_typed IS BOUND.
         INSERT ls_check INTO TABLE lt_check.
       ENDIF.
@@ -2691,7 +2706,11 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
         IF sy-subrc <> 0.
           CONTINUE.
         ENDIF.
-        DATA(lv_text) = |{ <cell> }|.
+        " the cell as text only for a pattern
+        CLEAR lv_text.
+        IF ls_check-has_pattern = abap_true.
+          lv_text = |{ <cell> }|.
+        ENDIF.
         DATA(lv_incl) = xsdbool( ls_check-has_incl = abap_false
                                  OR filter_match( val   = <cell>
                                                   range = ls_check-incl_typed ) = abap_true
@@ -2716,13 +2735,9 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
   METHOD filter_match.
 
     FIELD-SYMBOLS <range> TYPE STANDARD TABLE.
-    FIELD-SYMBOLS <incl>  TYPE STANDARD TABLE.
-    FIELD-SYMBOLS <line>  TYPE any.
-    FIELD-SYMBOLS <sign>  TYPE any.
-    DATA lr_incl TYPE REF TO data.
 
     " whether one line of the range matches val - an empty range matches
-    " nothing; the lines are all I or all E, an E line is asked as I
+    " nothing
     IF range IS NOT BOUND.
       RETURN.
     ENDIF.
@@ -2730,17 +2745,27 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
     IF <range> IS INITIAL.
       RETURN.
     ENDIF.
-    CREATE DATA lr_incl LIKE <range>.
-    ASSIGN lr_incl->* TO <incl>.
-    " empty - the transpiled runtime copies the rows along with LIKE
-    CLEAR <incl>.
-    LOOP AT <range> ASSIGNING <line>.
-      INSERT <line> INTO TABLE <incl> ASSIGNING FIELD-SYMBOL(<new>).
-      ASSIGN COMPONENT `SIGN` OF STRUCTURE <new> TO <sign>.
-      <sign> = `I`.
-    ENDLOOP.
     result = z2ui5_cl_cgui_context=>range_check( val   = val
-                                                 range = <incl> ).
+                                                 range = <range> ).
+
+  ENDMETHOD.
+
+  METHOD filter_include.
+
+    FIELD-SYMBOLS <range> TYPE STANDARD TABLE.
+    FIELD-SYMBOLS <line>  TYPE any.
+    FIELD-SYMBOLS <sign>  TYPE any.
+
+    IF range IS NOT BOUND.
+      RETURN.
+    ENDIF.
+    ASSIGN range->* TO <range>.
+    LOOP AT <range> ASSIGNING <line>.
+      ASSIGN COMPONENT `SIGN` OF STRUCTURE <line> TO <sign>.
+      IF sy-subrc = 0.
+        <sign> = `I`.
+      ENDIF.
+    ENDLOOP.
 
   ENDMETHOD.
 
