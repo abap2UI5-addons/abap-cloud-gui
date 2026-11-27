@@ -3725,14 +3725,16 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
         lo_column->a( n = `sorted`    b = abap_true
             )->a( n = `sortOrder` v = COND #( WHEN ls_column-sort = cs_sort-descending THEN `Descending` ELSE `Ascending` ) ).
       ENDIF.
+      " the tooltip of the column - before its label: a( ) goes to the last
+      " child of a node that has one
+      IF ls_column-tooltip IS NOT INITIAL.
+        lo_column->a( n = `tooltip` t = ls_column-tooltip ).
+      ENDIF.
 
       lo_column->ele( n = `label` ns = `table`
           )->tag( `Label`
               )->a( n = `text`   t = ls_comp-label
               )->a( n = `design` v = COND #( WHEN ls_column-key = abap_true THEN `Bold` ELSE `Standard` ) ).
-      IF ls_column-tooltip IS NOT INITIAL.
-        lo_column->a( n = `tooltip` t = ls_column-tooltip ).
-      ENDIF.
 
       render_template( node   = lo_column->ele( n = `template` ns = `table` )
                        client = client

@@ -680,7 +680,14 @@ CLASS ltcl_test IMPLEMENTATION.
     " the event on the table, not on the row settings
     cl_abap_unit_assert=>assert_char_cp( act = lv_view
                                          exp = `*<table:Table *cellClick=*fixedColumnCount="1"*<table:rowSettingsTemplate*` ).
-    cl_abap_unit_assert=>assert_true( xsdbool( lv_view CS `The airline` ) ).
+    " the tooltip on the column, not on its label
+    DATA(lv_before) = substring_before( val = lv_view
+                                        sub = `tooltip="The airline"` ).
+    cl_abap_unit_assert=>assert_char_cp( act = substring( val = lv_before
+                                                          off = find( val = lv_before
+                                                                      sub = `<`
+                                                                      occ = -1 ) )
+                                         exp = `<table:Column *` ).
     cl_abap_unit_assert=>assert_true( xsdbool( lv_view CS `Number(${PRICE}) !== 0` ) ).
     cl_abap_unit_assert=>assert_false( xsdbool( lv_view CS `FLDATE` ) ).
     cl_abap_unit_assert=>assert_true( xsdbool( lv_view CS `hAlign="Center"` ) ).
