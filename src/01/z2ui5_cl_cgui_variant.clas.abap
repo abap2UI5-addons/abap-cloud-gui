@@ -226,9 +226,6 @@ CLASS z2ui5_cl_cgui_variant IMPLEMENTATION.
 
     FIELD-SYMBOLS <attri> TYPE any.
     FIELD-SYMBOLS <range> TYPE STANDARD TABLE.
-    FIELD-SYMBOLS <line>  TYPE any.
-    FIELD-SYMBOLS <comp>  TYPE any.
-    DATA lr_line   TYPE REF TO data.
     DATA lv_last   TYPE string.
 
     DATA ls_value TYPE ty_s_value.
@@ -276,17 +273,11 @@ CLASS z2ui5_cl_cgui_variant IMPLEMENTATION.
             CONTINUE.
           ENDIF.
 
-          CREATE DATA lr_line LIKE LINE OF <range>.
-          ASSIGN lr_line->* TO <line>.
-          ASSIGN COMPONENT `SIGN` OF STRUCTURE <line> TO <comp>.
-          <comp> = lr_value->sign.
-          ASSIGN COMPONENT `OPTION` OF STRUCTURE <line> TO <comp>.
-          <comp> = lr_value->option.
-          ASSIGN COMPONENT `LOW` OF STRUCTURE <line> TO <comp>.
-          <comp> = lr_value->low.
-          ASSIGN COMPONENT `HIGH` OF STRUCTURE <line> TO <comp>.
-          <comp> = lr_value->high.
-          INSERT <line> INTO TABLE <range>.
+          z2ui5_cl_cgui_range=>line_append( EXPORTING sign   = lr_value->sign
+                                                      option = lr_value->option
+                                                      low    = lr_value->low
+                                                      high   = lr_value->high
+                                            CHANGING  range  = <range> ).
         CATCH cx_root ##NO_HANDLER.
       ENDTRY.
     ENDLOOP.

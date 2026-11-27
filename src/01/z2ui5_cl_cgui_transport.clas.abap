@@ -211,6 +211,7 @@ CLASS z2ui5_cl_cgui_transport IMPLEMENTATION.
     TYPES:
       BEGIN OF ty_s_e07t,
         trkorr  TYPE c LENGTH 20,
+        langu   TYPE c LENGTH 1,
         as4text TYPE c LENGTH 60,
       END OF ty_s_e07t.
     DATA lt_task    TYPE STANDARD TABLE OF ty_s_e070 WITH EMPTY KEY.
@@ -238,7 +239,7 @@ CLASS z2ui5_cl_cgui_transport IMPLEMENTATION.
         SELECT trkorr, strkorr FROM (lv_e070)
           WHERE trkorr IN @lt_range AND trstatus = 'D'
           INTO TABLE @lt_request.
-        SELECT trkorr, as4text FROM (lv_e07t)
+        SELECT trkorr, langu, as4text FROM (lv_e07t)
           WHERE trkorr IN @lt_range
           INTO TABLE @lt_text.
       CATCH cx_root.
@@ -249,7 +250,12 @@ CLASS z2ui5_cl_cgui_transport IMPLEMENTATION.
     SORT lt_request BY trkorr.
     LOOP AT lt_request INTO DATA(ls_request).
       READ TABLE lt_task INTO DATA(ls_task) WITH KEY strkorr = ls_request-trkorr.
-      READ TABLE lt_text INTO DATA(ls_text) WITH KEY trkorr = ls_request-trkorr.
+      " the text in the logon language, else the one there is
+      READ TABLE lt_text INTO DATA(ls_text) WITH KEY trkorr = ls_request-trkorr
+                                                     langu  = sy-langu.
+      IF sy-subrc <> 0.
+        READ TABLE lt_text INTO ls_text WITH KEY trkorr = ls_request-trkorr.
+      ENDIF.
       INSERT VALUE #( transport   = condense( CONV string( ls_request-trkorr ) )
                       task        = condense( CONV string( ls_task-trkorr ) )
                       description = condense( CONV string( ls_text-as4text ) ) ) INTO TABLE result.

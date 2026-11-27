@@ -83,6 +83,14 @@ CLASS z2ui5_cl_cgui_demo_output DEFINITION PUBLIC FINAL CREATE PRIVATE.
         VALUE(output) TYPE string.
 
   PROTECTED SECTION.
+    " PROTECTED, not PRIVATE: the object is kept with the report between
+    " the roundtrips, and the transpiled runtime restores PROTECTED
+    " attributes of the draft but not PRIVATE ones
+    DATA mv_level TYPE i.
+    " the line of the list the output started at - 0 before its first
+    " write and after display( ), get( ) and clear( )
+    DATA mv_from TYPE i.
+
   PRIVATE SECTION.
 
     " the widest a column of a table gets - the rest of a value is cut
@@ -91,11 +99,6 @@ CLASS z2ui5_cl_cgui_demo_output DEFINITION PUBLIC FINAL CREATE PRIVATE.
     TYPES ty_t_width TYPE STANDARD TABLE OF i WITH EMPTY KEY.
 
     CLASS-DATA go_default TYPE REF TO z2ui5_cl_cgui_demo_output.
-
-    DATA mv_level TYPE i.
-    " the line of the list the output started at - 0 before its first
-    " write and after display( ), get( ) and clear( )
-    DATA mv_from TYPE i.
 
     CLASS-METHODS default
       RETURNING

@@ -47,8 +47,12 @@ CLASS z2ui5_cl_cgui_salv_nodes DEFINITION PUBLIC CREATE PUBLIC.
     METHODS delete_all.
 
   PROTECTED SECTION.
-  PRIVATE SECTION.
+    " PROTECTED, not PRIVATE: the object is kept with the report between
+    " the roundtrips, and the transpiled runtime restores PROTECTED
+    " attributes of the draft but not PRIVATE ones
     DATA mo_tree TYPE REF TO z2ui5_cl_cgui_tree.
+
+  PRIVATE SECTION.
 ENDCLASS.
 
 
@@ -66,26 +70,27 @@ CLASS z2ui5_cl_cgui_salv_nodes IMPLEMENTATION.
     DATA(lv_related) = COND i( WHEN condense( CONV string( related_node ) ) CO `0123456789` AND related_node IS NOT INITIAL
                                THEN CONV i( related_node ) ).
     " a child below the related node, a sibling below its parent
-    DATA(lv_parent) = SWITCH i( relationship
-                                WHEN z2ui5_if_cgui_salv_c=>node_relation-first_child
-                                  OR z2ui5_if_cgui_salv_c=>node_relation-last_child THEN lv_related
-                                ELSE COND #( WHEN lv_related IS NOT INITIAL THEN lo_tree->get_parent( lv_related ) ) ).
+    DATA(lv_parent) = lo_tree->parent_of_related( related      = lv_related
+                                                  relationship = relationship ).
     DATA(lv_icon) = COND string( WHEN expanded_icon IS NOT INITIAL THEN expanded_icon ELSE collapsed_icon ).
     DATA(lv_folder) = xsdbool( folder = abap_true OR expander = abap_true ).
     DATA(lv_icon_ui5) = COND string( WHEN lv_icon CP `sap-icon://*` THEN lv_icon ).
     " a folder has no data row - passed only when there is one
     DATA lv_key TYPE i.
+    " an expander opens without children - EXPAND_EMPTY_FOLDER adds them
     IF data_row IS SUPPLIED.
       lv_key = lo_tree->add_node( parent = lv_parent
                                   text   = text
                                   data   = data_row
                                   icon   = lv_icon_ui5
-                                  folder = lv_folder ).
+                                  folder = lv_folder
+                                  lazy   = expander ).
     ELSE.
       lv_key = lo_tree->add_node( parent = lv_parent
                                   text   = text
                                   icon   = lv_icon_ui5
-                                  folder = lv_folder ).
+                                  folder = lv_folder
+                                  lazy   = expander ).
     ENDIF.
     value = NEW #( tree = mo_tree
                    key  = lv_key ).

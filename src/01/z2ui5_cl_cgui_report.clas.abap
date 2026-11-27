@@ -322,6 +322,8 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
         tree     TYPE REF TO z2ui5_cl_cgui_tree,
         alv_name TYPE string,
         alv_data TYPE REF TO data,
+        " the copy with the box field - the rows selected in the ALV
+        alv_box  TYPE REF TO data,
         window   TYPE abap_bool,
         w_title  TYPE string,
         w_cols   TYPE i,
@@ -1198,6 +1200,9 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
     " the messages of the run, I, W, E and A - what the message popover
     " lists; kept while the user picks one of them
     DATA mt_cgui_log           TYPE ty_t_cgui_msg.
+    " W, E or A came in a roundtrip that opened a popup - the popover opens
+    " when the screen shows again, the log stays until then
+    DATA mv_cgui_log_later     TYPE abap_bool.
     " every message of the run, S included - what cgui_run_in_background( )
     " returns
     DATA mt_cgui_run_msg       TYPE ty_t_cgui_msg.
@@ -1491,12 +1496,6 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
         action          TYPE clike
         values          TYPE z2ui5_cl_cgui_variant=>ty_t_value.
 
-    METHODS json_escape
-      IMPORTING
-        val           TYPE clike
-      RETURNING
-        VALUE(result) TYPE string.
-
     "! the values of the selection screen kept as the draft, when they
     "! changed since it was kept last
     METHODS draft_keep.
@@ -1630,7 +1629,11 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
       RETURNING
         VALUE(result) TYPE abap_bool.
 
+    "! every required field of fields filled - one message at each empty
+    "! one; without fields the ones of the selection screen
     METHODS check_obligatory
+      IMPORTING
+        fields        TYPE z2ui5_cl_cgui_selscreen=>ty_t_field OPTIONAL
       RETURNING
         VALUE(result) TYPE abap_bool.
 
@@ -2076,6 +2079,16 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
       IMPORTING
         screen TYPE REF TO z2ui5_cl_cgui_selscreen.
 
+    "! the start variant (set_variant( ), the URL, a transaction) onto the
+    "! screen - once; one of the URL that does not exist is a warning
+    METHODS variant_start_apply.
+
+    "! a lazy node opened the first time: at_tree_expand_no_children( ),
+    "! and EXPAND_EMPTY_FOLDER of the stand-in of cl_salv_tree
+    METHODS tree_expand
+      IMPORTING
+        key TYPE i.
+
 ENDCLASS.
 
 
@@ -2093,7 +2106,8 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
     mv_cgui_nav = abap_false.
     " the messages of the run stay while the popover opens and the user
     " picks one of them
-    IF client->get_event( ) <> cs_ucomm-message_focus AND client->get_event( ) <> cs_ucomm-messages_open.
+    IF client->get_event( ) <> cs_ucomm-message_focus AND client->get_event( ) <> cs_ucomm-messages_open
+        AND mv_cgui_log_later = abap_false.
       CLEAR mt_cgui_log.
     ENDIF.
 
@@ -2646,16 +2660,7 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
       draft_restore( ).
     ENDIF.
     IF mv_cgui_variant_start IS NOT INITIAL AND mo_cgui_store IS BOUND.
-      DATA(lv_start) = mv_cgui_variant_start.
-      CLEAR mv_cgui_variant_start.
-      IF z2ui5_cl_cgui_memory=>variant_apply( ctx    = memory_ctx( )
-                                              fields = screen_fields( )
-                                              name   = lv_start ) = abap_false AND mv_cgui_variant_url = abap_true.
-        message( text = replace( val  = 'Variant &1 does not exist'(002)
-                                 sub  = `&1`
-                                 with = lv_start )
-                 type = `W` ).
-      ENDIF.
+      variant_start_apply( ).
     ENDIF.
 
   ENDMETHOD.
@@ -3390,6 +3395,23 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
     ENDIF.
   ENDMETHOD.
 
+  METHOD tree_expand.
+
+    at_tree_expand_no_children( key ).
+    IF mo_cgui_tree_handler IS NOT BOUND.
+      RETURN.
+    ENDIF.
+    TRY.
+        DATA(lo_salv) = CAST z2ui5_cl_cgui_salv_tree( mo_cgui_tree_handler ).
+      CATCH cx_sy_move_cast_error.
+        RETURN.
+    ENDTRY.
+    " the handlers of the stand-in of cl_salv_tree - an event of a control
+    at_gui_event( ).
+    lo_salv->on_expand( key ).
+
+  ENDMETHOD.
+
   METHOD on_event_tree.
 
     IF mo_cgui_tree IS BOUND.
@@ -3400,7 +3422,7 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
       ELSEIF mo_cgui_tree->handle_event( client ) = abap_true.
         DATA(lv_lazy) = mo_cgui_tree->take_expand_request( ).
         IF lv_lazy IS NOT INITIAL.
-          at_tree_expand_no_children( lv_lazy ).
+          tree_expand( lv_lazy ).
         ENDIF.
         result = abap_true.
         RETURN.
@@ -3662,12 +3684,6 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
     result = abap_true.
     DATA(lr_full) = alv_shown( ).
     CASE lv_event.
-      WHEN z2ui5_cl_cgui_alv=>cs_event-page.
-        IF lr_full IS BOUND.
-          ASSIGN lr_full->* TO <tab>.
-          mo_cgui_alv->page_turn( direction = client->get_event_arg( )
-                                  lines     = lines( mo_cgui_alv->filter_index( <tab> ) ) ).
-        ENDIF.
       WHEN z2ui5_cl_cgui_alv=>cs_event-filter.
         alv_filter_popup( ).
       WHEN z2ui5_cl_cgui_alv=>cs_event-filter_clear.
@@ -3832,6 +3848,7 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
                     tree     = mo_cgui_tree
                     alv_name = mv_cgui_alv_name
                     alv_data = mr_cgui_alv
+                    alv_box  = mr_cgui_alv_box
                     window   = mv_cgui_window
                     w_title  = mv_cgui_window_title
                     w_cols   = mv_cgui_window_cols
@@ -3856,11 +3873,13 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
     mo_cgui_tree     = ls_level-tree.
     mv_cgui_alv_name = ls_level-alv_name.
     mr_cgui_alv      = ls_level-alv_data.
+    " the selection of the ALV stays as it was before the line selection
+    mr_cgui_alv_box  = ls_level-alv_box.
     mv_cgui_window       = ls_level-window.
     mv_cgui_window_title = ls_level-w_title.
     mv_cgui_window_cols  = ls_level-w_cols.
     mv_cgui_window_lines = ls_level-w_lines.
-    CLEAR: mr_cgui_alv_box, mr_cgui_alv_page, mt_cgui_alv_index, mt_cgui_alv_order.
+    CLEAR: mr_cgui_alv_page, mt_cgui_alv_index, mt_cgui_alv_order.
 
   ENDMETHOD.
 
@@ -4035,10 +4054,7 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
   METHOD input_sync.
 
     FIELD-SYMBOLS <range> TYPE STANDARD TABLE.
-    FIELD-SYMBOLS <line>  TYPE any.
-    FIELD-SYMBOLS <comp>  TYPE any.
     FIELD-SYMBOLS <field_val>   TYPE clike.
-    DATA lr_line TYPE REF TO data.
 
     IF mv_cgui_screen <> cs_screen-selection.
       RETURN.
@@ -4063,24 +4079,13 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
       IF lr_so->low IS INITIAL AND lr_so->high IS INITIAL.
         CONTINUE.
       ENDIF.
-      CREATE DATA lr_line LIKE LINE OF <range>.
-      ASSIGN lr_line->* TO <line>.
       TRY.
-          ASSIGN COMPONENT `SIGN` OF STRUCTURE <line> TO <comp>.
-          <comp> = `I`.
-          ASSIGN COMPONENT `OPTION` OF STRUCTURE <line> TO <comp>.
-          IF lr_so->high IS NOT INITIAL.
-            <comp> = `BT`.
-          ELSEIF lr_so->low CA `*+`.
-            <comp> = `CP`.
-          ELSE.
-            <comp> = `EQ`.
-          ENDIF.
-          ASSIGN COMPONENT `LOW` OF STRUCTURE <line> TO <comp>.
-          <comp> = lr_so->low.
-          ASSIGN COMPONENT `HIGH` OF STRUCTURE <line> TO <comp>.
-          <comp> = lr_so->high.
-          INSERT <line> INTO TABLE <range>.
+          z2ui5_cl_cgui_range=>line_append( EXPORTING option = COND #( WHEN lr_so->high IS NOT INITIAL THEN `BT`
+                                                                       WHEN lr_so->low CA `*+` THEN `CP`
+                                                                       ELSE `EQ` )
+                                                      low    = lr_so->low
+                                                      high   = lr_so->high
+                                            CHANGING  range  = <range> ).
         CATCH cx_sy_conversion_error.
           message( text  = replace( val  = 'Enter a valid value for &1'(008)
                                     sub  = `&1`
@@ -4279,9 +4284,6 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
   METHOD spro_open.
 
     DATA lt_field TYPE z2ui5_cl_cgui_popup=>ty_t_field.
-    DATA lt_line  TYPE string_table.
-    DATA lv_id    TYPE string.
-    DATA lv_val   TYPE string.
 
     IF authority_check_customizing( ) = abap_false.
       message( text = 'You are not authorized to maintain the customizing'(063)
@@ -4295,10 +4297,8 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
       RETURN.
     ENDIF.
 
-    SPLIT mv_cgui_spa_cust AT cl_abap_char_utilities=>newline INTO TABLE lt_line.
-    LOOP AT lt_line INTO DATA(lv_line) WHERE table_line IS NOT INITIAL.
-      SPLIT lv_line AT `=` INTO lv_id lv_val.
-      INSERT VALUE #( name = to_upper( lv_id ) text = to_upper( lv_id ) value = lv_val ) INTO TABLE lt_field.
+    LOOP AT z2ui5_cl_cgui_memory=>spa_pairs( mv_cgui_spa_cust ) INTO DATA(ls_pair).
+      INSERT VALUE #( name = ls_pair-n text = ls_pair-n value = ls_pair-v ) INTO TABLE lt_field.
     ENDLOOP.
     INSERT VALUE #( name = `%NEW_ID`    text = 'New parameter ID'(056) ) INTO TABLE lt_field.
     INSERT VALUE #( name = `%NEW_VALUE` text = 'Value'(057) ) INTO TABLE lt_field.
@@ -4485,11 +4485,7 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
     " also for a new tab: what is no report fails here, not there
     DATA(ls_start) = z2ui5_cl_cgui_command=>start_resolve( code    = code
                                                            catalog = mo_cgui_catalog ).
-    TRY.
-        lo_app ?= ls_start-app.
-      CATCH cx_sy_move_cast_error.
-        CLEAR lo_app.
-    ENDTRY.
+    lo_app ?= ls_start-app.
     IF lo_app IS NOT BOUND.
       message( text = replace( val  = 'Transaction &1 does not exist'(051)
                                sub  = `&1`
@@ -4816,20 +4812,26 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
     ENDIF.
 
     IF mv_cgui_variant_start IS NOT INITIAL.
-      DATA(lv_start) = mv_cgui_variant_start.
-      CLEAR mv_cgui_variant_start.
-      IF z2ui5_cl_cgui_memory=>variant_apply( ctx    = memory_ctx( )
-                                              fields = screen_fields( )
-                                              name   = lv_start ) = abap_false AND mv_cgui_variant_url = abap_true.
-        message( text = replace( val  = 'Variant &1 does not exist'(002)
-                                 sub  = `&1`
-                                 with = lv_start )
-                 type = `W` ).
-      ENDIF.
+      variant_start_apply( ).
       z2ui5_cl_cgui_command=>url_values_apply( command_ctx( ) ).
     ENDIF.
 
     auto_execute( ).
+
+  ENDMETHOD.
+
+  METHOD variant_start_apply.
+
+    DATA(lv_start) = mv_cgui_variant_start.
+    CLEAR mv_cgui_variant_start.
+    IF z2ui5_cl_cgui_memory=>variant_apply( ctx    = memory_ctx( )
+                                            fields = screen_fields( )
+                                            name   = lv_start ) = abap_false AND mv_cgui_variant_url = abap_true.
+      message( text = replace( val  = 'Variant &1 does not exist'(002)
+                               sub  = `&1`
+                               with = lv_start )
+               type = `W` ).
+    ENDIF.
 
   ENDMETHOD.
 
@@ -5289,7 +5291,7 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
         ENDIF.
         LOOP AT lt_lazy INTO DATA(lv_lazy).
           mo_cgui_tree->set_loaded( lv_lazy ).
-          at_tree_expand_no_children( lv_lazy ).
+          tree_expand( lv_lazy ).
         ENDLOOP.
       ENDDO.
       mo_cgui_tree->expand_all( ).
@@ -5384,7 +5386,8 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
     FIELD-SYMBOLS <field_val> TYPE any.
 
     result = abap_true.
-    LOOP AT mt_cgui_field REFERENCE INTO DATA(lr_field) WHERE obligatory = abap_true.
+    DATA(lt_field) = COND #( WHEN fields IS SUPPLIED THEN fields ELSE mt_cgui_field ).
+    LOOP AT lt_field REFERENCE INTO DATA(lr_field) WHERE obligatory = abap_true.
       DATA(lr_val) = attri_assign( lr_field->name ).
       IF lr_val IS NOT BOUND.
         CONTINUE.
@@ -5751,11 +5754,9 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
     FIELD-SYMBOLS <value> TYPE any.
     FIELD-SYMBOLS <range> TYPE STANDARD TABLE.
     FIELD-SYMBOLS <line>  TYPE any.
-    FIELD-SYMBOLS <comp>  TYPE any.
     FIELD-SYMBOLS <keep>  TYPE STANDARD TABLE.
     FIELD-SYMBOLS <sign>  TYPE any.
     FIELD-SYMBOLS <opt>   TYPE any.
-    DATA lr_line TYPE REF TO data.
     DATA lr_keep TYPE REF TO data.
     DATA lr_row  TYPE REF TO data.
 
@@ -5791,16 +5792,8 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
         CONTINUE.
       ENDIF.
       ASSIGN lr_value->* TO <value>.
-
-      CREATE DATA lr_line LIKE LINE OF <range>.
-      ASSIGN lr_line->* TO <line>.
-      ASSIGN COMPONENT `SIGN` OF STRUCTURE <line> TO <comp>.
-      <comp> = `I`.
-      ASSIGN COMPONENT `OPTION` OF STRUCTURE <line> TO <comp>.
-      <comp> = `EQ`.
-      ASSIGN COMPONENT `LOW` OF STRUCTURE <line> TO <comp>.
-      <comp> = <value>.
-      INSERT <line> INTO TABLE <range>.
+      z2ui5_cl_cgui_range=>line_append( EXPORTING low   = <value>
+                                        CHANGING  range = <range> ).
     ENDLOOP.
 
   ENDMETHOD.
@@ -6581,22 +6574,9 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
   METHOD on_screen_ok.
 
     " the required fields of the popup screen, then the report decides
-    FIELD-SYMBOLS <field_val> TYPE any.
-
-    LOOP AT mt_cgui_dynnr_field REFERENCE INTO DATA(lr_field) WHERE obligatory = abap_true.
-      DATA(lr_val) = attri_assign( lr_field->name ).
-      IF lr_val IS NOT BOUND.
-        CONTINUE.
-      ENDIF.
-      ASSIGN lr_val->* TO <field_val>.
-      IF <field_val> IS INITIAL.
-        message( text = replace( val  = 'Fill in the required field &1'(023)
-                                 sub  = `&1`
-                                 with = lr_field->text )
-                 type = `E` ).
-        RETURN.
-      ENDIF.
-    ENDLOOP.
+    IF check_obligatory( mt_cgui_dynnr_field ) = abap_false.
+      RETURN.
+    ENDIF.
 
     DATA(lv_dynnr) = mv_cgui_dynnr.
     CLEAR mv_cgui_dynnr.
@@ -6610,6 +6590,7 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
 
     DATA lo_app TYPE REF TO z2ui5_cl_cgui_report.
 
+    " typed: a class that is no report fails before it is created
     TRY.
         CREATE OBJECT lo_app TYPE (report).
       CATCH cx_sy_create_object_error cx_sy_move_cast_error.
@@ -6640,26 +6621,19 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
     DATA lo_app TYPE REF TO z2ui5_cl_cgui_report.
 
     DATA(lv_code) = to_upper( condense( CONV string( code ) ) ).
-    DATA(lv_report) = lv_code.
-    DATA(lv_variant) = ``.
-    IF mo_cgui_catalog IS BOUND.
-      DATA(lt_tcode) = mo_cgui_catalog->get( ).
-      LOOP AT lt_tcode INTO DATA(ls_tcode).
-        IF to_upper( ls_tcode-code ) = lv_code.
-          lv_report = to_upper( ls_tcode-report ).
-          lv_variant = ls_tcode-variant.
-          " the tile of the launchpad - its intent instead of the class
-          IF ls_tcode-semantic_object IS NOT INITIAL AND client->get( )-check_launchpad_active = abap_true.
-            intent_navigate( semantic_object = ls_tcode-semantic_object
-                             action          = ls_tcode-action
-                             values          = values ).
-            RETURN.
-          ENDIF.
-          EXIT.
-        ENDIF.
-      ENDLOOP.
+    DATA(ls_tcode) = z2ui5_cl_cgui_command=>tcode_find( code    = lv_code
+                                                        catalog = mo_cgui_catalog ).
+    " the tile of the launchpad - its intent instead of the class
+    IF ls_tcode-semantic_object IS NOT INITIAL AND client->get( )-check_launchpad_active = abap_true.
+      intent_navigate( semantic_object = ls_tcode-semantic_object
+                       action          = ls_tcode-action
+                       values          = values ).
+      RETURN.
     ENDIF.
+    DATA(lv_report) = COND string( WHEN ls_tcode IS INITIAL THEN lv_code ELSE to_upper( ls_tcode-report ) ).
+    DATA(lv_variant) = ls_tcode-variant.
 
+    " typed: a class that is no report fails before it is created
     TRY.
         CREATE OBJECT lo_app TYPE (lv_report).
       CATCH cx_sy_create_object_error cx_sy_move_cast_error.
@@ -6727,22 +6701,15 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
       ENDIF.
       INSERT ls_value-name INTO TABLE lt_name.
       lv_params = |{ lv_params }{ COND #( WHEN lv_params IS NOT INITIAL THEN `,` ) }| &&
-                  |"{ json_escape( ls_value-name ) }":"{ json_escape( ls_value-low ) }"|.
+                  |"{ z2ui5_cl_cgui_variant=>json_escape( ls_value-name ) }":"{ z2ui5_cl_cgui_variant=>json_escape( ls_value-low ) }"|.
     ENDLOOP.
 
     mv_cgui_nav = abap_true.
     client->follow_up_action(
         val   = client->cs_event-cross_app_nav_to_ext
-        t_arg = VALUE #( ( |\{"semanticObject":"{ json_escape( semantic_object ) }",| &&
-                           |"action":"{ json_escape( COND string( WHEN action IS INITIAL THEN `display` ELSE action ) ) }"\}| )
+        t_arg = VALUE #( ( |\{"semanticObject":"{ z2ui5_cl_cgui_variant=>json_escape( CONV #( semantic_object ) ) }",| &&
+                           |"action":"{ z2ui5_cl_cgui_variant=>json_escape( COND string( WHEN action IS INITIAL THEN `display` ELSE action ) ) }"\}| )
                          ( |\{{ lv_params }\}| ) ) ).
-
-  ENDMETHOD.
-
-  METHOD json_escape.
-
-    result = replace( val = val sub = `\` with = `\\` occ = 0 ).
-    result = replace( val = result sub = `"` with = `\"` occ = 0 ).
 
   ENDMETHOD.
 
@@ -6856,6 +6823,10 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
 
       WHEN z2ui5_cl_cgui_layout=>cs_action-apply.
         mo_cgui_alv->set_layout( ls_result-layout ).
+        " a saved layout picked and taken as it is - the one in use now
+        IF ls_result-name IS NOT INITIAL.
+          mv_cgui_layout = ls_result-name.
+        ENDIF.
 
       WHEN z2ui5_cl_cgui_layout=>cs_action-save.
         mo_cgui_alv->set_layout( ls_result-layout ).
@@ -7792,33 +7763,52 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
       ENDCASE.
     ENDLOOP.
 
-    IF lv_popover = abap_true AND mv_cgui_nav = abap_false AND mv_cgui_dynnr IS INITIAL.
-      " the popover is part of the screen, and opened in a roundtrip of its
-      " own: opened by the response that builds the screen, it stayed open
-      " without ever being rendered (the frontend holds the rendering back
-      " while it swaps the view). A timer of no time raises that roundtrip
-      client->follow_up_action( val   = client->cs_event-start_timer
-                                t_arg = VALUE #( ( cs_ucomm-messages_open ) ( `0` ) ( `X` ) ) ).
-    ELSEIF lv_text IS NOT INITIAL.
-      client->message_box_display( text = lv_text
-                                   type = `information` ).
+    " a popup opened in this roundtrip covers the screen - the popover waits
+    " for the screen to show again
+    DATA(lv_listed) = abap_false.
+    IF lv_popover = abap_true AND mv_cgui_nav = abap_true.
+      mv_cgui_log_later = abap_true.
+      lv_listed = abap_true.
+    ELSEIF mv_cgui_nav = abap_false AND mv_cgui_dynnr IS INITIAL.
+      IF mv_cgui_log_later = abap_true AND mt_cgui_log IS NOT INITIAL.
+        lv_popover = abap_true.
+      ENDIF.
+      mv_cgui_log_later = abap_false.
+      IF lv_popover = abap_true.
+        lv_listed = abap_true.
+        " the popover is part of the screen, and opened in a roundtrip of its
+        " own: opened by the response that builds the screen, it stayed open
+        " without ever being rendered (the frontend holds the rendering back
+        " while it swaps the view). A timer of no time raises that roundtrip
+        client->follow_up_action( val   = client->cs_event-start_timer
+                                  t_arg = VALUE #( ( cs_ucomm-messages_open ) ( `0` ) ( `X` ) ) ).
+      ENDIF.
+    ENDIF.
+    " the I messages - in the popover when it opens, else in a box
+    IF lv_listed = abap_true.
+      CLEAR lv_text.
     ENDIF.
 
-    " _msg_box( ): one box, its type the worst of the messages
-    IF mt_cgui_box IS NOT INITIAL AND lv_text IS INITIAL.
-      CLEAR lv_text.
-      DATA(lv_box) = `information`.
-      LOOP AT mt_cgui_box INTO DATA(ls_box).
-        lv_text = COND #( WHEN lv_text IS INITIAL THEN ls_box-text ELSE lv_text && cl_abap_char_utilities=>newline && ls_box-text ).
-        lv_box = SWITCH #( ls_box-type
-                           WHEN `E` OR `A` THEN `error`
-                           WHEN `W` THEN COND #( WHEN lv_box = `error` THEN lv_box ELSE `warning` )
-                           WHEN `S` THEN COND #( WHEN lv_box = `information` THEN `success` ELSE lv_box )
-                           ELSE lv_box ).
-      ENDLOOP.
-      client->message_box_display( text = lv_text
-                                   type = lv_box ).
+    " _msg_box( ): one box, its type the worst of the messages - the I
+    " messages of the run in it as well, a second box would replace the first
+    IF mt_cgui_box IS INITIAL.
+      IF lv_text IS NOT INITIAL.
+        client->message_box_display( text = lv_text
+                                     type = `information` ).
+      ENDIF.
+      RETURN.
     ENDIF.
+    DATA(lv_box) = `information`.
+    LOOP AT mt_cgui_box INTO DATA(ls_box).
+      lv_text = COND #( WHEN lv_text IS INITIAL THEN ls_box-text ELSE lv_text && cl_abap_char_utilities=>newline && ls_box-text ).
+      lv_box = SWITCH #( ls_box-type
+                         WHEN `E` OR `A` THEN `error`
+                         WHEN `W` THEN COND #( WHEN lv_box = `error` THEN lv_box ELSE `warning` )
+                         WHEN `S` THEN COND #( WHEN lv_box = `information` THEN `success` ELSE lv_box )
+                         ELSE lv_box ).
+    ENDLOOP.
+    client->message_box_display( text = lv_text
+                                 type = lv_box ).
 
   ENDMETHOD.
 

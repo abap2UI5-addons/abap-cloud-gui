@@ -142,6 +142,18 @@ CLASS z2ui5_cl_cgui_salv_table DEFINITION PUBLIC
         e_column_id TYPE z2ui5_cl_cgui_alv=>ty_s_lvc_col OPTIONAL.
 
   PROTECTED SECTION.
+    " PROTECTED, not PRIVATE: the object is kept with the report between
+    " the roundtrips, and the transpiled runtime restores PROTECTED
+    " attributes of the draft but not PRIVATE ones
+    DATA mr_table     TYPE REF TO data.
+    " the attribute of the report the table is - a reference to it is a
+    " copy once the draft has rebuilt it
+    DATA mv_table     TYPE string.
+    DATA mo_container TYPE REF TO z2ui5_cl_cgui_container.
+    DATA mo_grid      TYPE REF TO z2ui5_cl_cgui_alv_grid.
+    DATA mo_columns   TYPE REF TO z2ui5_cl_cgui_salv_cols.
+    DATA mo_settings  TYPE REF TO z2ui5_cl_cgui_salv_config.
+
   PRIVATE SECTION.
     TYPES:
       BEGIN OF ty_s_fcat,
@@ -161,15 +173,19 @@ CLASS z2ui5_cl_cgui_salv_table DEFINITION PUBLIC
         sel_mode   TYPE c LENGTH 1,
       END OF ty_s_layout.
 
-    DATA mr_table     TYPE REF TO data.
-    DATA mo_container TYPE REF TO z2ui5_cl_cgui_container.
-    DATA mo_grid      TYPE REF TO z2ui5_cl_cgui_alv_grid.
-    DATA mo_columns   TYPE REF TO z2ui5_cl_cgui_salv_cols.
-    DATA mo_settings  TYPE REF TO z2ui5_cl_cgui_salv_config.
-
     METHODS fieldcat
       RETURNING
         VALUE(result) TYPE ty_t_fcat.
+
+    "! the table of the report: the attribute by its name, else the
+    "! reference factory( ) or set_data( ) got
+    METHODS table
+      RETURNING
+        VALUE(result) TYPE REF TO data.
+
+    METHODS table_keep
+      CHANGING
+        t_table TYPE STANDARD TABLE.
 ENDCLASS.
 
 
@@ -180,7 +196,7 @@ CLASS z2ui5_cl_cgui_salv_table IMPLEMENTATION.
     DATA lr_line TYPE REF TO data.
 
     r_salv_table = NEW #( r_container ).
-    r_salv_table->mr_table = REF #( t_table ).
+    r_salv_table->table_keep( CHANGING t_table = t_table ).
     CREATE DATA lr_line LIKE LINE OF t_table.
     ASSIGN lr_line->* TO FIELD-SYMBOL(<line>).
     r_salv_table->mo_columns = NEW #( <line> ).
@@ -203,10 +219,11 @@ CLASS z2ui5_cl_cgui_salv_table IMPLEMENTATION.
     DATA lt_button TYPE z2ui5_if_cgui_gui=>ty_t_button.
     FIELD-SYMBOLS <table> TYPE STANDARD TABLE.
 
-    IF go_report IS NOT BOUND OR mr_table IS NOT BOUND.
+    DATA(lr_table) = table( ).
+    IF go_report IS NOT BOUND OR lr_table IS NOT BOUND.
       RETURN.
     ENDIF.
-    ASSIGN mr_table->* TO <table>.
+    ASSIGN lr_table->* TO <table>.
     IF mo_grid IS NOT BOUND.
       mo_grid = NEW #( i_parent = mo_container ).
       mo_grid->set_handler( event   = `USER_COMMAND`
@@ -253,9 +270,7 @@ CLASS z2ui5_cl_cgui_salv_table IMPLEMENTATION.
     LOOP AT mo_columns->get( ) INTO DATA(ls_ref).
       DATA(lo_column) = ls_ref-r_column.
       INSERT VALUE #( fieldname = lo_column->mv_name
-                      scrtext_l = COND #( WHEN lo_column->mv_long IS NOT INITIAL THEN lo_column->mv_long
-                                          WHEN lo_column->mv_medium IS NOT INITIAL THEN lo_column->mv_medium
-                                          ELSE lo_column->mv_short )
+                      scrtext_l = lo_column->get_text( )
                       no_out    = lo_column->mv_hidden
                       tech      = lo_column->mv_technical
                       hotspot   = lo_column->mv_hotspot
@@ -272,10 +287,11 @@ CLASS z2ui5_cl_cgui_salv_table IMPLEMENTATION.
     IF mo_grid IS NOT BOUND.
       RETURN.
     ENDIF.
+    DATA(lr_table) = table( ).
     IF t_table IS SUPPLIED.
       mo_grid->refresh_table_display( CHANGING it_outtab = t_table ).
-    ELSEIF mr_table IS BOUND.
-      ASSIGN mr_table->* TO <table>.
+    ELSEIF lr_table IS BOUND.
+      ASSIGN lr_table->* TO <table>.
       mo_grid->refresh_table_display( CHANGING it_outtab = <table> ).
     ENDIF.
 
@@ -283,7 +299,35 @@ CLASS z2ui5_cl_cgui_salv_table IMPLEMENTATION.
 
   METHOD set_data.
 
+    table_keep( CHANGING t_table = t_table ).
+
+  ENDMETHOD.
+
+  METHOD table_keep.
+
     mr_table = REF #( t_table ).
+    CLEAR mv_table.
+    IF go_report IS BOUND.
+      mv_table = z2ui5_cl_cgui_context=>attri_name_by_ref( app = go_report
+                                                           val = t_table ).
+    ENDIF.
+
+  ENDMETHOD.
+
+  METHOD table.
+
+    FIELD-SYMBOLS <table> TYPE STANDARD TABLE.
+    DATA lo_report TYPE REF TO object.
+
+    IF mv_table IS NOT INITIAL AND go_report IS BOUND.
+      lo_report = go_report.
+      ASSIGN lo_report->(mv_table) TO <table>.
+      IF <table> IS ASSIGNED.
+        result = REF #( <table> ).
+        RETURN.
+      ENDIF.
+    ENDIF.
+    result = mr_table.
 
   ENDMETHOD.
 

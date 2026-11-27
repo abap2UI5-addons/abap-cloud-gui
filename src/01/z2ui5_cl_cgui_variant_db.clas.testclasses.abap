@@ -21,7 +21,7 @@ CLASS ltcl_test DEFINITION FINAL FOR TESTING
         VALUE(result) TYPE z2ui5_cl_cgui_variant=>ty_s_variant.
 
     METHODS save_load_delete FOR TESTING RAISING z2ui5_cx_cgui_error.
-    METHODS other_users_variants FOR TESTING.
+    METHODS other_users_variants FOR TESTING RAISING z2ui5_cx_cgui_error.
 
 ENDCLASS.
 
@@ -156,6 +156,25 @@ CLASS ltcl_test IMPLEMENTATION.
     cl_abap_unit_assert=>assert_subrc( exp = 0 ).
     cl_abap_unit_assert=>assert_equals( act = lv_owner
                                         exp = `ZZ_OTHER` ).
+
+    " shared, not protected: saved over by this user, it stays shared - the
+    " sharing is the owner's, not the checkbox of who saved it
+    ls_db-variant   = `OPEN`.
+    ls_db-shared    = abap_true.
+    ls_db-protected = abap_false.
+    MODIFY z2ui5_t_19 FROM @ls_db.
+    DATA(ls_open) = variant( `OPEN` ).
+    ls_open-shared = abap_false.
+    mo_store->save( report  = cv_report
+                    variant = ls_open ).
+    DATA(lv_open) = CONV z2ui5_t_19-variant( `OPEN` ).
+    SELECT SINGLE owner, shared FROM z2ui5_t_19
+      WHERE report = @lv_report AND variant = @lv_open
+      INTO @DATA(ls_saved).
+    cl_abap_unit_assert=>assert_subrc( exp = 0 ).
+    cl_abap_unit_assert=>assert_equals( act = ls_saved-owner
+                                        exp = `ZZ_OTHER` ).
+    cl_abap_unit_assert=>assert_true( ls_saved-shared ).
 
   ENDMETHOD.
 

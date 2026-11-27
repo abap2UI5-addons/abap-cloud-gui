@@ -168,8 +168,12 @@ CLASS z2ui5_cl_cgui_salv_config DEFINITION PUBLIC CREATE PUBLIC.
         value TYPE any.
 
   PROTECTED SECTION.
-  PRIVATE SECTION.
+    " PROTECTED, not PRIVATE: the object is kept with the report between
+    " the roundtrips, and the transpiled runtime restores PROTECTED
+    " attributes of the draft but not PRIVATE ones
     DATA mo_grid TYPE REF TO z2ui5_cl_cgui_alv_grid.
+
+  PRIVATE SECTION.
 ENDCLASS.
 
 

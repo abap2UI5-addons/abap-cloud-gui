@@ -52,8 +52,12 @@ CLASS z2ui5_cl_cgui_salv_cols DEFINITION PUBLIC CREATE PUBLIC.
         position   TYPE i.
 
   PROTECTED SECTION.
-  PRIVATE SECTION.
+    " PROTECTED, not PRIVATE: the object is kept with the report between
+    " the roundtrips, and the transpiled runtime restores PROTECTED
+    " attributes of the draft but not PRIVATE ones
     DATA mt_column TYPE ty_t_column_ref.
+
+  PRIVATE SECTION.
 ENDCLASS.
 
 
@@ -65,7 +69,8 @@ CLASS z2ui5_cl_cgui_salv_cols IMPLEMENTATION.
     IF lo_type->kind <> cl_abap_typedescr=>kind_struct.
       RETURN.
     ENDIF.
-    LOOP AT CAST cl_abap_structdescr( lo_type )->get_components( ) INTO DATA(ls_component) WHERE name IS NOT INITIAL.
+    " the components of an .INCLUDE are columns as well
+    LOOP AT CAST cl_abap_structdescr( lo_type )->get_included_view( ) INTO DATA(ls_component) WHERE name IS NOT INITIAL.
       INSERT VALUE #( columnname = ls_component-name
                       r_column   = NEW #( ls_component-name ) ) INTO TABLE mt_column.
     ENDLOOP.

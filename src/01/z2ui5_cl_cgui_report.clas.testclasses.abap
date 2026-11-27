@@ -191,7 +191,8 @@ CLASS ltcl_catalog IMPLEMENTATION.
     result = VALUE #( ( code = `ZFLY`  report = `z2ui5_cl_cgui_sample_04` text = `Flights` variant = `MINE` )
                       ( code = `ZGONE` report = `ZCL_NOT_THERE`           text = `Gone` )
                       ( code = `ZAIR`  report = `LTCL_REPORT`             text = `Airline`
-                        semantic_object = `Airline` action = `display` ) ).
+                        semantic_object = `Airline` action = `display` )
+                      ( code = `zlow`  report = `z2ui5_cl_cgui_sample_04` text = `Lower case` ) ).
   ENDMETHOD.
 ENDCLASS.
 
@@ -265,6 +266,7 @@ CLASS ltcl_test DEFINITION FINAL FOR TESTING
     METHODS url_skip_screen FOR TESTING.
     METHODS url_range FOR TESTING.
     METHODS variant_screen_only FOR TESTING.
+    METHODS variant_names_refused FOR TESTING.
     METHODS events_screen_only FOR TESTING.
     METHODS submit_starts_report FOR TESTING.
     METHODS link_holds_values FOR TESTING.
@@ -277,6 +279,7 @@ CLASS ltcl_test DEFINITION FINAL FOR TESTING
     METHODS f4_keeps_other_lines FOR TESTING.
     METHODS popups_of_the_project FOR TESTING.
     METHODS short_api FOR TESTING.
+    METHODS messages_after_popup FOR TESTING.
     METHODS input_history FOR TESTING.
     METHODS execute_in_background FOR TESTING.
     METHODS command_field FOR TESTING.
@@ -1437,6 +1440,11 @@ CLASS ltcl_test IMPLEMENTATION.
     event( `SOME_COMMAND` ).
     cl_abap_unit_assert=>assert_equals( act = mo_cut->get_selected_rows( )
                                         exp = VALUE z2ui5_cl_cgui_alv=>ty_t_row( ( 2 ) ) ).
+    " and a line selection that wrote nothing, or Back from a secondary list
+    mo_cut->level_push( ).
+    mo_cut->level_pop( ).
+    cl_abap_unit_assert=>assert_equals( act = mo_cut->get_selected_rows( )
+                                        exp = VALUE z2ui5_cl_cgui_alv=>ty_t_row( ( 2 ) ) ).
     event( z2ui5_cl_cgui_alv=>cs_event-select_all ).
     cl_abap_unit_assert=>assert_equals( act = lines( mo_cut->get_selected_rows( ) )
                                         exp = 3 ).
@@ -1513,6 +1521,47 @@ CLASS ltcl_test IMPLEMENTATION.
                                         exp = `LH` ).
     cl_abap_unit_assert=>assert_initial( mo_report->mv_secret ).
     cl_abap_unit_assert=>assert_initial( mo_report->mv_ucomm ).
+
+  ENDMETHOD.
+
+  METHOD variant_names_refused.
+
+    DATA(lo_store) = NEW ltcl_variant_store( ).
+    mo_cut->set_variant_store( lo_store ).
+    init( ).
+
+    " the name scheme of the drafts and a name longer than the stores keep
+    " are no names of a variant
+    DATA(lt_name) = VALUE string_table( ( `%DRAFT_SOMEONE` )
+                                        ( `A123456789B123456789C123456789D123456789E` ) ).
+    LOOP AT lt_name INTO DATA(lv_name).
+      DATA(lo_popup) = z2ui5_cl_cgui_popup=>get_values( VALUE #( ( name = `NAME` value = lv_name ) ) ).
+      DATA(lo_client) = NEW ltcl_client( ).
+      lo_client->mo_app = lo_popup.
+      lo_client->mv_event = `CGUI_POP_OK`.
+      lo_popup->z2ui5_if_app~main( lo_client ).
+      cl_abap_unit_assert=>assert_true( lo_popup->result( )-confirmed ).
+      mo_cut->variant_save( lo_popup ).
+      cl_abap_unit_assert=>assert_initial( lo_store->mt_variant ).
+      cl_abap_unit_assert=>assert_equals( act = mo_cut->mt_cgui_msg[ lines( mo_cut->mt_cgui_msg ) ]-type
+                                          exp = `E` ).
+    ENDLOOP.
+
+    " a draft of another user's name, planted past the popup, is not
+    " restored
+    lo_store->mt_variant = VALUE #( ( name   = z2ui5_cl_cgui_memory=>draft_name( )
+                                      owner  = `ZZ_OTHER`
+                                      values = VALUE #( ( name = `P_CARRID` kind = `P` low = `XX` ) ) ) ).
+    DATA(lo_next) = NEW ltcl_report( ).
+    DATA(lo_next_client) = NEW ltcl_client( ).
+    lo_next_client->mo_app = lo_next.
+    lo_next_client->mv_init = abap_true.
+    lo_next->set_layout_store( NEW ltcl_layout_store( ) ).
+    lo_next->set_variant_store( lo_store ).
+    lo_next->set_draft( ).
+    lo_next->z2ui5_if_app~main( lo_next_client ).
+    cl_abap_unit_assert=>assert_differs( act = lo_next->p_carrid
+                                         exp = `XX` ).
 
   ENDMETHOD.
 
@@ -2134,6 +2183,22 @@ CLASS ltcl_test IMPLEMENTATION.
     cl_abap_unit_assert=>assert_equals( act = mo_cut->mt_cgui_msg[ lines( mo_cut->mt_cgui_msg ) ]-type
                                         exp = `E` ).
 
+    " a class that is no report is not even created - its constructor wants
+    " parameters
+    mo_cut->okcode_execute( `/nZ2UI5_CL_CGUI_MSG` ).
+    cl_abap_unit_assert=>assert_not_bound( mo_client->mo_called ).
+    cl_abap_unit_assert=>assert_char_cp( act = mo_cut->mt_cgui_msg[ lines( mo_cut->mt_cgui_msg ) ]-text
+                                         exp = `*Z2UI5_CL_CGUI_MSG*` ).
+    cl_abap_unit_assert=>assert_not_bound( z2ui5_cl_cgui_command=>start_resolve( code    = `Z2UI5_CL_CGUI_LOG`
+                                                                                 catalog = mo_cut->mo_cgui_catalog )-app ).
+    cl_abap_unit_assert=>assert_bound( z2ui5_cl_cgui_command=>start_resolve( code    = `z2ui5_cl_cgui_sample_04`
+                                                                             catalog = mo_cut->mo_cgui_catalog )-app ).
+
+    " the code of the catalog in any case, as CALL TRANSACTION finds it
+    mo_cut->okcode_execute( `ZLOW` ).
+    cl_abap_unit_assert=>assert_bound( mo_client->mo_called ).
+    CLEAR mo_client->mo_called.
+
     " Ctrl+K: the palette - the transactions and Execute
     event( z2ui5_cl_cgui_report=>cs_ucomm-palette ).
     DATA lo_palette TYPE REF TO z2ui5_cl_cgui_select.
@@ -2428,6 +2493,49 @@ CLASS ltcl_test IMPLEMENTATION.
       CATCH cx_sy_move_cast_error.
         cl_abap_unit_assert=>fail( `not a z2ui5_cl_cgui_select` ).
     ENDTRY.
+
+  ENDMETHOD.
+
+  METHOD messages_after_popup.
+
+    DATA(lv_open) = |*{ z2ui5_cl_cgui_report=>cs_ucomm-messages_open }*|.
+
+    init( ).
+    " a warning of the roundtrip that opened a popup - the popup covers the
+    " screen, the popover waits for it
+    mo_cut->message( text = `Careful`
+                     type = `W` ).
+    mo_cut->mv_cgui_nav = abap_true.
+    mo_cut->messages_display( ).
+    LOOP AT mo_client->mt_action INTO DATA(lv_action).
+      cl_abap_unit_assert=>assert_false( xsdbool( lv_action CP lv_open ) ).
+    ENDLOOP.
+
+    " back on the screen: the warning is still in the log, the popover opens
+    CLEAR mo_client->mt_action.
+    mo_client->mv_navigated = abap_true.
+    mo_cut->z2ui5_if_app~main( mo_client ).
+    mo_client->mv_navigated = abap_false.
+    cl_abap_unit_assert=>assert_true( xsdbool( line_exists( mo_cut->mt_cgui_log[ text = `Careful` ] ) ) ).
+    DATA(lv_armed) = abap_false.
+    LOOP AT mo_client->mt_action INTO lv_action.
+      IF lv_action CP lv_open.
+        lv_armed = abap_true.
+      ENDIF.
+    ENDLOOP.
+    cl_abap_unit_assert=>assert_true( lv_armed ).
+
+    " an I message and a box of _msg_box( ) - one box with both
+    CLEAR: mo_cut->mt_cgui_msg, mo_cut->mt_cgui_box, mo_client->mv_box.
+    mo_cut->mv_cgui_nav = abap_false.
+    mo_cut->message( text = `Note`
+                     type = `I` ).
+    mo_cut->_msg_box( )->w( `Boxed` ).
+    mo_cut->messages_display( ).
+    cl_abap_unit_assert=>assert_char_cp( exp = `Note*Boxed`
+                                         act = mo_client->mv_box ).
+    cl_abap_unit_assert=>assert_equals( exp = `warning`
+                                        act = mo_client->mv_box_type ).
 
   ENDMETHOD.
 

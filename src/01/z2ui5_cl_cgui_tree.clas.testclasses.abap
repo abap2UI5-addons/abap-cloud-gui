@@ -65,6 +65,7 @@ CLASS ltcl_test DEFINITION FINAL FOR TESTING
     METHODS lazy_node_requests_children FOR TESTING.
     METHODS checkbox_event_and_branch FOR TESTING.
     METHODS delete_and_change FOR TESTING.
+    METHODS salv_expander_is_lazy FOR TESTING.
 
 ENDCLASS.
 
@@ -316,6 +317,19 @@ CLASS ltcl_test IMPLEMENTATION.
     mo_tree->delete_node( mv_root ).
     cl_abap_unit_assert=>assert_equals( act = lines( mo_tree->get_nodes( ) )
                                         exp = 1 ).
+
+  ENDMETHOD.
+
+  METHOD salv_expander_is_lazy.
+
+    " an expander of the stand-in of cl_salv_tree opens without children -
+    " the first expand asks for them (EXPAND_EMPTY_FOLDER)
+    DATA(lo_salv) = NEW z2ui5_cl_cgui_salv_tree( ).
+    DATA(lo_node) = lo_salv->get_nodes( )->add_node( text     = `Folder`
+                                                     expander = abap_true ).
+    DATA(lv_key) = CONV i( lo_node->get_key( ) ).
+    DATA(lt_lazy) = lo_salv->get_tree( )->get_lazy_nodes( ).
+    cl_abap_unit_assert=>assert_true( xsdbool( line_exists( lt_lazy[ table_line = lv_key ] ) ) ).
 
   ENDMETHOD.
 
