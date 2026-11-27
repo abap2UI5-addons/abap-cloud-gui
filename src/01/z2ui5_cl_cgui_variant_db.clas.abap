@@ -117,8 +117,10 @@ CLASS z2ui5_cl_cgui_variant_db IMPLEMENTATION.
       ls_db-owner = lv_user.
     ENDIF.
 
-    " the protection belongs to the owner - another user keeps it as it is
-    ls_db-shared    = variant-shared.
+    " sharing and protection belong to the owner - another user keeps them
+    " as they are: a shared variant saved over stays in everyone's list
+    ls_db-shared    = COND #( WHEN ls_db-owner = lv_user THEN variant-shared
+                              ELSE ls_old-shared ).
     ls_db-protected = COND #( WHEN ls_db-owner = lv_user THEN variant-protected
                               ELSE ls_old-protected ).
     GET TIME STAMP FIELD ls_db-changed_at.

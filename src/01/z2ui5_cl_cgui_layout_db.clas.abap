@@ -140,12 +140,14 @@ CLASS z2ui5_cl_cgui_layout_db IMPLEMENTATION.
       ls_db-owner = lv_user.
     ENDIF.
 
-    " protection and default belong to the owner - another user keeps them
-    ls_db-shared = layout-shared.
+    " sharing, protection and default belong to the owner - another user
+    " keeps them: a shared layout saved over stays in everyone's list
     IF ls_db-owner = lv_user.
+      ls_db-shared     = layout-shared.
       ls_db-protected  = layout-protected.
       ls_db-is_default = layout-is_default.
     ELSE.
+      ls_db-shared     = ls_old-shared.
       ls_db-protected  = ls_old-protected.
       ls_db-is_default = ls_old-is_default.
     ENDIF.
