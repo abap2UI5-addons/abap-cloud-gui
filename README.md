@@ -94,7 +94,7 @@ which every object and every reference to abap2UI5 and to the addons this one
 needs carries that name; pull it with abapGit. Rename abap2UI5 and every addon
 of the installation with the same name.
 
-## Quick start
+## Usage
 
 Write your first report:
 
@@ -130,7 +130,7 @@ comes up, **Execute** runs the report and shows the list, **Back** returns to
 the selection screen. For more, run the samples below — `z2ui5_cl_cgui_sample_05`
 is a complete report.
 
-## What is there
+## Features
 
 | Class | Classic counterpart |
 |---|---|
@@ -1004,8 +1004,9 @@ the tables of the two stores in SQLite.
 
 ## Contributing
 
-Issues and pull requests are welcome. Read [AGENTS.md](AGENTS.md) first - it
-holds the layout, the release targets and the rules of this repository.
+Issues and pull requests are welcome - see [CONTRIBUTING.md](CONTRIBUTING.md)
+for what CI checks, and [AGENTS.md](AGENTS.md) for the layout, the release
+targets and the rules of this repository.
 
 ## License
 
