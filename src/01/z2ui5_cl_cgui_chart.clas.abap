@@ -190,8 +190,16 @@ CLASS z2ui5_cl_cgui_chart IMPLEMENTATION.
 
     FIELD-SYMBOLS <category> TYPE any.
     FIELD-SYMBOLS <value>    TYPE any.
+    TYPES:
+      BEGIN OF ty_s_label,
+        label TYPE string,
+        row   TYPE i,
+      END OF ty_s_label.
     DATA lt_point TYPE ty_t_point.
     DATA lt_name  TYPE string_table.
+    " the row of each category in lt_point - one lookup per row of tab, not
+    " a scan of the categories
+    DATA lt_label TYPE HASHED TABLE OF ty_s_label WITH UNIQUE KEY label.
 
     LOOP AT values INTO DATA(lv_name).
       IF lines( lt_name ) < cv_max_series.
@@ -206,12 +214,16 @@ CLASS z2ui5_cl_cgui_chart IMPLEMENTATION.
         RETURN.
       ENDIF.
       DATA(lv_label) = condense( CONV string( <category> ) ).
-      READ TABLE lt_point ASSIGNING FIELD-SYMBOL(<point>) WITH KEY label = lv_label.
-      IF sy-subrc <> 0.
+      READ TABLE lt_label INTO DATA(ls_label) WITH TABLE KEY label = lv_label.
+      IF sy-subrc = 0.
+        READ TABLE lt_point ASSIGNING FIELD-SYMBOL(<point>) INDEX ls_label-row.
+      ELSE.
         INSERT VALUE #( label = lv_label ) INTO TABLE lt_point ASSIGNING <point>.
         DO lv_count TIMES.
           INSERT VALUE #( ) INTO TABLE <point>-values.
         ENDDO.
+        INSERT VALUE #( label = lv_label
+                        row   = lines( lt_point ) ) INTO TABLE lt_label.
       ENDIF.
       IF lt_name IS INITIAL.
         <point>-values[ 1 ] = <point>-values[ 1 ] + 1.
