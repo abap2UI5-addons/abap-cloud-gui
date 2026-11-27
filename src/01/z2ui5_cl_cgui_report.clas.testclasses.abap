@@ -1950,6 +1950,9 @@ CLASS ltcl_test IMPLEMENTATION.
                                         exp = 100 ).
     cl_abap_unit_assert=>assert_equals( act = mo_report->mv_inits
                                         exp = 2 ).
+    " the output of the run is gone with it - it no longer travels with the
+    " selection screen
+    cl_abap_unit_assert=>assert_not_bound( mo_cut->mo_cgui_list ).
     cl_abap_unit_assert=>assert_equals( act = mo_report->p_carrid
                                         exp = `LH` ).
     event( z2ui5_cl_cgui_report=>cs_ucomm-execute ).
