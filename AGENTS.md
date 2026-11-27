@@ -76,7 +76,8 @@ Three release targets and one runtime, every one a CI gate with no excludes:
 - **ABAP Cloud** - released APIs only, `npm run check:cloud`;
 - **Standard ABAP** - 7.50 syntax that downports, `npm run lint` (its
   API set is the intersection of ABAP Cloud and 7.02);
-- **NW 7.02** - a downported copy, `npm run check:702`;
+- **NW 7.02** - a downported copy, `npm run check:702` (it also refuses
+  `=>typekind_int8`, which its API set has and 7.02 does not - write `` `8` ``);
 - **the transpiled Node runtime** - `npm run unit` runs every ABAP Unit test
   there, the DANGEROUS ones of the two stores against SQLite.
 

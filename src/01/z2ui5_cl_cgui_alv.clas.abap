@@ -2798,11 +2798,12 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
       WHEN cl_abap_typedescr=>typekind_int
           OR cl_abap_typedescr=>typekind_int1
           OR cl_abap_typedescr=>typekind_int2
-          OR cl_abap_typedescr=>typekind_int8
+          OR `8`
           OR cl_abap_typedescr=>typekind_packed
           OR cl_abap_typedescr=>typekind_float
           OR cl_abap_typedescr=>typekind_decfloat16
           OR cl_abap_typedescr=>typekind_decfloat34.
+        " `8`: typekind_int8, a constant lower releases do not have
         result = abap_true.
     ENDCASE.
 

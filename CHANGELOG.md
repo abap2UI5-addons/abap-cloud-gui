@@ -19,6 +19,8 @@ release.
   like the one of the toolbar - Delete Filter ends it; without paging the
   column menus offer no filter any more (it filtered the rows of the browser
   alone, the backend never heard of it) - the toolbar's filter is the one.
+- The ALV and the list activate on NW 7.02 - 7.40 again: they named
+  `cl_abap_typedescr=>typekind_int8`, which these releases do not have.
 - report2UI5 no longer writes wrong code where it used to: `HIDE` is
   `list( )->hide( )` at the statement - the value when `HIDE` runs, not at
   the `WRITE` before it - and works for a table with a header line and in a

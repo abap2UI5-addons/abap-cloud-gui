@@ -1099,10 +1099,11 @@ CLASS z2ui5_cl_cgui_list IMPLEMENTATION.
 
     DATA(lo_descr) = cl_abap_typedescr=>describe_by_data( val ).
     DATA(lv_kind) = lo_descr->type_kind.
+    " `8`: typekind_int8, a constant lower releases do not have
     DATA(lv_numeric) = xsdbool( lv_kind = cl_abap_typedescr=>typekind_int
                              OR lv_kind = cl_abap_typedescr=>typekind_int1
                              OR lv_kind = cl_abap_typedescr=>typekind_int2
-                             OR lv_kind = cl_abap_typedescr=>typekind_int8
+                             OR lv_kind = `8`
                              OR lv_kind = cl_abap_typedescr=>typekind_packed
                              OR lv_kind = cl_abap_typedescr=>typekind_float
                              OR lv_kind = cl_abap_typedescr=>typekind_decfloat16

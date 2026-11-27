@@ -6,6 +6,13 @@ set -euo pipefail
 root="$(cd "$(dirname "$0")/../.." && pwd)"
 build="$root/build/702"
 
+# constants 7.02 does not have, which abaplint cannot see: its 7.02 check
+# runs against the cl_abap_typedescr of open-abap-core, which has them all
+if grep -rniF --include='*.abap' '=>typekind_int8' "$root/src"; then
+  echo "check-702: typekind_int8 does not exist before 7.50 - write \`8\` (z2ui5_cl_cgui_context)" >&2
+  exit 1
+fi
+
 rm -rf "$build"
 mkdir -p "$build"
 cp -r "$root/src" "$build/src"
