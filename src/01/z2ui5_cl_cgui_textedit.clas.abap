@@ -459,21 +459,39 @@ CLASS z2ui5_cl_cgui_textedit IMPLEMENTATION.
                              with = |\n|
                              occ  = 0 ).
     SPLIT lv_text AT |\n| INTO TABLE DATA(lt_line).
+    DATA(lv_max) = -1.
     LOOP AT lt_line INTO DATA(lv_line).
-      APPEND INITIAL LINE TO table ASSIGNING FIELD-SYMBOL(<line>).
-      " a table of a structure (tline-tdline, a TEXT component) or of text
-      ASSIGN COMPONENT `TDLINE` OF STRUCTURE <line> TO FIELD-SYMBOL(<text>).
-      IF sy-subrc <> 0.
-        ASSIGN COMPONENT `TEXT` OF STRUCTURE <line> TO <text>.
-      ENDIF.
-      IF sy-subrc <> 0.
-        ASSIGN COMPONENT `LINE` OF STRUCTURE <line> TO <text>.
-      ENDIF.
-      IF sy-subrc = 0.
-        <text> = lv_line.
-      ELSE.
-        <line> = lv_line.
-      ENDIF.
+      " a line longer than the field of the table goes on in the next line
+      " of the table, as the classic editor wraps it - nothing is cut
+      DO.
+        APPEND INITIAL LINE TO table ASSIGNING FIELD-SYMBOL(<line>).
+        " a table of a structure (tline-tdline, a TEXT component) or of text
+        ASSIGN COMPONENT `TDLINE` OF STRUCTURE <line> TO FIELD-SYMBOL(<text>).
+        IF sy-subrc <> 0.
+          ASSIGN COMPONENT `TEXT` OF STRUCTURE <line> TO <text>.
+        ENDIF.
+        IF sy-subrc <> 0.
+          ASSIGN COMPONENT `LINE` OF STRUCTURE <line> TO <text>.
+        ENDIF.
+        IF sy-subrc <> 0.
+          ASSIGN <line> TO <text>.
+        ENDIF.
+        IF lv_max < 0.
+          " the characters the field takes - 0 for a string, no limit
+          DATA(lo_field) = cl_abap_typedescr=>describe_by_data( <text> ).
+          lv_max = COND #( WHEN lo_field->type_kind = cl_abap_typedescr=>typekind_char
+                           THEN CAST cl_abap_elemdescr( lo_field )->output_length
+                           ELSE 0 ).
+        ENDIF.
+        IF lv_max = 0 OR strlen( lv_line ) <= lv_max.
+          <text> = lv_line.
+          EXIT.
+        ENDIF.
+        <text> = substring( val = lv_line
+                            len = lv_max ).
+        lv_line = substring( val = lv_line
+                             off = lv_max ).
+      ENDDO.
     ENDLOOP.
 
   ENDMETHOD.
