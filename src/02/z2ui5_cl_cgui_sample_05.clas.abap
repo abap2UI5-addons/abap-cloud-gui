@@ -243,6 +243,10 @@ CLASS z2ui5_cl_cgui_sample_05 IMPLEMENTATION.
 
     lt_carrid = VALUE #( ( `AA` ) ( `LH` ) ( `SQ` ) ( `UA` ) ).
 
+    " initialization( ) runs again on Back from the list (the fresh start),
+    " and mt_flight is PROTECTED - the fresh start restores only the PUBLIC
+    " attributes, so the rows are built anew, not added to those of before
+    CLEAR mt_flight.
     DO 60 TIMES.
       DATA(lv_carrid) = lt_carrid[ ( sy-index MOD 4 ) + 1 ].
       INSERT VALUE #( carrid   = lv_carrid

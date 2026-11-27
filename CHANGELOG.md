@@ -37,6 +37,9 @@ release.
   (`CL_WEB_HTTP_UTILITY`, `CL_HTTP_UTILITY`), the ABAP loop is the last
   resort; a data URI without `;base64` is percent-decoded; the MIME type of
   a download comes from abap-util's catalog (`file_get_mimetype( )`).
+- Sample 05 built its flights anew on top of the old ones after Back and
+  Execute; sample 09 branched on `sy-dynnr` and `sy-ucomm`, which the
+  runtime does not set.
 - The command field (`/nCLASS`, a transaction of the catalog) creates a
   class only when it inherits from `z2ui5_cl_cgui_report` - a class whose
   constructor wants parameters ended the app. The command field, the
