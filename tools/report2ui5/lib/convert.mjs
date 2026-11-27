@@ -41,7 +41,7 @@ import {
   abaplint, after, child, children, findAll, hasSeq, isToken, key, kind, lc, literal, nodeText,
   partTokens, renderTokens, stmtTokens, uc, unquote, words,
 } from "./abap.mjs";
-import { classXml, longLines, normalizeAbap } from "./abapgit.mjs";
+import { classFileBase, classXml, normalizeAbap, wrapLongLines } from "./abapgit.mjs";
 import { refusalOf } from "./refusals.mjs";
 import { functionKey } from "./textpool.mjs";
 import { Indent } from "@abaplint/core/build/src/pretty_printer/indent.js";
@@ -64,6 +64,7 @@ import { localsMethods } from "./convert-locals.mjs";
 import { declMethods } from "./convert-decl.mjs";
 import { rewritesMethods } from "./convert-rewrites.mjs";
 
+export { classFileBase } from "./abapgit.mjs";
 export { UNCATALOGUED, FRONTEND, GUI, SALV, RESERVED_METHODS, hasHeaderLine, declName, selectTargetType, defaultClassName, REFUSED_MESSAGES } from "./convert-shared.mjs";
 
 class Converter {
@@ -182,17 +183,37 @@ class Converter {
       renamed.set(n, to);
     }
     const edits = [];
-    for (const s of this.stmts) {
+    const editsOf = (s) => {
       const parents = tokenParents(s);
       const toks = stmtTokens(s);
       toks.forEach((t, i) => {
         const to = renamed.get(lc(t.getStr()));
         if (!to) return;
+        // a token of an expanded macro stands at the call - its body is
+        // renamed below
+        if (t.getStart() instanceof abaplint.VirtualPosition) return;
         const prev = toks[i - 1];
         if (prev && (["->", "=>", "~"].includes(prev.getStr()) || (prev.getStr() === "-" && prev.constructor.name === "Dash"))) return;
         if (!["Field", "DefinitionName", "FieldSub", "SimpleFieldChain", "FieldChain", "Source", "Target"].includes(parents.get(key(t)))) return;
         edits.push({ row: t.getRow(), col: t.getCol(), len: t.getStr().length, to });
       });
+    };
+    for (const s of this.stmts) editsOf(s);
+    // the bodies of the macros (DEFINE ... END-OF-DEFINITION): the parser
+    // expands them at their calls and keeps the body as text. Parsed here on
+    // their own - every other line blank, a placeholder &1 a name of the same
+    // length, so a token stands where it stands in the report - and renamed
+    // by the same rule: a field, not a keyword, not a component
+    const macroRows = new Set();
+    for (const s of this.stmts) {
+      if (kind(s) !== "MacroContent") continue;
+      for (const t of s.getTokens()) macroRows.add(t.getRow());
+    }
+    if (macroRows.size) {
+      const text = this.lines.map((l, i) => (macroRows.has(i + 1) ? l.replace(/&(?=\d)/g, "q") : "")).join("\n");
+      const reg = new abaplint.Registry().addFile(new abaplint.MemoryFile("zr2c_macros.prog.abap", text));
+      reg.parse();
+      for (const s of reg.getFirstObject()?.getABAPFiles()[0]?.getStatements() ?? []) editsOf(s);
     }
     if (!edits.length) return false;
     const lines = this.source.split("\n");
@@ -316,6 +337,8 @@ class Converter {
     let current;           // the unit statements go to
     let implicit;          // statements before the first event: START-OF-SELECTION
     let pendingComments = [];
+    // the normalized texts of the DATA statements among the declarations
+    const dataTexts = new Set();
 
     for (let i = 0; i < this.stmts.length; i++) {
       const s = this.stmts[i];
@@ -404,12 +427,19 @@ class Converter {
         const end = this.declEnd(i);
         // the same DATA x TYPE t in two event blocks declares the one global
         // twice - kept once, an attribute can be declared once only
-        const text = (x) => renderTokens(stmtTokens(x)).replace(/\s+/g, " ").toLowerCase();
-        const again = end === i && k === "Data" && this.decls.some((x) => kind(x) === "Data" && text(x) === text(s));
+        // (the texts of the DATA statements kept so far, in a Set - a scan
+        // of the declarations for every one is quadratic in a long report)
+        const text = end === i && k === "Data" ? renderTokens(stmtTokens(s)).replace(/\s+/g, " ").toLowerCase() : undefined;
+        const again = text !== undefined && dataTexts.has(text);
         // a comment inside the run (TYPES: a TYPE i, "comment) would cut a
         // chain in two - it is left out
         if (!again) {
-          for (let j = i; j <= end; j++) if (j === i || kind(this.stmts[j]) !== "Comment") this.decls.push(this.stmts[j]);
+          for (let j = i; j <= end; j++) {
+            const x = this.stmts[j];
+            if (j !== i && kind(x) === "Comment") continue;
+            this.decls.push(x);
+            if (kind(x) === "Data") dataTexts.add(x === s && text !== undefined ? text : renderTokens(stmtTokens(x)).replace(/\s+/g, " ").toLowerCase());
+          }
         } else this.note(`DATA ${lc(declName(s) ?? "")} is declared twice the same way - an attribute of the class once`);
         i = end;
         pendingComments = [];
@@ -563,15 +593,21 @@ class Converter {
 
 
   insideBegin(s) {
-    // a DATA inside DATA BEGIN OF ... END OF is a component, not a variable
-    const idx = this.decls.indexOf(s);
-    let depth = 0;
-    for (let j = 0; j < idx; j++) {
-      const k = kind(this.decls[j]);
-      if (k === "DataBegin" || k === "TypeBegin" || k === "ConstantBegin") depth++;
-      if (k === "DataEnd" || k === "TypeEnd" || k === "ConstantEnd") depth--;
+    // a DATA inside DATA BEGIN OF ... END OF is a component, not a variable -
+    // the depth of every declaration in one pass, again only when the
+    // declarations changed
+    if (this.beginDepth?.decls !== this.decls || this.beginDepth.length !== this.decls.length) {
+      const inside = new Set();
+      let depth = 0;
+      for (const x of this.decls) {
+        if (depth > 0) inside.add(x);
+        const k = kind(x);
+        if (k === "DataBegin" || k === "TypeBegin" || k === "ConstantBegin") depth++;
+        if (k === "DataEnd" || k === "TypeEnd" || k === "ConstantEnd") depth--;
+      }
+      this.beginDepth = { decls: this.decls, length: this.decls.length, inside };
     }
-    return depth > 0;
+    return this.beginDepth.inside.has(s);
   }
 
 
@@ -1119,7 +1155,7 @@ class Converter {
       lines.push(`  METHOD ${m.name}.`);
       lines.push("");
       const was = [...(this.methodWa.get(m.name) ?? new Map())].map(([tab, wa]) => `DATA ${wa} LIKE LINE OF ${tab}.`);
-      const globalFs = [...was, ...(this.prelude.get(m.name) ?? []), ...this.fieldSymbolDecls(m.body)];
+      const globalFs = [...was, ...(this.prelude.get(m.name) ?? []), ...this.fieldSymbolDecls(m.body, m.name)];
       for (const l of [...globalFs, ...(globalFs.length ? [""] : []), ...trimBlank(dropEmptyIfs(m.body))]) lines.push(indent(l, 4));
       lines.push("");
       lines.push("  ENDMETHOD.");
@@ -1127,20 +1163,39 @@ class Converter {
     lines.push("");
     lines.push("ENDCLASS.");
 
-    let abap = normalizeAbap(this.reindent(lines.join("\n"), `${cls}.clas.abap`));
-    const files = { [`${cls}.clas.abap`]: abap };
+    // the files are named as abapGit names them: a namespace /abc/ is #abc#
+    const base = classFileBase(cls);
+    let abap = normalizeAbap(this.reindent(lines.join("\n"), `${base}.clas.abap`));
+    const files = { [`${base}.clas.abap`]: abap };
 
     // local classes and interfaces - indented as the house style does, the
     // converted method bodies with them
-    if (locals.def) files[`${cls}.clas.locals_def.abap`] = normalizeAbap(this.reindent(locals.def, "zr2c_locals_def.prog.abap"));
-    if (locals.imp) files[`${cls}.clas.locals_imp.abap`] = normalizeAbap(this.reindent(locals.imp, "zr2c_locals_imp.prog.abap"));
+    if (locals.def) files[`${base}.clas.locals_def.abap`] = normalizeAbap(this.reindent(locals.def, "zr2c_locals_def.prog.abap"));
+    if (locals.imp) files[`${base}.clas.locals_imp.abap`] = normalizeAbap(this.reindent(locals.imp, "zr2c_locals_imp.prog.abap"));
 
-    files[`${cls}.clas.xml`] = classXml(cls, this.pool.title || `report2UI5 - ${this.programName}`);
+    files[`${base}.clas.xml`] = classXml(cls, this.pool.title || `report2UI5 - ${this.programName}`);
 
-    for (const [name, text] of Object.entries(files)) {
-      for (const l of longLines(text)) {
-        this.todos.push({ row: 0, col: 0, file: name, message: `${name}:${l.row} is ${l.length} characters long - abapGit imports at most 255; split the line` });
+    // a line over 255 characters - abapGit's import dies on it and leaves an
+    // empty class behind: broken at a token boundary, or refused
+    for (const name of Object.keys(files).filter((f) => f.endsWith(".abap"))) {
+      const { text, failed } = wrapLongLines(files[name]);
+      files[name] = text;
+      for (const l of failed) {
+        this.refusals.push({ row: 0, col: 0, file: name, code: "long-line",
+          message: `a line over 255 characters: ${name}:${l.row} is ${l.length} characters long and has no place to break it - abapGit imports at most 255; shorten the statement in the report` });
       }
+    }
+
+    // a global field symbol is declared in every method that uses it: right
+    // where each assigns it before it uses it, not where one assigns it and
+    // another reads what it points to
+    for (const [s, units] of this.fsUnits ?? []) {
+      const names = [...new Set(units.map((u) => u.unit))];
+      const reading = [...new Set(units.filter((u) => !u.assigns).map((u) => u.unit))];
+      if (names.length < 2 || !reading.length) continue;
+      this.refuse(s, `FIELD-SYMBOLS ${uc(declName(s))} is global and used in ${names.map((n) => `${n}( )`).join(", ")} - ` +
+        `${reading.map((n) => `${n}( )`).join(", ")} use${reading.length === 1 ? "s" : ""} it without assigning it, and a field symbol is no attribute of the class: ` +
+        "pass the field as a parameter, or keep a data reference (REF TO) in a global");
     }
 
     return {
@@ -1627,6 +1682,19 @@ class Converter {
         this.refuse(s, `${t} - the app has no screens or transactions to leave; RETURN ends the event block, leave_to_selection_screen( ) goes back`);
         return;
       }
+      case "Exit": {
+        // EXIT outside of a loop leaves the method as it left the event
+        // block - the behaviour is kept; what the classic runtime did after
+        // it (END-OF-SELECTION after START-OF-SELECTION, say) is for the
+        // user to check
+        const c = b.ctx;
+        if (b.loopDepth > 0 || c.form || c.local || c.callback || c.handler || uc(renderTokens(stmtTokens(s))) !== "EXIT") break;
+        const message = `EXIT outside of a loop leaves ${c.method}( ) - the classic EXIT left the event block; check that what runs after it` +
+          `${c.method === "start_of_selection" ? " (end_of_selection( ), then the list)" : ""} is what the report expects`;
+        out.push(`" TODO report2UI5: ${message}`);
+        this.todo(s, message);
+        break;
+      }
       case "Stop":
         // STOP ended START-OF-SELECTION and went on with END-OF-SELECTION -
         // as the runtime does after start_of_selection( ) returns
@@ -1929,7 +1997,7 @@ function convertGuiClasses(result, opts, seen = new Set()) {
   const todo = (result.guiDeps ?? []).filter((c) => !seen.has(c));
   for (const cls of todo) seen.add(cls);
   for (const cls of todo) {
-    const fileName = `${cls.replace(/\//g, "#")}.clas.abap`;
+    const fileName = `${classFileBase(cls)}.clas.abap`;
     const dep = (opts.deps ?? []).find((d) => lc(d.name.split("/").pop()) === fileName);
     if (!dep) continue;
     const sub = convertGuiClass(cls, dep.text.replace(/^\uFEFF/, ""), opts, seen);
@@ -1961,7 +2029,7 @@ function convertGuiClass(cls, source, opts, seen) {
   const PRE = "REPORT zr2c_gui_class.\n";
   const sub = convertReport(`${PRE}${local}\n\nSTART-OF-SELECTION.\n`, {
     ...opts, file: "zr2c_gui_class.prog.abap", className: "z2ui5_cl_cgui_r2c_gui_class", programName: "zr2c_gui_class",
-    textpool: undefined, deps: (opts.deps ?? []).filter((d) => lc(d.name.split("/").pop()) !== `${cls.replace(/\//g, "#")}.clas.abap`),
+    textpool: undefined, deps: (opts.deps ?? []).filter((d) => lc(d.name.split("/").pop()) !== `${classFileBase(cls)}.clas.abap`),
   });
   const shift = (r) => ({ ...r, row: Math.max(0, (r.row ?? 0) - 1) });
   const nested = convertGuiClasses(sub, opts, seen);
@@ -1994,8 +2062,8 @@ function convertGuiClass(cls, source, opts, seen) {
     out.refusals.push({ row: 1, col: 1, message: "the conversion needs local types beside the class - port it by hand" });
     return out;
   }
-  out.files[`${cls.replace(/\//g, "#")}.clas.abap`] = normalizeAbap(body);
-  out.files[`${cls.replace(/\//g, "#")}.clas.xml`] = classXml(cls, `${cls} - its SAP GUI controls on the stand-ins of abap-cloud-gui (report2UI5)`);
+  out.files[`${classFileBase(cls)}.clas.abap`] = normalizeAbap(body);
+  out.files[`${classFileBase(cls)}.clas.xml`] = classXml(cls, `${cls} - its SAP GUI controls on the stand-ins of abap-cloud-gui (report2UI5)`);
   return out;
 }
 

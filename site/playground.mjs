@@ -29,7 +29,7 @@
 // function mount( ) answers takes the listeners of the window down. This
 // module is bundled by scripts/build-site.mjs into public/r2u/playground.js,
 // beside examples.json and runtime.json, which it fetches relative to itself.
-import { convert, defaultClassName } from "../tools/report2ui5/lib/convert.mjs";
+import { classFileBase, convert, defaultClassName } from "../tools/report2ui5/lib/convert.mjs";
 import { migrationReport } from "../tools/report2ui5/lib/report.mjs";
 import { parseTextpool } from "../tools/report2ui5/lib/textpool.mjs";
 import { highlightAbap, highlightFile } from "./highlight.mjs";
@@ -79,13 +79,15 @@ function convertReport(text, { textpool, className } = {}) {
   const name = nameOf(text);
   const result = convert(text, { file: `${name.replace(/\//g, "#")}.prog.abap`, programName: name, className, textpool });
   const report = migrationReport(result, { source: `${name}.prog.abap` });
-  const files = { ...(result.ok ? result.files : result.draft), [`${result.className}.migration.md`]: report };
+  const files = { ...(result.ok ? result.files : result.draft), [`${classFileBase(result.className)}.migration.md`]: report };
   return { name, result, report, files };
 }
 
 /** the files of a conversion as tabs over a <pre>, highlighted; answers the
  *  name of the file shown */
 function fileTabs(tabs, output, files, className) {
+  // the files are named as abapGit names them: /abc/cl_x is #abc#cl_x
+  const base = classFileBase(className);
   let current;
   const show = (name) => {
     current = name;
@@ -93,13 +95,13 @@ function fileTabs(tabs, output, files, className) {
     for (const b of tabs.children) b.setAttribute("aria-selected", String(b.dataset.name === name));
   };
   tabs.replaceChildren(...Object.keys(files)
-    .sort((a, b) => (a === `${className}.clas.abap` ? -1 : b === `${className}.clas.abap` ? 1 : a.localeCompare(b)))
+    .sort((a, b) => (a === `${base}.clas.abap` ? -1 : b === `${base}.clas.abap` ? 1 : a.localeCompare(b)))
     .map((f) => {
-      const b = el("button", { type: "button", role: "tab", "data-name": f }, f.replace(`${className}.`, ""));
+      const b = el("button", { type: "button", role: "tab", "data-name": f }, f.replace(`${base}.`, ""));
       b.onclick = () => show(f);
       return b;
     }));
-  show(Object.keys(files).find((f) => f === `${className}.clas.abap`) ?? Object.keys(files)[0]);
+  show(Object.keys(files).find((f) => f === `${base}.clas.abap`) ?? Object.keys(files)[0]);
   return () => current;
 }
 
@@ -151,7 +153,7 @@ function renderSteps(list, steps) {
 }
 
 function stepsOf(name, text, textpool, result) {
-  const files = Object.keys(result.files).filter((f) => f.endsWith(".abap") && !f.startsWith(`${result.className}.clas`));
+  const files = Object.keys(result.files).filter((f) => f.endsWith(".abap") && !f.startsWith(`${classFileBase(result.className)}.clas`));
   return {
     read: { state: "ok", text: `Read the report ${name.toUpperCase()}: ${text.split("\n").length} lines${textpool ? ", with its text pool" : " - no text pool, the labels are the field names"}.` },
     convert: result.ok
@@ -167,7 +169,7 @@ const FROM_PLAYGROUND = "abap2ui5-playground";
  *  the first file as the app */
 const classFiles = (all, className) => Object.fromEntries(Object.entries(all)
   .filter(([n]) => n.endsWith(".abap"))
-  .sort(([a], [b]) => (a === `${className}.clas.abap` ? -1 : b === `${className}.clas.abap` ? 1 : a.localeCompare(b))));
+  .sort(([a], [b]) => (a === `${classFileBase(className)}.clas.abap` ? -1 : b === `${classFileBase(className)}.clas.abap` ? 1 : a.localeCompare(b))));
 
 // the report runtime and the demo tables (runtime.json, scripts/build-site.mjs),
 // fetched once, when the first app starts
@@ -206,13 +208,18 @@ async function fragmentOf(list) {
  *  state, text } ) as it goes. `open` is a link that opens the same files in
  *  the playground with its editor. Answers how it ended: { ok, said, problems
  *  } - problems what stopped the Run in the playground, by file and line. */
-function appFrame(frame, cover, onStep, open, signal) {
+export function appFrame(frame, cover, onStep, open, signal) {
   let runs = 0;
+  // what the frame says goes to the run started last; cancel( ) settles the
+  // run before it - its timer cleared, so it cannot speak over a newer one
   let heard = () => {};
+  let cancel = () => {};
   window.addEventListener("message", (e) => {
     if (e.source === frame.contentWindow && e.data?.source === FROM_PLAYGROUND) heard(e.data);
   }, { signal });
+  signal?.addEventListener("abort", () => cancel());
   return async (classes, className) => {
+    cancel();
     const run = ++runs;
     onStep({ state: "wait", text: "Starting it in the abap2UI5 playground: the abap2UI5 runtime, the report runtime of abap-cloud-gui and the class are loaded in this browser..." });
     cover.hidden = false;
@@ -233,17 +240,25 @@ function appFrame(frame, cover, onStep, open, signal) {
     const started = Date.now();
     let problems = [];
     return new Promise((resolve) => {
+      let timer;
+      let listen;
+      const stop = () => done({ ok: false, said: "started again", problems: [] });
+      // settles this run once: its timer cleared, and the listener and the
+      // cancel( ) of the page reset only while they are still this run's
       const done = (outcome) => {
         clearTimeout(timer);
-        heard = () => {};
+        if (heard === listen) heard = () => {};
+        if (cancel === stop) cancel = () => {};
         resolve(outcome);
       };
-      const timer = setTimeout(() => {
+      cancel = stop;
+      timer = setTimeout(() => {
+        if (run !== runs) return stop();
         onStep({ state: "bad", text: "It did not start within two minutes - is the network down?" });
         done({ ok: false, said: "no start within two minutes", problems: [] });
       }, 120000);
-      heard = (m) => {
-        if (run !== runs) return done({ ok: false, said: "started again", problems: [] });
+      heard = listen = (m) => {
+        if (run !== runs) return stop();
         if (m.type === "problems" && Array.isArray(m.problems)) problems = m.problems;
         if (m.type !== "status" || typeof m.message !== "string") return;
         const said = m.message.trim();
@@ -292,7 +307,7 @@ const download = (name, text, type = "text/plain") => {
 // all the files as the zip abapGit imports offline (Repository - New Offline,
 // then Import zip): .abapgit.xml and the objects under src/ - the way into
 // the system in one click
-const downloadZip = (files, className) => download(`${className}.zip`, abapgitZip(files, className), "application/zip");
+const downloadZip = (files, className) => download(`${classFileBase(className)}.zip`, abapgitZip(files, className), "application/zip");
 
 /** the playground on a page: the samples (site/samples.md) or your own
  *  report, GitHub and the package (site/playground.md) - whichever sections
@@ -618,7 +633,14 @@ function ownSection(signal) {
   classname.value = was?.classname ?? "";
   run();
 
-  const open = ({ source: text, xml }) => {
+  /** makes a report your own - with ask (a ?github= link, nothing the
+   *  user did on the page), only after asking whether your own report in the
+   *  editor, which is kept in this browser and would be lost, goes. Answers
+   *  whether it was opened */
+  const open = ({ source: text, xml }, { ask = false } = {}) => {
+    const mine = source.value;
+    if (ask && mine.trim() && mine.trim() !== text.trim()
+      && !window.confirm("Replace your own report in the editor with the report of the link? Yours is not kept anywhere else - Cancel keeps it.")) return false;
     source.value = text;
     textpoolXml.value = xml ?? "";
     classname.value = "";
@@ -626,6 +648,7 @@ function ownSection(signal) {
     run();
     selectTab("src-own");
     $("converted").scrollIntoView({ behavior: "smooth" });
+    return true;
   };
   return { open };
 }
@@ -745,7 +768,9 @@ function githubSection(own, pkg, signal) {
     status.textContent = text;
   };
 
-  const importFrom = async (link) => {
+  // ask: the link came with the page (?github=), not from a click - your
+  // own report is not replaced without asking
+  const importFrom = async (link, { ask = false } = {}) => {
     const at = parseGithub(link);
     if (!at) {
       say("bad", "That is no GitHub link - a repository, a folder (…/tree/…) or a file (…/blob/….prog.abap).");
@@ -760,7 +785,10 @@ function githubSection(own, pkg, signal) {
         if (source === undefined) throw new Error("Not found on GitHub - is the repository public, and the branch and path right?");
         const xml = /\.prog\.abap$/i.test(at.path) ? await getText(rawUrl(at, at.path.replace(/\.abap$/i, ".xml"))) : undefined;
         if (signal.aborted) return;
-        own.open({ source, xml });
+        if (!own.open({ source, xml }, { ask })) {
+          say("", `Not imported - your own report stays in the editor. Import ${at.path.split("/").pop()} again to replace it.`);
+          return;
+        }
         say("ok", `Imported ${at.path.split("/").pop()}${xml ? " with its text pool" : ""} from ${at.owner}/${at.repo}.`);
       } else {
         say("", `Reading ${at.owner}/${at.repo}${at.path ? `/${at.path}` : ""}...`);
@@ -793,6 +821,6 @@ function githubSection(own, pkg, signal) {
   if (linked) {
     selectTab("src-gh");
     input.value = linked;
-    importFrom(linked);
+    importFrom(linked, { ask: true });
   }
 }

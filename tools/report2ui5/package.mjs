@@ -9,9 +9,11 @@
 // how many converted, and the refusals ranked across the package. Exit code
 // 0 whatever the numbers; 1: wrong call.
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
 import { includesFrom } from "./lib/includes-fs.mjs";
 import { coverage, isReport, programs, summary } from "./coverage.mjs";
+import { defaultClassName } from "./lib/convert.mjs";
+import { uniqueClassNames } from "./lib/package.mjs";
 
 const USAGE = "usage: node tools/report2ui5/package.mjs <dir> [<dir> ...] --out <dir> [--includes dir]";
 
@@ -33,8 +35,22 @@ function args(argv) {
  *  summary.md in out, when it is given */
 export function packageRun(files, { read, out } = {}) {
   const reportFiles = files.filter((f) => isReport(readFileSync(f, "utf8")));
-  const rows = coverage(reportFiles, { read, keep: true });
-  const markdown = ["# report2UI5 package", "", "```", summary(rows), "```", ""].join("\n");
+  // one class name per report - two reports that would give the same one
+  // (ZREPORT and Z_REPORT, two long names cut alike) are numbered, and a
+  // SUBMIT starts the class the report it names got
+  const programOf = (f) => (/^(.+)\.prog\.abap$/i.exec(basename(f))?.[1] ?? basename(f)).replace(/#/g, "/");
+  const wanted = reportFiles.map((f) => defaultClassName(programOf(f)));
+  const unique = uniqueClassNames(wanted);
+  const classOf = new Map(reportFiles.map((f, i) => [f, unique[i]]));
+  const byProgram = new Map();
+  reportFiles.forEach((f, i) => {
+    if (!byProgram.has(programOf(f).toUpperCase())) byProgram.set(programOf(f).toUpperCase(), unique[i]);
+  });
+  const rows = coverage(reportFiles, { read, keep: true, className: (f) => classOf.get(f), classFor: (p) => byProgram.get(String(p).toUpperCase()) });
+  const renamed = reportFiles.flatMap((f, i) => (unique[i] !== wanted[i]
+    ? [`  ${programOf(f).toUpperCase()} -> ${unique[i]} (${wanted[i]} is ${programOf(reportFiles[wanted.indexOf(wanted[i])]).toUpperCase()}'s)`] : []));
+  const text = [summary(rows), ...(renamed.length ? ["", "Class names taken by another report of the package - numbered", ...renamed] : [])].join("\n");
+  const markdown = ["# report2UI5 package", "", "```", text, "```", ""].join("\n");
   if (out) {
     mkdirSync(out, { recursive: true });
     for (const row of rows) for (const [name, text] of Object.entries(row.files ?? {})) writeFileSync(join(out, name), text);

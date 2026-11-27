@@ -58,6 +58,8 @@ const SAMPLES = {
   "window": ["WINDOW outside of AT LINE-SELECTION - window( ) shows the secondary list"],
   "function-keys": ["AT PF05 - a second block for the key", "AT PF99 - no function key of that number"],
   "syntax": ["the parser does not understand this statement - a syntax error", "no END FORM for this statement"],
+  "global-field-symbol": ["FIELD-SYMBOLS <LINE> is global and used in start_of_selection( ), bump( ) - bump( ) uses it without assigning it"],
+  "long-line": ["a line over 255 characters: zcl_x.clas.abap:12 is 301 characters long and has no place to break it"],
   "list-control": ["LEAVE TO LIST-PROCESSING - the list is shown after start_of_selection( )", "NEW-PAGE PRINT ON - printing is not supported"],
 };
 

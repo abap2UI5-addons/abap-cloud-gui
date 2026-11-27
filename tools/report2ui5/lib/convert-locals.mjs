@@ -242,7 +242,7 @@ export const localsMethods = {
           const key = `${n}~${b.name}`;
           const body = this.convertBody(b.body, { method: key, local: { cls: n, declared: own } });
           const was = [...(this.methodWa.get(key) ?? new Map())].map(([tab, wa]) => `DATA ${wa} LIKE LINE OF ${tab}.`);
-          const pre = [...was, ...(this.prelude.get(key) ?? []), ...this.fieldSymbolDecls(body)];
+          const pre = [...was, ...(this.prelude.get(key) ?? []), ...this.fieldSymbolDecls(body, key)];
           const mine = methodsOf.get(n) ?? new Set();
           const calls = new Set([...BASE_METHODS, ...REPORT_CALLS, ...formMethods].filter((x) => !mine.has(x)));
           // a method of the runtime the local class has one of its own name
@@ -351,13 +351,22 @@ export const localsMethods = {
   },
 
 
-  fieldSymbolDecls(body) {
+  /** the global field symbols a method uses, declared in it - and noted
+   *  in fsUnits: which method uses which, and whether it assigns it itself
+   *  (generate( ) refuses one that a method reads without assigning it) */
+  fieldSymbolDecls(body, unit) {
     if (!this.globalFieldSymbols) return [];
     const text = body.join("\n").toLowerCase();
     // a field symbol the method declares itself shadows the global one
     const own = (name) => new RegExp(`${name.replace(/[<>]/g, "\\$&")}\\s+(type|like|structure)\\b`).test(text);
-    return this.globalFieldSymbols
-      .filter((s) => text.includes(lc(declName(s))) && !own(lc(declName(s))))
-      .map((s) => `${renderTokens(stmtTokens(s), new Map(), s.getColon()).replace(/^([\w-]+)(\s*):\s*/, "$1 ")}.`);
+    const used = this.globalFieldSymbols.filter((s) => text.includes(lc(declName(s))) && !own(lc(declName(s))));
+    this.fsUnits ??= new Map();
+    for (const s of used) {
+      const esc = lc(declName(s)).replace(/[<>]/g, "\\$&");
+      // ASSIGN ... TO <fs>, LOOP / READ / INSERT / APPEND ... ASSIGNING <fs>
+      const assigns = new RegExp(`\\bassigning\\s+${esc}`).test(text) || new RegExp(`\\bassign\\b[^.]*?\\bto\\s+${esc}`).test(text);
+      this.fsUnits.set(s, [...(this.fsUnits.get(s) ?? []), { unit: unit ?? "?", assigns }]);
+    }
+    return used.map((s) => `${renderTokens(stmtTokens(s), new Map(), s.getColon()).replace(/^([\w-]+)(\s*):\s*/, "$1 ")}.`);
   },
 };

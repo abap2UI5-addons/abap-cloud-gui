@@ -2,7 +2,7 @@
 // summary.md beside them.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { packageRun } from "../package.mjs";
@@ -28,6 +28,27 @@ test("a package in one run: the classes written, summary.md beside them", () => 
     assert.equal(md, markdown);
     assert.match(md, /3 report\(s\) - 2 converted/);
     assert.match(md, /\[dynpro\]/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("a package in one run: two reports that would give the same class get a name each - as many classes written as converted", () => {
+  const dir = mkdtempSync(join(tmpdir(), "r2c-pkg-"));
+  const out = join(dir, "out");
+  try {
+    writeFileSync(join(dir, "zr2c_pd.prog.abap"), "REPORT zr2c_pd.\nSTART-OF-SELECTION.\n  WRITE / 'one'.\n  SUBMIT z_r2c_pd AND RETURN.\n");
+    writeFileSync(join(dir, "z_r2c_pd.prog.abap"), "REPORT z_r2c_pd.\nSTART-OF-SELECTION.\n  WRITE / 'two'.\n");
+    const { rows, markdown } = packageRun(programs(dir), { read: includesFrom([dir]), out });
+    assert.deepEqual(rows.map((r) => r.ok), [true, true]);
+    const classes = readdirSync(out).filter((f) => f.endsWith(".clas.abap")).sort();
+    assert.deepEqual(classes, ["zcl_r2c_pd.clas.abap", "zcl_r2c_pd2.clas.abap"]);
+    assert.match(readFileSync(join(out, "zcl_r2c_pd.clas.abap"), "utf8"), /write\( 'two' \)/);
+    const two = readFileSync(join(out, "zcl_r2c_pd2.clas.abap"), "utf8");
+    assert.match(two, /^CLASS zcl_r2c_pd2 DEFINITION/);
+    assert.match(two, /submit\( report = `ZCL_R2C_PD`/i);
+    assert.match(markdown, /2 report\(s\) - 2 converted/);
+    assert.match(markdown, /ZR2C_PD -> zcl_r2c_pd2 \(zcl_r2c_pd is Z_R2C_PD's\)/);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

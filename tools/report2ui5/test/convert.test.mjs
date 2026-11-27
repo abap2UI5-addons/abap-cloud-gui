@@ -1765,3 +1765,106 @@ test("SALV stand-in: a tree's handler of added_function OF cl_salv_events is ref
   assert.equal(r.ok, false);
   assert.ok(r.refusals.some((x) => /SET HANDLER on_function/.test(x.message)), r.refusals.map((x) => x.message).join("\n"));
 });
+
+// ------------------------------------------------ findings of a review
+
+test("a global field symbol one block assigns and another reads is refused - one every user assigns itself is declared in each", () => {
+  const shared = "REPORT zt.\nDATA gt TYPE STANDARD TABLE OF i WITH DEFAULT KEY.\nFIELD-SYMBOLS <line> TYPE i.\nSTART-OF-SELECTION.\n  APPEND 1 TO gt.\n  READ TABLE gt ASSIGNING <line> INDEX 1.\n  PERFORM bump.\n  WRITE / <line>.\nFORM bump.\n  <line> = <line> + 1.\nENDFORM.\n";
+  const r = convert(shared, { file: "zt.prog.abap", className: "zcl_t" });
+  assert.equal(r.ok, false);
+  assert.deepEqual(r.refusals.map((x) => [x.row, x.code]), [[3, "global-field-symbol"]]);
+  assert.match(r.refusals[0].message, /^FIELD-SYMBOLS <LINE> is global and used in start_of_selection\( \), bump\( \) - bump\( \) uses it without assigning it/);
+  assert.deepEqual(r.files, {});
+
+  // every block assigns it before it uses it - a field symbol of its own each
+  const own = shared.replace("\nFORM bump.\n", "\nFORM bump.\n  LOOP AT gt ASSIGNING <line>.\n  ENDLOOP.\n");
+  const ok = convert(own, { file: "zt.prog.abap", className: "zcl_t" });
+  assert.deepEqual(ok.refusals, []);
+  assert.equal(ok.files["zcl_t.clas.abap"].match(/FIELD-SYMBOLS <line> TYPE i\./g).length, 2);
+});
+
+test("a namespaced report: the files are named as abapGit names them - #abc#, no folder", () => {
+  const r = convert("REPORT /abc/zrep.\nSTART-OF-SELECTION.\n  WRITE / 'x'.\n", { file: "#abc#zrep.prog.abap", programName: "/abc/zrep" });
+  assert.equal(r.className, "/abc/cl_zrep");
+  assert.deepEqual(Object.keys(r.files).sort(), ["#abc#cl_zrep.clas.abap", "#abc#cl_zrep.clas.xml"]);
+  assert.match(r.files["#abc#cl_zrep.clas.abap"], /^CLASS \/abc\/cl_zrep DEFINITION PUBLIC/);
+  assert.match(r.files["#abc#cl_zrep.clas.xml"], /<CLSNAME>\/ABC\/CL_ZREP<\/CLSNAME>/);
+});
+
+test("a global renamed for a component of the runtime is renamed in the bodies of the macros too - not the keyword, not a component", () => {
+  const src = "REPORT zt.\nTYPES: BEGIN OF ty_s,\n         message TYPE i,\n       END OF ty_s.\nDATA message TYPE i.\nDATA ls TYPE ty_s.\n\nDEFINE bump.\n  message = message + &1.\n  ls-message = &1.\n  IF message > 100.\n    MESSAGE 'big' TYPE 'I'.\n  ENDIF.\nEND-OF-DEFINITION.\n\nSTART-OF-SELECTION.\n  bump 1.\n  bump 22.\n  WRITE / message.\n";
+  const r = convert(src, { file: "zt.prog.abap", className: "zcl_t" });
+  assert.deepEqual(r.refusals, []);
+  const cls = r.files["zcl_t.clas.abap"];
+  assert.match(cls, /gv_message = gv_message \+ 1\.\n\s+ls-message = 1\.\n\s+IF gv_message > 100\./);
+  assert.match(cls, /gv_message = gv_message \+ 22\./);
+  assert.doesNotMatch(cls, /\bmessage = message\b|ls-gv_message/);
+  // the keyword stays a MESSAGE, converted as one
+  assert.match(cls, /message\( text = 'big'/);
+});
+
+test("a long report converts in linear time - the declarations deduplicated through a Set, BEGIN OF depths in one pass", () => {
+  const n = 4000;
+  const src = ["REPORT zbig.", ...Array.from({ length: n }, (_, i) => `DATA gv_${i} TYPE i.`), "PARAMETERS p_a TYPE i.", "START-OF-SELECTION.",
+    ...Array.from({ length: n }, (_, i) => `  gv_${i} = p_a + ${i}.\n  IF gv_${i} > 3. WRITE: / gv_${i}. ENDIF.`), ""].join("\n");
+  const started = Date.now();
+  const r = convert(src, { file: "zbig.prog.abap", className: "zcl_big" });
+  const ms = Date.now() - started;
+  assert.equal(r.ok, true);
+  // 14 000 lines: about a second - quadratic, it took twenty
+  assert.ok(ms < 8000, `${ms} ms for ${src.split("\n").length} lines`);
+});
+
+test("a line over 255 characters is broken at a token boundary, a literal in two joined with & - a template that cannot be broken is refused", () => {
+  const x = "x".repeat(240);
+  const src = `REPORT zt.\nDATA gv_s TYPE string.\nDATA gt TYPE STANDARD TABLE OF i WITH DEFAULT KEY.\nSTART-OF-SELECTION.\n  PERFORM f.\nFORM f.\n  LOOP AT gt INTO DATA(lv).\n    IF lv > 0.\n      DO 2 TIMES.\n        gv_s = 'it''s ${x}'. " a comment\n      ENDDO.\n    ENDIF.\n  ENDLOOP.\nENDFORM.\n`;
+  const r = convert(src, { file: "zt.prog.abap", className: "zcl_t" });
+  assert.deepEqual(r.refusals, []);
+  const cls = r.files["zcl_t.clas.abap"];
+  for (const l of cls.split("\n")) assert.ok(l.length <= 255, `${l.length}: ${l.slice(0, 60)}`);
+  // the same literal: the two parts joined again
+  const m = /gv_s =\n\s+('[^\n]*') &\n\s+('[^\n]*')\. +" a comment/.exec(cls);
+  assert.ok(m, cls);
+  assert.equal(m[1].slice(0, -1) + m[2].slice(1), `'it''s ${x}'`);
+
+  const template = convert(src.replace(`'it''s ${x}'`, `|${"y".repeat(300)}|`), { file: "zt.prog.abap", className: "zcl_t" });
+  assert.equal(template.ok, false);
+  assert.deepEqual(template.refusals.map((x) => [x.code, x.file]), [["long-line", "zcl_t.clas.abap"]]);
+  assert.match(template.refusals[0].message, /^a line over 255 characters: zcl_t\.clas\.abap:\d+ is \d+ characters long/);
+  assert.deepEqual(template.files, {});
+});
+
+test("wrapLongLines: never between the quotes of an escaped quote, comments go on in comment lines", async () => {
+  const { wrapLongLines } = await import("../lib/abapgit.mjs");
+  // the cut would fall between the two quotes of ''
+  const lit = `'${"a".repeat(248)}''${"b".repeat(20)}'`;
+  const { text, failed } = wrapLongLines(`    lv = ${lit}.`);
+  assert.deepEqual(failed, []);
+  const [, ...rest] = text.split("\n");
+  const parts = rest.map((l) => l.trim().replace(/ &$/, "").replace(/\.$/, ""));
+  assert.equal(parts.map((p) => p.slice(1, -1)).join(""), lit.slice(1, -1));
+  for (const l of text.split("\n")) assert.ok(l.length <= 255);
+  const comment = wrapLongLines(`    " ${"word ".repeat(80)}`);
+  assert.deepEqual(comment.failed, []);
+  assert.ok(comment.text.split("\n").every((l) => l.length <= 255 && /^ {4}" /.test(l)), comment.text);
+});
+
+test("a USING parameter a field symbol or a reference is set to - ASSIGN, GET REFERENCE OF, REF #( ) - is CHANGING, as one written to", () => {
+  const src = "REPORT zt.\nDATA gv TYPE i.\nSTART-OF-SELECTION.\n  PERFORM viafs USING gv.\n  PERFORM viaref USING gv.\n  PERFORM vianew USING gv.\n  PERFORM read USING gv.\nFORM viafs USING iv TYPE i.\n  FIELD-SYMBOLS <fs> TYPE i.\n  ASSIGN iv TO <fs>.\n  <fs> = 5.\nENDFORM.\nFORM viaref USING iv TYPE i.\n  DATA lr TYPE REF TO i.\n  GET REFERENCE OF iv INTO lr.\n  lr->* = 6.\nENDFORM.\nFORM vianew USING iv TYPE i.\n  DATA(lr) = REF #( iv ).\n  lr->* = 7.\nENDFORM.\nFORM read USING iv TYPE i.\n  WRITE / iv.\nENDFORM.\n";
+  const r = convert(src, { file: "zt.prog.abap", className: "zcl_t" });
+  assert.deepEqual(r.refusals, []);
+  const cls = r.files["zcl_t.clas.abap"];
+  for (const m of ["viafs", "viaref", "vianew"]) assert.match(cls, new RegExp(`METHODS ${m}\\n\\s+CHANGING\\n\\s+iv TYPE i\\.`), m);
+  assert.match(cls, /METHODS read\n\s+IMPORTING\n\s+iv TYPE i\./);
+});
+
+test("EXIT outside of a loop in an event block is kept, with a TODO to check what runs after it - not in a loop, not in a FORM", () => {
+  const src = "REPORT zt.\nPARAMETERS p_x TYPE i.\nSTART-OF-SELECTION.\n  DO 3 TIMES.\n    EXIT.\n  ENDDO.\n  IF p_x = 0.\n    EXIT.\n  ENDIF.\n  PERFORM f.\nEND-OF-SELECTION.\n  WRITE / 'end'.\nFORM f.\n  EXIT.\nENDFORM.\n";
+  const r = convert(src, { file: "zt.prog.abap", className: "zcl_t" });
+  assert.equal(r.ok, true);
+  const cls = r.files["zcl_t.clas.abap"];
+  assert.equal(cls.match(/\bEXIT\./g).length, 3, "the behaviour is kept");
+  assert.match(cls, /IF p_x = 0\.\n\s+" TODO report2UI5: EXIT outside of a loop leaves start_of_selection\( \) - [^\n]*end_of_selection\( \)[^\n]*\n\s+EXIT\./);
+  assert.equal(cls.match(/TODO report2UI5: EXIT/g).length, 1);
+  assert.deepEqual(r.todos.filter((t) => /^EXIT/.test(t.message)).map((t) => t.row), [8]);
+});
