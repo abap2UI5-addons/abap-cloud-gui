@@ -121,6 +121,15 @@ CLASS z2ui5_cl_cgui_tree DEFINITION PUBLIC FINAL CREATE PUBLIC.
       RETURNING
         VALUE(result) TYPE i.
 
+    "! open a closed node, close an open one with children - abap_true when
+    "! it was a lazy node opened the first time, without children: it counts
+    "! as loaded now, its children are the caller's to add
+    METHODS toggle
+      IMPORTING
+        key           TYPE i
+      RETURNING
+        VALUE(result) TYPE abap_bool.
+
     "! a lazy node was opened and has no children yet - its key, once: the
     "! report loads the children (at_tree_expand_no_children)
     METHODS take_expand_request
@@ -848,22 +857,30 @@ CLASS z2ui5_cl_cgui_tree IMPLEMENTATION.
 
   ENDMETHOD.
 
+  METHOD toggle.
+
+    DATA(ls_node) = get_node( key ).
+    IF ls_node-expanded = abap_true AND has_children( key ) = abap_true.
+      collapse( key ).
+      RETURN.
+    ENDIF.
+    expand( key ).
+    IF ls_node-lazy = abap_true AND has_children( key ) = abap_false.
+      " loaded once - empty afterwards, it is a folder without children
+      set_loaded( key ).
+      result = abap_true.
+    ENDIF.
+
+  ENDMETHOD.
+
   METHOD handle_event.
 
     result = abap_true.
     CASE client->get_event( ).
       WHEN cs_event-toggle.
         DATA(lv_key) = get_node_by_event( client ).
-        DATA(ls_node) = get_node( lv_key ).
-        IF ls_node-expanded = abap_true AND has_children( lv_key ) = abap_true.
-          collapse( lv_key ).
-        ELSE.
-          expand( lv_key ).
-          IF ls_node-lazy = abap_true AND has_children( lv_key ) = abap_false.
-            " loaded once - empty afterwards, it is a folder without children
-            set_loaded( lv_key ).
-            mv_expand_request = lv_key.
-          ENDIF.
+        IF toggle( lv_key ) = abap_true.
+          mv_expand_request = lv_key.
         ENDIF.
       WHEN cs_event-checkbox.
         " the tick is in the node already (sync) - the branch follows it

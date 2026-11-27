@@ -429,17 +429,10 @@ CLASS z2ui5_cl_cgui_simple_tree IMPLEMENTATION.
 
     CASE lv_event.
       WHEN `EXPAND`.
-        DATA(ls_node) = mo_tree->get_node( lv_key ).
-        IF ls_node-expanded = abap_true AND mo_tree->has_children( lv_key ) = abap_true.
-          mo_tree->collapse( lv_key ).
-        ELSE.
-          mo_tree->expand( lv_key ).
-          " a node with expander: the handler adds its children now
-          IF ls_node-lazy = abap_true AND mo_tree->has_children( lv_key ) = abap_false.
-            mo_tree->set_loaded( lv_key ).
-            raise_node_event( event = `EXPAND_NO_CHILDREN`
-                              key   = lv_key ).
-          ENDIF.
+        " a node with expander: the handler adds its children now
+        IF mo_tree->toggle( lv_key ) = abap_true.
+          raise_node_event( event = `EXPAND_NO_CHILDREN`
+                            key   = lv_key ).
         ENDIF.
       WHEN `CLICK`.
         mv_selected = lv_key.
