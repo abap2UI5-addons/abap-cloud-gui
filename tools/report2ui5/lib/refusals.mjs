@@ -152,8 +152,8 @@ zcl_common=>read_customer( lv_kunnr ).
     id: "reserved-name",
     title: "A name of the runtime: a parameter named like a component of z2ui5_cl_cgui_report",
     match: /is the name of a component of z2ui5_cl_cgui_report/,
-    why: "Every global of the report becomes an attribute of the class, which inherits from `z2ui5_cl_cgui_report`. A global with the name of one of its methods or attributes (`list`, `message`, `alv`, `client`, ...) would collide. A global `DATA` or `CONSTANTS` is renamed by the converter (`message` becomes `gv_message`, the migration report says so); a parameter or select-option is not - the text pool and every `SUBMIT ... WITH` know its name.",
-    rewrite: "Rename the parameter in the report and in its selection texts, then convert again - for example `list` to `p_list`.",
+    why: "Every global of the report becomes an attribute of the class, which inherits from `z2ui5_cl_cgui_report`. A global with the name of one of its methods or attributes (`list`, `message`, `alv`, `client`, ...) would collide. A global `DATA` or `CONSTANTS` is renamed by the converter (`message` becomes `gv_message`, the migration report says so); a parameter or select-option is not - the text pool and every `SUBMIT ... WITH` know its name. A renamed global passed to a macro (`add message 1.`) is renamed in the call too where the macro's body uses that placeholder as a field everywhere; where it uses it as a field in one place and as a component in another (`ls-&1 = &1.`), or in a statement the converter does not parse, the call is refused.",
+    rewrite: "Rename the parameter in the report and in its selection texts, then convert again - for example `list` to `p_list`. For a global passed to a macro, rename the global in the report.",
   },
   {
     id: "local-class",

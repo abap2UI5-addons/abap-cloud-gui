@@ -183,18 +183,23 @@ class Converter {
       renamed.set(n, to);
     }
     const edits = [];
+    // a token that is a field: not a component (wa-message, ref->message,
+    // cl=>message, intf~message), not a keyword
+    const isField = (toks, i, parents) => {
+      const prev = toks[i - 1];
+      if (prev && (["->", "=>", "~"].includes(prev.getStr()) || (prev.getStr() === "-" && prev.constructor.name === "Dash"))) return false;
+      return ["Field", "DefinitionName", "FieldSub", "SimpleFieldChain", "FieldChain", "Source", "Target"].includes(parents.get(key(toks[i])));
+    };
     const editsOf = (s) => {
       const parents = tokenParents(s);
       const toks = stmtTokens(s);
       toks.forEach((t, i) => {
         const to = renamed.get(lc(t.getStr()));
         if (!to) return;
-        // a token of an expanded macro stands at the call - its body is
-        // renamed below
+        // a token of an expanded macro stands at the call - its body and
+        // its arguments are renamed below
         if (t.getStart() instanceof abaplint.VirtualPosition) return;
-        const prev = toks[i - 1];
-        if (prev && (["->", "=>", "~"].includes(prev.getStr()) || (prev.getStr() === "-" && prev.constructor.name === "Dash"))) return;
-        if (!["Field", "DefinitionName", "FieldSub", "SimpleFieldChain", "FieldChain", "Source", "Target"].includes(parents.get(key(t)))) return;
+        if (!isField(toks, i, parents)) return;
         edits.push({ row: t.getRow(), col: t.getCol(), len: t.getStr().length, to });
       });
     };
@@ -205,15 +210,73 @@ class Converter {
     // length, so a token stands where it stands in the report - and renamed
     // by the same rule: a field, not a keyword, not a component
     const macroRows = new Set();
+    const macroOfRow = new Map();
+    const defined = new Set();
+    let macro;
     for (const s of this.stmts) {
+      if (kind(s) === "Define") defined.add(macro = lc(stmtTokens(s)[1]?.getStr() ?? ""));
       if (kind(s) !== "MacroContent") continue;
-      for (const t of s.getTokens()) macroRows.add(t.getRow());
+      for (const t of s.getTokens()) {
+        macroRows.add(t.getRow());
+        macroOfRow.set(t.getRow(), macro);
+      }
     }
+    // how each placeholder of each macro is used in its body: as a field
+    // only, never as one, or in a statement the parser does not know
+    const placeholders = new Map();
+    const uses = new Map();
     if (macroRows.size) {
-      const text = this.lines.map((l, i) => (macroRows.has(i + 1) ? l.replace(/&(?=\d)/g, "q") : "")).join("\n");
+      const text = this.lines.map((l, i) => {
+        if (!macroRows.has(i + 1)) return "";
+        for (const m of l.matchAll(/&(\d)/g)) placeholders.set(`${i + 1}:${m.index + 1}`, m[1]);
+        return l.replace(/&(?=\d)/g, "q");
+      }).join("\n");
       const reg = new abaplint.Registry().addFile(new abaplint.MemoryFile("zr2c_macros.prog.abap", text));
       reg.parse();
-      for (const s of reg.getFirstObject()?.getABAPFiles()[0]?.getStatements() ?? []) editsOf(s);
+      for (const s of reg.getFirstObject()?.getABAPFiles()[0]?.getStatements() ?? []) {
+        editsOf(s);
+        const parents = tokenParents(s);
+        const toks = stmtTokens(s);
+        const known = !["Unknown", "MacroCall"].includes(kind(s));
+        toks.forEach((t, i) => {
+          const n = placeholders.get(key(t));
+          if (!n) return;
+          const id = `${macroOfRow.get(t.getRow())}#${n}`;
+          const use = uses.get(id) ?? { field: 0, other: 0, unknown: 0 };
+          use[!known ? "unknown" : isField(toks, i, parents) ? "field" : "other"]++;
+          uses.set(id, use);
+        });
+      }
+    }
+    // the arguments of the macro calls (add message 1.): the call keeps them
+    // as plain tokens, the body has &1 where it has message. An argument
+    // goes with the global where its placeholder is a field in every place
+    // of the body, stays where it is never one (ls-&1, a type) - and where
+    // the body uses it both ways, or in a statement that does not parse,
+    // the call is refused rather than half renamed
+    for (const s of this.stmts) {
+      if (kind(s) !== "MacroCall") continue;
+      const toks = stmtTokens(s);
+      const name = lc(toks[0]?.getStr() ?? "");
+      let n = 0;
+      toks.forEach((t, i) => {
+        if (i === 0) return;
+        const prev = toks[i - 1];
+        // an argument is a run of tokens without blanks between them
+        const joined = i > 1 && prev.getRow() === t.getRow() && prev.getCol() + prev.getStr().length === t.getCol();
+        if (!joined) n++;
+        const to = renamed.get(lc(t.getStr()));
+        if (!to || joined) return;
+        // a placeholder the body does not use: the argument is no field
+        const use = uses.get(`${name}#${n}`) ?? (defined.has(name) ? { field: 0, other: 0, unknown: 0 } : undefined);
+        if (use && !use.unknown && !(use.field && use.other)) {
+          if (use.field) edits.push({ row: t.getRow(), col: t.getCol(), len: t.getStr().length, to });
+          return;
+        }
+        this.refuse(s, `the global ${uc(t.getStr())} is the name of a component of z2ui5_cl_cgui_report and is renamed to ${to}, ` +
+          `but it is passed to the macro ${uc(name)}, whose &${n} the converter cannot tell a field or not - ` +
+          `rename ${uc(t.getStr())} in the report`);
+      });
     }
     if (!edits.length) return false;
     const lines = this.source.split("\n");

@@ -1783,6 +1783,46 @@ test("a global field symbol one block assigns and another reads is refused - one
   assert.equal(ok.files["zcl_t.clas.abap"].match(/FIELD-SYMBOLS <line> TYPE i\./g).length, 2);
 });
 
+test("a global field symbol is assigned by what the statements say - a '.' inside an ASSIGN ends no statement", () => {
+  const conv = (src) => convert(src, { file: "zt.prog.abap", className: "zcl_t" });
+  // a decimal key in a table expression: converted as at 1d77ea9, a field symbol of its own in each method
+  const key = conv("REPORT zt.\nTYPES: BEGIN OF ty, k TYPE p DECIMALS 1, v TYPE i, END OF ty.\nDATA gt TYPE STANDARD TABLE OF ty WITH DEFAULT KEY.\nFIELD-SYMBOLS <fs> TYPE ty.\nSTART-OF-SELECTION.\n  LOOP AT gt ASSIGNING <fs>. WRITE / <fs>-v. ENDLOOP.\n  PERFORM f.\nFORM f.\n  ASSIGN gt[ k = '1.5' ] TO <fs>.\n  IF sy-subrc = 0. WRITE / <fs>-v. ENDIF.\nENDFORM.\n");
+  assert.deepEqual(key.refusals, []);
+  assert.match(key.files["zcl_t.clas.abap"], /METHOD f\.\n\n {4}FIELD-SYMBOLS <fs> TYPE ty\.\n\n {4}ASSIGN gt\[ k = '1\.5' \] TO <fs>\.\n/);
+  assert.equal(key.files["zcl_t.clas.abap"].match(/FIELD-SYMBOLS <fs> TYPE ty\./g).length, 2);
+  // READ TABLE ... ASSIGNING; a dynamic component ->('A.B'); CASTING after a "." in a comment
+  for (const assign of ["READ TABLE gt INDEX 1 ASSIGNING <fs>.", "ASSIGN go->('A.B') TO <fs>.", "ASSIGN ('GV') TO <fs> CASTING TYPE i. \" note. more"]) {
+    const r = conv(`REPORT zt.\nDATA gt TYPE STANDARD TABLE OF i WITH DEFAULT KEY.\nDATA gv TYPE i.\nDATA go TYPE REF TO object.\nFIELD-SYMBOLS <fs> TYPE any.\nSTART-OF-SELECTION.\n  LOOP AT gt ASSIGNING <fs>. WRITE / <fs>. ENDLOOP.\n  PERFORM f.\nFORM f.\n  ${assign}\n  IF sy-subrc = 0. WRITE / <fs>. ENDIF.\nENDFORM.\n`);
+    assert.deepEqual(r.refusals, [], assign);
+  }
+  // an ASSIGN in a comment assigns nothing
+  const commented = conv("REPORT zt.\nDATA gv TYPE i.\nFIELD-SYMBOLS <fs> TYPE any.\nSTART-OF-SELECTION.\n  ASSIGN gv TO <fs>.\n  PERFORM f.\nFORM f.\n  \" ASSIGN gv TO <fs>.\n  WRITE / <fs>.\nENDFORM.\n");
+  assert.deepEqual(commented.refusals.map((x) => x.code), ["global-field-symbol"]);
+});
+
+test("an inline FIELD-SYMBOL(<fs>) is a local of the method - it shadows the global, which is not declared there", () => {
+  const r = convert("REPORT zt.\nDATA gt TYPE STANDARD TABLE OF i WITH DEFAULT KEY.\nFIELD-SYMBOLS <fs> TYPE i.\nSTART-OF-SELECTION.\n  LOOP AT gt ASSIGNING <fs>. WRITE / <fs>. ENDLOOP.\n  PERFORM f.\nFORM f.\n  LOOP AT gt ASSIGNING FIELD-SYMBOL(<fs>).\n    WRITE / <fs>.\n  ENDLOOP.\n  READ TABLE gt INDEX 1 ASSIGNING FIELD-SYMBOL(<fs2>).\nENDFORM.\n", { file: "zt.prog.abap", className: "zcl_t" });
+  assert.deepEqual(r.refusals, []);
+  const cls = r.files["zcl_t.clas.abap"];
+  assert.equal(cls.match(/FIELD-SYMBOLS <fs> TYPE i\./g).length, 1, "start_of_selection( ) only");
+  assert.match(cls, /METHOD f\.\n\n {4}LOOP AT gt ASSIGNING FIELD-SYMBOL\(<fs>\)\./);
+});
+
+test("a global renamed for a component of the runtime is renamed where a macro call passes it - or the call is refused", () => {
+  const conv = (src) => convert(src, { file: "zt.prog.abap", className: "zcl_t" });
+  const r = conv("REPORT zt.\nTYPES: BEGIN OF ty, message TYPE i, END OF ty.\nDATA message TYPE i.\nDATA total TYPE i.\nDATA ls TYPE ty.\nDEFINE add.\n  &1 = &1 + &2.\nEND-OF-DEFINITION.\nDEFINE comp.\n  ls-&1 = &2.\nEND-OF-DEFINITION.\nSTART-OF-SELECTION.\n  add message 1.\n  add total message.\n  add: message 2, ls-message message.\n  comp message 3.\n  WRITE / message.\n  WRITE / 'message'.\n");
+  assert.deepEqual(r.refusals, []);
+  const cls = r.files["zcl_t.clas.abap"];
+  assert.match(cls, /gv_message = gv_message \+ 1\.\n\s+total = total \+ gv_message\.\n\s+gv_message = gv_message \+ 2\.\n\s+ls-message = ls-message \+ gv_message\.\n\s+ls-message = 3\./);
+  assert.match(cls, /->write\( 'message' \)/);
+  assert.doesNotMatch(cls, /(^|[^-_\w'])message\b(?! TYPE i,)/m, "no field MESSAGE is left");
+
+  // the body uses &1 both as a component and as a field: refused, not half renamed
+  const both = conv("REPORT zt.\nTYPES: BEGIN OF ty, message TYPE i, END OF ty.\nDATA message TYPE i.\nDATA ls TYPE ty.\nDEFINE both.\n  ls-&1 = &1.\nEND-OF-DEFINITION.\nSTART-OF-SELECTION.\n  both message.\n");
+  assert.deepEqual(both.refusals.map((x) => [x.row, x.code]), [[9, "reserved-name"]]);
+  assert.match(both.refusals[0].message, /passed to the macro BOTH, whose &1/);
+});
+
 test("a namespaced report: the files are named as abapGit names them - #abc#, no folder", () => {
   const r = convert("REPORT /abc/zrep.\nSTART-OF-SELECTION.\n  WRITE / 'x'.\n", { file: "#abc#zrep.prog.abap", programName: "/abc/zrep" });
   assert.equal(r.className, "/abc/cl_zrep");
