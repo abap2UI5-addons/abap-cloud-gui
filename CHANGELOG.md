@@ -30,6 +30,13 @@ release.
   `REUSE_ALV_*` are mapped. ABAP SQL puts `INTO` behind `WHERE` and `ORDER
   BY`, as strict mode wants; a dynamic `WHERE` is a TODO. The corpus report
   `zr2c_54_listdetails` (test set `src/03`) covers them.
+- The XLSX export drops the control characters XML forbids (Excel
+  repaired the workbook) and keeps the leading and trailing blanks of a
+  cell; the SVG chart escapes the same way (`z2ui5_cl_cgui_context=>
+  c_escape_xml( )`, copied from abap-util). Base64 goes through the kernel
+  (`CL_WEB_HTTP_UTILITY`, `CL_HTTP_UTILITY`), the ABAP loop is the last
+  resort; a data URI without `;base64` is percent-decoded; the MIME type of
+  a download comes from abap-util's catalog (`file_get_mimetype( )`).
 - The command field (`/nCLASS`, a transaction of the catalog) creates a
   class only when it inherits from `z2ui5_cl_cgui_report` - a class whose
   constructor wants parameters ended the app. The command field, the

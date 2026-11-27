@@ -145,7 +145,8 @@ CLASS z2ui5_cl_cgui_file IMPLEMENTATION.
     IF find( val = lv_head sub = `;base64` ) >= 0.
       result = z2ui5_cl_cgui_context=>conv_decode_x_base64( lv_data ).
     ELSE.
-      result = z2ui5_cl_cgui_context=>conv_get_xstring_by_string( lv_data ).
+      " the data of a data URI without ;base64 is percent-encoded (RFC 2397)
+      result = z2ui5_cl_cgui_context=>url_unescape_x( lv_data ).
     ENDIF.
 
   ENDMETHOD.

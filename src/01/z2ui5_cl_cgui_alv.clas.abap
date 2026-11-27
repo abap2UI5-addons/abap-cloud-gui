@@ -3301,7 +3301,8 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
     INSERT |{ lc_xml }<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>|
            INTO TABLE lt_xml.
     LOOP AT lt_visible INTO DATA(ls_visible).
-      INSERT |<c t="inlineStr"><is><t>{ z2ui5_cl_cgui_chart=>xml_escape( ls_visible-label ) }</t></is></c>| INTO TABLE lt_cell.
+      INSERT |<c t="inlineStr"><is><t xml:space="preserve">{ z2ui5_cl_cgui_context=>c_escape_xml( ls_visible-label ) }</t></is></c>|
+             INTO TABLE lt_cell.
     ENDLOOP.
     INSERT |<row>{ concat_lines_of( lt_cell ) }</row>| INTO TABLE lt_xml.
 
@@ -3316,9 +3317,12 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
         IF is_numeric( ls_visible-type_kind ) = abap_true.
           INSERT |<c><v>{ <cell> }</v></c>| INTO TABLE lt_cell.
         ELSE.
-          DATA(lv_cell) = z2ui5_cl_cgui_chart=>xml_escape( cell_to_text( val  = <cell>
-                                                     comp = ls_visible ) ).
-          INSERT |<c t="inlineStr"><is><t>{ lv_cell }</t></is></c>| INTO TABLE lt_cell.
+          " the control characters XML forbids are dropped (a legacy text
+          " carries them, and Excel repairs a workbook with one), leading
+          " and trailing blanks kept (xml:space)
+          DATA(lv_cell) = z2ui5_cl_cgui_context=>c_escape_xml( cell_to_text( val  = <cell>
+                                                                             comp = ls_visible ) ).
+          INSERT |<c t="inlineStr"><is><t xml:space="preserve">{ lv_cell }</t></is></c>| INTO TABLE lt_cell.
         ENDIF.
       ENDLOOP.
       INSERT |<row>{ concat_lines_of( lt_cell ) }</row>| INTO TABLE lt_xml.
