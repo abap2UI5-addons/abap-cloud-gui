@@ -589,7 +589,7 @@ test("zr2c_07_messages: every form of MESSAGE", { skip }, async () => {
 test("zr2c_08_listformat: FORMAT, AS CHECKBOX, AS ICON, HOTSPOT, HIDE, NEW-PAGE", { skip }, async () => {
   let s = await d.start("z2ui5_cl_cgui_r2c_08");
   s = await d.act(s.session, { event: "CGUI_EXECUTE" });
-  // DD/MM/YYYY is not carried over (the migration report says so) - the list writes its default format
+  // DD/MM/YYYY is the user's date format with a four-digit year, as in the classic list
   assert.deepEqual(d.lines(), [
     `Tasks ${listDate(dateIn(0))}`,
     "---",

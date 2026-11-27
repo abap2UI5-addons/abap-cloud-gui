@@ -37,6 +37,10 @@ release.
   (`CL_WEB_HTTP_UTILITY`, `CL_HTTP_UTILITY`), the ABAP loop is the last
   resort; a data URI without `;base64` is percent-decoded; the MIME type of
   a download comes from abap-util's catalog (`file_get_mimetype( )`).
+- The list writes `DD/MM/YY`, `MM/DD/YY`, `DD/MM/YYYY` and `MM/DD/YYYY`
+  in the order of the user's date format, as the classic additions do
+  (both pairs mean the same) - it put the day or the month first as the
+  name said.
 - Sample 05 built its flights anew on top of the old ones after Back and
   Execute; sample 09 branched on `sy-dynnr` and `sy-ucomm`, which the
   runtime does not set.

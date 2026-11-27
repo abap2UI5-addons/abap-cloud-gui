@@ -563,8 +563,10 @@ CLASS z2ui5_cl_cgui_list DEFINITION PUBLIC FINAL CREATE PUBLIC.
       RETURNING
         VALUE(result) TYPE string.
 
-    "! the date val in format (cs_date_format) - day, month and year in
-    "! that order, with the separator of the user's date format
+    "! the date val in format (cs_date_format) - as the classic additions:
+    "! DD/MM/YY and MM/DD/YY (DD/MM/YYYY and MM/DD/YYYY) both in the order and
+    "! with the separator of the user's date format, the year with 2 (4)
+    "! digits; DDMMYY, MMDDYY and YYMMDD in their order, without separator
     CLASS-METHODS date_text
       IMPORTING
         val           TYPE d
@@ -1306,14 +1308,21 @@ CLASS z2ui5_cl_cgui_list IMPLEMENTATION.
     DATA(lv_day) = |{ val+6(2) }|.
     DATA(lv_format) = to_upper( format ).
     CASE lv_format.
-      WHEN cs_date_format-dd_mm_yy.
-        result = |{ lv_day }{ lv_sep }{ lv_month }{ lv_sep }{ lv_yy }|.
-      WHEN cs_date_format-mm_dd_yy.
-        result = |{ lv_month }{ lv_sep }{ lv_day }{ lv_sep }{ lv_yy }|.
-      WHEN cs_date_format-dd_mm_yyyy.
-        result = |{ lv_day }{ lv_sep }{ lv_month }{ lv_sep }{ lv_year }|.
-      WHEN cs_date_format-mm_dd_yyyy.
-        result = |{ lv_month }{ lv_sep }{ lv_day }{ lv_sep }{ lv_year }|.
+      WHEN cs_date_format-dd_mm_yyyy OR cs_date_format-mm_dd_yyyy.
+        " the classic DD/MM/YYYY and MM/DD/YYYY mean the same: the user's
+        " date format with a four-digit year - the order is not theirs
+        result = lv_user.
+      WHEN cs_date_format-dd_mm_yy OR cs_date_format-mm_dd_yy.
+        " the user's date format with a two-digit year - the year stands
+        " at its start (YYYY.MM.DD, YYYY-MM-DD) or at its end
+        DATA(lv_user_len) = strlen( lv_user ).
+        IF lv_user_len > 4 AND substring( val = lv_user len = 4 ) = lv_year.
+          result = lv_yy && substring( val = lv_user off = 4 ).
+        ELSEIF lv_user_len > 4 AND substring( val = lv_user off = lv_user_len - 4 ) = lv_year.
+          result = substring( val = lv_user len = lv_user_len - 4 ) && lv_yy.
+        ELSE.
+          result = |{ lv_day }{ lv_sep }{ lv_month }{ lv_sep }{ lv_yy }|.
+        ENDIF.
       WHEN cs_date_format-ddmmyy.
         result = |{ lv_day }{ lv_month }{ lv_yy }|.
       WHEN cs_date_format-mmddyy.

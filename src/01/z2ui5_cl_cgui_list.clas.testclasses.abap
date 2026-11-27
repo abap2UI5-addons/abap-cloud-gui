@@ -40,6 +40,7 @@ CLASS ltcl_test DEFINITION FINAL FOR TESTING
     METHODS line_count_and_footer FOR TESTING.
     METHODS format_and_columns FOR TESTING.
     METHODS write_options_r10 FOR TESTING.
+    METHODS date_formats_of_the_user FOR TESTING.
     METHODS pages_and_lines FOR TESTING.
     METHODS cut_from_a_line FOR TESTING.
     METHODS skip_lines FOR TESTING.
@@ -366,6 +367,40 @@ CLASS ltcl_test IMPLEMENTATION.
                                         exp = 20 ).
     cl_abap_unit_assert=>assert_equals( act = lo_list->line_text( 2 )
                                         exp = `LH                 at20` ).
+
+  ENDMETHOD.
+
+  METHOD date_formats_of_the_user.
+
+    DATA lv_date TYPE d VALUE '20261127'.
+
+    " DD/MM/YYYY and MM/DD/YYYY are the user's date format, as in the
+    " classic list; DD/MM/YY and MM/DD/YY the same with two digits of the year
+    DATA(lv_user) = |{ lv_date DATE = USER }|.
+    DATA(lo_list) = z2ui5_cl_cgui_list=>factory( ).
+    lo_list->write( val         = lv_date
+                    date_format = z2ui5_cl_cgui_list=>cs_date_format-dd_mm_yyyy
+        )->write( val         = lv_date
+                  date_format = z2ui5_cl_cgui_list=>cs_date_format-mm_dd_yyyy
+        )->write( val         = lv_date
+                  date_format = z2ui5_cl_cgui_list=>cs_date_format-dd_mm_yy
+        )->write( val         = lv_date
+                  date_format = z2ui5_cl_cgui_list=>cs_date_format-mm_dd_yy
+        )->write( val         = lv_date
+                  date_format = z2ui5_cl_cgui_list=>cs_date_format-ddmmyy ).
+    DATA(lt_item) = lo_list->get_items( ).
+    cl_abap_unit_assert=>assert_equals( act = lt_item[ 1 ]-text
+                                        exp = lv_user ).
+    cl_abap_unit_assert=>assert_equals( act = lt_item[ 2 ]-text
+                                        exp = lv_user ).
+    cl_abap_unit_assert=>assert_equals( act = strlen( lt_item[ 3 ]-text )
+                                        exp = strlen( lv_user ) - 2 ).
+    cl_abap_unit_assert=>assert_equals( act = lt_item[ 4 ]-text
+                                        exp = lt_item[ 3 ]-text ).
+    cl_abap_unit_assert=>assert_char_cp( act = lt_item[ 3 ]-text
+                                         exp = `*26*` ).
+    cl_abap_unit_assert=>assert_equals( act = lt_item[ 5 ]-text
+                                        exp = `271126` ).
 
   ENDMETHOD.
 
