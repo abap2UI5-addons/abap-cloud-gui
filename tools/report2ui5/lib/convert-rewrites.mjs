@@ -62,6 +62,28 @@ export const rewritesMethods = {
 
 
   /**
+   * sy-lisel: lisel( ), the clicked line as a string. With an offset or a
+   * length (sy-lisel+2(10)) - not allowed on a method call, and a string
+   * shorter than that would raise - a character field of the method that
+   * holds it, filled at the start of the method.
+   */
+  liselRef(tok, after, ctx, b) {
+    const touches = after && tok.getRow() === after.getRow() && tok.getCol() + tok.getStr().length === after.getCol();
+    if (!touches || !["(", "+"].includes(after.getStr()) || !b) return "lisel( )";
+    const name = this.identifiers.has("lv_lisel") ? "lv_r2c_lisel" : "lv_lisel";
+    this.addPrelude(ctx.method, `DATA ${name} TYPE c LENGTH 1023.`);
+    if (!b.liselFilled) {
+      b.liselFilled = true;
+      // after the declarations the method starts with
+      let at = 0;
+      while (at < b.out.length && typeof b.out[at] === "string" && /^(DATA|TYPES|CONSTANTS|FIELD-SYMBOLS|STATICS|"|\*|$)/i.test(b.out[at].trim())) at++;
+      b.out.splice(at, 0, `${name} = lisel( ).`);
+    }
+    return name;
+  },
+
+
+  /**
    * The token rewrites of a statement in its method: text symbols become
    * literals, sy-ucomm the ucomm parameter, screen-* the line of
    * loop_at_screen( ), icons of type pool ICON the UI5 icon.
@@ -203,13 +225,16 @@ export const rewritesMethods = {
         ov.set(key(toks[i + 1]), null);
         ov.set(key(toks[i + 2]), null);
       }
-      if (ctx.lineSelection && t === "sy" && next === "-" && ["lilli", "curow"].includes(next2)) {
-        ov.set(key(toks[i]), "row");
+      // the line clicked: in at_line_selection( ) its row, in a FORM or a
+      // method of a local class (called from there) the line of get_cursor( )
+      const called = ctx.form || ctx.local;
+      if ((ctx.lineSelection || called) && t === "sy" && next === "-" && ["lilli", "curow"].includes(next2)) {
+        ov.set(key(toks[i]), ctx.lineSelection ? "row" : "get_cursor( )-line");
         ov.set(key(toks[i + 1]), null);
         ov.set(key(toks[i + 2]), null);
       }
-      if (ctx.lineSelection && t === "sy" && next === "-" && next2 === "lisel") {
-        ov.set(key(toks[i]), "lisel( )");
+      if ((ctx.lineSelection || called) && t === "sy" && next === "-" && next2 === "lisel") {
+        ov.set(key(toks[i]), this.liselRef(toks[i + 2], toks[i + 3], ctx, b ?? this.currentBody));
         ov.set(key(toks[i + 1]), null);
         ov.set(key(toks[i + 2]), null);
       }
@@ -221,11 +246,11 @@ export const rewritesMethods = {
         ov.set(key(toks[i + 2]), null);
       }
       if (b && this.hasHeader(t)) {
-        if (next === "-") ov.set(key(toks[i]), this.headerWa(b, t));
+        if (next === "-") ov.set(key(toks[i]), this.reportRef(b, this.headerWa(b, t)));
         else if (next === "[" && toks[i + 2]?.getStr() === "]") {
           ov.set(key(toks[i + 1]), null);
           ov.set(key(toks[i + 2]), null);
-        } else if (this.isDataHeader(t) && headerLineContext(s, toks, i)) ov.set(key(toks[i]), this.headerWa(b, t));
+        } else if (this.isDataHeader(t) && headerLineContext(s, toks, i)) ov.set(key(toks[i]), this.reportRef(b, this.headerWa(b, t)));
       }
       if (b && b.screenLoopDepth >= 0 && t === "screen" && next === "-") {
         ov.set(key(toks[i]), b.screenWa);
@@ -407,5 +432,44 @@ export const rewritesMethods = {
       }
       for (const item of items.slice(0, -1)) comma(item[item.length - 1].getLastToken());
     }
+    this.intoLast(s, ov);
+    this.dynamicWhere ??= new Set();
+    if (!this.dynamicWhere.has(s) && findAll(s, "SQLCond").some((c) => findAll(c, "Dynamic").length)) {
+      this.dynamicWhere.add(s);
+      this.todo(s, "a dynamic WHERE condition in strict ABAP SQL - the variables named in the condition string need an @ (`carrid = @p_carrid`), check the code that builds it");
+    }
+  },
+
+
+  /**
+   * Strict mode wants INTO / APPENDING after WHERE, GROUP BY, HAVING and
+   * ORDER BY, and UP TO / OFFSET after INTO: the clauses are moved behind
+   * the last of the others, a clause that had a line of its own keeps one.
+   */
+  intoLast(s, ov) {
+    const sel = child(s, "Select");
+    if (!sel) return;
+    const ch = children(sel);
+    const into = ch.find((c) => ["SQLIntoTable", "SQLIntoStructure", "SQLIntoList"].includes(kind(c)));
+    if (!into) return;
+    const moved = [into, ...ch.filter((c) => ["SQLUpTo", "SQLOffset"].includes(kind(c)))];
+    const rest = ch.filter((c) => !moved.includes(c));
+    const at = ch.indexOf(into);
+    if (!rest.some((c) => ch.indexOf(c) > at && ["SQLCond", "SQLGroupBy", "SQLHaving", "SQLOrderBy"].includes(kind(c)))) return;
+    const last = rest[rest.length - 1].getLastToken();
+    // a statement over several lines: each moved clause on a line of its
+    // own, indented as the line the last clause starts on
+    const all = stmtTokens(s);
+    const lineOf = (row) => all.find((t) => t.getRow() === row);
+    const multi = all[all.length - 1].getRow() !== all[0].getRow();
+    const indent = " ".repeat(Math.max(lineOf(rest[rest.length - 1].getFirstToken().getRow()).getCol() - all[0].getCol(), 2));
+    let text = ov.has(key(last)) ? ov.get(key(last)) : last.getStr();
+    for (const m of moved) {
+      const toks = m.getTokens();
+      const body = renderTokens(toks, ov);
+      text += multi ? `\n${indent}${body}` : ` ${body}`;
+      for (const t of toks) ov.set(key(t), null);
+    }
+    ov.set(key(last), text);
   },
 };

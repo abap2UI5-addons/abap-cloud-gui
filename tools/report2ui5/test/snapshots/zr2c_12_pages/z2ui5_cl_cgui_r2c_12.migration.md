@@ -50,7 +50,7 @@ Layout, formatting and behaviour of the classic report that the list, the ALV or
 | 51 | `START-OF-SELECTION` | `start_of_selection( )` |
 | 54 | `IF s_skip IS NOT INITIAL AND gv_num IN s_skip` | `z2ui5_cl_cgui_context=>range_check( val range )` - IN outside ABAP SQL |
 | 57 | `WRITE / gv_num HOTSPOT` | `write( )`, hotspot |
-| 58 | `HIDE gv_num` | `hide = gv_num` at the hotspot of the line, restored in `at_line_selection( )` |
+| 58 | `HIDE gv_num` | `list( )->hide( )` - the value of the current line, its texts hotspots; restored in `at_line_selection( )` |
 | 62 | `NEW-PAGE NO-HEADING` | `list( )->new_page( )` |
 | 63 | `WRITE / 'Last page'` | `write( )` |
 | 66 | `END-OF-SELECTION` | `end_of_selection( )` - the runtime runs it after `start_of_selection( )`, after its RETURN too |

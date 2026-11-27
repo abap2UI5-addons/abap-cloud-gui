@@ -20,6 +20,7 @@ export const alvMethods = {
     this.salv = new Map();        // salv variable -> { table, settings, lineSelection }
     const cols = new Map();       // columns variable -> salv variable
     const col = new Map();        // column variable -> { salv, name }
+    const parts = new Map();      // a variable of get_sorts( ), get_display_settings( ), ... -> { salv, level }
     this.salvVars = new Set();
     const fcat = new Map();       // field catalog table -> [{ name, text, hidden }]
     const fcatWa = new Map();     // field catalog work area -> current column
@@ -28,6 +29,9 @@ export const alvMethods = {
     this.alvCallbacks = new Map(); // FORM name -> callback kind
     this.fcat = fcat;
     this.layoutTitle = new Map();  // layout variable -> the title it sets (grid_title)
+    const sortVars = new Map();    // a sort table or line of the classic ALV -> "table" | "line"
+    const sortWa = new Map();      // sort line -> the row it holds now
+    this.sortRows = new Map();     // sort table -> [{ name, descending, subtotal }]
 
     // the variables: REF TO cl_salv_*, the field catalog and layout types
     const allStmts = [...this.decls, ...this.events.flatMap((e) => e.stmts), ...this.forms.flatMap((f) => f.body)];
@@ -43,7 +47,25 @@ export const alvMethods = {
       const name = lc(declName(s) ?? "");
       if (/type\s+ref\s+to\s+c[lx]_salv_/.test(text) && !salvMode) this.salvVars.add(name);
       if (/type\s+(standard\s+table\s+of\s+|table\s+of\s+|line\s+of\s+)?(slis_t_fieldcat_alv|slis_fieldcat_alv|lvc_t_fcat|lvc_s_fcat)\b/.test(text)) this.fcatVars.add(name);
-      if (/type\s+(slis_layout_alv|lvc_s_layo|slis_print_alv|disvariant|slis_t_sortinfo_alv|slis_t_event|slis_t_listheader|lvc_t_sort)\b/.test(text)) this.layoutVars.add(name);
+      // the layout, sort, events, header and print settings of the classic
+      // ALV - the tables and their lines; the sort becomes set_sort( )
+      const typed = (types) => new RegExp(`(type|like)\\s+((standard\\s+|sorted\\s+|hashed\\s+)?table\\s+of\\s+|line\\s+of\\s+)?(${types})\\b`).test(text);
+      if (typed("slis_t_sortinfo_alv|slis_sortinfo_alv|lvc_t_sort|lvc_s_sort")) {
+        this.layoutVars.add(name);
+        sortVars.set(name, /slis_t_sortinfo_alv|lvc_t_sort|table\s+of/.test(text) ? "table" : "line");
+      } else if (typed("slis_layout_alv|lvc_s_layo|slis_print_alv|lvc_s_prnt|disvariant|slis_t_event|slis_alv_event|slis_t_listheader|slis_listheader|slis_t_extab|slis_extab|slis_t_filter_alv|slis_filter_alv|lvc_t_filt|lvc_s_filt|ui_functions")) {
+        this.layoutVars.add(name);
+      }
+    }
+    // LIKE LINE OF / LIKE a table of the layout - dropped with it
+    for (const s of allStmts) {
+      if (!["Data", "Static"].includes(kind(s))) continue;
+      const m = /\blike\s+(?:line\s+of\s+)?([\w/]+)/.exec(lc(renderTokens(stmtTokens(s))));
+      const name = lc(declName(s) ?? "");
+      if (m && this.layoutVars.has(m[1]) && name) {
+        this.layoutVars.add(name);
+        if (sortVars.has(m[1])) sortVars.set(name, /line\s+of/.test(lc(renderTokens(stmtTokens(s)))) ? "line" : sortVars.get(m[1]));
+      }
     }
 
     const tryStack = [];
@@ -130,6 +152,7 @@ export const alvMethods = {
         if (this.salv.has(chain.root)) ctx = { level: "salv", salv: chain.root };
         else if (cols.has(chain.root)) ctx = { level: "columns", salv: cols.get(chain.root) };
         else if (col.has(chain.root)) ctx = { level: "column", ...col.get(chain.root) };
+        else if (parts.has(chain.root)) ctx = { ...parts.get(chain.root) };
         if (ctx) {
           let ok = true;
           for (const c of chain.calls) {
@@ -143,9 +166,39 @@ export const alvMethods = {
               case "salv.get_display_settings": ctx = { ...ctx, level: "display" }; break;
               case "salv.get_functions": ctx = { ...ctx, level: "functions" }; break;
               case "salv.get_event": ctx = { ...ctx, level: "event" }; break;
-              case "salv.get_sorts": case "salv.get_aggregations": case "salv.get_layout": case "salv.get_selections":
+              case "salv.get_sorts": ctx = { ...ctx, level: "sorts" }; break;
+              case "salv.get_aggregations": ctx = { ...ctx, level: "aggregations" }; break;
+              case "salv.get_layout": case "salv.get_selections":
               case "salv.get_filters": case "salv.get_print": case "salv.get_functional_settings":
                 ctx = { ...ctx, level: "other" }; break;
+              case "sorts.add_sort": {
+                // add_sort( columnname = 'A' sequence = if_salv_c_sort=>sort_down subtotal = abap_true )
+                const a = namedArgs(arg, "columnname");
+                const name = a.columnname && /^['`]/.test(a.columnname) ? uc(unquote(a.columnname)) : undefined;
+                if (!name) ok = false;
+                else salv.settings.push({ m: "set_sort", name, descending: /sort_down/i.test(a.sequence ?? ""), subtotal: a.subtotal && isTrue(a.subtotal) });
+                break;
+              }
+              case "aggregations.add_aggregation": {
+                const a = namedArgs(arg, "columnname");
+                const name = a.columnname && /^['`]/.test(a.columnname) ? uc(unquote(a.columnname)) : undefined;
+                const agg = /=>\s*(\w+)$/.exec(a.aggregation ?? "if_salv_c_aggregation=>total")?.[1].toLowerCase();
+                const mapped = { total: "sum", average: "average", minimum: "minimum", maximum: "maximum", count: "count" }[agg];
+                if (!name || !mapped) ok = false;
+                else salv.settings.push({ m: "set_column_aggregation", name, aggregation: mapped });
+                break;
+              }
+              case "columns.set_optimize": salv.settings.push({ m: "set_optimize", val: arg === undefined || isTrue(arg) }); break;
+              case "display.set_striped_pattern": salv.settings.push({ m: "set_striped", val: arg === undefined || isTrue(arg) }); break;
+              case "column.set_key":
+                if (ctx.name) salv.settings.push({ m: "set_column_key", name: ctx.name, val: arg === undefined || isTrue(arg) });
+                else ok = false;
+                break;
+              case "column.set_output_length":
+                // a width of n characters - 0.6 em a character, as the list counts
+                if (ctx.name && /^\d+$/.test(arg ?? "")) salv.settings.push({ m: "set_column_width", name: ctx.name, width: `${(Number(arg) * 0.6).toFixed(1)}em` });
+                else ok = false;
+                break;
               case "salv.display":
                 salv.displayed = true;
                 this.alvPlan.set(s, { action: "alv", salv: ctx.salv });
@@ -162,9 +215,8 @@ export const alvMethods = {
               case "column.set_technical":
                 if (ctx.name && !/abap_false|' '|space/.test(lc(arg ?? ""))) salv.settings.push({ m: "set_column_hidden", name: ctx.name });
                 break;
-              case "columns.set_optimize": case "functions.set_all": case "functions.set_default": case "display.set_striped_pattern":
-              case "column.set_optimized": case "column.set_output_length":
-                this.note("CL_SALV_TABLE settings without a counterpart (optimized widths, toolbar functions, striped rows) - the grid sorts and filters by itself");
+              case "functions.set_all": case "functions.set_default": case "column.set_optimized":
+                this.note("CL_SALV_TABLE: the toolbar functions and the optimized width of one column have no counterpart - the grid has its toolbar, sorts and filters by itself, and optimizes every column (set_optimize( ))");
                 break;
               default:
                 ok = false;
@@ -173,7 +225,8 @@ export const alvMethods = {
           if (chain.target) {
             if (ctx.level === "columns") cols.set(target, ctx.salv);
             else if (ctx.level === "column") col.set(target, { salv: ctx.salv, name: ctx.name });
-            else if (ctx.level !== "salv") ok = ok && ["display", "functions", "event", "other"].includes(ctx.level);
+            // lo_sorts = go_alv->get_sorts( ) - its calls further down are the chain's
+            else if (["get_sorts", "get_aggregations", "get_display_settings", "get_functions"].includes(chain.calls[chain.calls.length - 1].name)) parts.set(target, ctx);
             this.salvVars.add(target);
           }
           if (!this.alvPlan.has(s)) {
@@ -229,7 +282,9 @@ export const alvMethods = {
             const formName = lc(unquote(nodeText(v.node).trim()));
             this.alvCallbacks.set(formName, { kind: cb, stmt: s });
           }
-          for (const ignored of ["is_layout", "is_layout_lvc", "it_sort", "it_sort_lvc", "it_events", "is_variant", "i_save", "it_filter", "is_print", "it_excluding"]) {
+          const sort = p.get("it_sort") ?? p.get("it_sort_lvc");
+          if (sort) plan.sortVar = lc(nodeText(sort.node)).replace(/\[\]$/, "");
+          for (const ignored of ["is_layout", "is_layout_lvc", "it_events", "is_variant", "i_save", "it_filter", "is_print", "it_excluding"]) {
             if (p.has(ignored)) plan.todos = [...(plan.todos ?? []), `${fm}: ${uc(ignored)} has no counterpart in the alv( ) chain and is dropped`];
           }
           this.alvPlan.set(s, plan);
@@ -278,7 +333,10 @@ export const alvMethods = {
           else if ((m[2] === "no_out" || m[2] === "tech") && /'x'|abap_true/.test(m[3])) cur.hidden = true;
           else if (m[2] === "hotspot" && /'x'|abap_true/.test(m[3])) cur.hotspot = true;
           else if (m[2] === "do_sum" && /'x'|abap_true/.test(m[3])) cur.sum = true;
-          else this.note("field catalog settings without a counterpart (output length, key, sums, column position) - the grid takes columns and widths from the table");
+          else if (m[2] === "key" && /'x'|abap_true/.test(m[3])) cur.key = true;
+          else if (m[2] === "outputlen" && /^'?\d+'?$/.test(m[3].trim())) cur.width = Number(m[3].trim().replace(/'/g, ""));
+          else if (m[2] === "col_pos" && /^'?\d+'?$/.test(m[3].trim())) cur.position = Number(m[3].trim().replace(/'/g, ""));
+          else this.note("field catalog settings without a counterpart (the emphasis, the edit mask, the DDIC reference, ...) - the grid takes them from the table");
           fcatWa.set(m[1], cur);
         } else if (k === "Move" && /^(?:data\s*\(\s*)?([\w/]+)(?:\s*\))?\s*=\s*value\s+[\w/#]+\s*\(/.test(flat)) {
           // fcat = VALUE #( ( fieldname = 'A' coltext = 'T' ) ( ... ) ) - a column per row
@@ -303,6 +361,46 @@ export const alvMethods = {
           for (const v of this.fcatVars) if (new RegExp(`\\b${v}\\b`).test(flat)) fcatWa.set(v, {});
         }
         this.alvPlan.set(s, { action: "drop", reason: "field catalog - set_column_text( ) / set_column_hidden( ) in the alv( ) chain" });
+        continue;
+      }
+      // the sort of REUSE_ALV_*: wa-fieldname = 'A', wa-down = 'X', APPEND wa TO sort
+      if (toks.some((t, i) => sortVars.has(lc(t)) && (i === 0 || !["-", "->", "=>"].includes(toks[i - 1]))) && k !== "CallFunction" && !["Data", "Static"].includes(k)) {
+        const m = /^([\w/]+)\s*-\s*(\w+)\s*=\s*(.+)$/.exec(toks.join(" "));
+        const app = /^append\s+([\w/]+)\s+to\s+([\w/]+)$/.exec(flat.replace(/\s*\.$/, ""));
+        const val = m && m[3].trim();
+        let understood = true;
+        if (k === "Move" && m && sortVars.get(lc(m[1])) === "line") {
+          const cur = sortWa.get(lc(m[1])) ?? {};
+          const comp = lc(m[2]);
+          if (comp === "fieldname" && /^['`]/.test(val)) cur.name = uc(unquote(val));
+          else if (comp === "down") cur.descending = isTrue(val);
+          else if (comp === "up") cur.descending = !isTrue(val) && cur.descending;
+          else if (comp === "subtot") cur.subtotal = isTrue(val);
+          else if (!["spos", "tabname", "comp", "expa", "group", "obligatory"].includes(comp)) understood = false;
+          if (comp === "fieldname" && !/^['`]/.test(val)) understood = false;
+          sortWa.set(lc(m[1]), cur);
+        } else if (k === "Move" && /^([\w/]+)\s*=\s*value\s+[\w/#]+\s*\(/.test(flat) && sortVars.get(/^([\w/]+)/.exec(flat)[1]) === "table") {
+          // sort = VALUE #( ( fieldname = 'A' down = 'X' ) ( ... ) )
+          const text = toks.join(" ");
+          const rows = valueRows(text.slice(text.search(/\bvalue\b/i))) ?? [];
+          const parsed = rows.map((r) => {
+            const a = Object.fromEntries([...r.matchAll(/(\w+)\s*=\s*('(?:[^']|'')*'|`(?:[^`]|``)*`|[\w-]+)/g)].map((x) => [lc(x[1]), x[2]]));
+            return { name: a.fieldname && /^['`]/.test(a.fieldname) ? uc(unquote(a.fieldname)) : undefined, descending: !!a.down && isTrue(a.down), subtotal: !!a.subtot && isTrue(a.subtot) };
+          });
+          if (!rows.length || parsed.some((x) => !x.name)) understood = false;
+          else this.sortRows.set(/^([\w/]+)/.exec(flat)[1], parsed);
+        } else if (k === "Append" && app && sortVars.get(app[1]) === "line" && sortVars.get(app[2]) === "table") {
+          if (!this.sortRows.has(app[2])) this.sortRows.set(app[2], []);
+          this.sortRows.get(app[2]).push({ ...(sortWa.get(app[1]) ?? {}) });
+        } else if (["Clear", "Refresh", "Free"].includes(k)) {
+          for (const v of sortVars.keys()) if (new RegExp(`\\b${v}\\b`).test(flat)) {
+            if (sortVars.get(v) === "line") sortWa.set(v, {});
+            else this.sortRows.set(v, []);
+          }
+        } else understood = false;
+        this.alvPlan.set(s, understood
+          ? { action: "drop", reason: "the sort of the ALV - set_sort( ) in the alv( ) chain" }
+          : { action: "drop", reason: "the sort of the ALV", todo: `the sort of the ALV is set here in a way set_sort( ) of the alv( ) chain does not take, dropped: ${shortText(s)}` });
         continue;
       }
       // the layout of the grid: its title; zebra and optimized widths are the runtime's
@@ -333,7 +431,7 @@ export const alvMethods = {
     for (const s of seq) {
       if (this.alvPlan.has(s) || ["Data", "Static", "Comment"].includes(kind(s))) continue;
       const toks = stmtTokens(s).map((t) => lc(t.getStr()));
-      const used = toks.find((t, i) => this.salv.has(t) || cols.has(t) || col.has(t)
+      const used = toks.find((t, i) => this.salv.has(t) || cols.has(t) || col.has(t) || parts.has(t)
         ? i === 0 || !["-", "->", "=>", "~"].includes(toks[i - 1]) : false);
       if (used) this.refuse(s, `${used}, an object of CL_SALV_TABLE, is used here - alv( ) has no object to refer to; port the statement by hand`);
     }
@@ -345,6 +443,33 @@ export const alvMethods = {
     for (const [name, v] of this.salv) {
       if (!v.displayed) this.todo(v.stmt, `the CL_SALV_TABLE object ${name} is created but never displayed - no alv( ) is generated for it`);
     }
+  },
+
+
+  /** the alv( ) settings of a column of a classic field catalog */
+  fcatSettings(c) {
+    const out = [];
+    if (!c.name) return out;
+    if (c.text) out.push({ m: "set_column_text", name: c.name, arg: c.text });
+    if (c.hidden) out.push({ m: "set_column_hidden", name: c.name });
+    if (c.hotspot) out.push({ m: "set_column_hotspot", name: c.name });
+    if (c.sum) out.push({ m: "set_column_sum", name: c.name });
+    if (c.key) out.push({ m: "set_column_key", name: c.name, val: true });
+    if (c.width) out.push({ m: "set_column_width", name: c.name, width: `${(c.width * 0.6).toFixed(1)}em` });
+    if (c.position) out.push({ m: "set_column_position", name: c.name, position: String(c.position) });
+    return out;
+  },
+
+
+  /** IT_SORT of REUSE_ALV_*: set_sort( ) per row the report filled in */
+  sortSettings(plan, s) {
+    if (!plan.sortVar) return [];
+    const rows = this.sortRows.get(plan.sortVar);
+    if (!rows?.length) {
+      this.todo(s, `${plan.fm}: IT_SORT ${plan.sortVar} is filled in a way the converter does not follow - set_sort( ) in the alv( ) chain, by hand`);
+      return [];
+    }
+    return rows.filter((r) => r.name).map((r) => ({ m: "set_sort", name: r.name, descending: !!r.descending, subtotal: !!r.subtotal }));
   },
 
 
@@ -376,6 +501,25 @@ export const alvMethods = {
     for (const name of hidden) items.push({ method: "set_column_hidden", params: [{ value: literal(name) }] });
     for (const st of settings.filter((x) => x.m === "set_column_hotspot" || x.m === "set_column_sum")) {
       items.push({ method: st.m, params: [{ value: literal(st.name) }] });
+    }
+    for (const st of settings) {
+      const bool = (v) => (v ? "abap_true" : "abap_false");
+      if (st.m === "set_column_aggregation") {
+        items.push(st.aggregation === "sum" ? { method: "set_column_sum", params: [{ value: literal(st.name) }] }
+          : { method: st.m, params: [{ name: "name", value: literal(st.name) }, { name: "aggregation", value: `z2ui5_cl_cgui_alv=>cs_aggregation-${st.aggregation}` }] });
+      } else if (st.m === "set_sort") {
+        items.push({ method: st.m, params: [{ name: "name", value: literal(st.name) },
+          ...(st.descending ? [{ name: "descending", value: "abap_true" }] : []), ...(st.subtotal ? [{ name: "subtotal", value: "abap_true" }] : [])], positional: !st.descending && !st.subtotal });
+      } else if (st.m === "set_column_key") {
+        items.push({ method: st.m, params: [{ name: "name", value: literal(st.name) }, ...(st.val ? [] : [{ name: "val", value: "abap_false" }])], positional: st.val });
+      } else if (st.m === "set_column_width") {
+        items.push({ method: st.m, params: [{ name: "name", value: literal(st.name) }, { name: "width", value: literal(st.width) }] });
+      } else if (st.m === "set_column_position") {
+        items.push({ method: st.m, params: [{ name: "name", value: literal(st.name) }, { name: "position", value: st.position }] });
+      } else if (st.m === "set_optimize" || st.m === "set_striped") {
+        // both are on by default
+        if (!st.val) items.push({ method: st.m, params: [{ value: bool(st.val) }] });
+      }
     }
     for (const st of settings.filter((x) => x.m === "add_function")) items.push({ method: "add_function", params: st.params });
     if (settings.some((x) => x.m === "set_selection_mode")) items.push({ method: "set_selection_mode", params: [] });
@@ -518,3 +662,24 @@ export const alvMethods = {
     return lines;
   },
 };
+
+
+/** abap_true, 'X', `X` - not abap_false, ' ', space */
+const isTrue = (v) => /^(abap_true|'x'|`x`)$/i.test(String(v).trim());
+
+/** the named arguments of a call as written (a = 1 b = c=>d), by lower case
+ *  name; a single unnamed argument is the one named `first` */
+function namedArgs(text, first) {
+  const out = {};
+  if (!text) return out;
+  const re = /(?:^|\s)([a-z_]\w*)\s*=(?!>)\s*/gi;
+  const hits = [...text.matchAll(re)];
+  if (!hits.length) {
+    out[first] = text.trim();
+    return out;
+  }
+  hits.forEach((m, i) => {
+    out[m[1].toLowerCase()] = text.slice(m.index + m[0].length, i + 1 < hits.length ? hits[i + 1].index : text.length).trim();
+  });
+  return out;
+}

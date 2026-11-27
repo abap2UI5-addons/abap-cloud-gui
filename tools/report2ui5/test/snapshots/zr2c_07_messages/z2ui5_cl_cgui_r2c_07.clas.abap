@@ -82,6 +82,9 @@ CLASS z2ui5_cl_cgui_r2c_07 IMPLEMENTATION.
     MESSAGE ID sy-msgid TYPE sy-msgty NUMBER sy-msgno WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4 INTO lv_message.
     message( text = lv_message
              type = sy-msgty ).
+    IF sy-msgty CA 'EA'.
+      RETURN.
+    ENDIF.
 
   ENDMETHOD.
 

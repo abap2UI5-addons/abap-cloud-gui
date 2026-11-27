@@ -89,10 +89,10 @@ CLASS z2ui5_cl_cgui_r2c_02 IMPLEMENTATION.
 
     SELECT carrid, connid, fldate, price, currency, seatsmax, seatsocc
       FROM sflight
-      INTO TABLE @gt_flight
-      UP TO @p_max ROWS
       WHERE carrid = @p_carrid
-        AND fldate IN @s_fldate.
+        AND fldate IN @s_fldate
+      INTO TABLE @gt_flight
+      UP TO @p_max ROWS.
     IF sy-subrc <> 0.
       MESSAGE s002(zr2c) WITH p_carrid INTO DATA(lv_message).
       message( lv_message ).
@@ -103,10 +103,10 @@ CLASS z2ui5_cl_cgui_r2c_02 IMPLEMENTATION.
       list( )->new_line(
           )->write( val     = gs_flight-carrid
                     hotspot = abap_true
-                    hide    = |{ gs_flight-carrid }\t{ gs_flight-connid }\t{ gs_flight-fldate }|
           )->write( gs_flight-connid
           )->write( gs_flight-fldate
-          )->write( gs_flight-price
+          )->write( val      = gs_flight-price
+                    currency = gs_flight-currency
           )->write( gs_flight-currency ).
       IF gs_flight-seatsocc >= gs_flight-seatsmax.
         write( val   = gs_flight-seatsocc
@@ -115,6 +115,7 @@ CLASS z2ui5_cl_cgui_r2c_02 IMPLEMENTATION.
         write( val   = gs_flight-seatsocc
                color = z2ui5_cl_cgui_list=>cs_color-positive ).
       ENDIF.
+      list( )->hide( |{ gs_flight-carrid }\t{ gs_flight-connid }\t{ gs_flight-fldate }| ).
       gv_total = gv_total + gs_flight-seatsocc.
     ENDLOOP.
 

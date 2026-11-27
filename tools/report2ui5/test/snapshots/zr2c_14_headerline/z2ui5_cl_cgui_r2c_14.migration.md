@@ -11,7 +11,7 @@
 ## TODO
 
 - no selection text in the text pool for P_CARRID, S_FLDATE - the label is the DDIC label of the type or the field name; pass the .prog.xml (--texts) or set text = in selection_screen( )
-- `zr2c_14_headerline.prog.abap:11:1` - TABLES sflight is now a work area of type SFLIGHT - on ABAP Cloud the table must be replaced by a released CDS view (see the release TODOs)
+- `zr2c_14_headerline.prog.abap:11:1` - TABLES sflight is now a work area of type SFLIGHT, an attribute of the class
 
 ## Mapped
 

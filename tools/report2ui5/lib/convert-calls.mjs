@@ -552,9 +552,14 @@ export const callsMethods = {
     if (type === "`S`") lines.push(`message( ${text} ).`);
     else lines.push(`message( text = ${text}\n         type = ${type} ).`);
     b.out.push(...lines);
-    if (type === "`E`" || type === "`A`") {
-      b.out.push("RETURN.");
-      if (b.ctx.form && !b.ctx.form.module) this.todo(s, `MESSAGE TYPE ${type[1]} in FORM ${b.ctx.form.name}: the classic message ended the event block, RETURN here only leaves ${b.ctx.form.method}( ) - the runtime still stops the run, but the caller continues`);
+    // a type in a variable (sy-msgty, lv_type) is known at runtime only
+    const dynamic = !/^`.`$/.test(type);
+    if (type === "`E`" || type === "`A`" || dynamic) {
+      if (dynamic) b.out.push(`IF ${type} CA 'EA'.`, "  RETURN.", "ENDIF.");
+      else b.out.push("RETURN.");
+      const t = dynamic ? `TYPE ${type} (E or A)` : `TYPE ${type[1]}`;
+      if (b.ctx.form && !b.ctx.form.module) this.todo(s, `MESSAGE ${t} in FORM ${b.ctx.form.name}: the classic message ended the event block, RETURN here only leaves ${b.ctx.form.method}( ) - the runtime still stops the run, but the caller continues`);
+      else if (b.ctx.local) this.todo(s, `MESSAGE ${t} in method ${b.ctx.method.split("~")[1]} of ${b.ctx.method.split("~")[0]}: the classic message ended the event block, RETURN here only leaves the method - the runtime still stops the run, but the caller continues`);
     }
     if (type === "`X`") this.todo(s, "MESSAGE TYPE X - a dump; message( ) shows it as an abort message instead");
   },
@@ -619,7 +624,7 @@ export const callsMethods = {
       (changingParam ? chg : imp).push({ name: p.name, value });
     }
     const call = renderCall(f.method, imp, chg);
-    b.out.push(call);
+    this.formatCall(b, name, call);
     this.map(s, `\`${f.method}( )\``);
   },
 

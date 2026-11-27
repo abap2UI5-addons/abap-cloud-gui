@@ -7,8 +7,7 @@ CLASS z2ui5_cl_cgui_sample_09 DEFINITION PUBLIC
   CREATE PUBLIC.
 
   PUBLIC SECTION.
-    DATA button1
- TYPE c LENGTH 20.
+    DATA button1 TYPE c LENGTH 20.
     DATA button2 TYPE c LENGTH 20.
     DATA button3 TYPE c LENGTH 20.
 
@@ -56,29 +55,15 @@ CLASS z2ui5_cl_cgui_sample_09 IMPLEMENTATION.
 
   METHOD at_selection_screen.
 
-    CASE sy-dynnr.
-      WHEN 1000.
-        CASE sy-ucomm.
-          WHEN 'PUSH1'.
-            " mytab-dynnr = 100.
-            " mytab-activetab = 'BUTTON1'.
-          WHEN 'PUSH2'.
-            " mytab-dynnr = 200.
-            " mytab-activetab = 'BUTTON2'.
-        ENDCASE.
-      WHEN 100.
-        message_t100( id     = `SABAPDEMOS`
-                      number = 888
-                      type   = `S`
-                      v1     = `Action on Selection Screen`
-                      v2     = sy-dynnr ).
-      WHEN 200.
-        message_t100( id     = `SABAPDEMOS`
-                      number = 888
-                      type   = `S`
-                      v1     = `Action on Selection Screen`
-                      v2     = sy-dynnr ).
-    ENDCASE.
+    " the classic report branches on sy-dynnr (the subscreens 100 and 200)
+    " and sy-ucomm, which the runtime does not set: the tabs are one screen
+    " here, checked as a whole - so the message of the demo comes once, for
+    " the selection screen; a push button would arrive in at_user_command( )
+    message_t100( id     = `SABAPDEMOS`
+                  number = 888
+                  type   = `S`
+                  v1     = `Action on Selection Screen`
+                  v2     = `1000` ).
 
   ENDMETHOD.
 
@@ -87,9 +72,6 @@ CLASS z2ui5_cl_cgui_sample_09 IMPLEMENTATION.
     button1 = `Selection Screen 1`.
     button2 = `Selection Screen 2`.
     button3 = `Dynpro`.
-    " mytab-prog = sy-repid.
-    " mytab-dynnr = 100.
-    " mytab-activetab = 'BUTTON1'.
 
   ENDMETHOD.
 

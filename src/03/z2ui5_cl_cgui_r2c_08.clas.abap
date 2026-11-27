@@ -59,12 +59,15 @@ CLASS z2ui5_cl_cgui_r2c_08 IMPLEMENTATION.
 
     lv_color = z2ui5_cl_cgui_list=>cs_color-key.
     list( )->new_line(
-        )->write( val   = 'Tasks'
-                  pos   = 1
-                  color = lv_color
-        )->write( val   = sy-datum
-                  pos   = 40
-                  color = lv_color ).
+        )->write( val         = 'Tasks'
+                  pos         = 1
+                  color       = lv_color
+                  intensified = abap_true
+        )->write( val         = sy-datum
+                  pos         = 40
+                  color       = lv_color
+                  intensified = abap_true
+                  date_format = z2ui5_cl_cgui_list=>cs_date_format-dd_mm_yyyy ).
     CLEAR lv_color.
     list( )->uline( ).
 
@@ -88,11 +91,11 @@ CLASS z2ui5_cl_cgui_r2c_08 IMPLEMENTATION.
                     pos     = 12
                     color   = lv_color
                     hotspot = abap_true
-                    hide    = gs_task-id
           )->write( val   = gs_task-due
                     pos   = 45
                     color = lv_color ).
       CLEAR lv_color.
+      list( )->hide( gs_task-id ).
     ENDLOOP.
 
     list( )->skip( 2 ).

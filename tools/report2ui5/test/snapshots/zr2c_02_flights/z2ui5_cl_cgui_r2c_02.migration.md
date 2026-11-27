@@ -8,12 +8,6 @@
 | Mapped | 38 construct(s) |
 | TODO | 0 |
 
-## Not carried over
-
-Layout, formatting and behaviour of the classic report that the list, the ALV or the selection screen of abap-cloud-gui do not have:
-
-- WRITE ... CURRENCY - the list writes the value in its default format
-
 ## Mapped
 
 | Line | Classic | abap-cloud-gui |
@@ -30,13 +24,13 @@ Layout, formatting and behaviour of the classic report that the list, the ALV or
 | 38 | `AT SELECTION-SCREEN` | `at_selection_screen( )` |
 | 40 | `MESSAGE e001 WITH p_max` | `MESSAGE ... INTO` + `message( )` |
 | 43 | `TOP-OF-PAGE` | `top_of_page( )` - the header the runtime writes above the list and repeats on every page |
-| 44 | `FORMAT COLOR COL_HEADING` | applied to the following `write( )` calls of the method (color, hotspot) |
+| 44 | `FORMAT COLOR COL_HEADING` | applied to the following `write( )` calls of the method (color, hotspot, intensified, inverse, input) |
 | 45 | `WRITE / 'Airline'` | `write( )`, color |
 | 45 | `WRITE 'No.'` | `write( )`, color |
 | 45 | `WRITE 'Date'` | `write( )`, color |
 | 45 | `WRITE 'Price'` | `write( )`, color |
 | 45 | `WRITE 'Occupied'` | `write( )`, color |
-| 46 | `FORMAT RESET` | applied to the following `write( )` calls of the method (color, hotspot) |
+| 46 | `FORMAT RESET` | applied to the following `write( )` calls of the method (color, hotspot, intensified, inverse, input) |
 | 47 | `ULINE` | `list( )->uline( )` |
 | 49 | `START-OF-SELECTION` | `start_of_selection( )` |
 | 57 | `MESSAGE s002 WITH p_carrid` | `MESSAGE ... INTO` + `message( )` |
@@ -47,9 +41,9 @@ Layout, formatting and behaviour of the classic report that the list, the ALV or
 | 66 | `WRITE gs_flight-currency` | `write( )` |
 | 68 | `WRITE gs_flight-seatsocc COLOR COL_NEGATIVE` | `write( )`, color |
 | 70 | `WRITE gs_flight-seatsocc COLOR COL_POSITIVE` | `write( )`, color |
-| 72 | `HIDE gs_flight-carrid` | `hide = gs_flight-carrid` at the hotspot of the line, restored in `at_line_selection( )` |
-| 72 | `HIDE gs_flight-connid` | `hide = gs_flight-carrid gs_flight-connid` at the hotspot of the line, restored in `at_line_selection( )` |
-| 72 | `HIDE gs_flight-fldate` | `hide = gs_flight-carrid gs_flight-connid gs_flight-fldate` at the hotspot of the line, restored in `at_line_selection( )` |
+| 72 | `HIDE gs_flight-carrid` | `list( )->hide( )` - the value of the current line, its texts hotspots; restored in `at_line_selection( )` |
+| 72 | `HIDE gs_flight-connid` | `list( )->hide( )` - the value of the current line, its texts hotspots; restored in `at_line_selection( )` |
+| 72 | `HIDE gs_flight-fldate` | `list( )->hide( )` - the value of the current line, its texts hotspots; restored in `at_line_selection( )` |
 | 76 | `END-OF-SELECTION` | `end_of_selection( )` - the runtime runs it after `start_of_selection( )`, after its RETURN too |
 | 77 | `SKIP` | `list( )->skip( )` |
 | 78 | `WRITE / 'Seats occupied in total:'(002)` | `write( )` |

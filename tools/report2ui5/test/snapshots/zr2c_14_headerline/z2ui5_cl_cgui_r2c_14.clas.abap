@@ -67,8 +67,9 @@ CLASS z2ui5_cl_cgui_r2c_14 IMPLEMENTATION.
 
     CLEAR gt_flight.
     CLEAR gt_sum.
-    SELECT * FROM sflight INTO TABLE @gt_flight
-      WHERE carrid = @p_carrid AND fldate IN @s_fldate.
+    SELECT * FROM sflight
+      WHERE carrid = @p_carrid AND fldate IN @s_fldate
+      INTO TABLE @gt_flight.
 
     LOOP AT gt_flight INTO wa_gt_flight.
       CLEAR wa_gt_sum.

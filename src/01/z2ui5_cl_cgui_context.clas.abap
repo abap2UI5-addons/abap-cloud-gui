@@ -248,20 +248,58 @@ CLASS z2ui5_cl_cgui_context DEFINITION PUBLIC FINAL CREATE PUBLIC.
       RETURNING
         VALUE(result) TYPE string.
 
-    "! val in base64 - plain ABAP, for the data URI of a download
+    "! val in base64, for the data URI of a download - the kernel
+    "! (CL_WEB_HTTP_UTILITY, CL_HTTP_UTILITY, named as strings as abap-util
+    "! does it), plain ABAP where neither is there
     CLASS-METHODS conv_encode_x_base64
       IMPORTING
         val           TYPE xstring
       RETURNING
         VALUE(result) TYPE string.
 
-    "! the bytes of base64 val - plain ABAP, for the data URI of an upload;
-    "! a character outside the alphabet ends it
+    "! the bytes of base64 val, for the data URI of an upload - the kernel
+    "! as conv_encode_x_base64( ), plain ABAP where neither is there (a
+    "! character outside the alphabet ends it)
     CLASS-METHODS conv_decode_x_base64
       IMPORTING
         val           TYPE string
       RETURNING
         VALUE(result) TYPE xstring.
+
+    "! the bytes of percent-encoded val - %XX is the byte XX, every other
+    "! character its UTF-8, a + stays a + (the data of a data URI, RFC 2397;
+    "! not a form field)
+    CLASS-METHODS url_unescape_x
+      IMPORTING
+        val           TYPE string
+      RETURNING
+        VALUE(result) TYPE xstring.
+
+    "! val escaped for the text or an attribute of XML: &, <, > and " as
+    "! entities, LF, CR and TAB as character references, the control
+    "! characters XML 1.0 forbids dropped - copied from abap-util
+    "! (zabaputil_cl_util_context=>c_escape_xml)
+    CLASS-METHODS c_escape_xml
+      IMPORTING
+        val           TYPE clike
+      RETURNING
+        VALUE(result) TYPE string.
+
+    "! the MIME type of a file by the extension of its name - copied from
+    "! abap-util (zabaputil_cl_util_context=>file_get_mimetype)
+    CLASS-METHODS file_get_mimetype
+      IMPORTING
+        val           TYPE clike
+      RETURNING
+        VALUE(result) TYPE string.
+
+    "! val without the blanks and tabs at either end - copied from abap-util
+    "! (zabaputil_cl_util_context=>c_trim)
+    CLASS-METHODS c_trim
+      IMPORTING
+        val           TYPE any
+      RETURNING
+        VALUE(result) TYPE string.
 
     "! val in width characters, aligned LEFT, RIGHT or CENTER with blanks -
     "! a string template's WIDTH and ALIGN, which the transpiled runtime
@@ -379,6 +417,23 @@ CLASS z2ui5_cl_cgui_context DEFINITION PUBLIC FINAL CREATE PUBLIC.
 
   PROTECTED SECTION.
   PRIVATE SECTION.
+
+    " the character set c_escape_xml guards against, built on first use (a
+    " class_constructor is the alternative, and a known trap)
+    CLASS-DATA gv_xml_escape_specials TYPE string.
+    CLASS-DATA gv_xml_escape_controls TYPE string.
+
+    CLASS-METHODS conv_decode_x_base64_abap
+      IMPORTING
+        val           TYPE string
+      RETURNING
+        VALUE(result) TYPE xstring.
+
+    CLASS-METHODS conv_encode_x_base64_abap
+      IMPORTING
+        val           TYPE xstring
+      RETURNING
+        VALUE(result) TYPE string.
 
     CLASS-METHODS rtti_get_dtel_texts_by_ddic
       IMPORTING
@@ -528,6 +583,49 @@ CLASS z2ui5_cl_cgui_context IMPLEMENTATION.
 
   METHOD conv_decode_x_base64.
 
+    " the kernel first - copied from abap-util (zabaputil_cl_util_context=>
+    " conv_decode_x_base64): CL_WEB_HTTP_UTILITY on ABAP Cloud, CL_HTTP_UTILITY
+    " on premise, both named as strings. Where neither decodes, the plain
+    " ABAP below instead of an exception
+    DATA lv_web_http_name TYPE c LENGTH 19.
+    DATA classname        TYPE c LENGTH 15.
+
+    " the line breaks of a wrapped encoding are no characters of it
+    DATA(lv_val) = val.
+    REPLACE ALL OCCURRENCES OF |\n| IN lv_val WITH ``.
+    REPLACE ALL OCCURRENCES OF |\r| IN lv_val WITH ``.
+    REPLACE ALL OCCURRENCES OF ` ` IN lv_val WITH ``.
+
+    TRY.
+        lv_web_http_name = `CL_WEB_HTTP_UTILITY`.
+        CALL METHOD (lv_web_http_name)=>(`DECODE_X_BASE64`)
+          EXPORTING
+            encoded = lv_val
+          RECEIVING
+            decoded = result.
+        RETURN.
+      CATCH cx_root ##NO_HANDLER.
+        " not there - the classic class below
+    ENDTRY.
+
+    TRY.
+        classname = `CL_HTTP_UTILITY`.
+        CALL METHOD (classname)=>(`DECODE_X_BASE64`)
+          EXPORTING
+            encoded = lv_val
+          RECEIVING
+            decoded = result.
+        RETURN.
+      CATCH cx_root ##NO_HANDLER.
+        " neither - plain ABAP
+    ENDTRY.
+
+    result = conv_decode_x_base64_abap( lv_val ).
+
+  ENDMETHOD.
+
+  METHOD conv_decode_x_base64_abap.
+
     CONSTANTS lc_alphabet TYPE string VALUE `ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/`.
     DATA lv_byte  TYPE x LENGTH 1.
     DATA lv_bits  TYPE i.
@@ -569,6 +667,40 @@ CLASS z2ui5_cl_cgui_context IMPLEMENTATION.
 
   METHOD conv_encode_x_base64.
 
+    " the kernel first, as conv_decode_x_base64( )
+    DATA lv_web_http_name TYPE c LENGTH 19.
+    DATA classname        TYPE c LENGTH 15.
+
+    TRY.
+        lv_web_http_name = `CL_WEB_HTTP_UTILITY`.
+        CALL METHOD (lv_web_http_name)=>(`ENCODE_X_BASE64`)
+          EXPORTING
+            unencoded = val
+          RECEIVING
+            encoded   = result.
+        RETURN.
+      CATCH cx_root ##NO_HANDLER.
+        " not there - the classic class below
+    ENDTRY.
+
+    TRY.
+        classname = `CL_HTTP_UTILITY`.
+        CALL METHOD (classname)=>(`ENCODE_X_BASE64`)
+          EXPORTING
+            unencoded = val
+          RECEIVING
+            encoded   = result.
+        RETURN.
+      CATCH cx_root ##NO_HANDLER.
+        " neither - plain ABAP
+    ENDTRY.
+
+    result = conv_encode_x_base64_abap( val ).
+
+  ENDMETHOD.
+
+  METHOD conv_encode_x_base64_abap.
+
     CONSTANTS lc_alphabet TYPE string VALUE `ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/`.
     DATA lt_part   TYPE string_table.
     DATA lv_byte   TYPE x LENGTH 1.
@@ -606,6 +738,207 @@ CLASS z2ui5_cl_cgui_context IMPLEMENTATION.
       INSERT lv_part INTO TABLE lt_part.
     ENDWHILE.
     result = concat_lines_of( lt_part ).
+
+  ENDMETHOD.
+
+  METHOD url_unescape_x.
+
+    DATA lv_byte TYPE x LENGTH 1.
+    DATA lv_text TYPE string.
+    DATA lv_utf8 TYPE xstring.
+
+    DATA(lv_len) = strlen( val ).
+    DATA(lv_off) = 0.
+    WHILE lv_off < lv_len.
+      DATA(lv_char) = substring( val = val off = lv_off len = 1 ).
+      " only two hex digits make an escape - %ZZ stays as it is
+      DATA(lv_hex) = ``.
+      IF lv_char = `%` AND lv_off + 2 < lv_len.
+        lv_hex = to_upper( substring( val = val off = lv_off + 1 len = 2 ) ).
+      ENDIF.
+      IF lv_hex IS NOT INITIAL AND lv_hex CO `0123456789ABCDEF`.
+        " the characters before it as UTF-8, then the byte
+        IF lv_text IS NOT INITIAL.
+          lv_utf8 = conv_get_xstring_by_string( lv_text ).
+          CONCATENATE result lv_utf8 INTO result IN BYTE MODE.
+          CLEAR lv_text.
+        ENDIF.
+        lv_byte = lv_hex.
+        CONCATENATE result lv_byte INTO result IN BYTE MODE.
+        lv_off = lv_off + 3.
+        CONTINUE.
+      ENDIF.
+      lv_text = lv_text && lv_char.
+      lv_off = lv_off + 1.
+    ENDWHILE.
+    IF lv_text IS NOT INITIAL.
+      lv_utf8 = conv_get_xstring_by_string( lv_text ).
+      CONCATENATE result lv_utf8 INTO result IN BYTE MODE.
+    ENDIF.
+
+  ENDMETHOD.
+
+  METHOD c_escape_xml.
+
+    " copied from abap-util - the line break, carriage return and tab as
+    " string templates instead of its cv_char_util_* constants (this class
+    " has no class_constructor)
+    "
+    " one CA scan up front: replace( occ = 0 ) copies the whole string on
+    " every call even when nothing matches, and a value without any special
+    " character is the common case
+    IF gv_xml_escape_specials IS INITIAL.
+      " the XML-illegal control characters as one string, built from their
+      " UTF-8 bytes; behind them the two non-characters U+FFFE and U+FFFF.
+      " Without a codepage API the set stays empty - the controls are then
+      " kept, everything else is escaped as before
+      gv_xml_escape_controls = conv_get_string_by_xstring(
+          CONV xstring( `000102030405060708` && `0B0C` && `0E0F101112131415161718191A1B1C1D1E1F`
+                        && `EFBFBE` && `EFBFBF` ) ).
+      gv_xml_escape_specials = `&<>"` && |\n| && |\r| && |\t| && gv_xml_escape_controls.
+    ENDIF.
+    result = val.
+    IF result NA gv_xml_escape_specials.
+      RETURN.
+    ENDIF.
+
+    result = replace( val  = result
+                      sub  = `&`
+                      with = `&amp;`
+                      occ  = 0 ).
+    result = replace( val  = result
+                      sub  = `<`
+                      with = `&lt;`
+                      occ  = 0 ).
+    result = replace( val  = result
+                      sub  = `>`
+                      with = `&gt;`
+                      occ  = 0 ).
+    result = replace( val  = result
+                      sub  = `"`
+                      with = `&quot;`
+                      occ  = 0 ).
+    " whitespace as character references - attribute-value normalization
+    " would turn a literal one into a blank
+    result = replace( val  = result
+                      sub  = |\n|
+                      with = `&#xA;`
+                      occ  = 0 ).
+    result = replace( val  = result
+                      sub  = |\r|
+                      with = `&#xD;`
+                      occ  = 0 ).
+    result = replace( val  = result
+                      sub  = |\t|
+                      with = `&#x9;`
+                      occ  = 0 ).
+
+    " what is left of the control range is illegal in XML 1.0 outright - it
+    " cannot even be written as a character reference, and one such byte
+    " makes the whole document invalid (Excel repairs the workbook, UI5
+    " refuses the view). It carries no meaning in a text, so it is dropped
+    IF result CA gv_xml_escape_controls.
+      " one replace per character, no regex
+      DATA(lv_off) = 0.
+      DATA(lv_len) = strlen( gv_xml_escape_controls ).
+      WHILE lv_off < lv_len.
+        result = replace( val  = result
+                          sub  = gv_xml_escape_controls+lv_off(1)
+                          with = ``
+                          occ  = 0 ).
+        lv_off = lv_off + 1.
+      ENDWHILE.
+    ENDIF.
+
+  ENDMETHOD.
+
+  METHOD c_trim.
+
+    result = val.
+    " blanks and tabs alternate at either end - strip until nothing changes
+    DO.
+      DATA(lv_before) = result.
+      result = shift_left( shift_right( result ) ).
+      result = shift_right( val = result
+                            sub = |\t| ).
+      result = shift_left( val = result
+                           sub = |\t| ).
+      IF result = lv_before.
+        EXIT.
+      ENDIF.
+    ENDDO.
+
+  ENDMETHOD.
+
+  METHOD file_get_mimetype.
+
+    DATA(lv_name) = to_lower( c_trim( val ) ).
+    SPLIT lv_name AT `.` INTO TABLE DATA(lt_parts).
+    " no name, no extension - an empty name splits into no part at all
+    IF lt_parts IS INITIAL.
+      result = `application/octet-stream`.
+      RETURN.
+    ENDIF.
+    DATA(lv_ext) = lt_parts[ lines( lt_parts ) ].
+
+    CASE lv_ext.
+      WHEN `txt` OR `text` OR `log` OR `md`.
+        result = `text/plain`.
+      WHEN `html` OR `htm`.
+        result = `text/html`.
+      WHEN `css`.
+        result = `text/css`.
+      WHEN `csv`.
+        result = `text/csv`.
+      WHEN `js` OR `mjs`.
+        result = `text/javascript`.
+      WHEN `json`.
+        result = `application/json`.
+      WHEN `xml`.
+        result = `application/xml`.
+      WHEN `pdf`.
+        result = `application/pdf`.
+      WHEN `zip`.
+        result = `application/zip`.
+      WHEN `png`.
+        result = `image/png`.
+      WHEN `jpg` OR `jpeg`.
+        result = `image/jpeg`.
+      WHEN `gif`.
+        result = `image/gif`.
+      WHEN `svg`.
+        result = `image/svg+xml`.
+      WHEN `webp`.
+        result = `image/webp`.
+      WHEN `ico`.
+        result = `image/x-icon`.
+      WHEN `mp3`.
+        result = `audio/mpeg`.
+      WHEN `mp4`.
+        result = `video/mp4`.
+      WHEN `woff`.
+        result = `font/woff`.
+      WHEN `woff2`.
+        result = `font/woff2`.
+      WHEN `ttf`.
+        result = `font/ttf`.
+      WHEN `otf`.
+        result = `font/otf`.
+      WHEN `xlsx`.
+        result = `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`.
+      WHEN `xls`.
+        result = `application/vnd.ms-excel`.
+      WHEN `docx`.
+        result = `application/vnd.openxmlformats-officedocument.wordprocessingml.document`.
+      WHEN `doc`.
+        result = `application/msword`.
+      WHEN `pptx`.
+        result = `application/vnd.openxmlformats-officedocument.presentationml.presentation`.
+      WHEN `ppt`.
+        result = `application/vnd.ms-powerpoint`.
+      WHEN OTHERS.
+        result = `application/octet-stream`.
+    ENDCASE.
 
   ENDMETHOD.
 

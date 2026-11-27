@@ -1049,19 +1049,12 @@ CLASS z2ui5_cl_cgui_frontend IMPLEMENTATION.
 
   METHOD mime_type.
 
-    DATA(lv_dot) = find( val = name sub = `.` occ = -1 ).
-    DATA(lv_ext) = COND string( WHEN lv_dot >= 0 THEN to_lower( substring( val = name off = lv_dot + 1 ) ) ).
-    result = SWITCH #( lv_ext
-                       WHEN `csv` THEN `text/csv`
-                       WHEN `txt` OR `log` OR `abap` THEN `text/plain`
-                       WHEN `xml` THEN `application/xml`
-                       WHEN `json` THEN `application/json`
-                       WHEN `html` OR `htm` THEN `text/html`
-                       WHEN `xlsx` THEN `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`
-                       WHEN `xls` THEN `application/vnd.ms-excel`
-                       WHEN `pdf` THEN `application/pdf`
-                       WHEN `zip` THEN `application/zip`
-                       ELSE `application/octet-stream` ).
+    " the catalog of abap-util; ABAP source is text as well
+    IF to_lower( z2ui5_cl_cgui_context=>c_trim( name ) ) CP `*.abap`.
+      result = `text/plain`.
+      RETURN.
+    ENDIF.
+    result = z2ui5_cl_cgui_context=>file_get_mimetype( name ).
 
   ENDMETHOD.
 

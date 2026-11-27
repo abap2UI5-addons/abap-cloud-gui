@@ -24,6 +24,9 @@ CLASS ltcl_test DEFINITION FINAL FOR TESTING
     METHODS range_to_text_more_lines FOR TESTING.
     METHODS conv_to_text FOR TESTING.
     METHODS base64_round_trip FOR TESTING.
+    METHODS escape_xml FOR TESTING.
+    METHODS url_unescape_x FOR TESTING.
+    METHODS mimetype_by_name FOR TESTING.
     METHODS check_boolean FOR TESTING.
     METHODS t_comp FOR TESTING.
     METHODS attri_name_by_ref FOR TESTING.
@@ -180,6 +183,45 @@ CLASS ltcl_test IMPLEMENTATION.
     cl_abap_unit_assert=>assert_equals( exp = `Hello, €!`
                                         act = z2ui5_cl_cgui_context=>conv_get_string_by_xstring(
                                                   z2ui5_cl_cgui_context=>conv_decode_x_base64( `SGVsbG8s` && |\n| && `IOKCrCE=` ) ) ).
+
+  ENDMETHOD.
+
+  METHOD escape_xml.
+
+    cl_abap_unit_assert=>assert_equals( exp = `plain text`
+                                        act = z2ui5_cl_cgui_context=>c_escape_xml( `plain text` ) ).
+    cl_abap_unit_assert=>assert_equals( exp = `a &amp; b &lt;c&gt; &quot;d&quot;`
+                                        act = z2ui5_cl_cgui_context=>c_escape_xml( `a & b <c> "d"` ) ).
+    " A, form feed, B, tab, C, line feed: the form feed is no character of
+    " XML 1.0 and goes, tab and line feed are character references
+    cl_abap_unit_assert=>assert_equals( exp = `AB&#x9;C&#xA;`
+                                        act = z2ui5_cl_cgui_context=>c_escape_xml(
+                                                  z2ui5_cl_cgui_context=>conv_get_string_by_xstring( CONV xstring( `410C4209430A` ) ) ) ).
+
+  ENDMETHOD.
+
+  METHOD url_unescape_x.
+
+    " %XX a byte, a + stays, the rest UTF-8
+    cl_abap_unit_assert=>assert_equals( exp = CONV xstring( `6120622B63E282AC` )
+                                        act = z2ui5_cl_cgui_context=>url_unescape_x( `a%20b+c%e2%82%AC` ) ).
+    " no escape without two hex digits
+    cl_abap_unit_assert=>assert_equals( exp = CONV xstring( `255A5A2534` )
+                                        act = z2ui5_cl_cgui_context=>url_unescape_x( `%ZZ%4` ) ).
+    cl_abap_unit_assert=>assert_initial( z2ui5_cl_cgui_context=>url_unescape_x( `` ) ).
+
+  ENDMETHOD.
+
+  METHOD mimetype_by_name.
+
+    cl_abap_unit_assert=>assert_equals( exp = `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`
+                                        act = z2ui5_cl_cgui_context=>file_get_mimetype( `Report.XLSX` ) ).
+    cl_abap_unit_assert=>assert_equals( exp = `text/plain`
+                                        act = z2ui5_cl_cgui_context=>file_get_mimetype( ` notes.txt ` ) ).
+    cl_abap_unit_assert=>assert_equals( exp = `application/octet-stream`
+                                        act = z2ui5_cl_cgui_context=>file_get_mimetype( `archive.tar.gz` ) ).
+    cl_abap_unit_assert=>assert_equals( exp = `application/octet-stream`
+                                        act = z2ui5_cl_cgui_context=>file_get_mimetype( `` ) ).
 
   ENDMETHOD.
 

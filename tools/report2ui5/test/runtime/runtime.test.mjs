@@ -112,12 +112,12 @@ test("zr2c_02_flights: SELECT with a select-option, TOP-OF-PAGE, colors, HIDE, A
   const header = ["Airline No. Date Price Occupied", "---"];
   const flights = [`LH 0400 ${listDate(dateIn(10))} 666.00 EUR 120`, `LH 0402 ${listDate(dateIn(30))} 777.50 EUR 385`];
   assert.deepEqual(d.lines(), [...header, ...flights, "", "Seats occupied in total: 505"]);
-  // the carrier is the hotspot, its HIDE the key of the flight
+  // HIDE makes every text of its line a hotspot, the HIDE the key of the flight
   const clicks = actionsOf(s, "CGUI_LINE_SELECTION");
-  assert.deepEqual(clicks.map((a) => a.args[1]), [`LH\t0400\t${dateIn(10)}`, `LH\t0402\t${dateIn(30)}`]);
+  assert.deepEqual([...new Set(clicks.map((a) => a.args[1]))], [`LH\t0400\t${dateIn(10)}`, `LH\t0402\t${dateIn(30)}`]);
 
   // AT LINE-SELECTION reads the HIDE fields and the table of the run
-  s = await d.act(s.session, { event: clicks[1].id });
+  s = await d.act(s.session, { event: clicks.find((a) => a.args[1] === `LH\t0402\t${dateIn(30)}`).id });
   assert.deepEqual(boxes(s), ["Flight LH 0402: 385 seats occupied"]);
 
   // a second run starts afresh - the total is not summed up twice
@@ -589,7 +589,7 @@ test("zr2c_07_messages: every form of MESSAGE", { skip }, async () => {
 test("zr2c_08_listformat: FORMAT, AS CHECKBOX, AS ICON, HOTSPOT, HIDE, NEW-PAGE", { skip }, async () => {
   let s = await d.start("z2ui5_cl_cgui_r2c_08");
   s = await d.act(s.session, { event: "CGUI_EXECUTE" });
-  // DD/MM/YYYY is not carried over (the migration report says so) - the list writes its default format
+  // DD/MM/YYYY is the user's date format with a four-digit year, as in the classic list
   assert.deepEqual(d.lines(), [
     `Tasks ${listDate(dateIn(0))}`,
     "---",
@@ -601,9 +601,11 @@ test("zr2c_08_listformat: FORMAT, AS CHECKBOX, AS ICON, HOTSPOT, HIDE, NEW-PAGE"
     "#",
     "Second page",
   ]);
+  // HIDE makes every text of its line a hotspot - the title among them
   const clicks = actionsOf(s, "CGUI_LINE_SELECTION");
-  assert.deepEqual(clicks.map((a) => a.label), ["Write the report", "Convert the report", "Test the class"]);
-  s = await d.act(s.session, { event: clicks[1].id });
+  const titles = ["Write the report", "Convert the report", "Test the class"];
+  assert.deepEqual(clicks.filter((a) => titles.includes(a.label)).map((a) => a.label), titles);
+  s = await d.act(s.session, { event: clicks.find((a) => a.label === "Convert the report").id });
   assert.deepEqual(boxes(s), ["Task 2: Convert the report"]);
 
   s = await d.act(s.session, { event: "CGUI_BACK" });
@@ -914,4 +916,21 @@ test("zr2c_47_salvtree: CL_SALV_TREE as the stand-in - the nodes below their rel
   // a click on 0402 - double_click with its key, the handler reads its text
   s = await d.act(s.session, { event: "CGUI_TREE_NODE", args: [String(view[2].KEY)] });
   assert.deepEqual(toasts(s), ["0402 picked"]);
+});
+
+test("zr2c_54_listdetails: HIDE where it runs (a header line, a local class), FORMAT across a PERFORM, sy-lisel in a FORM", { skip }, async () => {
+  let s = await d.start("z2ui5_cl_cgui_r2c_54");
+  // DEFAULT abap_true of the checkbox and of the second radio button
+  assert.deepEqual(fieldsOf(s).filter((f) => /^P_(CB|LIST|TOTAL)=/.test(f)), ["P_CB=true", "P_LIST=false", "P_TOTAL=true"]);
+  s = await d.act(s.session, { event: "CGUI_EXECUTE" });
+  const lines = d.lines();
+  assert.equal(lines[0], "Name Amount Due");
+  assert.ok(lines.some((l) => /^Total\s+1,?289\.50$/.test(l.trim())), lines.join("\n"));
+  // the HIDE of each line is the value when HIDE ran - the total line hides
+  // what the local class set before its HIDE, not the last item of the loop
+  const clicks = actionsOf(s, "CGUI_LINE_SELECTION");
+  assert.deepEqual([...new Set(clicks.map((a) => a.args[1]))], ["1\tRent", "2\tTrain", "0\tTotal"]);
+  // AT LINE-SELECTION: the FORM reads the clicked line through sy-lisel(4)
+  s = await d.act(s.session, { event: clicks.find((a) => a.args[1] === "2\tTrain").id });
+  assert.match(d.lines().join("\n"), /^Item\s+2 Train\s+line\s+\d+ starts with Trai$/m);
 });

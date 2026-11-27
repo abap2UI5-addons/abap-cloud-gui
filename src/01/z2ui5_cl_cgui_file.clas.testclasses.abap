@@ -26,6 +26,11 @@ CLASS ltcl_test IMPLEMENTATION.
     cl_abap_unit_assert=>assert_equals( exp = CONV xstring( `48656C6C6F` )
                                         act = z2ui5_cl_cgui_file=>content_of_data_uri( `data:text/plain;base64,SGVsbG8=` ) ).
     cl_abap_unit_assert=>assert_initial( z2ui5_cl_cgui_file=>content_of_data_uri( `no uri` ) ).
+    " without ;base64 the data is percent-encoded
+    cl_abap_unit_assert=>assert_equals( exp = CONV xstring( `48656C6C6F20576F726C64` )
+                                        act = z2ui5_cl_cgui_file=>content_of_data_uri( `data:text/plain,Hello%20World` ) ).
+    cl_abap_unit_assert=>assert_equals( exp = CONV xstring( `612C62` )
+                                        act = z2ui5_cl_cgui_file=>content_of_data_uri( `data:text/csv;charset=utf-8,a%2Cb` ) ).
 
   ENDMETHOD.
 

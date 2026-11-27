@@ -83,7 +83,9 @@ CLASS z2ui5_cl_cgui_chart DEFINITION PUBLIC FINAL CREATE PUBLIC.
       RETURNING
         VALUE(result) TYPE string.
 
-    "! val escaped for the text or an attribute of XML - &, <, > and "
+    "! val escaped for the text or an attribute of XML - &, <, > and ", the
+    "! control characters XML forbids dropped (z2ui5_cl_cgui_context=>
+    "! c_escape_xml( ))
     CLASS-METHODS xml_escape
       IMPORTING
         val           TYPE clike
@@ -495,10 +497,7 @@ CLASS z2ui5_cl_cgui_chart IMPLEMENTATION.
 
   METHOD xml_escape.
 
-    result = replace( val = val    sub = `&` with = `&amp;` occ = 0 ).
-    result = replace( val = result sub = `<` with = `&lt;`  occ = 0 ).
-    result = replace( val = result sub = `>` with = `&gt;`  occ = 0 ).
-    result = replace( val = result sub = `"` with = `&quot;` occ = 0 ).
+    result = z2ui5_cl_cgui_context=>c_escape_xml( val ).
 
   ENDMETHOD.
 

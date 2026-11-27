@@ -16,7 +16,7 @@
 
 Layout, formatting and behaviour of the classic report that the list, the ALV or the selection screen of abap-cloud-gui do not have:
 
-- CL_SALV_TABLE settings without a counterpart (optimized widths, toolbar functions, striped rows) - the grid sorts and filters by itself (2×)
+- CL_SALV_TABLE: the toolbar functions and the optimized width of one column have no counterpart - the grid has its toolbar, sorts and filters by itself, and optimizes every column (set_optimize( ))
 - MESSAGE ... DISPLAY LIKE 'E' - a status or info message displayed as an error becomes a warning (shown in the popover, the run goes on)
 
 ## Mapped

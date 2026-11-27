@@ -43,7 +43,7 @@ CLASS z2ui5_cl_cgui_r2c_05 IMPLEMENTATION.
     IF p_curr IS INITIAL.
       SELECT * FROM scarr INTO TABLE @gt_scarr.
     ELSE.
-      SELECT * FROM scarr INTO TABLE @gt_scarr WHERE currcode = @p_curr.
+      SELECT * FROM scarr WHERE currcode = @p_curr INTO TABLE @gt_scarr.
     ENDIF.
 
     alv( gt_scarr
@@ -57,6 +57,9 @@ CLASS z2ui5_cl_cgui_r2c_05 IMPLEMENTATION.
         )->set_column_text( name = `URL`
                             text = 'Website'
         )->set_column_hidden( `MANDT`
+        )->set_column_key( `CARRID`
+        )->set_column_width( name  = `CARRNAME`
+                             width = `15.0em`
         )->set_line_selection( ).
 
   ENDMETHOD.

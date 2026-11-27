@@ -71,17 +71,17 @@ CLASS z2ui5_cl_cgui_r2c_16 IMPLEMENTATION.
 
   METHOD start_of_selection.
 
-    SELECT * FROM sflight INTO TABLE @gt_flight
+    SELECT * FROM sflight
       WHERE carrid = @p_carrid
-      ORDER BY PRIMARY KEY.
+      ORDER BY PRIMARY KEY
+      INTO TABLE @gt_flight.
     LOOP AT gt_flight INTO gs_flight.
       list( )->new_line(
-          )->write( val     = gs_flight-carrid
-                    hotspot = abap_true
-                    hide    = gs_flight
+          )->write( gs_flight-carrid
           )->write( gs_flight-connid
           )->write( gs_flight-fldate
           )->write( gs_flight-seatsocc ).
+      list( )->hide( gs_flight ).
     ENDLOOP.
 
   ENDMETHOD.

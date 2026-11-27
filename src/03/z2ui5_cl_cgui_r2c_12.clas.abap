@@ -114,8 +114,8 @@ CLASS z2ui5_cl_cgui_r2c_12 IMPLEMENTATION.
       ENDIF.
       list( )->new_line(
           )->write( val     = gv_num
-                    hotspot = abap_true
-                    hide    = gv_num ).
+                    hotspot = abap_true ).
+      list( )->hide( gv_num ).
       gv_count = gv_count + 1.
     ENDDO.
     IF p_last = abap_true.

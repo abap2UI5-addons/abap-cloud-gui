@@ -8,6 +8,42 @@ release.
 
 **Fixes**
 
+- report2UI5 no longer writes wrong code where it used to: `HIDE` is
+  `list( )->hide( )` at the statement - the value when `HIDE` runs, not at
+  the `WRITE` before it - and works for a table with a header line and in a
+  method of a local class (both did not compile); the one set of hidden
+  fields is compared field by field (`gv_id2` was taken for `gv_id`). A
+  `FORMAT` before a `PERFORM` is the FORM's too, and one left on at the end
+  of a FORM is a TODO. `WRITE` passes `CURRENCY`, `UNIT`, `DECIMALS`,
+  `ROUND`, `NO-ZERO`, `NO-SIGN`, `NO-GROUPING`, the justification, the
+  edit mask, the date formats, `TIME ZONE`, `QUICKINFO`, `INTENSIFIED`,
+  `INVERSE` and `INPUT` to `write( )` instead of dropping them.
+  `DEFAULT abap_true` (or a constant) of a checkbox or radio button is
+  kept; a `USING` parameter written through a field symbol or a reference
+  is `CHANGING`; `sy-lisel` / `sy-lilli` in a FORM called from `AT
+  LINE-SELECTION` read the clicked line, `sy-lisel(n)` compiles; `MESSAGE
+  ... TYPE <variable>` returns on E and A; the `IF sy-subrc` after
+  `F4IF_INT_TABLE_VALUE_REQUEST` that read `RETURN_TAB` (and cleared the
+  field) is dropped; the SLIS / LVC line types are dropped with their
+  tables. Sorts, aggregations, keys, widths, `set_optimize` and the stripes
+  of `CL_SALV_TABLE`, and `IT_SORT`, `KEY`, `OUTPUTLEN`, `COL_POS` of
+  `REUSE_ALV_*` are mapped. ABAP SQL puts `INTO` behind `WHERE` and `ORDER
+  BY`, as strict mode wants; a dynamic `WHERE` is a TODO. The corpus report
+  `zr2c_54_listdetails` (test set `src/03`) covers them.
+- The XLSX export drops the control characters XML forbids (Excel
+  repaired the workbook) and keeps the leading and trailing blanks of a
+  cell; the SVG chart escapes the same way (`z2ui5_cl_cgui_context=>
+  c_escape_xml( )`, copied from abap-util). Base64 goes through the kernel
+  (`CL_WEB_HTTP_UTILITY`, `CL_HTTP_UTILITY`), the ABAP loop is the last
+  resort; a data URI without `;base64` is percent-decoded; the MIME type of
+  a download comes from abap-util's catalog (`file_get_mimetype( )`).
+- The list writes `DD/MM/YY`, `MM/DD/YY`, `DD/MM/YYYY` and `MM/DD/YYYY`
+  in the order of the user's date format, as the classic additions do
+  (both pairs mean the same) - it put the day or the month first as the
+  name said.
+- Sample 05 built its flights anew on top of the old ones after Back and
+  Execute; sample 09 branched on `sy-dynnr` and `sy-ucomm`, which the
+  runtime does not set.
 - report2UI5: a global field symbol that one event block, FORM or method
   assigns and another one reads is refused (`global-field-symbol`) - the
   class declared a local one in each, and the second read an unassigned
