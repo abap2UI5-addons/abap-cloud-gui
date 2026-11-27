@@ -77,6 +77,7 @@ CLASS ltcl_test DEFINITION FINAL FOR TESTING
     METHODS text_for_printing FOR TESTING.
     METHODS paging FOR TESTING.
     METHODS window_order FOR TESTING.
+    METHODS window_filter_selects FOR TESTING.
     METHODS filter_rows FOR TESTING.
     METHODS colors_and_header FOR TESTING.
     METHODS columns_and_cell_types FOR TESTING.
@@ -589,6 +590,51 @@ CLASS ltcl_test IMPLEMENTATION.
     lo_alv->set_sort( `CONNID` ).
     cl_abap_unit_assert=>assert_equals( act = lo_alv->window_order( mo_app->mt_row )
                                         exp = VALUE z2ui5_cl_cgui_alv=>ty_t_index( ( 3 ) ( 2 ) ( 1 ) ) ).
+
+  ENDMETHOD.
+
+  METHOD window_filter_selects.
+
+    FIELD-SYMBOLS <copy> TYPE ltcl_app=>ty_t_row.
+
+    DATA(lo_alv) = z2ui5_cl_cgui_alv=>factory( )->set_paging( 2 )->set_selection_mode( ).
+
+    " a filter of a column menu of the paged grid is a filter of the grid:
+    " Select All, print and export take the rows it lets through
+    cl_abap_unit_assert=>assert_false( lo_alv->is_filtered( ) ).
+    lo_alv->window_request( VALUE #( reason   = z2ui5_if_client=>cs_window_reason-filter
+                                     t_filter = VALUE #( ( group = 1 path = `CARRID` operator = `EQ` value1 = `AA` ) ) ) ).
+    cl_abap_unit_assert=>assert_true( lo_alv->is_filtered( ) ).
+    cl_abap_unit_assert=>assert_equals( act = lo_alv->filter_index( mo_app->mt_row )
+                                        exp = VALUE z2ui5_cl_cgui_alv=>ty_t_index( ( 2 ) ) ).
+    lo_alv->select_filtered( EXPORTING selected = abap_true
+                             CHANGING  tab      = mo_app->mt_row ).
+    cl_abap_unit_assert=>assert_equals( act = lo_alv->get_selected_rows( mo_app->mt_row )
+                                        exp = VALUE z2ui5_cl_cgui_alv=>ty_t_row( ( 2 ) ) ).
+    DATA(lr_rows) = REF #( mo_app->mt_row ).
+    DATA(lr_copy) = lo_alv->filtered_copy( source = lr_rows
+                                           shown  = lr_rows ).
+    ASSIGN lr_copy->* TO <copy>.
+    cl_abap_unit_assert=>assert_equals( act = lines( <copy> )
+                                        exp = 1 ).
+
+    " the column menus filter only where the backend hears of it - paged
+    DATA(lo_view) = z2ui5_cl_ui5_view_builder=>factory( )->ele( `VBox` ).
+    lo_alv->render( node   = lo_view
+                    client = mo_client
+                    tab    = mo_app->mt_row ).
+    cl_abap_unit_assert=>assert_true( xsdbool( lo_view->stringify( ) CS `filterProperty` ) ).
+    lo_view = z2ui5_cl_ui5_view_builder=>factory( )->ele( `VBox` ).
+    z2ui5_cl_cgui_alv=>factory( )->render( node   = lo_view
+                                           client = mo_client
+                                           tab    = mo_app->mt_row ).
+    cl_abap_unit_assert=>assert_false( xsdbool( lo_view->stringify( ) CS `filterProperty` ) ).
+
+    " Delete Filter ends it
+    lo_alv->clear_filter( ).
+    cl_abap_unit_assert=>assert_false( lo_alv->is_filtered( ) ).
+    cl_abap_unit_assert=>assert_equals( act = lines( lo_alv->filter_index( mo_app->mt_row ) )
+                                        exp = 3 ).
 
   ENDMETHOD.
 

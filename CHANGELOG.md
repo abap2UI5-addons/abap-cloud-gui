@@ -14,6 +14,11 @@ release.
   report runtime now commits at the end of every roundtrip, as the classic
   implicit commit at the end of a dialog step does, so a report's own
   database changes are kept too - not after a message of type `A` or `X`.
+- ALV: Select All, print and export take the rows a filter of a column menu
+  lets through. Paged (`set_paging( )`), that filter is a filter of the grid
+  like the one of the toolbar - Delete Filter ends it; without paging the
+  column menus offer no filter any more (it filtered the rows of the browser
+  alone, the backend never heard of it) - the toolbar's filter is the one.
 - report2UI5 no longer writes wrong code where it used to: `HIDE` is
   `list( )->hide( )` at the statement - the value when `HIDE` runs, not at
   the `WRITE` before it - and works for a table with a header line and in a

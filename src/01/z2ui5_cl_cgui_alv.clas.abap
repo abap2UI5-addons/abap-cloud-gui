@@ -557,8 +557,8 @@ CLASS z2ui5_cl_cgui_alv DEFINITION PUBLIC FINAL CREATE PUBLIC.
       RETURNING
         VALUE(result) TYPE string.
 
-    "! the numbers of the rows of tab that pass the filters - all rows
-    "! without filter
+    "! the numbers of the rows of tab that pass the filters, the search
+    "! and (paged) the filter of the column menus - all rows without filter
     METHODS filter_index
       IMPORTING
         tab           TYPE STANDARD TABLE
@@ -776,7 +776,8 @@ CLASS z2ui5_cl_cgui_alv DEFINITION PUBLIC FINAL CREATE PUBLIC.
       RETURNING
         VALUE(result) TYPE string.
 
-    "! a filter or a search is set - not all rows are shown
+    "! a filter, a search or (paged) the filter of a column menu is set -
+    "! not all rows are shown
     METHODS is_filtered
       RETURNING
         VALUE(result) TYPE abap_bool.
@@ -2163,7 +2164,8 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
 
   METHOD is_filtered.
 
-    result = xsdbool( mt_filter IS NOT INITIAL OR mv_search IS NOT INITIAL ).
+    result = xsdbool( mt_filter IS NOT INITIAL OR mv_search IS NOT INITIAL
+                      OR ( mv_page_size > 0 AND mt_window_filter IS NOT INITIAL ) ).
 
   ENDMETHOD.
 
@@ -2437,11 +2439,13 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
 
   METHOD clear_filter.
 
+    " the filter of a column menu of the paged grid with it
     IF name IS INITIAL.
-      CLEAR mt_filter.
+      CLEAR: mt_filter, mt_window_filter.
     ELSE.
       DATA(lv_name) = to_upper( name ).
       DELETE mt_filter WHERE name = lv_name.
+      DELETE mt_window_filter WHERE path = lv_name.
     ENDIF.
     mv_page = 1.
 
@@ -2539,7 +2543,14 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
     DATA lv_error   TYPE string.
     FIELD-SYMBOLS <cell> TYPE any.
 
-    LOOP AT mt_filter INTO DATA(ls_filter).
+    " the filter of the grid and, paged, the one of the column menus - the
+    " browser holds only some of the rows there and filters none of them
+    DATA(lt_filter) = mt_filter.
+    IF mv_page_size > 0.
+      INSERT LINES OF window_filter( tab ) INTO TABLE lt_filter.
+    ENDIF.
+
+    LOOP AT lt_filter INTO DATA(ls_filter).
       IF check_filter( name = ls_filter-name
                        rows = ls_filter-rows
                        tab  = tab ) IS NOT INITIAL.
@@ -2962,11 +2973,7 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
     ENDIF.
 
     " the filter of the grid and the one of the column menus together
-    DATA(lt_keep) = mt_filter.
-    DATA(lt_window) = window_filter( tab ).
-    INSERT LINES OF lt_window INTO TABLE mt_filter.
     result = filter_index( tab ).
-    mt_filter = lt_keep.
 
     LOOP AT mt_window_sort INTO DATA(ls_sort).
       INSERT VALUE #( name       = ls_sort-path
@@ -3728,9 +3735,16 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
       ENDIF.
 
       DATA(lo_column) = node->ele( n = `Column` ns = `table`
-          )->a( n = `sortProperty`   t = z2ui5_cl_ui5_view_builder=>component_path( ls_comp-name )
-          )->a( n = `filterProperty` t = z2ui5_cl_ui5_view_builder=>component_path( ls_comp-name )
-          )->a( n = `hAlign`         v = lv_align ).
+          )->a( n = `sortProperty` t = z2ui5_cl_ui5_view_builder=>component_path( ls_comp-name )
+          )->a( n = `hAlign`       v = lv_align ).
+      " the filter of a column menu reaches the backend through the paged
+      " binding only (window_request( )) - without paging it filtered the
+      " rows of the browser alone, and Select All, print, export and the
+      " totals ran on rows the user did not see: there the filter of the
+      " grid (the toolbar) is the one
+      IF mv_page_size > 0.
+        lo_column->a( n = `filterProperty` t = z2ui5_cl_ui5_view_builder=>component_path( ls_comp-name ) ).
+      ENDIF.
       IF lv_width IS NOT INITIAL.
         lo_column->a( n = `width` t = lv_width ).
       ENDIF.
