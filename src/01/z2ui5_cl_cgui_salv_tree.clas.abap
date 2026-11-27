@@ -105,11 +105,15 @@ CLASS z2ui5_cl_cgui_salv_tree DEFINITION PUBLIC
         key TYPE i.
 
   PROTECTED SECTION.
-  PRIVATE SECTION.
+    " PROTECTED, not PRIVATE: the object is kept with the report between
+    " the roundtrips, and the transpiled runtime restores PROTECTED
+    " attributes of the draft but not PRIVATE ones
     DATA mo_tree     TYPE REF TO z2ui5_cl_cgui_tree.
     DATA mo_nodes    TYPE REF TO z2ui5_cl_cgui_salv_nodes.
     DATA mo_columns  TYPE REF TO z2ui5_cl_cgui_salv_cols.
     DATA mo_settings TYPE REF TO z2ui5_cl_cgui_salv_config.
+
+  PRIVATE SECTION.
 ENDCLASS.
 
 

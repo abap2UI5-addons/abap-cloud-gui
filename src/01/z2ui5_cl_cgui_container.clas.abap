@@ -200,8 +200,12 @@ CLASS z2ui5_cl_cgui_container DEFINITION PUBLIC
         lifetime_dynpro_dynpro_link.
 
   PROTECTED SECTION.
-  PRIVATE SECTION.
+    " PROTECTED, not PRIVATE: the object is kept with the report between
+    " the roundtrips, and the transpiled runtime restores PROTECTED
+    " attributes of the draft but not PRIVATE ones
     DATA mt_cell TYPE STANDARD TABLE OF REF TO z2ui5_cl_cgui_container WITH EMPTY KEY.
+
+  PRIVATE SECTION.
 ENDCLASS.
 
 

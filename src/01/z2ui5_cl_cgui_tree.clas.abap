@@ -294,11 +294,9 @@ CLASS z2ui5_cl_cgui_tree DEFINITION PUBLIC FINAL CREATE PUBLIC.
         VALUE(result) TYPE string_table.
 
   PROTECTED SECTION.
-  PRIVATE SECTION.
-
-    " the number of a cell column, C01 ... C99
-    TYPES ty_cell_no TYPE n LENGTH 2.
-
+    " PROTECTED, not PRIVATE: the object is kept with the report between
+    " the roundtrips, and the transpiled runtime restores PROTECTED
+    " attributes of the draft but not PRIVATE ones
     DATA mt_node   TYPE ty_t_node.
     DATA mt_column TYPE ty_t_column.
     DATA mv_title  TYPE string.
@@ -309,6 +307,11 @@ CLASS z2ui5_cl_cgui_tree DEFINITION PUBLIC FINAL CREATE PUBLIC.
     DATA mv_check_branch TYPE abap_bool.
     DATA mv_expand_request TYPE i.
     DATA mt_function TYPE z2ui5_cl_cgui_alv=>ty_t_function.
+
+  PRIVATE SECTION.
+
+    " the number of a cell column, C01 ... C99
+    TYPES ty_cell_no TYPE n LENGTH 2.
 
     METHODS columns_from
       IMPORTING

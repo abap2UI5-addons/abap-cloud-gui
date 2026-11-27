@@ -187,9 +187,13 @@ CLASS z2ui5_cl_cgui_textedit DEFINITION PUBLIC
         error_cntl_call_method.
 
   PROTECTED SECTION.
-  PRIVATE SECTION.
+    " PROTECTED, not PRIVATE: the object is kept with the report between
+    " the roundtrips, and the transpiled runtime restores PROTECTED
+    " attributes of the draft but not PRIVATE ones
     "! the text, and the user changed it after the program set it
     DATA mv_set TYPE string.
+
+  PRIVATE SECTION.
 
     METHODS text_put
       IMPORTING

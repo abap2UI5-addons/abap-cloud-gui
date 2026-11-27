@@ -52,8 +52,12 @@ CLASS z2ui5_cl_cgui_salv_cols DEFINITION PUBLIC CREATE PUBLIC.
         position   TYPE i.
 
   PROTECTED SECTION.
-  PRIVATE SECTION.
+    " PROTECTED, not PRIVATE: the object is kept with the report between
+    " the roundtrips, and the transpiled runtime restores PROTECTED
+    " attributes of the draft but not PRIVATE ones
     DATA mt_column TYPE ty_t_column_ref.
+
+  PRIVATE SECTION.
 ENDCLASS.
 
 

@@ -142,6 +142,15 @@ CLASS z2ui5_cl_cgui_salv_table DEFINITION PUBLIC
         e_column_id TYPE z2ui5_cl_cgui_alv=>ty_s_lvc_col OPTIONAL.
 
   PROTECTED SECTION.
+    " PROTECTED, not PRIVATE: the object is kept with the report between
+    " the roundtrips, and the transpiled runtime restores PROTECTED
+    " attributes of the draft but not PRIVATE ones
+    DATA mr_table     TYPE REF TO data.
+    DATA mo_container TYPE REF TO z2ui5_cl_cgui_container.
+    DATA mo_grid      TYPE REF TO z2ui5_cl_cgui_alv_grid.
+    DATA mo_columns   TYPE REF TO z2ui5_cl_cgui_salv_cols.
+    DATA mo_settings  TYPE REF TO z2ui5_cl_cgui_salv_config.
+
   PRIVATE SECTION.
     TYPES:
       BEGIN OF ty_s_fcat,
@@ -160,12 +169,6 @@ CLASS z2ui5_cl_cgui_salv_table DEFINITION PUBLIC
         zebra      TYPE abap_bool,
         sel_mode   TYPE c LENGTH 1,
       END OF ty_s_layout.
-
-    DATA mr_table     TYPE REF TO data.
-    DATA mo_container TYPE REF TO z2ui5_cl_cgui_container.
-    DATA mo_grid      TYPE REF TO z2ui5_cl_cgui_alv_grid.
-    DATA mo_columns   TYPE REF TO z2ui5_cl_cgui_salv_cols.
-    DATA mo_settings  TYPE REF TO z2ui5_cl_cgui_salv_config.
 
     METHODS fieldcat
       RETURNING
