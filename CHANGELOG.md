@@ -234,6 +234,9 @@ release.
   SELECTION-SCREEN OUTPUT left, not from the one the group was declared
   with: a group the PBO switched raised no user command from the button
   just deselected.
+- `popup_to_decide_list( )` leaves out the lines of its SPOPLI table with
+  HIDE or INACTIVE - they were offered and could be picked; the answer is
+  still the line of the table.
 
 **The value help and table controls in windows too**
 

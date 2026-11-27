@@ -2073,6 +2073,31 @@ CLASS ltcl_test IMPLEMENTATION.
     cl_abap_unit_assert=>assert_equals( act = mo_report->mv_then
                                         exp = `2` ).
 
+    " HIDE and INACTIVE lines are no option - the answer is still the line
+    lt_list = VALUE #( ( varoption = 'Hidden' hide = 'X' )
+                       ( varoption = 'Packages' )
+                       ( varoption = 'Locked' inactive = 'X' )
+                       ( varoption = 'Source code' ) ).
+    CLEAR mo_report->mv_then.
+    mo_cut->popup_to_decide_list( question = `Which objects?`
+                                  list     = lt_list
+                                  then     = `ON_SURE` ).
+    lo_popup = CAST z2ui5_cl_cgui_popup( mo_client->mo_called ).
+    mo_client->mv_init = abap_true.
+    lo_popup->z2ui5_if_app~main( mo_client ).
+    mo_client->mv_init = abap_false.
+    cl_abap_unit_assert=>assert_false( xsdbool( mo_client->mv_popup CS `Hidden` ) ).
+    cl_abap_unit_assert=>assert_false( xsdbool( mo_client->mv_popup CS `Locked` ) ).
+    mo_client->mv_event = `CGUI_POP_OPTION_2`.
+    lo_popup->z2ui5_if_app~main( mo_client ).
+    mo_client->mo_prev = lo_popup.
+    mo_client->mv_event = z2ui5_cl_cgui_report=>cs_ucomm-popup_answer.
+    mo_client->mv_navigated = abap_true.
+    mo_cut->z2ui5_if_app~main( mo_client ).
+    mo_client->mv_navigated = abap_false.
+    cl_abap_unit_assert=>assert_equals( act = mo_report->mv_then
+                                        exp = `4` ).
+
   ENDMETHOD.
 
   METHOD popup_then.
@@ -2725,6 +2750,7 @@ CLASS ltcl_test IMPLEMENTATION.
     mo_client->mo_called->main( mo_client ).
     cl_abap_unit_assert=>assert_true( mo_client->mv_left ).
     CLEAR mo_client->mv_event.
+
 
     mo_report->s_code = VALUE #( ( sign = `I` option = `EQ` low = `A` ) ).
     mo_cut->mv_cgui_value_field = `S_CODE`.

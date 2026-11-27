@@ -919,7 +919,7 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
 
     "! POPUP_TO_DECIDE_LIST with its SPOPLI table: every VAROPTION one option
     "! of popup_to_decide( ) - the answer is the number of the line, `A` for
-    "! cancel, as the classic one: every line of the table is an option
+    "! cancel, as the classic one; a line with HIDE or INACTIVE is no option
     METHODS popup_to_decide_list
       IMPORTING
         question TYPE clike
@@ -1285,6 +1285,9 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
 
     DATA mv_cgui_batch         TYPE abap_bool.
     DATA mv_cgui_answer        TYPE string.
+    " popup_to_decide_list( ): the line of the table each option stands for -
+    " lines with HIDE or INACTIVE are no option
+    DATA mt_cgui_decide_line   TYPE STANDARD TABLE OF i WITH EMPTY KEY.
     DATA mt_cgui_popup_values  TYPE z2ui5_cl_cgui_popup=>ty_t_field.
     DATA mv_cgui_dynnr         TYPE string.
     DATA mv_cgui_dynnr_title   TYPE string.
@@ -4242,6 +4245,14 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
     ENDTRY.
     mv_cgui_answer = lo_popup->result( )-answer.
     mt_cgui_popup_values = lo_popup->result( )-fields.
+    " POPUP_TO_DECIDE_LIST answers the line of its table
+    IF mt_cgui_decide_line IS NOT INITIAL AND mv_cgui_answer CO `0123456789` AND mv_cgui_answer IS NOT INITIAL.
+      READ TABLE mt_cgui_decide_line INTO DATA(lv_line) INDEX CONV i( mv_cgui_answer ).
+      IF sy-subrc = 0.
+        mv_cgui_answer = |{ lv_line }|.
+      ENDIF.
+    ENDIF.
+    CLEAR mt_cgui_decide_line.
 
 
   ENDMETHOD.
@@ -6692,7 +6703,7 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
 
   METHOD popup_to_decide.
 
-    CLEAR mv_cgui_answer.
+    CLEAR: mv_cgui_answer, mt_cgui_decide_line.
     DATA(lv_event) = popup_event( ucomm = ucomm
                                   then  = then ).
     mv_cgui_pending_kind = cs_pending-decide.
@@ -6724,16 +6735,31 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
   METHOD popup_to_decide_list.
 
     DATA lt_option TYPE string_table.
+    DATA lt_line   LIKE mt_cgui_decide_line.
     FIELD-SYMBOLS <line> TYPE any.
     FIELD-SYMBOLS <comp> TYPE any.
+    FIELD-SYMBOLS <flag> TYPE any.
 
     LOOP AT list ASSIGNING <line>.
+      DATA(lv_index) = sy-tabix.
+      " HIDE: not offered; INACTIVE: not to be picked - left out as well
+      UNASSIGN <flag>.
+      ASSIGN COMPONENT `HIDE` OF STRUCTURE <line> TO <flag>.
+      IF <flag> IS ASSIGNED AND <flag> IS NOT INITIAL.
+        CONTINUE.
+      ENDIF.
+      UNASSIGN <flag>.
+      ASSIGN COMPONENT `INACTIVE` OF STRUCTURE <line> TO <flag>.
+      IF <flag> IS ASSIGNED AND <flag> IS NOT INITIAL.
+        CONTINUE.
+      ENDIF.
       UNASSIGN <comp>.
       ASSIGN COMPONENT `VAROPTION` OF STRUCTURE <line> TO <comp>.
       IF <comp> IS NOT ASSIGNED.
         ASSIGN <line> TO <comp>.
       ENDIF.
       INSERT condense( CONV string( <comp> ) ) INTO TABLE lt_option.
+      INSERT lv_index INTO TABLE lt_line.
       UNASSIGN <comp>.
     ENDLOOP.
 
@@ -6742,6 +6768,8 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
                      ucomm    = ucomm
                      title    = title
                      then     = then ).
+    " the answer is the line of the table, not the number of the option
+    mt_cgui_decide_line = lt_line.
 
   ENDMETHOD.
 
