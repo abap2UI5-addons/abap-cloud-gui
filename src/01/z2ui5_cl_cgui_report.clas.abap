@@ -3685,12 +3685,6 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
     result = abap_true.
     DATA(lr_full) = alv_shown( ).
     CASE lv_event.
-      WHEN z2ui5_cl_cgui_alv=>cs_event-page.
-        IF lr_full IS BOUND.
-          ASSIGN lr_full->* TO <tab>.
-          mo_cgui_alv->page_turn( direction = client->get_event_arg( )
-                                  lines     = lines( mo_cgui_alv->filter_index( <tab> ) ) ).
-        ENDIF.
       WHEN z2ui5_cl_cgui_alv=>cs_event-filter.
         alv_filter_popup( ).
       WHEN z2ui5_cl_cgui_alv=>cs_event-filter_clear.

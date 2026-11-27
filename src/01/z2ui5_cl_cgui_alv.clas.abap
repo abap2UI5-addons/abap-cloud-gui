@@ -97,6 +97,10 @@ CLASS z2ui5_cl_cgui_alv DEFINITION PUBLIC FINAL CREATE PUBLIC.
       END OF cs_color.
 
     CONSTANTS:
+      "! deprecated - the page buttons are gone: set_paging( ) binds a window
+      "! of rows the grid scrolls through; kept for callers, removed with the
+      "! next major release, as get_page( ), get_page_offset( ), page_turn( )
+      "! and cs_event-page
       BEGIN OF cs_page,
         first    TYPE string VALUE `FIRST`,
         previous TYPE string VALUE `PREVIOUS`,
@@ -475,18 +479,20 @@ CLASS z2ui5_cl_cgui_alv DEFINITION PUBLIC FINAL CREATE PUBLIC.
       RETURNING
         VALUE(result) TYPE i.
 
-    "! the page shown, from 1
+    "! deprecated - the page shown, from 1; the grid shows no pages, it
+    "! scrolls through a window of rows (set_paging( ))
     METHODS get_page
       RETURNING
         VALUE(result) TYPE i.
 
-    "! the rows before the page shown - add it to a row of the page to get
-    "! the row of the table
+    "! deprecated - the rows before the page shown - add it to a row of the
+    "! page to get the row of the table
     METHODS get_page_offset
       RETURNING
         VALUE(result) TYPE i.
 
-    "! turn the page - cs_page - for a table of lines rows
+    "! deprecated - turn the page - cs_page - for a table of lines rows;
+    "! no control of the grid raises cs_event-page any more
     METHODS page_turn
       IMPORTING
         direction TYPE clike
