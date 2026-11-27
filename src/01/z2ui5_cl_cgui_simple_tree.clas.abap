@@ -275,12 +275,12 @@ CLASS z2ui5_cl_cgui_simple_tree IMPLEMENTATION.
       IF ls_node-node_key IS INITIAL OR ls_node-hidden = abap_true.
         CONTINUE.
       ENDIF.
-      " a child below its relatkey, a sibling beside it
-      DATA(lv_parent) = key_of( ls_node-relatkey ).
-      IF lv_parent <> 0 AND ls_node-relatship <> relat_first_child AND ls_node-relatship <> relat_last_child
-          AND ls_node-relatship <> 0.
-        lv_parent = mo_tree->get_parent( lv_parent ).
-      ENDIF.
+      " a child below its relatkey, a sibling beside it - no relationship
+      " is a child
+      DATA(lv_parent) = mo_tree->parent_of_related(
+                            related      = key_of( ls_node-relatkey )
+                            relationship = COND #( WHEN ls_node-relatship = 0 THEN relat_last_child
+                                                   ELSE ls_node-relatship ) ).
       IF lv_parent <> 0 AND mo_tree->get_node( lv_parent )-lazy = abap_true.
         mo_tree->set_loaded( lv_parent ).
       ENDIF.

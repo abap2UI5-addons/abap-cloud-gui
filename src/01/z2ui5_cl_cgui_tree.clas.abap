@@ -121,6 +121,17 @@ CLASS z2ui5_cl_cgui_tree DEFINITION PUBLIC FINAL CREATE PUBLIC.
       RETURNING
         VALUE(result) TYPE i.
 
+    "! the parent of a node added related to the node related -
+    "! relationship as z2ui5_if_cgui_salv_c=>node_relation (the relat_* of
+    "! the classic trees): a child below it, a sibling beside it; 0 without
+    "! a related node
+    METHODS parent_of_related
+      IMPORTING
+        related       TYPE i
+        relationship  TYPE i
+      RETURNING
+        VALUE(result) TYPE i.
+
     "! open a closed node, close an open one with children - abap_true when
     "! it was a lazy node opened the first time, without children: it counts
     "! as loaded now, its children are the caller's to add
@@ -854,6 +865,20 @@ CLASS z2ui5_cl_cgui_tree IMPLEMENTATION.
           )->a( n = `text`     v = |\{C{ CONV ty_cell_no( lv_index ) }\}|
           )->a( n = `wrapping` b = abap_false ).
     ENDLOOP.
+
+  ENDMETHOD.
+
+  METHOD parent_of_related.
+
+    IF related = 0.
+      RETURN.
+    ENDIF.
+    IF relationship = z2ui5_if_cgui_salv_c=>node_relation-first_child
+        OR relationship = z2ui5_if_cgui_salv_c=>node_relation-last_child.
+      result = related.
+    ELSE.
+      result = get_parent( related ).
+    ENDIF.
 
   ENDMETHOD.
 

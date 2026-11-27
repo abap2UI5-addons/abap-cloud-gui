@@ -70,10 +70,8 @@ CLASS z2ui5_cl_cgui_salv_nodes IMPLEMENTATION.
     DATA(lv_related) = COND i( WHEN condense( CONV string( related_node ) ) CO `0123456789` AND related_node IS NOT INITIAL
                                THEN CONV i( related_node ) ).
     " a child below the related node, a sibling below its parent
-    DATA(lv_parent) = SWITCH i( relationship
-                                WHEN z2ui5_if_cgui_salv_c=>node_relation-first_child
-                                  OR z2ui5_if_cgui_salv_c=>node_relation-last_child THEN lv_related
-                                ELSE COND #( WHEN lv_related IS NOT INITIAL THEN lo_tree->get_parent( lv_related ) ) ).
+    DATA(lv_parent) = lo_tree->parent_of_related( related      = lv_related
+                                                  relationship = relationship ).
     DATA(lv_icon) = COND string( WHEN expanded_icon IS NOT INITIAL THEN expanded_icon ELSE collapsed_icon ).
     DATA(lv_folder) = xsdbool( folder = abap_true OR expander = abap_true ).
     DATA(lv_icon_ui5) = COND string( WHEN lv_icon CP `sap-icon://*` THEN lv_icon ).
