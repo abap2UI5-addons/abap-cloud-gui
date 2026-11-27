@@ -266,6 +266,7 @@ CLASS ltcl_test DEFINITION FINAL FOR TESTING
     METHODS url_skip_screen FOR TESTING.
     METHODS url_range FOR TESTING.
     METHODS variant_screen_only FOR TESTING.
+    METHODS variant_names_refused FOR TESTING.
     METHODS events_screen_only FOR TESTING.
     METHODS submit_starts_report FOR TESTING.
     METHODS link_holds_values FOR TESTING.
@@ -1514,6 +1515,47 @@ CLASS ltcl_test IMPLEMENTATION.
                                         exp = `LH` ).
     cl_abap_unit_assert=>assert_initial( mo_report->mv_secret ).
     cl_abap_unit_assert=>assert_initial( mo_report->mv_ucomm ).
+
+  ENDMETHOD.
+
+  METHOD variant_names_refused.
+
+    DATA(lo_store) = NEW ltcl_variant_store( ).
+    mo_cut->set_variant_store( lo_store ).
+    init( ).
+
+    " the name scheme of the drafts and a name longer than the stores keep
+    " are no names of a variant
+    DATA(lt_name) = VALUE string_table( ( `%DRAFT_SOMEONE` )
+                                        ( `A123456789B123456789C123456789D123456789E` ) ).
+    LOOP AT lt_name INTO DATA(lv_name).
+      DATA(lo_popup) = z2ui5_cl_cgui_popup=>get_values( VALUE #( ( name = `NAME` value = lv_name ) ) ).
+      DATA(lo_client) = NEW ltcl_client( ).
+      lo_client->mo_app = lo_popup.
+      lo_client->mv_event = `CGUI_POP_OK`.
+      lo_popup->z2ui5_if_app~main( lo_client ).
+      cl_abap_unit_assert=>assert_true( lo_popup->result( )-confirmed ).
+      mo_cut->variant_save( lo_popup ).
+      cl_abap_unit_assert=>assert_initial( lo_store->mt_variant ).
+      cl_abap_unit_assert=>assert_equals( act = mo_cut->mt_cgui_msg[ lines( mo_cut->mt_cgui_msg ) ]-type
+                                          exp = `E` ).
+    ENDLOOP.
+
+    " a draft of another user's name, planted past the popup, is not
+    " restored
+    lo_store->mt_variant = VALUE #( ( name   = z2ui5_cl_cgui_memory=>draft_name( )
+                                      owner  = `ZZ_OTHER`
+                                      values = VALUE #( ( name = `P_CARRID` kind = `P` low = `XX` ) ) ) ).
+    DATA(lo_next) = NEW ltcl_report( ).
+    DATA(lo_next_client) = NEW ltcl_client( ).
+    lo_next_client->mo_app = lo_next.
+    lo_next_client->mv_init = abap_true.
+    lo_next->set_layout_store( NEW ltcl_layout_store( ) ).
+    lo_next->set_variant_store( lo_store ).
+    lo_next->set_draft( ).
+    lo_next->z2ui5_if_app~main( lo_next_client ).
+    cl_abap_unit_assert=>assert_differs( act = lo_next->p_carrid
+                                         exp = `XX` ).
 
   ENDMETHOD.
 

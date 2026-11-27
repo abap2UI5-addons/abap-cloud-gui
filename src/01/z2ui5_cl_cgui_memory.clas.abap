@@ -453,7 +453,9 @@ CLASS z2ui5_cl_cgui_memory IMPLEMENTATION.
 
     ASSIGN ctx-fields->* TO <fields>.
     DATA(lv_name) = condense( popup->result_value( `NAME` ) ).
-    IF lv_name IS INITIAL OR lv_name CP '##*'.
+    " ## are the layouts of the ALV, % the drafts - no names of a variant;
+    " the stores keep 40 characters of a name
+    IF lv_name IS INITIAL OR lv_name CP '##*' OR lv_name CP '%*' OR strlen( lv_name ) > 40.
       RAISE EXCEPTION TYPE z2ui5_cx_cgui_error
         EXPORTING
           val = 'Enter a name for the variant'(001).
@@ -954,7 +956,13 @@ CLASS z2ui5_cl_cgui_memory IMPLEMENTATION.
   METHOD draft_restore.
 
     DATA(lt_variant) = variant_catalog( ctx ).
-    IF NOT line_exists( lt_variant[ name = draft_name( ) ] ).
+    READ TABLE lt_variant INTO DATA(ls_draft) WITH KEY name = draft_name( ).
+    IF sy-subrc <> 0.
+      RETURN.
+    ENDIF.
+    " only a draft of this user - a server store names the owner, the
+    " browser's storage none
+    IF ls_draft-owner IS NOT INITIAL AND to_upper( ls_draft-owner ) <> to_upper( sy-uname ).
       RETURN.
     ENDIF.
     IF variant_apply( ctx    = ctx
