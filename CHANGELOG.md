@@ -85,12 +85,20 @@ release.
 - report2UI5: a global field symbol that one event block, FORM or method
   assigns and another one reads is refused (`global-field-symbol`) - the
   class declared a local one in each, and the second read an unassigned
-  one. A report `/abc/zrep` writes `#abc#cl_zrep.*`, as abapGit names the
+  one. Whether a block assigns it is read from its statements (an ASSIGN
+  ... TO, an ... ASSIGNING), so a `.` inside an ASSIGN (`gt[ k = '1.5' ]`,
+  a dynamic name, `->('A.B')`) no longer refuses a report that converts;
+  an inline `ASSIGNING FIELD-SYMBOL(<fs>)` is the block's own field symbol
+  and shadows the global, which is not declared there as well. A report `/abc/zrep` writes `#abc#cl_zrep.*`, as abapGit names the
   files, not a folder. A line over 255 characters is broken at a token
   boundary (a character literal in two joined with `&`), and refused
   (`long-line`) where it cannot be - it was a TODO, and abapGit's import
   left an empty class. A global renamed for a component of the runtime
-  (`message`) is renamed in the bodies of the macros too. A FORM's USING
+  (`message`) is renamed in the bodies of the macros too, and where it is
+  passed to a macro as an argument (`add message 1.`) - when the macro's
+  body uses that placeholder as a field in every place; one it uses as a
+  field and as a component (`ls-&1 = &1.`), or in a statement that does
+  not parse, refuses the call (`reserved-name`). A FORM's USING
   parameter a field symbol or a reference is set to (ASSIGN, GET REFERENCE
   OF, REF #( )) is CHANGING. EXIT outside of a loop in an event block gets
   a TODO to check what runs after it. A long report converts in linear
