@@ -46,7 +46,11 @@ export function parseJsonc(text) {
     } else if (c === "/" && text[i + 1] === "/") {
       while (i < text.length && text[i] !== "\n") i++;
     } else if (c === "/" && text[i + 1] === "*") {
-      i = text.indexOf("*/", i + 2) + 2;
+      // an unclosed comment is an error: indexOf -1 plus 2 restarted the
+      // walk at 1 and it never came back
+      const end = text.indexOf("*/", i + 2);
+      if (end === -1) throw new Error("JSONC: a /* comment is never closed");
+      i = end + 2;
     } else {
       out += c;
       i++;
