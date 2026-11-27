@@ -1307,6 +1307,13 @@ CLASS z2ui5_cl_cgui_alv DEFINITION PUBLIC FINAL CREATE PUBLIC.
       RETURNING
         VALUE(result) TYPE string.
 
+    "! an aggregate as text - a count without decimals, an average with two
+    CLASS-METHODS aggregate_text
+      IMPORTING
+        aggregate     TYPE ty_s_aggregate
+      RETURNING
+        VALUE(result) TYPE string.
+
     METHODS cell_to_text
       IMPORTING
         val           TYPE any
@@ -3146,7 +3153,6 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
     DATA lv_line  TYPE string.
     DATA lv_text  TYPE string.
     DATA lv_index TYPE i.
-    DATA lv_sum   TYPE decfloat34.
     DATA lv_total TYPE abap_bool.
     DATA lr_copy  TYPE REF TO data.
     FIELD-SYMBOLS <copy> TYPE STANDARD TABLE.
@@ -3183,25 +3189,19 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
       INSERT lt_cell INTO TABLE lt_cells.
     ENDLOOP.
 
-    " the totals of the summed columns
+    " the aggregates of the columns - a total, an average, a minimum, a
+    " maximum or a count, as the grid shows them
     CLEAR lt_cell.
+    DATA(lt_aggregate) = get_aggregates( <copy> ).
     LOOP AT lt_comp INTO ls_comp.
       lv_index = sy-tabix.
-      DATA(ls_column) = column_setting( ls_comp-name ).
-      IF ls_column-sum = abap_false.
+      READ TABLE lt_aggregate INTO DATA(ls_aggregate) WITH KEY column = ls_comp-name.
+      IF sy-subrc <> 0.
         INSERT `` INTO TABLE lt_cell.
         CONTINUE.
       ENDIF.
       lv_total = abap_true.
-      CLEAR lv_sum.
-      LOOP AT <copy> ASSIGNING <row>.
-        ASSIGN COMPONENT ls_comp-name OF STRUCTURE <row> TO <cell>.
-        TRY.
-            lv_sum = lv_sum + <cell>.
-          CATCH cx_sy_conversion_error cx_sy_arithmetic_error ##NO_HANDLER.
-        ENDTRY.
-      ENDLOOP.
-      lv_text = |{ lv_sum NUMBER = USER }|.
+      lv_text = aggregate_text( ls_aggregate ).
       INSERT lv_text INTO TABLE lt_cell.
       lt_width[ lv_index ]-width = nmax( val1 = lt_width[ lv_index ]-width
                                          val2 = strlen( lv_text ) ).
@@ -4055,6 +4055,16 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
 
   ENDMETHOD.
 
+  METHOD aggregate_text.
+
+    result = COND #( WHEN aggregate-aggregation = cs_aggregation-count
+                     THEN |{ CONV i( aggregate-value ) NUMBER = USER }|
+                     WHEN aggregate-aggregation = cs_aggregation-average
+                     THEN |{ aggregate-value NUMBER = USER DECIMALS = 2 }|
+                     ELSE |{ aggregate-value NUMBER = USER }| ).
+
+  ENDMETHOD.
+
   METHOD cell_to_text.
 
     DATA lv_date   TYPE d.
@@ -4103,11 +4113,7 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
                                       WHEN cs_aggregation-maximum THEN 'Maximum'(017)
                                       WHEN cs_aggregation-count   THEN 'Count'(018)
                                       ELSE 'Total'(004) ).
-      DATA(lv_value) = COND string( WHEN ls_aggregate-aggregation = cs_aggregation-count
-                                    THEN |{ CONV i( ls_aggregate-value ) NUMBER = USER }|
-                                    WHEN ls_aggregate-aggregation = cs_aggregation-average
-                                    THEN |{ ls_aggregate-value NUMBER = USER DECIMALS = 2 }|
-                                    ELSE |{ ls_aggregate-value NUMBER = USER }| ).
+      DATA(lv_value) = aggregate_text( ls_aggregate ).
       lo_sums->tag( `ObjectStatus`
           )->a( n = `title` t = |{ lv_title } { ls_aggregate-label }|
           )->a( n = `text`  t = lv_value

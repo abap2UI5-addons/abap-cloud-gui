@@ -503,6 +503,14 @@ CLASS ltcl_test IMPLEMENTATION.
     cl_abap_unit_assert=>assert_false( xsdbool( lt_text[ 3 ] CS `say` ) ).
     cl_abap_unit_assert=>assert_true( xsdbool( lt_text[ 7 ] CS `600` ) ).
 
+    " the aggregation of the column, not always a total: the maximum
+    lt_text = z2ui5_cl_cgui_alv=>factory(
+        )->set_column_aggregation( name        = `PRICE`
+                                   aggregation = z2ui5_cl_cgui_alv=>cs_aggregation-maximum
+        )->to_text( mo_app->mt_row ).
+    cl_abap_unit_assert=>assert_true( xsdbool( lt_text[ lines( lt_text ) ] CS `300` ) ).
+    cl_abap_unit_assert=>assert_false( xsdbool( lt_text[ lines( lt_text ) ] CS `600` ) ).
+
   ENDMETHOD.
 
   METHOD paging.
