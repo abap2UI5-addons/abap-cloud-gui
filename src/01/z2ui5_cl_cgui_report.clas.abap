@@ -322,6 +322,8 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
         tree     TYPE REF TO z2ui5_cl_cgui_tree,
         alv_name TYPE string,
         alv_data TYPE REF TO data,
+        " the copy with the box field - the rows selected in the ALV
+        alv_box  TYPE REF TO data,
         window   TYPE abap_bool,
         w_title  TYPE string,
         w_cols   TYPE i,
@@ -3832,6 +3834,7 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
                     tree     = mo_cgui_tree
                     alv_name = mv_cgui_alv_name
                     alv_data = mr_cgui_alv
+                    alv_box  = mr_cgui_alv_box
                     window   = mv_cgui_window
                     w_title  = mv_cgui_window_title
                     w_cols   = mv_cgui_window_cols
@@ -3856,11 +3859,13 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
     mo_cgui_tree     = ls_level-tree.
     mv_cgui_alv_name = ls_level-alv_name.
     mr_cgui_alv      = ls_level-alv_data.
+    " the selection of the ALV stays as it was before the line selection
+    mr_cgui_alv_box  = ls_level-alv_box.
     mv_cgui_window       = ls_level-window.
     mv_cgui_window_title = ls_level-w_title.
     mv_cgui_window_cols  = ls_level-w_cols.
     mv_cgui_window_lines = ls_level-w_lines.
-    CLEAR: mr_cgui_alv_box, mr_cgui_alv_page, mt_cgui_alv_index, mt_cgui_alv_order.
+    CLEAR: mr_cgui_alv_page, mt_cgui_alv_index, mt_cgui_alv_order.
 
   ENDMETHOD.
 

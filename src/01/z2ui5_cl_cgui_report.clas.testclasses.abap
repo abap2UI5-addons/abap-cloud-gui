@@ -1439,6 +1439,11 @@ CLASS ltcl_test IMPLEMENTATION.
     event( `SOME_COMMAND` ).
     cl_abap_unit_assert=>assert_equals( act = mo_cut->get_selected_rows( )
                                         exp = VALUE z2ui5_cl_cgui_alv=>ty_t_row( ( 2 ) ) ).
+    " and a line selection that wrote nothing, or Back from a secondary list
+    mo_cut->level_push( ).
+    mo_cut->level_pop( ).
+    cl_abap_unit_assert=>assert_equals( act = mo_cut->get_selected_rows( )
+                                        exp = VALUE z2ui5_cl_cgui_alv=>ty_t_row( ( 2 ) ) ).
     event( z2ui5_cl_cgui_alv=>cs_event-select_all ).
     cl_abap_unit_assert=>assert_equals( act = lines( mo_cut->get_selected_rows( ) )
                                         exp = 3 ).
