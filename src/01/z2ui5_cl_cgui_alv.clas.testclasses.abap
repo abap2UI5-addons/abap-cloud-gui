@@ -706,12 +706,15 @@ CLASS ltcl_test IMPLEMENTATION.
     DATA(lo_edit) = z2ui5_cl_cgui_alv=>factory(
         )->set_column_dropdown( name   = `CARRID`
                                 values = VALUE #( ( key = `LH` text = `Lufthansa` )
+                                                  ( key = `UA` text = `United & Co` )
                                                   ( key = `AA` text = `American` ) ) ).
     lo_view = z2ui5_cl_ui5_view_builder=>factory( )->ele( `VBox` ).
     lo_edit->render( node   = lo_view
                      client = mo_client
                      tab    = mo_app->mt_row ).
     cl_abap_unit_assert=>assert_true( xsdbool( lo_view->stringify( ) CS `'LH' ? 'Lufthansa'` ) ).
+    " escaped once, by the builder - the text shows A &amp; B, not A &amp;amp; B
+    cl_abap_unit_assert=>assert_true( xsdbool( lo_view->stringify( ) CS `'United &amp; Co'` ) ).
     lo_edit->set_edit( )->set_edit_field( `ZZSELKZ` ).
     lo_view = z2ui5_cl_ui5_view_builder=>factory( )->ele( `VBox` ).
     lo_edit->render( node   = lo_view

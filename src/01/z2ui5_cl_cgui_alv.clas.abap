@@ -1725,11 +1725,10 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
 
   METHOD expr_escape.
 
+    " a literal of the expression binding - the XML escapes are the
+    " builder's, it writes every attribute value escaped
     result = replace( val = val sub = `\` with = `\\` occ = 0 ).
     result = replace( val = result sub = `'` with = `\'` occ = 0 ).
-    result = replace( val = result sub = `&` with = `&amp;` occ = 0 ).
-    result = replace( val = result sub = `"` with = `&quot;` occ = 0 ).
-    result = replace( val = result sub = `<` with = `&lt;` occ = 0 ).
     result = replace( val = result sub = `{` with = `(` occ = 0 ).
     result = replace( val = result sub = `}` with = `)` occ = 0 ).
 
