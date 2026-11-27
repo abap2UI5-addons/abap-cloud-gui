@@ -43,6 +43,11 @@ release.
   the state of the tree, the SALV stand-ins, the text editor, the HTML
   viewer, the container, the demo output and the application log is
   PROTECTED, so the transpiled runtime restores it from the draft.
+- The helpers of `z2ui5_cl_cgui_context` copied from abap-util follow
+  its fixes: on ABAP Cloud the labels of a data element are read again
+  (the XCO call failed on its parameter types, so every column and field
+  fell back to its name), and an `INT8` is typed for the model without
+  the typekind constant 7.02 lacks.
 
 - The value help (`z2ui5_cl_cgui_select`) shows a column with a namespace
   (`/SCWM/...`) again: its cell bound `{/SCWM/...}`, an absolute path read
