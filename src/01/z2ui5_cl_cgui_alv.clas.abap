@@ -3049,11 +3049,19 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
 
   METHOD get_subtotals.
 
+    TYPES:
+      BEGIN OF ty_s_seen,
+        group  TYPE string,
+        column TYPE string,
+        pos    TYPE i,
+      END OF ty_s_seen.
     FIELD-SYMBOLS <row>  TYPE any.
     FIELD-SYMBOLS <cell> TYPE any.
-    DATA lt_part TYPE string_table.
-    DATA lt_sum  TYPE SORTED TABLE OF ty_s_subtotal WITH UNIQUE KEY group column.
-    DATA lv_value TYPE decfloat34.
+    DATA lt_part   TYPE string_table.
+    DATA lt_seen   TYPE SORTED TABLE OF ty_s_seen WITH UNIQUE KEY group column.
+    DATA lt_index  TYPE ty_t_index.
+    DATA lv_value  TYPE decfloat34.
+    DATA lv_number TYPE i.
 
     DATA(lt_comp) = z2ui5_cl_cgui_context=>rtti_get_t_comp( tab ).
     DATA(lt_group) = mt_column.
@@ -3065,7 +3073,18 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
       RETURN.
     ENDIF.
 
-    LOOP AT tab ASSIGNING <row>.
+    " the rows in the order of the sorting - the groups follow it, not the
+    " order of their texts: 9 before 10, and descending where it sorts so
+    DO lines( tab ) TIMES.
+      lv_number = sy-index.
+      INSERT lv_number INTO TABLE lt_index.
+    ENDDO.
+    index_sort( EXPORTING tab   = tab
+                          order = sort_order( tab )
+                CHANGING  index = lt_index ).
+
+    LOOP AT lt_index INTO DATA(lv_row).
+      READ TABLE tab ASSIGNING <row> INDEX lv_row.
       CLEAR lt_part.
       LOOP AT lt_group INTO DATA(ls_group).
         READ TABLE lt_comp INTO DATA(ls_comp) WITH KEY name = ls_group-name.
@@ -3088,23 +3107,21 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
           CATCH cx_sy_conversion_error cx_sy_arithmetic_error.
             CONTINUE.
         ENDTRY.
-        READ TABLE lt_sum ASSIGNING FIELD-SYMBOL(<sum>) WITH TABLE KEY group  = lv_group
-                                                                       column = ls_summed-name.
+        READ TABLE lt_seen INTO DATA(ls_seen) WITH TABLE KEY group  = lv_group
+                                                             column = ls_summed-name.
         IF sy-subrc = 0.
+          READ TABLE result ASSIGNING FIELD-SYMBOL(<sum>) INDEX ls_seen-pos.
           <sum>-value = <sum>-value + lv_value.
         ELSE.
           INSERT VALUE #( group  = lv_group
                           column = ls_summed-name
-                          value  = lv_value ) INTO TABLE lt_sum.
+                          value  = lv_value ) INTO TABLE result.
+          INSERT VALUE #( group  = lv_group
+                          column = ls_summed-name
+                          pos    = lines( result ) ) INTO TABLE lt_seen.
         ENDIF.
       ENDLOOP.
     ENDLOOP.
-
-    result = lt_sum.
-    READ TABLE lt_group INTO ls_group INDEX 1.
-    IF ls_group-sort = cs_sort-descending.
-      SORT result BY group DESCENDING column ASCENDING.
-    ENDIF.
 
   ENDMETHOD.
 
