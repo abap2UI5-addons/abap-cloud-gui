@@ -154,44 +154,17 @@ CLASS z2ui5_cl_cgui_chart IMPLEMENTATION.
 
   METHOD bars.
 
-    FIELD-SYMBOLS <category> TYPE any.
-    FIELD-SYMBOLS <value>    TYPE any.
-    DATA lt_bar TYPE ty_t_bar.
-
-    LOOP AT tab ASSIGNING FIELD-SYMBOL(<row>).
-      ASSIGN COMPONENT category OF STRUCTURE <row> TO <category>.
-      IF sy-subrc <> 0.
-        RETURN.
-      ENDIF.
-      DATA(lv_label) = condense( CONV string( <category> ) ).
-      READ TABLE lt_bar ASSIGNING FIELD-SYMBOL(<bar>) WITH KEY label = lv_label.
-      IF sy-subrc <> 0.
-        INSERT VALUE #( label = lv_label ) INTO TABLE lt_bar ASSIGNING <bar>.
-      ENDIF.
-      IF value IS INITIAL.
-        <bar>-value = <bar>-value + 1.
-        CONTINUE.
-      ENDIF.
-      ASSIGN COMPONENT value OF STRUCTURE <row> TO <value>.
-      IF sy-subrc <> 0.
-        RETURN.
-      ENDIF.
-      TRY.
-          <bar>-value = <bar>-value + <value>.
-        CATCH cx_sy_conversion_error cx_sy_arithmetic_error ##NO_HANDLER.
-      ENDTRY.
-    ENDLOOP.
-
-    SORT lt_bar BY value DESCENDING label ASCENDING.
-    LOOP AT lt_bar INTO DATA(ls_bar).
-      IF sy-tabix <= cv_max_bars.
-        INSERT ls_bar INTO TABLE result.
-        CONTINUE.
-      ENDIF.
-      IF lines( result ) = cv_max_bars.
-        INSERT VALUE #( label = other ) INTO TABLE result.
-      ENDIF.
-      result[ lines( result ) ]-value = result[ lines( result ) ]-value + ls_bar-value.
+    " one series - its value, or the count of the rows
+    DATA(lt_value) = VALUE string_table( ).
+    IF value IS NOT INITIAL.
+      INSERT CONV string( value ) INTO TABLE lt_value.
+    ENDIF.
+    LOOP AT series( tab      = tab
+                    category = category
+                    values   = lt_value
+                    other    = other ) INTO DATA(ls_point).
+      INSERT VALUE #( label = ls_point-label
+                      value = ls_point-values[ 1 ] ) INTO TABLE result.
     ENDLOOP.
 
   ENDMETHOD.
