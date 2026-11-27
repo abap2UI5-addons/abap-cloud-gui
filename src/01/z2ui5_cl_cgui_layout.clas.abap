@@ -154,6 +154,10 @@ CLASS z2ui5_cl_cgui_layout DEFINITION PUBLIC FINAL CREATE PRIVATE.
     DATA mt_saved  TYPE ty_t_saved.
     DATA ms_result TYPE ty_s_result.
     DATA mv_sharing TYPE abap_bool.
+    " the saved layout loaded as it came - OK without a change applies it,
+    " it is not saved again
+    DATA ms_loaded TYPE ty_s_result.
+    DATA mt_loaded TYPE ty_t_row.
 
   PRIVATE SECTION.
 
@@ -345,7 +349,14 @@ CLASS z2ui5_cl_cgui_layout IMPLEMENTATION.
       WHEN cs_event-ok.
         ms_result-layout = rows_to_layout( mt_row ).
         ms_result-name = condense( mv_name ).
-        IF ms_result-name IS NOT INITIAL.
+        IF ms_result-name IS NOT INITIAL AND ms_result-name = ms_loaded-name AND mt_row = mt_loaded
+            AND mv_default = ms_loaded-is_default AND mv_shared = ms_loaded-shared
+            AND mv_protected = ms_loaded-protected.
+          " the saved layout as it was picked - applied, not saved again: a
+          " protected one of another user would refuse, a shared one be
+          " written anew
+          ms_result-action = cs_action-apply.
+        ELSEIF ms_result-name IS NOT INITIAL.
           ms_result-action     = cs_action-save.
           ms_result-is_default = mv_default.
           ms_result-shared     = xsdbool( mv_sharing = abap_true AND mv_shared = abap_true ).
@@ -376,8 +387,14 @@ CLASS z2ui5_cl_cgui_layout IMPLEMENTATION.
           mv_default   = ls_saved-is_default.
           mv_shared    = ls_saved-shared.
           mv_protected = ls_saved-protected.
+          ms_loaded = VALUE #( name       = mv_name
+                               is_default = mv_default
+                               shared     = mv_shared
+                               protected  = mv_protected ).
+          mt_loaded = mt_row.
         ELSE.
           mt_row = layout_to_rows( mt_base ).
+          CLEAR: ms_loaded, mt_loaded.
         ENDIF.
 
       WHEN cs_event-delete.

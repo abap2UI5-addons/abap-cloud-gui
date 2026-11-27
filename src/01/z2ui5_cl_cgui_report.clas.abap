@@ -6842,6 +6842,10 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
 
       WHEN z2ui5_cl_cgui_layout=>cs_action-apply.
         mo_cgui_alv->set_layout( ls_result-layout ).
+        " a saved layout picked and taken as it is - the one in use now
+        IF ls_result-name IS NOT INITIAL.
+          mv_cgui_layout = ls_result-name.
+        ENDIF.
 
       WHEN z2ui5_cl_cgui_layout=>cs_action-save.
         mo_cgui_alv->set_layout( ls_result-layout ).

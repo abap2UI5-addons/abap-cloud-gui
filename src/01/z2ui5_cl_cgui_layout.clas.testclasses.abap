@@ -256,9 +256,20 @@ CLASS ltcl_test IMPLEMENTATION.
     cl_abap_unit_assert=>assert_equals( act = lo_popup->mv_name
                                         exp = `NARROW` ).
 
+    " OK as it was loaded: applied, not saved again
     run( popup = lo_popup
          event = z2ui5_cl_cgui_layout=>cs_event-ok ).
     DATA(ls_result) = lo_popup->result( ).
+    cl_abap_unit_assert=>assert_equals( act = ls_result-action
+                                        exp = z2ui5_cl_cgui_layout=>cs_action-apply ).
+    cl_abap_unit_assert=>assert_equals( act = ls_result-name
+                                        exp = `NARROW` ).
+
+    " changed, it is saved under its name
+    lo_popup->mt_row[ 2 ]-visible = abap_true.
+    run( popup = lo_popup
+         event = z2ui5_cl_cgui_layout=>cs_event-ok ).
+    ls_result = lo_popup->result( ).
     cl_abap_unit_assert=>assert_equals( act = ls_result-action
                                         exp = z2ui5_cl_cgui_layout=>cs_action-save ).
     cl_abap_unit_assert=>assert_equals( act = ls_result-name
