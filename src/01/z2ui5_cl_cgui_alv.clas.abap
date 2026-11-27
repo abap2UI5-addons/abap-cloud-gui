@@ -1765,31 +1765,26 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
         ENDIF.
       ENDLOOP.
 
-      IF classic_value( row = <fcat> name = `NO_OUT` ) = abap_true.
-        set_column_hidden( lv_name ).
-      ENDIF.
-      IF classic_value( row = <fcat> name = `TECH` ) = abap_true.
-        set_column_technical( lv_name ).
-      ENDIF.
-      IF classic_value( row = <fcat> name = `DO_SUM` ) = abap_true.
-        set_column_sum( lv_name ).
-      ENDIF.
-      IF classic_value( row = <fcat> name = `HOTSPOT` ) = abap_true.
-        set_column_hotspot( lv_name ).
-      ENDIF.
-      IF classic_value( row = <fcat> name = `KEY` ) = abap_true.
-        set_column_key( lv_name ).
-      ENDIF.
-      IF classic_value( row = <fcat> name = `ICON` ) = abap_true.
-        set_column_icon( lv_name ).
-      ENDIF.
-      IF classic_value( row = <fcat> name = `NO_ZERO` ) = abap_true.
-        set_column_no_zero( lv_name ).
-      ENDIF.
-      IF classic_value( row = <fcat> name = `EDIT` ) = abap_true.
-        set_edit( ).
-        set_column_edit( lv_name ).
-      ENDIF.
+      " the flags as the field catalog has them - a catalog set again on
+      " the grid that shows switches them off as well
+      set_column_hidden( name   = lv_name
+                         hidden = xsdbool( classic_value( row = <fcat> name = `NO_OUT` ) = abap_true ) ).
+      set_column_technical( name = lv_name
+                            val  = xsdbool( classic_value( row = <fcat> name = `TECH` ) = abap_true ) ).
+      set_column_sum( name = lv_name
+                      val  = xsdbool( classic_value( row = <fcat> name = `DO_SUM` ) = abap_true ) ).
+      set_column_hotspot( name = lv_name
+                          val  = xsdbool( classic_value( row = <fcat> name = `HOTSPOT` ) = abap_true ) ).
+      set_column_key( name = lv_name
+                      val  = xsdbool( classic_value( row = <fcat> name = `KEY` ) = abap_true ) ).
+      set_column_icon( name = lv_name
+                       val  = xsdbool( classic_value( row = <fcat> name = `ICON` ) = abap_true ) ).
+      set_column_no_zero( name = lv_name
+                          val  = xsdbool( classic_value( row = <fcat> name = `NO_ZERO` ) = abap_true ) ).
+      " EDIT makes this column an input column - not the whole grid, and
+      " without it the column still follows the EDIT of the layout
+      DATA(lr_column) = column_get( lv_name ).
+      lr_column->edit = xsdbool( classic_value( row = <fcat> name = `EDIT` ) = abap_true ).
 
       DATA(lv_length) = classic_value( row  = <fcat>
                                        name = `OUTPUTLEN` ).
@@ -1895,6 +1890,10 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
 
   METHOD set_sort_classic.
 
+    " the sort table is the whole sort - one set again replaces the last
+    LOOP AT mt_column REFERENCE INTO DATA(lr_column) WHERE sort IS NOT INITIAL OR subtotal = abap_true.
+      CLEAR: lr_column->sort, lr_column->sort_seq, lr_column->subtotal.
+    ENDLOOP.
     LOOP AT sort ASSIGNING FIELD-SYMBOL(<sort>).
       DATA(lv_name) = to_upper( classic_value( row  = <sort>
                                                name = `FIELDNAME` ) ).

@@ -83,6 +83,7 @@ CLASS ltcl_test DEFINITION FINAL FOR TESTING
     METHODS aggregates_search_single FOR TESTING.
     METHODS f4_in_cells FOR TESTING.
     METHODS classic_fieldcat_layout_sort FOR TESTING.
+    METHODS classic_fieldcat_again FOR TESTING.
 
 ENDCLASS.
 
@@ -855,6 +856,58 @@ CLASS ltcl_test IMPLEMENTATION.
     cl_abap_unit_assert=>assert_true( xsdbool( lv_aa < lv_lh ) ).
     cl_abap_unit_assert=>assert_char_cp( act = lv_text
                                          exp = `*30*` ).
+
+  ENDMETHOD.
+
+  METHOD classic_fieldcat_again.
+
+    TYPES:
+      BEGIN OF ty_s_flight,
+        carrid TYPE c LENGTH 3,
+        price  TYPE p LENGTH 8 DECIMALS 2,
+      END OF ty_s_flight.
+    TYPES:
+      BEGIN OF ty_s_fcat,
+        fieldname TYPE c LENGTH 30,
+        scrtext_l TYPE c LENGTH 40,
+        coltext   TYPE c LENGTH 40,
+        no_out    TYPE c LENGTH 1,
+        edit      TYPE c LENGTH 1,
+      END OF ty_s_fcat.
+    TYPES:
+      BEGIN OF ty_s_sort,
+        fieldname TYPE c LENGTH 30,
+        down      TYPE c LENGTH 1,
+      END OF ty_s_sort.
+    DATA lt_flight TYPE STANDARD TABLE OF ty_s_flight WITH EMPTY KEY.
+    DATA lt_fcat   TYPE STANDARD TABLE OF ty_s_fcat WITH EMPTY KEY.
+    DATA lt_sort   TYPE STANDARD TABLE OF ty_s_sort WITH EMPTY KEY.
+
+    " COLTEXT is the text the report gave the column - before the DDIC's;
+    " EDIT of one column makes that column an input, not the grid
+    lt_fcat = VALUE #( ( fieldname = 'CARRID' no_out = abap_true )
+                       ( fieldname = 'PRICE'  scrtext_l = 'Price' coltext = 'Fare' edit = abap_true ) ).
+    lt_sort = VALUE #( ( fieldname = 'PRICE' down = abap_true ) ).
+    DATA(lo_alv) = z2ui5_cl_cgui_alv=>factory( )->set_fieldcat( lt_fcat
+        )->set_sort_classic( lt_sort ).
+    DATA(lt_layout) = lo_alv->get_layout( lt_flight ).
+    cl_abap_unit_assert=>assert_equals( act = lt_layout[ name = `PRICE` ]-text
+                                        exp = `Fare` ).
+    cl_abap_unit_assert=>assert_true( lt_layout[ name = `CARRID` ]-hidden ).
+    cl_abap_unit_assert=>assert_true( lo_alv->is_editable( ) ).
+
+    " the catalog and the sort set again on the grid that shows: what is
+    " off now is off - the grid is no input grid -, the old sort is gone
+    lt_fcat = VALUE #( ( fieldname = 'CARRID' )
+                       ( fieldname = 'PRICE' ) ).
+    lt_sort = VALUE #( ( fieldname = 'CARRID' ) ).
+    lo_alv->set_fieldcat( lt_fcat )->set_sort_classic( lt_sort ).
+    lt_layout = lo_alv->get_layout( lt_flight ).
+    cl_abap_unit_assert=>assert_false( lt_layout[ name = `CARRID` ]-hidden ).
+    cl_abap_unit_assert=>assert_false( lo_alv->is_editable( ) ).
+    cl_abap_unit_assert=>assert_initial( lt_layout[ name = `PRICE` ]-sort ).
+    cl_abap_unit_assert=>assert_equals( act = lt_layout[ name = `CARRID` ]-sort_seq
+                                        exp = 1 ).
 
   ENDMETHOD.
 
