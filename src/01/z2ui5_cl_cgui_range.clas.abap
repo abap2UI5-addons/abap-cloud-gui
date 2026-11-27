@@ -610,8 +610,7 @@ CLASS z2ui5_cl_cgui_range IMPLEMENTATION.
   METHOD leave.
 
     ms_result-rows = mt_row.
-    client->popup_destroy( ).
-    client->nav_app_leave( client->get_app_prev( ) ).
+    z2ui5_cl_cgui_popup=>leave_to_caller( client ).
 
   ENDMETHOD.
 

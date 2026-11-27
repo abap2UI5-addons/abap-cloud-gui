@@ -98,6 +98,13 @@ CLASS z2ui5_cl_cgui_popup DEFINITION PUBLIC FINAL CREATE PRIVATE.
       RETURNING
         VALUE(result) TYPE REF TO z2ui5_cl_cgui_popup.
 
+    "! a popup closes and goes back to the app that called it - with event
+    "! as the event of that app, when there is one
+    CLASS-METHODS leave_to_caller
+      IMPORTING
+        client TYPE REF TO z2ui5_if_client
+        event  TYPE clike OPTIONAL.
+
     CLASS-METHODS confirm
       IMPORTING
         question      TYPE clike
@@ -297,12 +304,19 @@ CLASS z2ui5_cl_cgui_popup IMPLEMENTATION.
       lv_event = mv_event_cancel.
     ENDIF.
 
+    leave_to_caller( client = client
+                     event  = lv_event ).
+
+  ENDMETHOD.
+
+  METHOD leave_to_caller.
+
     client->popup_destroy( ).
-    IF lv_event IS INITIAL.
+    IF event IS INITIAL.
       client->nav_app_leave( client->get_app_prev( ) ).
     ELSE.
       client->nav_app_leave( app   = client->get_app_prev( )
-                             event = lv_event ).
+                             event = event ).
     ENDIF.
 
   ENDMETHOD.

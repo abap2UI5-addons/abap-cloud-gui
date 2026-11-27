@@ -491,13 +491,8 @@ CLASS z2ui5_cl_cgui_select IMPLEMENTATION.
 
   METHOD leave.
 
-    client->popup_destroy( ).
-    IF event IS INITIAL.
-      client->nav_app_leave( client->get_app_prev( ) ).
-    ELSE.
-      client->nav_app_leave( app   = client->get_app_prev( )
-                             event = event ).
-    ENDIF.
+    z2ui5_cl_cgui_popup=>leave_to_caller( client = client
+                                          event  = event ).
 
   ENDMETHOD.
 
