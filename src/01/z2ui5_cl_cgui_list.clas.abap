@@ -873,7 +873,10 @@ CLASS z2ui5_cl_cgui_list IMPLEMENTATION.
         mv_body_line = ls_item-line.
       ELSEIF ls_item-line <> mv_body_line.
         mv_body_line = ls_item-line.
-        mv_page_lines = mv_page_lines + 1.
+        " SKIP n is n lines of the page
+        mv_page_lines = mv_page_lines + COND i( WHEN ls_item-kind = cs_kind-skip
+                                                THEN nmax( val1 = 1 val2 = CONV i( ls_item-text ) )
+                                                ELSE 1 ).
         IF mv_line_count > 0 AND mv_page_lines > mv_line_count.
           mv_id = mv_id + 1.
           INSERT VALUE #( line = mv_line
@@ -1419,6 +1422,11 @@ CLASS z2ui5_cl_cgui_list IMPLEMENTATION.
       ENDIF.
       lv_line = lr_item->line.
       CASE lr_item->kind.
+        WHEN cs_kind-skip.
+          " SKIP n: n empty lines - the last one is this line itself
+          DO nmax( val1 = 1 val2 = CONV i( lr_item->text ) ) - 1 TIMES.
+            INSERT `` INTO TABLE result.
+          ENDDO.
         WHEN cs_kind-uline.
           IF lr_item->pos > 1.
             lv_text = repeat( val = ` ` occ = lr_item->pos - 1 ).
