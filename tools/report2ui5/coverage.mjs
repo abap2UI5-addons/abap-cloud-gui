@@ -57,13 +57,14 @@ const todoOf = (message) => message.replace(/'[^']*'/g, "'…'").replace(/`[^`]*
 
 /** the coverage of the reports in `files`; read(name) answers an include,
  *  deps is the dependency index of their repository (lib/deps.mjs),
- *  className(file) names the class (default: zcl_ + the report name), and
+ *  className(file) names the class (default: zcl_ + the report name),
+ *  classFor(program) the class a SUBMIT of a program starts, and
  *  with keep the generated files of every converted report are in its row,
  *  and the files of the dependencies it reads (deps: { name: text }) */
-export function coverage(files, { read, className, keep = false, deps } = {}) {
+export function coverage(files, { read, className, classFor, keep = false, deps } = {}) {
   const rows = [];
   for (const file of files) {
-    const report = reportOf(file, { read, className, deps });
+    const report = reportOf(file, { read, className, classFor, deps });
     if (!report) continue;
     const { includes, needs } = report;
     let result;
@@ -97,7 +98,7 @@ export function coverage(files, { read, className, keep = false, deps } = {}) {
  *  convert(text) - the conversion of that text, or of another one in its
  *  place, with the same options. undefined for an
  *  include, which is no report of its own */
-export function reportOf(file, { read, className, deps } = {}) {
+export function reportOf(file, { read, className, classFor, deps } = {}) {
   const raw = readFileSync(file, "utf8");
   if (!isReport(raw)) return undefined;
   const dir = dirname(file);
@@ -124,7 +125,7 @@ export function reportOf(file, { read, className, deps } = {}) {
       origin: text.trimEnd() === includes.source.trimEnd() ? includes.origin : undefined,
       className: name,
       deps: needs,
-      classFor: (program) => (reader(program) !== undefined ? defaultClassName(program) : undefined),
+      classFor: (program) => classFor?.(program) ?? (reader(program) !== undefined ? defaultClassName(program) : undefined),
     }),
   };
 }

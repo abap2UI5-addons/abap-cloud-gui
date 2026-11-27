@@ -73,7 +73,10 @@ node tools/report2ui5/cli.mjs <report.prog.abap> [options]
 | 2 | refused - every refusal on stderr as `file:row:col - reason`, the migration report lists them, no class written (`--partial` writes the draft with the refused statements marked) |
 
 It writes, in abapGit format (BOM in the XML, LF, no trailing blanks, at most
-255 characters per line - the abap2UI5 skill `abap-check`):
+255 characters per line - the abap2UI5 skill `abap-check`; a longer line is
+broken at a token boundary, a character literal in two joined with `&`, and
+one that cannot be broken - a long string template - is refused; a class of a
+namespace, `/abc/cl_x`, is in the files `#abc#cl_x.*`):
 
 | File | |
 |---|---|
@@ -134,7 +137,10 @@ node tools/report2ui5/package.mjs <dir> [<dir> ...] --out <dir> [--includes dir]
 converts every report under the folders as `coverage.mjs` does and writes the
 classes of the converted ones into `--out`, with `summary.md` beside them:
 how many converted, and the refusals ranked across the package. A `SUBMIT`
-of a report of the package starts its class.
+of a report of the package starts its class. Two reports that would give the
+same class (`ZREPORT` and `Z_REPORT` are both `zcl_report`, two long names
+are cut at 30 characters alike) get a name each: the first keeps it, the next
+one a number at its end, and `summary.md` lists them.
 
 ### The web corpus
 

@@ -25,6 +25,7 @@ A refused statement has no counterpart in an abap-cloud-gui report. The converte
 | [TOP-OF-PAGE and END-OF-PAGE with logic, or twice](#page-events) | `page-events` |
 | [AT SELECTION-SCREEN ON ... of a field, block or group that does not exist](#selscreen-event-field) | `selscreen-event-field` |
 | [An inline declaration of an event block, used in another one, of a type that cannot be told](#inline-global) | `inline-global` |
+| [A global field symbol assigned in one block and read in another](#global-field-symbol) | `global-field-symbol` |
 | [A field of the selection screen typed at runtime (TYPE (name), FOR (name)) or with a local type](#dynamic-screen-type) | `dynamic-screen-type` |
 | [SELECTION-SCREEN INCLUDE and other screen statements](#selscreen) | `selscreen` |
 | [CALL SELECTION-SCREEN of a screen the report does not have, or twice](#call-selection-screen) | `call-selection-screen` |
@@ -38,6 +39,7 @@ A refused statement has no counterpart in an abap-cloud-gui report. The converte
 | [TABLES and STATICS in the wrong place, a TABLES parameter without a type](#declarations) | `declarations` |
 | [WINDOW outside of AT LINE-SELECTION](#window) | `window` |
 | [AT PFnn twice, or of a key that does not exist](#function-keys) | `function-keys` |
+| [A line over 255 characters with no place to break it](#long-line) | `long-line` |
 | [A statement the parser does not understand, a block without its end](#syntax) | `syntax` |
 
 <a id="dynpro"></a>
@@ -334,6 +336,33 @@ INITIALIZATION.
   go_app = zcl_app=>create( ).
 ```
 
+<a id="global-field-symbol"></a>
+
+## A global field symbol assigned in one block and read in another
+
+**Why.** The globals of a report become attributes of the class - a field symbol cannot be one. The converter declares a global field symbol in every method that uses it, which is right where each event block, FORM or method assigns it before it uses it. Where one assigns it and another reads what it points to, the field symbol of the second is a local one, not assigned (GETWA_NOT_ASSIGNED at runtime) - the converter refuses rather than write that class.
+
+**Rewrite.**
+
+```abap
+* before
+FIELD-SYMBOLS <line> TYPE ty_line.
+START-OF-SELECTION.
+  READ TABLE gt_lines ASSIGNING <line> INDEX 1.
+  PERFORM bump.
+FORM bump.
+  <line>-count = <line>-count + 1.
+ENDFORM.
+
+* after - the line passed to the FORM
+START-OF-SELECTION.
+  READ TABLE gt_lines ASSIGNING FIELD-SYMBOL(<line>) INDEX 1.
+  PERFORM bump CHANGING <line>.
+FORM bump CHANGING cs_line TYPE ty_line.
+  cs_line-count = cs_line-count + 1.
+ENDFORM.
+```
+
 <a id="dynamic-screen-type"></a>
 
 ## A field of the selection screen typed at runtime (TYPE (name), FOR (name)) or with a local type
@@ -531,6 +560,23 @@ Move the `WINDOW` statement into `AT LINE-SELECTION`, before the `WRITE`s of the
 **Rewrite.**
 
 Merge the blocks of the same key; use a key from PF01 to PF48.
+
+<a id="long-line"></a>
+
+## A line over 255 characters with no place to break it
+
+**Why.** abapGit imports at most 255 characters per line - a longer one ends the import and leaves an empty class behind. The converter breaks a long line of the class at a blank between two tokens, in front of a comment, or in a character literal (two literals joined with `&`, the same literal). A string template or a single token longer than that cannot be broken.
+
+**Rewrite.**
+
+```abap
+* before
+gv_text = |{ a } ... a template of 300 characters ... { b }|.
+
+* after
+gv_text = |{ a } ... the first part ...|
+       && |... the second part ... { b }|.
+```
 
 <a id="syntax"></a>
 

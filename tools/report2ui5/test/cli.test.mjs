@@ -100,3 +100,31 @@ test("coverage: the corpus as numbers - converted, refused, the reasons ranked",
   assert.doesNotMatch(r.stdout, /ABAP Cloud/);
   assert.equal(spawnSync(process.execPath, [join(HERE, "..", "coverage.mjs")], { encoding: "utf8" }).status, 1);
 });
+
+test("a namespaced report: the files as abapGit names them (#abc#), exit code 0 - no folder, no ENOENT", () => {
+  const dir = mkdtempSync(join(tmpdir(), "report2ui5-cli-"));
+  try {
+    const file = join(dir, "#abc#zrep.prog.abap");
+    writeFileSync(file, "REPORT /abc/zrep.\nSTART-OF-SELECTION.\n  WRITE / 'x'.\n");
+    const r = run(file, "--out", join(dir, "out"));
+    assert.equal(r.status, 0, r.stderr);
+    for (const f of ["#abc#cl_zrep.clas.abap", "#abc#cl_zrep.clas.xml", "#abc#cl_zrep.migration.md"]) assert.ok(existsSync(join(dir, "out", f)), f);
+    assert.match(r.stdout, /\/abc\/cl_zrep: \d+ constructs mapped/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("a line over 255 characters that cannot be broken is a refusal: exit code 2, the generated file named, no class", () => {
+  const dir = mkdtempSync(join(tmpdir(), "report2ui5-cli-"));
+  try {
+    const file = join(dir, "zlong.prog.abap");
+    writeFileSync(file, `REPORT zlong.\nDATA gv_s TYPE string.\nSTART-OF-SELECTION.\n  gv_s = |${"y".repeat(300)}|.\n`);
+    const r = run(file, "--out", join(dir, "out"));
+    assert.equal(r.status, 2);
+    assert.match(r.stderr, /^zcl_long\.clas\.abap - a line over 255 characters: zcl_long\.clas\.abap:\d+ is \d+ characters long/m);
+    assert.ok(!existsSync(join(dir, "out", "zcl_long.clas.abap")));
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});

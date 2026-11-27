@@ -5,15 +5,40 @@
 // refusals ranked. Nothing is
 // read from disk or written to it here; package.mjs (the CLI) does that
 // around coverage( ), this is the same run for a caller that has the texts.
-import { convert, defaultClassName } from "./convert.mjs";
+import { classFileBase, convert, defaultClassName } from "./convert.mjs";
 import { includeFileName, inlineIncludes } from "./includes.mjs";
 import { migrationReport } from "./report.mjs";
 import { parseTextpool } from "./textpool.mjs";
 import { refusalOf } from "./refusals.mjs";
 
 const base = (path) => path.split("/").pop();
+const lc = (s) => String(s).toLowerCase();
 const isReport = (source) => /^\s*(REPORT|PROGRAM)\b/im.test(source);
 const programOf = (file) => (/^(.+)\.prog\.abap$/i.exec(base(file))?.[1] ?? base(file)).replace(/#/g, "/");
+
+/**
+ * The class names of a package, one per report, made unique: two reports
+ * whose names give the same class - ZREPORT and Z_REPORT are both
+ * zcl_report, two long names are cut at 30 characters alike - would write
+ * the same files, the second over the first. The first keeps the name, the
+ * next one gets a number at its end (zcl_report2), never a name another
+ * report of the package has. wanted: the names, in the order of the
+ * reports; answers the names in that order.
+ */
+export function uniqueClassNames(wanted) {
+  const names = wanted.map((n) => String(n).toLowerCase());
+  const all = new Set(names);
+  const taken = new Set();
+  return names.map((name) => {
+    let to = name;
+    for (let n = 2; taken.has(to); n++) {
+      to = `${name.slice(0, 30 - String(n).length)}${n}`;
+      if (all.has(to) && to !== name) to = name;
+    }
+    taken.add(to);
+    return to;
+  });
+}
 
 /** the counts summary( ) of coverage.mjs prints - without reading the rows
  *  from disk */
@@ -28,6 +53,11 @@ function summaryText(rows) {
   if (ranked.length) {
     lines.push("", "Refused for (reports affected)");
     for (const [k, n] of ranked.slice(0, 15)) lines.push(`  ${String(n).padStart(5)}  ${k}`);
+  }
+  const renamed = rows.filter((r) => r.renamedFrom);
+  if (renamed.length) {
+    lines.push("", "Class names taken by another report of the package - numbered");
+    for (const r of renamed) lines.push(`  ${r.name} -> ${r.className} (${r.renamedFrom} is ${r.renamedFor}'s)`);
   }
   return lines.join("\n");
 }
@@ -48,13 +78,23 @@ export function convertPackage(files, { className } = {}) {
   const reports = Object.entries(files)
     .filter(([path, text]) => /\.prog\.abap$/i.test(path) && isReport(text))
     .sort(([a], [b]) => a.localeCompare(b));
-  const names = new Map(reports.map(([path]) => [programOf(path).toUpperCase(), className?.(programOf(path)) ?? defaultClassName(programOf(path).toLowerCase())]));
+  const wanted = reports.map(([path]) => lc(className?.(programOf(path)) ?? defaultClassName(programOf(path).toLowerCase())));
+  const unique = uniqueClassNames(wanted);
+  // a SUBMIT of a report of the package starts its class - the first
+  // report of that name
+  const names = new Map();
+  reports.forEach(([path], i) => {
+    if (!names.has(programOf(path).toUpperCase())) names.set(programOf(path).toUpperCase(), unique[i]);
+  });
   const classFor = (program) => names.get(String(program).toUpperCase());
+  const owner = (name) => programOf(reports[wanted.indexOf(name)][0]).toUpperCase();
 
   const rows = [];
-  for (const [path, raw] of reports) {
+  for (const [i, [path, raw]] of reports.entries()) {
     const file = base(path);
     const program = programOf(path);
+    const cls = unique[i];
+    const renamed = cls !== wanted[i] ? { renamedFrom: wanted[i], renamedFor: owner(wanted[i]) } : {};
     const includes = inlineIncludes(raw, { file, read });
     const xml = byName.get(file.replace(/\.abap$/i, ".xml").toLowerCase());
     let textpool;
@@ -65,9 +105,9 @@ export function convertPackage(files, { className } = {}) {
     }
     let result;
     try {
-      result = convert(includes.source, { file, programName: program, textpool, origin: includes.origin, className: classFor(program), classFor });
+      result = convert(includes.source, { file, programName: program, textpool, origin: includes.origin, className: cls, classFor });
     } catch (e) {
-      rows.push({ file, name: program.toUpperCase(), className: classFor(program), ok: false, crashed: String(e?.message ?? e), refusals: [], refusalKinds: [], todos: [], files: {}, report: "" });
+      rows.push({ file, name: program.toUpperCase(), className: cls, ...renamed, ok: false, crashed: String(e?.message ?? e), refusals: [], refusalKinds: [], todos: [], files: {}, report: "" });
       continue;
     }
     const report = migrationReport(result, { source: file, texts: xml ? file.replace(/\.abap$/i, ".xml") : undefined, includes });
@@ -75,6 +115,7 @@ export function convertPackage(files, { className } = {}) {
       file,
       name: program.toUpperCase(),
       className: result.className,
+      ...renamed,
       ok: result.ok,
       refusals: result.refusals,
       refusalKinds: result.refusals.map((r) => {
@@ -91,7 +132,7 @@ export function convertPackage(files, { className } = {}) {
   const output = { "summary.md": ["# report2UI5 package", "", "```", summary, "```", ""].join("\n") };
   for (const r of rows) {
     Object.assign(output, r.files);
-    if (r.report) output[`${r.className}.migration.md`] = r.report;
+    if (r.report) output[`${classFileBase(r.className)}.migration.md`] = r.report;
   }
   return { rows, summary, output };
 }
