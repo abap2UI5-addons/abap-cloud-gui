@@ -429,7 +429,8 @@ CLASS z2ui5_cl_cgui_layout IMPLEMENTATION.
 
   METHOD leave.
 
-    z2ui5_cl_cgui_popup=>leave_to_caller( client ).
+    client->popup_destroy( ).
+    client->nav_app_leave( client->get_app_prev( ) ).
 
   ENDMETHOD.
 
