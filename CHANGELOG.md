@@ -247,6 +247,15 @@ release.
   a kept SALV showed no totals and no initial sort. A minimum, maximum or
   average and `set_color_column( )` still have no counterpart. The field
   catalog of the ALV reads TOOLTIP.
+- A control that is freed (`free( )`, the controls of the list of the run
+  before, of a list level left, a custom control area filled anew) no
+  longer travels with the draft and every response: its object, its text,
+  HTML and buttons, its handlers and its grid are dropped - each Execute of
+  a report with controls added them for good.
+- The tree builds its view and takes the ticks over with an index, and the
+  chart finds the category of a row with a hashed lookup - both scanned
+  all nodes or categories per row, which a tree of thousands of nodes or a
+  chart over a large ALV felt on every roundtrip.
 
 **The value help and table controls in windows too**
 

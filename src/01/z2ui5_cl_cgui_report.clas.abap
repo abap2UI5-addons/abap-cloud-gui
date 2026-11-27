@@ -1534,6 +1534,11 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
       IMPORTING
         from TYPE i.
 
+    "! the controls freed are gone for good: their objects, texts, HTML,
+    "! buttons, handlers and grids no longer travel with the draft and the
+    "! response - the line of mt_cgui_gui stays, its index is the id
+    METHODS gui_release.
+
     "! the run ended on the selection screen (mv_cgui_restart): the classic
     "! report restarts - its data as after INITIALIZATION, no output
     METHODS restart_pending.
@@ -2248,6 +2253,7 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
       draft_keep( ).
     ENDIF.
 
+    gui_release( ).
     messages_display( ).
     cgui_statics_keep( ).
 
@@ -5463,6 +5469,41 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
       mv_cgui_skipped = abap_false.
     ENDIF.
     restart_pending( ).
+
+  ENDMETHOD.
+
+  METHOD gui_release.
+
+    DATA lt_dead TYPE STANDARD TABLE OF i WITH EMPTY KEY.
+
+    LOOP AT mt_cgui_gui ASSIGNING FIELD-SYMBOL(<control>).
+      DATA(lv_id) = sy-tabix.
+      IF gui_alive( lv_id ) = abap_true.
+        CONTINUE.
+      ENDIF.
+      READ TABLE mt_cgui_gui_obj ASSIGNING FIELD-SYMBOL(<object>) INDEX lv_id.
+      IF sy-subrc = 0 AND <object> IS BOUND.
+        CLEAR <object>.
+        INSERT lv_id INTO TABLE lt_dead.
+      ENDIF.
+      CLEAR: <control>-text, <control>-html, <control>-url, <control>-buttons.
+    ENDLOOP.
+    IF lt_dead IS INITIAL.
+      RETURN.
+    ENDIF.
+
+    LOOP AT lt_dead INTO lv_id.
+      DELETE mt_cgui_grid WHERE id = lv_id.
+    ENDLOOP.
+    " the handlers of the controls left - their objects once each again
+    DATA(lt_handler) = z2ui5_if_cgui_gui~handlers_get( ).
+    DATA(lv_before) = lines( lt_handler ).
+    LOOP AT lt_dead INTO lv_id.
+      DELETE lt_handler WHERE id = lv_id.
+    ENDLOOP.
+    IF lines( lt_handler ) < lv_before.
+      z2ui5_if_cgui_gui~handlers_set( lt_handler ).
+    ENDIF.
 
   ENDMETHOD.
 

@@ -272,6 +272,7 @@ CLASS ltcl_test DEFINITION FINAL FOR TESTING
     METHODS empty_list_restarts FOR TESTING.
     METHODS screen_as_window_checks FOR TESTING.
     METHODS salv_sorts_and_totals FOR TESTING.
+    METHODS controls_released FOR TESTING.
     METHODS popup_in_the_run FOR TESTING.
     METHODS leave_during_the_run FOR TESTING.
     METHODS file_upload_and_download FOR TESTING.
@@ -1111,6 +1112,24 @@ CLASS ltcl_test IMPLEMENTATION.
                                         exp = 2 ).
     cl_abap_unit_assert=>assert_equals( act = mo_report->p_carrid
                                         exp = `LH` ).
+
+  ENDMETHOD.
+
+  METHOD controls_released.
+
+    init( ).
+    DATA(lo_edit) = NEW z2ui5_cl_cgui_textedit( parent = NEW z2ui5_cl_cgui_container( container_name = 'CC' ) ).
+    lo_edit->set_textstream( `a long note` ).
+    DATA(lv_id) = lo_edit->get_id( ).
+    event( `NOTHING` ).
+    cl_abap_unit_assert=>assert_bound( mo_cut->mt_cgui_gui_obj[ lv_id ] ).
+
+    " FREE: the object and its text no longer travel with the draft
+    lo_edit->free( ).
+    event( `NOTHING` ).
+    cl_abap_unit_assert=>assert_not_bound( mo_cut->mt_cgui_gui_obj[ lv_id ] ).
+    cl_abap_unit_assert=>assert_initial( mo_cut->mt_cgui_gui[ lv_id ]-text ).
+    cl_abap_unit_assert=>assert_true( mo_cut->mt_cgui_gui[ lv_id ]-freed ).
 
   ENDMETHOD.
 
