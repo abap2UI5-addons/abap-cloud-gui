@@ -279,6 +279,17 @@ CLASS ltcl_test IMPLEMENTATION.
     cl_abap_unit_assert=>assert_char_cp( act = lv_view
                                          exp = `*{/MV_RB_B}" editable="true" select="EVENT:MODE"*` ).
 
+    " AT SELECTION-SCREEN OUTPUT switched the group after the declaration:
+    " the wiring follows the attributes, A raises it now
+    mo_app->mv_rb_a = abap_false.
+    mo_app->mv_rb_b = abap_true.
+    lv_view = lo_screen->stringify( ).
+    FIND ALL OCCURRENCES OF `select="EVENT:MODE"` IN lv_view MATCH COUNT lv_count.
+    cl_abap_unit_assert=>assert_equals( exp = 1
+                                        act = lv_count ).
+    cl_abap_unit_assert=>assert_char_cp( act = lv_view
+                                         exp = `*{/MV_RB_A}" editable="true" select="EVENT:MODE"*` ).
+
   ENDMETHOD.
 
   METHOD checkbox_user_command.
@@ -474,6 +485,26 @@ CLASS ltcl_test IMPLEMENTATION.
                                         exp = 1 ).
     cl_abap_unit_assert=>assert_equals( act = lt_key[ 1 ]-ucomm
                                         exp = `FC02` ).
+
+    " a block in a block: the field after the inner one is in the outer one
+    lo_screen = z2ui5_cl_cgui_selscreen=>factory( mo_client ).
+    lo_screen->block_begin( title = `Outer`
+                            name  = `B1`
+        )->block_begin( title = `Inner`
+                        name  = `B2`
+        )->parameter( mo_app->mv_char
+        )->block_end(
+        )->parameter( mo_app->mv_char2
+        )->block_end( ).
+    lt_field = lo_screen->get_fields( ).
+    cl_abap_unit_assert=>assert_equals( act = lt_field[ name = `MV_CHAR` ]-block
+                                        exp = `B2` ).
+    cl_abap_unit_assert=>assert_equals( act = lt_field[ name = `MV_CHAR` ]-blocks
+                                        exp = VALUE string_table( ( `B1` ) ( `B2` ) ) ).
+    cl_abap_unit_assert=>assert_equals( act = lt_field[ name = `MV_CHAR2` ]-block
+                                        exp = `B1` ).
+    cl_abap_unit_assert=>assert_equals( act = lt_field[ name = `MV_CHAR2` ]-blocks
+                                        exp = VALUE string_table( ( `B1` ) ) ).
 
   ENDMETHOD.
 

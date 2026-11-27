@@ -224,6 +224,16 @@ release.
   every selection screen - an E message keeps the dialog; its parameters
   are converted to upper case and ALPHA like those of the selection screen
   (`mat1` stayed lower case and found nothing).
+- The checks of the selection screen run in the classic order: VALUE
+  CHECK with OBLIGATORY before any AT SELECTION-SCREEN ON field; ON BLOCK
+  after the last field of its block and ON RADIOBUTTON GROUP after the last
+  button of its group, not after all fields. A block in a block: ON BLOCK
+  of the outer one ran for none of its fields after the inner block (or not
+  at all) - `ty_s_field` has `blocks`, the named blocks a field is in.
+- The user command of a radio button group is wired from the selection AT
+  SELECTION-SCREEN OUTPUT left, not from the one the group was declared
+  with: a group the PBO switched raised no user command from the button
+  just deselected.
 
 **The value help and table controls in windows too**
 

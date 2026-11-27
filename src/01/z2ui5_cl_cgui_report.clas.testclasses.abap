@@ -2901,14 +2901,18 @@ CLASS ltcl_test IMPLEMENTATION.
     init( ).
     mo_report->p_carrid = `LH`.
     mo_report->p_check = `Q`.
+    mo_report->p_text = `BAD`.
     event( z2ui5_cl_cgui_report=>cs_ucomm-execute ).
 
-    " VALUE CHECK stops the run at the field - before ON BLOCK
+    " VALUE CHECK stops the run at the field - before ON BLOCK, and before
+    " the ON field of the report, as the checks of the screen do
     cl_abap_unit_assert=>assert_equals( act = mo_cut->mv_cgui_screen
                                         exp = `SELECTION` ).
     cl_abap_unit_assert=>assert_true( xsdbool( line_exists( mo_cut->mt_cgui_log[ type = `E` field = `P_CHECK` ] ) ) ).
+    cl_abap_unit_assert=>assert_false( xsdbool( line_exists( mo_cut->mt_cgui_log[ text = `Not this text` ] ) ) ).
     cl_abap_unit_assert=>assert_initial( mo_report->mv_block ).
 
+    mo_report->p_text = ``.
     mo_report->p_check = `X`.
     event( z2ui5_cl_cgui_report=>cs_ucomm-execute ).
     cl_abap_unit_assert=>assert_equals( act = mo_report->mv_block

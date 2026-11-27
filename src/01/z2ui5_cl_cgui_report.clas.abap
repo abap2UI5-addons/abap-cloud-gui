@@ -2077,8 +2077,17 @@ CLASS z2ui5_cl_cgui_report DEFINITION PUBLIC ABSTRACT CREATE PUBLIC.
       RETURNING
         VALUE(result) TYPE string_table.
 
-    "! VALUE CHECK, ON BLOCK and ON RADIOBUTTON GROUP
+    "! VALUE CHECK - with OBLIGATORY the checks of the screen itself, before
+    "! any event of the report
     METHODS check_values
+      RETURNING
+        VALUE(result) TYPE abap_bool.
+
+    "! AT SELECTION-SCREEN ON field, field by field in the order of the
+    "! screen; ON BLOCK after the last field of the block (an inner block
+    "! before the outer one), ON RADIOBUTTON GROUP after the last button
+    "! of the group - the order of the PAI of the classic selection screen
+    METHODS check_events
       RETURNING
         VALUE(result) TYPE abap_bool.
 
@@ -5496,16 +5505,11 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
       RETURN.
     ENDIF.
 
-    LOOP AT mt_cgui_field REFERENCE INTO DATA(lr_field) WHERE shown = abap_true.
-      mv_cgui_on_field = lr_field->name.
-      at_selection_screen_on( lr_field->name ).
-      CLEAR mv_cgui_on_field.
-      IF mv_cgui_stop = abap_true.
-        RETURN.
-      ENDIF.
-    ENDLOOP.
-
     IF check_values( ) = abap_false.
+      RETURN.
+    ENDIF.
+
+    IF check_events( ) = abap_false.
       RETURN.
     ENDIF.
 
@@ -5658,7 +5662,6 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
   METHOD check_values.
 
     FIELD-SYMBOLS <field_val> TYPE any.
-    DATA lt_done TYPE string_table.
 
     result = abap_true.
 
@@ -5678,40 +5681,65 @@ CLASS z2ui5_cl_cgui_report IMPLEMENTATION.
         result = abap_false.
       ENDIF.
     ENDLOOP.
-    IF result = abap_false.
-      RETURN.
-    ENDIF.
 
-    " ON BLOCK - a message belongs to the first field of the block
-    LOOP AT mt_cgui_field REFERENCE INTO lr_field WHERE block IS NOT INITIAL AND shown = abap_true.
-      IF line_exists( lt_done[ table_line = lr_field->block ] ).
-        CONTINUE.
-      ENDIF.
-      INSERT lr_field->block INTO TABLE lt_done.
-      mv_cgui_on_field = lr_field->name.
-      at_selection_screen_on_block( lr_field->block ).
+  ENDMETHOD.
+
+  METHOD check_events.
+
+    DATA lt_shown TYPE z2ui5_cl_cgui_selscreen=>ty_t_field.
+    DATA ls_next  TYPE z2ui5_cl_cgui_selscreen=>ty_s_field.
+
+    LOOP AT mt_cgui_field INTO DATA(ls_shown) WHERE shown = abap_true.
+      INSERT ls_shown INTO TABLE lt_shown.
+    ENDLOOP.
+
+    LOOP AT lt_shown INTO DATA(ls_field).
+      DATA(lv_index) = sy-tabix.
+      mv_cgui_on_field = ls_field-name.
+      at_selection_screen_on( ls_field-name ).
       CLEAR mv_cgui_on_field.
       IF mv_cgui_stop = abap_true.
-        result = abap_false.
         RETURN.
+      ENDIF.
+
+      CLEAR ls_next.
+      READ TABLE lt_shown INTO ls_next INDEX lv_index + 1.
+
+      " the blocks the field closes, the inner one first - a message belongs
+      " to the first field of the block
+      DATA(lv_block) = lines( ls_field-blocks ).
+      WHILE lv_block > 0.
+        DATA(lv_name) = ls_field-blocks[ lv_block ].
+        lv_block = lv_block - 1.
+        IF line_exists( ls_next-blocks[ table_line = lv_name ] ).
+          CONTINUE.
+        ENDIF.
+        LOOP AT lt_shown INTO DATA(ls_first).
+          IF line_exists( ls_first-blocks[ table_line = lv_name ] ).
+            EXIT.
+          ENDIF.
+        ENDLOOP.
+        mv_cgui_on_field = ls_first-name.
+        at_selection_screen_on_block( lv_name ).
+        CLEAR mv_cgui_on_field.
+        IF mv_cgui_stop = abap_true.
+          RETURN.
+        ENDIF.
+      ENDWHILE.
+
+      " the group the button closes - a message belongs to its first button
+      IF ls_field-group IS NOT INITIAL AND ls_next-group <> ls_field-group.
+        READ TABLE lt_shown INTO ls_first WITH KEY group = ls_field-group.
+        mv_cgui_on_field = ls_first-name.
+        at_selection_screen_on_radio( ls_field-group ).
+        CLEAR mv_cgui_on_field.
+        IF mv_cgui_stop = abap_true.
+          RETURN.
+        ENDIF.
       ENDIF.
     ENDLOOP.
 
-    " ON RADIOBUTTON GROUP - a message belongs to the first button
-    CLEAR lt_done.
-    LOOP AT mt_cgui_field REFERENCE INTO lr_field WHERE group IS NOT INITIAL AND shown = abap_true.
-      IF line_exists( lt_done[ table_line = lr_field->group ] ).
-        CONTINUE.
-      ENDIF.
-      INSERT lr_field->group INTO TABLE lt_done.
-      mv_cgui_on_field = lr_field->name.
-      at_selection_screen_on_radio( lr_field->group ).
-      CLEAR mv_cgui_on_field.
-      IF mv_cgui_stop = abap_true.
-        result = abap_false.
-        RETURN.
-      ENDIF.
-    ENDLOOP.
+    result = abap_true.
 
   ENDMETHOD.
 
