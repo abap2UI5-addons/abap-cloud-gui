@@ -1717,7 +1717,8 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
   METHOD edit_binding.
 
     IF mv_edit_field IS NOT INITIAL.
-      result = |\{= $\{{ mv_edit_field }\} === true \|\| $\{{ mv_edit_field }\} === 'X' \}|.
+      DATA(lv_path) = z2ui5_cl_ui5_view_builder=>component_path( mv_edit_field ).
+      result = |\{= $\{{ lv_path }\} === true \|\| $\{{ lv_path }\} === 'X' \}|.
     ENDIF.
 
   ENDMETHOD.
@@ -2392,7 +2393,7 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
   METHOD color_binding.
 
     " the same as color_state( ), in the browser
-    DATA(lv_code) = |(String($\{{ to_upper( field ) }\} \|\| '')).substring(1,2)|.
+    DATA(lv_code) = |(String($\{{ z2ui5_cl_ui5_view_builder=>component_path( to_upper( field ) ) }\} \|\| '')).substring(1,2)|.
     result = |\{= { lv_code } === '1' ? 'Indication05' : { lv_code } === '3' ? 'Warning' : |
           && |{ lv_code } === '4' ? 'Indication06' : { lv_code } === '5' ? 'Success' : |
           && |{ lv_code } === '6' ? 'Error' : { lv_code } === '7' ? 'Indication03' : 'None' \}|.
@@ -3675,14 +3676,14 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
           )->ele( n = `template` ns = `table`
               )->tag( `RadioButton`
               )->a( n = `groupName` v = `cgui_alv_single`
-              )->a( n = `selected`  v = |\{{ get_box_field( ) }\}| ).
+              )->a( n = `selected`  v = |\{{ z2ui5_cl_ui5_view_builder=>component_path( get_box_field( ) ) }\}| ).
     ELSEIF multi = abap_true.
       node->ele( n = `Column` ns = `table`
           )->a( n = `width`  v = `3rem`
           )->a( n = `hAlign` v = `Center`
           )->ele( n = `template` ns = `table`
               )->tag( `CheckBox`
-              )->a( n = `selected` v = |\{{ get_box_field( ) }\}| ).
+              )->a( n = `selected` v = |\{{ z2ui5_cl_ui5_view_builder=>component_path( get_box_field( ) ) }\}| ).
     ENDIF.
 
     LOOP AT columns_visible( tab ) INTO DATA(ls_comp).
@@ -3715,8 +3716,8 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
       ENDIF.
 
       DATA(lo_column) = node->ele( n = `Column` ns = `table`
-          )->a( n = `sortProperty`   t = ls_comp-name
-          )->a( n = `filterProperty` t = ls_comp-name
+          )->a( n = `sortProperty`   t = z2ui5_cl_ui5_view_builder=>component_path( ls_comp-name )
+          )->a( n = `filterProperty` t = z2ui5_cl_ui5_view_builder=>component_path( ls_comp-name )
           )->a( n = `hAlign`         v = lv_align ).
       IF lv_width IS NOT INITIAL.
         lo_column->a( n = `width` t = lv_width ).
@@ -3747,6 +3748,10 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
 
   METHOD render_template.
 
+    " the binding path of the column - a namespace's leading slash dropped:
+    " /ABC/FIELD is the member FIELD of ABC, not an absolute path
+    DATA(lv_path) = z2ui5_cl_ui5_view_builder=>component_path( comp-name ).
+
     IF column_editable( column ) = abap_true.
       render_edit( node   = node
                    client = client
@@ -3759,7 +3764,7 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
       WHEN cs_cell_type-checkbox_hotspot.
         " a checkbox that can be clicked - the value changes, the event follows
         node->tag( `CheckBox`
-            )->a( n = `selected` v = |\{{ comp-name }\}|
+            )->a( n = `selected` v = |\{{ lv_path }\}|
             )->a( n = `select`   v = client->_event( val   = cs_event-hotspot
                                                      t_arg = VALUE #( ( `$event.getSource().getBindingContext().getPath()` )
                                                                       ( comp-name ) ) ) ).
@@ -3775,9 +3780,9 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
       WHEN cs_cell_type-dropdown.
         " shown: the text of the key
         DATA(lt_value) = dropdown_values( comp-name ).
-        DATA(lv_expr) = |$\{{ comp-name }\}|.
+        DATA(lv_expr) = |$\{{ lv_path }\}|.
         LOOP AT lt_value INTO DATA(ls_value).
-          lv_expr = |$\{{ comp-name }\} === '{ expr_escape( ls_value-key ) }' ? '{ expr_escape( ls_value-text ) }' : { lv_expr }|.
+          lv_expr = |$\{{ lv_path }\} === '{ expr_escape( ls_value-key ) }' ? '{ expr_escape( ls_value-text ) }' : { lv_expr }|.
         ENDLOOP.
         node->tag( `Text`
             )->a( n = `text`     v = |\{= { lv_expr } \}|
@@ -3787,13 +3792,13 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
 
     IF column-icon = abap_true.
       node->tag( n = `Icon` ns = `core`
-          )->a( n = `src` v = |\{{ comp-name }\}| ).
+          )->a( n = `src` v = |\{{ lv_path }\}| ).
       RETURN.
     ENDIF.
 
     IF comp-boolean = abap_true.
       node->tag( `CheckBox`
-          )->a( n = `selected` v = |\{= $\{{ comp-name }\} === true \|\| $\{{ comp-name }\} === 'X' \}|
+          )->a( n = `selected` v = |\{= $\{{ lv_path }\} === true \|\| $\{{ lv_path }\} === 'X' \}|
           )->a( n = `editable` b = abap_false ).
       RETURN.
     ENDIF.
@@ -3824,21 +3829,24 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
         )->a( n = `wrapping` b = abap_false ).
     " NO_ZERO: a zero is not shown
     IF column-no_zero = abap_true AND is_numeric( comp-type_kind ) = abap_true.
-      node->a( n = `visible` v = |\{= Number($\{{ comp-name }\}) !== 0 \}| ).
+      node->a( n = `visible` v = |\{= Number($\{{ lv_path }\}) !== 0 \}| ).
     ELSEIF column-no_zero = abap_true AND comp-type_kind = cl_abap_typedescr=>typekind_num.
-      node->a( n = `visible` v = |\{= !/^0*$/.test($\{{ comp-name }\}) \}| ).
+      node->a( n = `visible` v = |\{= !/^0*$/.test($\{{ lv_path }\}) \}| ).
     ENDIF.
 
   ENDMETHOD.
 
   METHOD render_edit.
 
+    " the binding path of the column - a namespace's leading slash dropped:
+    " /ABC/FIELD is the member FIELD of ABC, not an absolute path
+    DATA(lv_path) = z2ui5_cl_ui5_view_builder=>component_path( comp-name ).
 
     DATA(lv_editable) = edit_binding( ).
 
     IF column-cell_type = cs_cell_type-dropdown.
       DATA(lo_select) = node->ele( `Select`
-          )->a( n = `selectedKey`    v = |\{{ comp-name }\}|
+          )->a( n = `selectedKey`    v = |\{{ lv_path }\}|
           )->a( n = `forceSelection` b = abap_false
           )->a( n = `change`         v = client->_event( val   = cs_event-data_changed
                                                          t_arg = VALUE #( ( `$event.getSource().getBindingContext().getPath()` )
@@ -3860,7 +3868,7 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
 
     IF comp-boolean = abap_true.
       node->tag( `CheckBox`
-          )->a( n = `selected` v = |\{{ comp-name }\}|
+          )->a( n = `selected` v = |\{{ lv_path }\}|
           )->a( n = `select`   v = client->_event( val   = cs_event-data_changed
                                                    t_arg = VALUE #( ( `$event.getSource().getBindingContext().getPath()` )
                                                                     ( comp-name ) ) ) ).
@@ -3873,7 +3881,7 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
     CASE comp-type_kind.
       WHEN cl_abap_typedescr=>typekind_date.
         node->tag( `DatePicker`
-            )->a( n = `value`         v = |\{{ comp-name }\}|
+            )->a( n = `value`         v = |\{{ lv_path }\}|
             )->a( n = `valueFormat`   v = `yyyy-MM-dd`
             )->a( n = `displayFormat` v = `medium`
             )->a( n = `change`        v = client->_event( val   = cs_event-data_changed
@@ -3884,7 +3892,7 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
         ENDIF.
       WHEN cl_abap_typedescr=>typekind_time.
         node->tag( `TimePicker`
-            )->a( n = `value`         v = |\{{ comp-name }\}|
+            )->a( n = `value`         v = |\{{ lv_path }\}|
             )->a( n = `valueFormat`   v = `HH:mm:ss`
             )->a( n = `displayFormat` v = `HH:mm:ss`
             )->a( n = `change`        v = client->_event( val   = cs_event-data_changed
@@ -3913,7 +3921,7 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
           ENDIF.
         ELSE.
           node->tag( `Input`
-              )->a( n = `value`  v = |\{{ comp-name }\}|
+              )->a( n = `value`  v = |\{{ lv_path }\}|
               )->a( n = `change` v = client->_event( val   = cs_event-data_changed
                                                      t_arg = VALUE #( ( `$event.getSource().getBindingContext().getPath()` )
                                                                       ( comp-name ) ) ) ).
@@ -3994,11 +4002,12 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
 
   METHOD cell_binding.
 
-    result = z2ui5_cl_cgui_context=>ui5_binding_by_kind( path          = comp-name
-                                                        type_kind     = comp-type_kind
-                                                        decimals      = comp-decimals
-                                                        currency_path = column-currency
-                                                        unit_path     = column-quantity ).
+    result = z2ui5_cl_cgui_context=>ui5_binding_by_kind(
+                 path          = z2ui5_cl_ui5_view_builder=>component_path( comp-name )
+                 type_kind     = comp-type_kind
+                 decimals      = comp-decimals
+                 currency_path = z2ui5_cl_ui5_view_builder=>component_path( column-currency )
+                 unit_path     = z2ui5_cl_ui5_view_builder=>component_path( column-quantity ) ).
 
   ENDMETHOD.
 
