@@ -671,16 +671,9 @@ CLASS z2ui5_cl_cgui_tree IMPLEMENTATION.
       DATA(lv_text) = z2ui5_cl_cgui_context=>rtti_get_label_by_descr( ls_comp-type ).
       INSERT VALUE #( name  = ls_comp-name
                       text  = COND #( WHEN lv_text IS NOT INITIAL THEN lv_text ELSE ls_comp-name )
-                      align = SWITCH #( ls_comp-type->type_kind
-                                        WHEN cl_abap_typedescr=>typekind_int
-                                          OR cl_abap_typedescr=>typekind_int1
-                                          OR cl_abap_typedescr=>typekind_int2
-                                          OR cl_abap_typedescr=>typekind_int8
-                                          OR cl_abap_typedescr=>typekind_packed
-                                          OR cl_abap_typedescr=>typekind_float
-                                          OR cl_abap_typedescr=>typekind_decfloat16
-                                          OR cl_abap_typedescr=>typekind_decfloat34 THEN `End`
-                                        ELSE `Begin` ) ) INTO TABLE mt_column.
+                      align = COND #( WHEN z2ui5_cl_cgui_alv=>is_numeric( ls_comp-type->type_kind ) = abap_true
+                                      THEN `End`
+                                      ELSE `Begin` ) ) INTO TABLE mt_column.
     ENDLOOP.
 
   ENDMETHOD.

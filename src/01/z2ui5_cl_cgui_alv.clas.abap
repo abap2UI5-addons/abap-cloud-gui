@@ -853,6 +853,13 @@ CLASS z2ui5_cl_cgui_alv DEFINITION PUBLIC FINAL CREATE PUBLIC.
       RETURNING
         VALUE(result) TYPE ty_t_subtotal.
 
+    "! a type kind of a number - an integer, packed, float or decfloat
+    CLASS-METHODS is_numeric
+      IMPORTING
+        type_kind     TYPE clike
+      RETURNING
+        VALUE(result) TYPE abap_bool.
+
     "! the visible columns of tab as Excel file (Office Open XML)
     METHODS to_xlsx
       IMPORTING
@@ -1226,12 +1233,6 @@ CLASS z2ui5_cl_cgui_alv DEFINITION PUBLIC FINAL CREATE PUBLIC.
       IMPORTING
         node TYPE REF TO z2ui5_cl_ui5_view_builder
         tab  TYPE STANDARD TABLE.
-
-    CLASS-METHODS is_numeric
-      IMPORTING
-        type_kind     TYPE clike
-      RETURNING
-        VALUE(result) TYPE abap_bool.
 
     " the types of the cell formats, loaded with core:require on the grid
     CLASS-METHODS type_require
@@ -3293,17 +3294,13 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
           INSERT `<c/>` INTO TABLE lt_cell.
           CONTINUE.
         ENDIF.
-        CASE ls_visible-type_kind.
-          WHEN cl_abap_typedescr=>typekind_int OR cl_abap_typedescr=>typekind_int1
-              OR cl_abap_typedescr=>typekind_int2 OR cl_abap_typedescr=>typekind_int8
-              OR cl_abap_typedescr=>typekind_packed OR cl_abap_typedescr=>typekind_float
-              OR cl_abap_typedescr=>typekind_decfloat16 OR cl_abap_typedescr=>typekind_decfloat34.
-            INSERT |<c><v>{ <cell> }</v></c>| INTO TABLE lt_cell.
-          WHEN OTHERS.
-            DATA(lv_cell) = xlsx_escape( cell_to_text( val  = <cell>
-                                                       comp = ls_visible ) ).
-            INSERT |<c t="inlineStr"><is><t>{ lv_cell }</t></is></c>| INTO TABLE lt_cell.
-        ENDCASE.
+        IF is_numeric( ls_visible-type_kind ) = abap_true.
+          INSERT |<c><v>{ <cell> }</v></c>| INTO TABLE lt_cell.
+        ELSE.
+          DATA(lv_cell) = xlsx_escape( cell_to_text( val  = <cell>
+                                                     comp = ls_visible ) ).
+          INSERT |<c t="inlineStr"><is><t>{ lv_cell }</t></is></c>| INTO TABLE lt_cell.
+        ENDIF.
       ENDLOOP.
       INSERT |<row>{ concat_lines_of( lt_cell ) }</row>| INTO TABLE lt_xml.
     ENDLOOP.
@@ -3706,18 +3703,7 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
 
       DATA(ls_column) = column_setting( ls_comp-name ).
 
-      DATA(lv_align) = `Begin`.
-      CASE ls_comp-type_kind.
-        WHEN cl_abap_typedescr=>typekind_int
-            OR cl_abap_typedescr=>typekind_int1
-            OR cl_abap_typedescr=>typekind_int2
-            OR cl_abap_typedescr=>typekind_int8
-            OR cl_abap_typedescr=>typekind_packed
-            OR cl_abap_typedescr=>typekind_float
-            OR cl_abap_typedescr=>typekind_decfloat16
-            OR cl_abap_typedescr=>typekind_decfloat34.
-          lv_align = `End`.
-      ENDCASE.
+      DATA(lv_align) = COND string( WHEN is_numeric( ls_comp-type_kind ) = abap_true THEN `End` ELSE `Begin` ).
       IF ls_column-icon = abap_true OR ls_comp-boolean = abap_true.
         lv_align = `Center`.
       ENDIF.
@@ -4081,17 +4067,11 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
       WHEN cl_abap_typedescr=>typekind_packed.
         lv_number = val.
         result = |{ lv_number NUMBER = USER DECIMALS = comp-decimals }|.
-      WHEN cl_abap_typedescr=>typekind_float
-          OR cl_abap_typedescr=>typekind_int
-          OR cl_abap_typedescr=>typekind_int1
-          OR cl_abap_typedescr=>typekind_int2
-          OR cl_abap_typedescr=>typekind_int8
-          OR cl_abap_typedescr=>typekind_decfloat16
-          OR cl_abap_typedescr=>typekind_decfloat34.
-        lv_number = val.
-        result = |{ lv_number NUMBER = USER }|.
       WHEN OTHERS.
-        IF comp-boolean = abap_true.
+        IF is_numeric( comp-type_kind ) = abap_true.
+          lv_number = val.
+          result = |{ lv_number NUMBER = USER }|.
+        ELSEIF comp-boolean = abap_true.
           result = COND #( WHEN val IS NOT INITIAL THEN `X` ).
         ELSE.
           result = |{ val }|.
