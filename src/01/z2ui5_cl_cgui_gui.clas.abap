@@ -174,11 +174,13 @@ ENDCLASS.
 CLASS z2ui5_cl_cgui_gui IMPLEMENTATION.
 
   METHOD get_cursor_field.
+    DATA ls_cursor TYPE z2ui5_if_cgui_gui=>ty_s_cursor.
 
     IF go_report IS NOT BOUND.
       RAISE not_on_field.
     ENDIF.
-    DATA(ls_cursor) = go_report->cursor( ).
+
+    ls_cursor = go_report->cursor( ).
     field = ls_cursor-field.
     value = ls_cursor-value.
     line = ls_cursor-line.
@@ -212,18 +214,23 @@ CLASS z2ui5_cl_cgui_gui IMPLEMENTATION.
 
   METHOD set_visible.
 
-    DATA(ls_control) = get( ).
+    DATA ls_control TYPE z2ui5_if_cgui_gui=>ty_s_control.
+    DATA temp1 TYPE xsdboolean.
+    ls_control = get( ).
     IF ls_control-id IS INITIAL.
       RAISE cntl_error.
     ENDIF.
-    ls_control-hidden = xsdbool( flag( visible ) = abap_false ).
+
+    temp1 = boolc( flag( visible ) = abap_false ).
+    ls_control-hidden = temp1.
     put( ls_control ).
 
   ENDMETHOD.
 
   METHOD free.
 
-    DATA(ls_control) = get( ).
+    DATA ls_control TYPE z2ui5_if_cgui_gui=>ty_s_control.
+    ls_control = get( ).
     IF ls_control-id IS INITIAL.
       RETURN.
     ENDIF.
@@ -240,20 +247,31 @@ CLASS z2ui5_cl_cgui_gui IMPLEMENTATION.
 
   METHOD set_handler.
 
-    DATA(lv_event) = to_upper( condense( event ) ).
-    DATA(lv_method) = to_upper( condense( method ) ).
-    DATA(lv_class) = to_upper( condense( class ) ).
+    DATA lv_event TYPE string.
+    DATA lv_method TYPE string.
+    DATA lv_class TYPE string.
+    DATA lt_handler TYPE z2ui5_if_cgui_gui=>ty_t_handler.
+      DATA temp1 TYPE z2ui5_if_cgui_gui=>ty_s_handler.
+    lv_event = to_upper( condense( event ) ).
+
+    lv_method = to_upper( condense( method ) ).
+
+    lv_class = to_upper( condense( class ) ).
     IF go_report IS NOT BOUND.
       RETURN.
     ENDIF.
-    DATA(lt_handler) = go_report->handlers_get( ).
+
+    lt_handler = go_report->handlers_get( ).
     DELETE lt_handler WHERE id = mv_id AND event = lv_event AND method = lv_method AND handler = handler AND class = lv_class.
     IF activation = abap_true.
-      INSERT VALUE #( id      = mv_id
-                      event   = lv_event
-                      handler = handler
-                      class   = lv_class
-                      method  = lv_method ) INTO TABLE lt_handler.
+
+      CLEAR temp1.
+      temp1-id = mv_id.
+      temp1-event = lv_event.
+      temp1-handler = handler.
+      temp1-class = lv_class.
+      temp1-method = lv_method.
+      INSERT temp1 INTO TABLE lt_handler.
     ENDIF.
     go_report->handlers_set( lt_handler ).
 
@@ -273,33 +291,61 @@ CLASS z2ui5_cl_cgui_gui IMPLEMENTATION.
 
     " sender typed as the class of the control - the handler's parameter is
     " typed with the class of the event (the stand-in or a parent of it)
-    DATA(lv_class) = cl_abap_typedescr=>describe_by_object_ref( me )->get_relative_name( ).
+    DATA lv_class TYPE string.
+    DATA lt_handler TYPE z2ui5_if_cgui_gui=>ty_t_handler.
+    DATA ls_handler LIKE LINE OF lt_handler.
+      DATA temp2 TYPE REF TO cl_abap_objectdescr.
+      DATA temp1 TYPE REF TO cl_abap_objectdescr.
+      DATA temp4 TYPE REF TO cl_abap_objectdescr.
+      DATA lo_type LIKE temp4.
+      DATA ls_method TYPE abap_methdescr.
+      DATA ls_parameter LIKE LINE OF ls_method-parameters.
+          DATA temp3 TYPE abap_parmbind.
+        DATA ls_param TYPE abap_parmbind.
+    lv_class = cl_abap_typedescr=>describe_by_object_ref( me )->get_relative_name( ).
     CREATE DATA lr_sender TYPE REF TO (lv_class).
     ASSIGN lr_sender->* TO <sender>.
     <sender> ?= me.
     IF go_report IS NOT BOUND.
       RETURN.
     ENDIF.
-    DATA(lt_handler) = go_report->handlers_get( ).
-    LOOP AT lt_handler INTO DATA(ls_handler) WHERE id = mv_id AND event = event.
+
+    lt_handler = go_report->handlers_get( ).
+
+    LOOP AT lt_handler INTO ls_handler WHERE id = mv_id AND event = event.
       " the parameters the handler method takes - an event handler names a
       " part of the event's parameters
-      DATA(lo_type) = COND #( WHEN ls_handler-handler IS BOUND
-                              THEN CAST cl_abap_objectdescr( cl_abap_typedescr=>describe_by_object_ref( ls_handler-handler ) )
-                              ELSE CAST cl_abap_objectdescr( cl_abap_typedescr=>describe_by_name( ls_handler-class ) ) ).
-      READ TABLE lo_type->methods INTO DATA(ls_method) WITH KEY name = ls_handler-method.
+
+      temp2 ?= cl_abap_typedescr=>describe_by_object_ref( ls_handler-handler ).
+
+      temp1 ?= cl_abap_typedescr=>describe_by_name( ls_handler-class ).
+
+      IF ls_handler-handler IS BOUND.
+        temp4 = temp2.
+      ELSE.
+        temp4 = temp1.
+      ENDIF.
+
+      lo_type = temp4.
+
+      READ TABLE lo_type->methods INTO ls_method WITH KEY name = ls_handler-method.
       IF sy-subrc <> 0.
         CONTINUE.
       ENDIF.
       CLEAR lt_param.
-      LOOP AT ls_method-parameters INTO DATA(ls_parameter).
+
+      LOOP AT ls_method-parameters INTO ls_parameter.
         IF ls_parameter-name = `SENDER`.
-          INSERT VALUE #( name  = `SENDER`
-                          kind  = cl_abap_objectdescr=>exporting
-                          value = lr_sender ) INTO TABLE lt_param.
+
+          CLEAR temp3.
+          temp3-name = `SENDER`.
+          temp3-kind = cl_abap_objectdescr=>exporting.
+          temp3-value = lr_sender.
+          INSERT temp3 INTO TABLE lt_param.
           CONTINUE.
         ENDIF.
-        READ TABLE params INTO DATA(ls_param) WITH TABLE KEY name = ls_parameter-name.
+
+        READ TABLE params INTO ls_param WITH TABLE KEY name = ls_parameter-name.
         IF sy-subrc = 0.
           INSERT ls_param INTO TABLE lt_param.
         ENDIF.
@@ -353,8 +399,15 @@ CLASS z2ui5_cl_cgui_gui IMPLEMENTATION.
   METHOD flag.
 
     " as text: 'X' compared with the number 1 is no number
-    DATA(lv_mode) = condense( CONV string( mode ) ).
-    result = xsdbool( lv_mode = `1` OR lv_mode = `X` OR lv_mode = `x` ).
+    DATA temp4 TYPE string.
+    DATA lv_mode TYPE string.
+    DATA temp2 TYPE xsdboolean.
+    temp4 = mode.
+
+    lv_mode = condense( temp4 ).
+
+    temp2 = boolc( lv_mode = `1` OR lv_mode = `X` OR lv_mode = `x` ).
+    result = temp2.
 
   ENDMETHOD.
 

@@ -38,14 +38,36 @@ CLASS z2ui5_cl_cgui_r2c_34 IMPLEMENTATION.
 
   METHOD start_of_selection.
 
-    gt_sale = VALUE #( ( region = 'NORTH' month = '01' amount = '120.00' )
-                       ( region = 'SOUTH' month = '01' amount = '80.50' )
-                       ( region = 'NORTH' month = '02' amount = '99.90' )
-                       ( region = 'SOUTH' month = '02' amount = '150.00' )
-                       ( region = 'NORTH' month = '01' amount = '30.00' ) ).
+    DATA temp1 LIKE gt_sale.
+    DATA temp2 LIKE LINE OF temp1.
+    DATA ls_sale LIKE LINE OF gt_sale.
+    CLEAR temp1.
+
+    temp2-region = 'NORTH'.
+    temp2-month = '01'.
+    temp2-amount = '120.00'.
+    INSERT temp2 INTO TABLE temp1.
+    temp2-region = 'SOUTH'.
+    temp2-month = '01'.
+    temp2-amount = '80.50'.
+    INSERT temp2 INTO TABLE temp1.
+    temp2-region = 'NORTH'.
+    temp2-month = '02'.
+    temp2-amount = '99.90'.
+    INSERT temp2 INTO TABLE temp1.
+    temp2-region = 'SOUTH'.
+    temp2-month = '02'.
+    temp2-amount = '150.00'.
+    INSERT temp2 INTO TABLE temp1.
+    temp2-region = 'NORTH'.
+    temp2-month = '01'.
+    temp2-amount = '30.00'.
+    INSERT temp2 INTO TABLE temp1.
+    gt_sale = temp1.
     SORT gt_sale BY region month.
 
-    LOOP AT gt_sale INTO DATA(ls_sale).
+
+    LOOP AT gt_sale INTO ls_sale.
       AT FIRST.
         list( )->new_line(
             )->write( 'Sales per region' ).

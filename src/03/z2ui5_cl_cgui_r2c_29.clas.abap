@@ -46,13 +46,55 @@ CLASS z2ui5_cl_cgui_r2c_29 IMPLEMENTATION.
 
   METHOD start_of_selection.
 
-    DATA(lt_stock) = VALUE ty_t_stock( ( item = 'BOLT'   quantity = 120 shelf = 'A1' )
-                                       ( item = 'NUT'    quantity = 3   shelf = 'A2' )
-                                       ( item = 'WASHER' quantity = 48  shelf = 'B1' )
-                                       ( item = 'SCREW'  quantity = 2   shelf = 'B4' ) ).
+    DATA temp1 TYPE ty_t_stock.
+    DATA temp2 LIKE LINE OF temp1.
+    DATA lt_stock LIKE temp1.
+    DATA temp3 TYPE ty_t_stock.
+    DATA ls_row LIKE LINE OF lt_stock.
+    DATA lt_low LIKE temp3.
+    DATA temp5 TYPE i.
+    DATA n TYPE i.
+    DATA ls_line LIKE LINE OF lt_stock.
+    DATA lv_total LIKE temp5.
+    CLEAR temp1.
 
-    DATA(lt_low) = VALUE ty_t_stock( FOR ls_row IN lt_stock WHERE ( quantity < p_min ) ( ls_row ) ).
-    DATA(lv_total) = REDUCE i( INIT n = 0 FOR ls_line IN lt_stock NEXT n = n + ls_line-quantity ).
+    temp2-item = 'BOLT'.
+    temp2-quantity = 120.
+    temp2-shelf = 'A1'.
+    INSERT temp2 INTO TABLE temp1.
+    temp2-item = 'NUT'.
+    temp2-quantity = 3.
+    temp2-shelf = 'A2'.
+    INSERT temp2 INTO TABLE temp1.
+    temp2-item = 'WASHER'.
+    temp2-quantity = 48.
+    temp2-shelf = 'B1'.
+    INSERT temp2 INTO TABLE temp1.
+    temp2-item = 'SCREW'.
+    temp2-quantity = 2.
+    temp2-shelf = 'B4'.
+    INSERT temp2 INTO TABLE temp1.
+
+    lt_stock = temp1.
+
+
+    CLEAR temp3.
+
+    LOOP AT lt_stock INTO ls_row WHERE quantity < p_min.
+      INSERT ls_row INTO TABLE temp3.
+    ENDLOOP.
+
+    lt_low = temp3.
+
+
+    n = 0.
+
+    LOOP AT lt_stock INTO ls_line.
+      n = n + ls_line-quantity.
+    ENDLOOP.
+    temp5 = n.
+
+    lv_total = temp5.
 
     z2ui5_cl_cgui_demo_output=>begin_section( 'Inventory' ).
     z2ui5_cl_cgui_demo_output=>write_text( |{ lines( lt_stock ) } items, { lv_total } pieces in stock| ).

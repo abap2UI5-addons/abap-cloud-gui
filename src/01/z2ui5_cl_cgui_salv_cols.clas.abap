@@ -65,14 +65,27 @@ CLASS z2ui5_cl_cgui_salv_cols IMPLEMENTATION.
 
   METHOD constructor.
 
-    DATA(lo_type) = cl_abap_typedescr=>describe_by_data( line ).
+    DATA lo_type TYPE REF TO cl_abap_typedescr.
+    DATA temp2 TYPE REF TO cl_abap_structdescr.
+    DATA temp20 TYPE abap_component_view_tab.
+    DATA ls_component LIKE LINE OF temp20.
+      DATA temp21 TYPE z2ui5_cl_cgui_salv_cols=>ty_s_column_ref.
+    lo_type = cl_abap_typedescr=>describe_by_data( line ).
     IF lo_type->kind <> cl_abap_typedescr=>kind_struct.
       RETURN.
     ENDIF.
     " the components of an .INCLUDE are columns as well
-    LOOP AT CAST cl_abap_structdescr( lo_type )->get_included_view( ) INTO DATA(ls_component) WHERE name IS NOT INITIAL.
-      INSERT VALUE #( columnname = ls_component-name
-                      r_column   = NEW #( ls_component-name ) ) INTO TABLE mt_column.
+
+    temp2 ?= lo_type.
+
+    temp20 = temp2->get_included_view( ).
+
+    LOOP AT temp20 INTO ls_component WHERE name IS NOT INITIAL.
+
+      CLEAR temp21.
+      temp21-columnname = ls_component-name.
+      CREATE OBJECT temp21-r_column EXPORTING NAME = ls_component-name.
+      INSERT temp21 INTO TABLE mt_column.
     ENDLOOP.
 
   ENDMETHOD.
@@ -85,8 +98,11 @@ CLASS z2ui5_cl_cgui_salv_cols IMPLEMENTATION.
 
   METHOD get_column.
 
-    DATA(lv_name) = to_upper( condense( columnname ) ).
-    LOOP AT mt_column INTO DATA(ls_column) WHERE columnname = lv_name.
+    DATA lv_name TYPE string.
+    DATA ls_column LIKE LINE OF mt_column.
+    lv_name = to_upper( condense( columnname ) ).
+
+    LOOP AT mt_column INTO ls_column WHERE columnname = lv_name.
       value = ls_column-r_column.
       RETURN.
     ENDLOOP.
@@ -111,8 +127,11 @@ CLASS z2ui5_cl_cgui_salv_cols IMPLEMENTATION.
   METHOD set_column_position.
 
     " the order of get( ) is the order of the columns of the grid
-    DATA(lv_name) = to_upper( condense( columnname ) ).
-    READ TABLE mt_column INTO DATA(ls_column) WITH KEY columnname = lv_name.
+    DATA lv_name TYPE string.
+    DATA ls_column TYPE z2ui5_cl_cgui_salv_cols=>ty_s_column_ref.
+    lv_name = to_upper( condense( columnname ) ).
+
+    READ TABLE mt_column INTO ls_column WITH KEY columnname = lv_name.
     IF sy-subrc <> 0 OR position < 1.
       RETURN.
     ENDIF.

@@ -101,8 +101,8 @@ CLASS z2ui5_cl_cgui_selscreen DEFINITION PUBLIC FINAL CREATE PRIVATE.
         text   TYPE string,
         icon   TYPE string,
       END OF ty_s_function_key.
-    TYPES ty_t_function_key TYPE STANDARD TABLE OF ty_s_function_key WITH EMPTY KEY.
-    TYPES ty_t_field TYPE STANDARD TABLE OF ty_s_field WITH EMPTY KEY.
+    TYPES ty_t_function_key TYPE STANDARD TABLE OF ty_s_function_key WITH DEFAULT KEY.
+    TYPES ty_t_field TYPE STANDARD TABLE OF ty_s_field WITH DEFAULT KEY.
 
     TYPES:
       "! a value of a listbox - the classic VRM_VALUES
@@ -110,7 +110,7 @@ CLASS z2ui5_cl_cgui_selscreen DEFINITION PUBLIC FINAL CREATE PRIVATE.
         key  TYPE string,
         text TYPE string,
       END OF ty_s_value.
-    TYPES ty_t_value TYPE STANDARD TABLE OF ty_s_value WITH EMPTY KEY.
+    TYPES ty_t_value TYPE STANDARD TABLE OF ty_s_value WITH DEFAULT KEY.
 
     TYPES:
       "! a line of loop_at_screen( ) - the classic SCREEN structure, with
@@ -128,7 +128,7 @@ CLASS z2ui5_cl_cgui_selscreen DEFINITION PUBLIC FINAL CREATE PRIVATE.
         recommended TYPE abap_bool,
         length      TYPE i,
       END OF ty_s_screen.
-    TYPES ty_t_screen TYPE STANDARD TABLE OF ty_s_screen WITH EMPTY KEY.
+    TYPES ty_t_screen TYPE STANDARD TABLE OF ty_s_screen WITH DEFAULT KEY.
 
     "! value_help_auto - F4 for every field whose DDIC type has a standard
     "! F4 (domain fixed values, value table); the caller answers
@@ -528,21 +528,21 @@ CLASS z2ui5_cl_cgui_selscreen DEFINITION PUBLIC FINAL CREATE PRIVATE.
         recommended  TYPE abap_bool,
         for_field    TYPE string,
       END OF ty_s_item.
-    TYPES ty_t_item TYPE STANDARD TABLE OF ty_s_item WITH EMPTY KEY.
+    TYPES ty_t_item TYPE STANDARD TABLE OF ty_s_item WITH DEFAULT KEY.
 
     TYPES:
       BEGIN OF ty_s_listbox,
         name   TYPE string,
         values TYPE ty_t_value,
       END OF ty_s_listbox.
-    TYPES ty_t_listbox TYPE STANDARD TABLE OF ty_s_listbox WITH EMPTY KEY.
+    TYPES ty_t_listbox TYPE STANDARD TABLE OF ty_s_listbox WITH DEFAULT KEY.
 
     TYPES:
       BEGIN OF ty_s_tab_bind,
         index TYPE i,
         bind  TYPE string,
       END OF ty_s_tab_bind.
-    TYPES ty_t_tab_bind TYPE STANDARD TABLE OF ty_s_tab_bind WITH EMPTY KEY.
+    TYPES ty_t_tab_bind TYPE STANDARD TABLE OF ty_s_tab_bind WITH DEFAULT KEY.
 
     DATA client  TYPE REF TO z2ui5_if_client.
     DATA mo_app  TYPE REF TO object.
@@ -556,7 +556,8 @@ CLASS z2ui5_cl_cgui_selscreen DEFINITION PUBLIC FINAL CREATE PRIVATE.
         name   TYPE string,
         values TYPE string_table,
       END OF ty_s_history.
-    DATA mt_history         TYPE STANDARD TABLE OF ty_s_history WITH EMPTY KEY.
+    TYPES temp1_ce960d2d7e TYPE STANDARD TABLE OF ty_s_history WITH DEFAULT KEY.
+DATA mt_history         TYPE temp1_ce960d2d7e.
     DATA mt_tab_bind        TYPE ty_t_tab_bind.
     " the columns of the table controls, by name
     TYPES:
@@ -564,7 +565,8 @@ CLASS z2ui5_cl_cgui_selscreen DEFINITION PUBLIC FINAL CREATE PRIVATE.
         name    TYPE string,
         columns TYPE z2ui5_if_cgui_gui=>ty_t_tc_column,
       END OF ty_s_tc.
-    DATA mt_tc              TYPE STANDARD TABLE OF ty_s_tc WITH EMPTY KEY.
+    TYPES temp2_ce960d2d7e TYPE STANDARD TABLE OF ty_s_tc WITH DEFAULT KEY.
+DATA mt_tc              TYPE temp2_ce960d2d7e.
     DATA mt_function_key    TYPE ty_t_function_key.
     " BEGIN OF BLOCK ... NO INTERVALS - the blocks open that have it
     DATA mv_block_depth     TYPE i.
@@ -707,7 +709,7 @@ CLASS z2ui5_cl_cgui_selscreen IMPLEMENTATION.
 
   METHOD factory.
 
-    result = NEW #( ).
+    CREATE OBJECT result.
     result->client = client.
     result->mo_app = app.
     IF result->mo_app IS NOT BOUND AND client IS BOUND.
@@ -720,10 +722,13 @@ CLASS z2ui5_cl_cgui_selscreen IMPLEMENTATION.
 
   METHOD block_begin.
 
-    INSERT VALUE #( kind         = cs_kind-block_begin
-                    text         = title
-                    group        = to_upper( name )
-                    no_intervals = no_intervals ) INTO TABLE mt_item.
+    DATA temp60 TYPE z2ui5_cl_cgui_selscreen=>ty_s_item.
+    CLEAR temp60.
+    temp60-kind = cs_kind-block_begin.
+    temp60-text = title.
+    temp60-group = to_upper( name ).
+    temp60-no_intervals = no_intervals.
+    INSERT temp60 INTO TABLE mt_item.
     mv_block_depth = mv_block_depth + 1.
     IF no_intervals = abap_true AND mv_block_no_int = 0.
       mv_block_no_int = mv_block_depth.
@@ -734,7 +739,10 @@ CLASS z2ui5_cl_cgui_selscreen IMPLEMENTATION.
 
   METHOD block_end.
 
-    INSERT VALUE #( kind = cs_kind-block_end ) INTO TABLE mt_item.
+    DATA temp61 TYPE z2ui5_cl_cgui_selscreen=>ty_s_item.
+    CLEAR temp61.
+    temp61-kind = cs_kind-block_end.
+    INSERT temp61 INTO TABLE mt_item.
     IF mv_block_no_int = mv_block_depth.
       mv_block_no_int = 0.
     ENDIF.
@@ -745,22 +753,31 @@ CLASS z2ui5_cl_cgui_selscreen IMPLEMENTATION.
 
   METHOD line_begin.
 
-    INSERT VALUE #( kind = cs_kind-line_begin
-                    text = text ) INTO TABLE mt_item.
+    DATA temp62 TYPE z2ui5_cl_cgui_selscreen=>ty_s_item.
+    CLEAR temp62.
+    temp62-kind = cs_kind-line_begin.
+    temp62-text = text.
+    INSERT temp62 INTO TABLE mt_item.
     result = me.
 
   ENDMETHOD.
 
   METHOD line_end.
 
-    INSERT VALUE #( kind = cs_kind-line_end ) INTO TABLE mt_item.
+    DATA temp63 TYPE z2ui5_cl_cgui_selscreen=>ty_s_item.
+    CLEAR temp63.
+    temp63-kind = cs_kind-line_end.
+    INSERT temp63 INTO TABLE mt_item.
     result = me.
 
   ENDMETHOD.
 
   METHOD parameter.
 
-    DATA(ls_item) = item_create( val  = val
+    DATA ls_item TYPE z2ui5_cl_cgui_selscreen=>ty_s_item.
+    DATA lo_descr TYPE REF TO cl_abap_typedescr.
+      DATA temp64 TYPE REF TO cl_abap_elemdescr.
+    ls_item = item_create( val  = val
                                  kind = cs_kind-parameter
                                  text = text ).
     ls_item-control    = control_by_type( val ).
@@ -792,10 +809,13 @@ CLASS z2ui5_cl_cgui_selscreen IMPLEMENTATION.
                           own  = help_request
                 CHANGING  item = ls_item ).
 
-    DATA(lo_descr) = cl_abap_typedescr=>describe_by_data( val ).
+
+    lo_descr = cl_abap_typedescr=>describe_by_data( val ).
     IF lo_descr->type_kind = cl_abap_typedescr=>typekind_char
         OR lo_descr->type_kind = cl_abap_typedescr=>typekind_num.
-      ls_item-max_length = CAST cl_abap_elemdescr( lo_descr )->output_length.
+
+      temp64 ?= lo_descr.
+      ls_item-max_length = temp64->output_length.
     ENDIF.
     IF ls_item-control = cs_control-input.
       ls_item-upper = upper_check( descr      = lo_descr
@@ -812,6 +832,8 @@ CLASS z2ui5_cl_cgui_selscreen IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD upper_check.
+        DATA temp65 TYPE REF TO cl_abap_elemdescr.
+        DATA lo_elem LIKE temp65.
 
     IF lower_case = abap_true OR descr->type_kind <> cl_abap_typedescr=>typekind_char.
       RETURN.
@@ -819,7 +841,10 @@ CLASS z2ui5_cl_cgui_selscreen IMPLEMENTATION.
 
     result = abap_true.
     TRY.
-        DATA(lo_elem) = CAST cl_abap_elemdescr( descr ).
+
+        temp65 ?= descr.
+
+        lo_elem = temp65.
         IF lo_elem->is_ddic_type( ) = abap_true AND lo_elem->get_ddic_field( )-lowercase = abap_true.
           result = abap_false.
         ENDIF.
@@ -830,82 +855,122 @@ CLASS z2ui5_cl_cgui_selscreen IMPLEMENTATION.
 
   METHOD skip.
 
-    INSERT VALUE #( kind  = cs_kind-skip
-                    lines = nmax( val1 = val val2 = 1 ) ) INTO TABLE mt_item.
+    DATA temp66 TYPE z2ui5_cl_cgui_selscreen=>ty_s_item.
+    CLEAR temp66.
+    temp66-kind = cs_kind-skip.
+    temp66-lines = nmax( val1 = val val2 = 1 ).
+    INSERT temp66 INTO TABLE mt_item.
     result = me.
 
   ENDMETHOD.
 
   METHOD uline.
 
-    INSERT VALUE #( kind = cs_kind-uline ) INTO TABLE mt_item.
+    DATA temp67 TYPE z2ui5_cl_cgui_selscreen=>ty_s_item.
+    CLEAR temp67.
+    temp67-kind = cs_kind-uline.
+    INSERT temp67 INTO TABLE mt_item.
     result = me.
 
   ENDMETHOD.
 
   METHOD tabbed_block_begin.
 
-    INSERT VALUE #( kind = cs_kind-tabbed
-                    name = to_upper( name ) ) INTO TABLE mt_item.
+    DATA temp68 TYPE z2ui5_cl_cgui_selscreen=>ty_s_item.
+    CLEAR temp68.
+    temp68-kind = cs_kind-tabbed.
+    temp68-name = to_upper( name ).
+    INSERT temp68 INTO TABLE mt_item.
     result = me.
 
   ENDMETHOD.
 
   METHOD tab.
 
-    INSERT VALUE #( kind  = cs_kind-tab
-                    text  = text
-                    event = to_upper( fcode )
-                    group = to_upper( area ) ) INTO TABLE mt_item.
+    DATA temp69 TYPE z2ui5_cl_cgui_selscreen=>ty_s_item.
+    CLEAR temp69.
+    temp69-kind = cs_kind-tab.
+    temp69-text = text.
+    temp69-event = to_upper( fcode ).
+    temp69-group = to_upper( area ).
+    INSERT temp69 INTO TABLE mt_item.
     result = me.
 
   ENDMETHOD.
 
   METHOD table_control.
 
-    DATA(lv_name) = to_upper( condense( CONV string( name ) ) ).
-    INSERT VALUE #( kind = cs_kind-table
-                    name = lv_name
-                    text = title ) INTO TABLE mt_item.
+    DATA temp70 TYPE string.
+    DATA lv_name TYPE string.
+    DATA temp71 TYPE z2ui5_cl_cgui_selscreen=>ty_s_item.
+    DATA temp72 TYPE z2ui5_cl_cgui_selscreen=>ty_s_tc.
+    temp70 = name.
+
+    lv_name = to_upper( condense( temp70 ) ).
+
+    CLEAR temp71.
+    temp71-kind = cs_kind-table.
+    temp71-name = lv_name.
+    temp71-text = title.
+    INSERT temp71 INTO TABLE mt_item.
     DELETE mt_tc WHERE name = lv_name.
-    INSERT VALUE #( name    = lv_name
-                    columns = columns ) INTO TABLE mt_tc.
+
+    CLEAR temp72.
+    temp72-name = lv_name.
+    temp72-columns = columns.
+    INSERT temp72 INTO TABLE mt_tc.
     result = me.
 
   ENDMETHOD.
 
   METHOD subscreen.
 
-    INSERT VALUE #( kind = cs_kind-subscreen
-                    name = to_upper( area ) ) INTO TABLE mt_item.
+    DATA temp73 TYPE z2ui5_cl_cgui_selscreen=>ty_s_item.
+    CLEAR temp73.
+    temp73-kind = cs_kind-subscreen.
+    temp73-name = to_upper( area ).
+    INSERT temp73 INTO TABLE mt_item.
     result = me.
 
   ENDMETHOD.
 
   METHOD tabbed_block_end.
 
-    INSERT VALUE #( kind = cs_kind-tabbed_end ) INTO TABLE mt_item.
+    DATA temp74 TYPE z2ui5_cl_cgui_selscreen=>ty_s_item.
+    CLEAR temp74.
+    temp74-kind = cs_kind-tabbed_end.
+    INSERT temp74 INTO TABLE mt_item.
     result = me.
 
   ENDMETHOD.
 
   METHOD set_history.
 
-    DATA(lv_name) = to_upper( name ).
+    DATA lv_name TYPE string.
+      DATA temp75 TYPE z2ui5_cl_cgui_selscreen=>ty_s_history.
+    lv_name = to_upper( name ).
     DELETE mt_history WHERE name = lv_name.
     IF values IS NOT INITIAL.
-      INSERT VALUE #( name   = lv_name
-                      values = values ) INTO TABLE mt_history.
+
+      CLEAR temp75.
+      temp75-name = lv_name.
+      temp75-values = values.
+      INSERT temp75 INTO TABLE mt_history.
     ENDIF.
 
   ENDMETHOD.
 
   METHOD set_listbox_values.
 
-    DATA(lv_name) = to_upper( name ).
+    DATA lv_name TYPE string.
+    DATA temp76 TYPE z2ui5_cl_cgui_selscreen=>ty_s_listbox.
+    lv_name = to_upper( name ).
     DELETE mt_listbox WHERE name = lv_name.
-    INSERT VALUE #( name   = lv_name
-                    values = values ) INTO TABLE mt_listbox.
+
+    CLEAR temp76.
+    temp76-name = lv_name.
+    temp76-values = values.
+    INSERT temp76 INTO TABLE mt_listbox.
 
   ENDMETHOD.
 
@@ -913,7 +978,12 @@ CLASS z2ui5_cl_cgui_selscreen IMPLEMENTATION.
 
     FIELD-SYMBOLS <field_val> TYPE any.
 
-    READ TABLE mt_listbox REFERENCE INTO DATA(lr_listbox) WITH KEY name = item-name.
+    DATA lr_listbox TYPE REF TO z2ui5_cl_cgui_selscreen=>ty_s_listbox.
+    DATA temp77 TYPE z2ui5_cl_cgui_context=>ty_t_fix_val.
+    DATA temp11 LIKE LINE OF temp77.
+    DATA lr_fix LIKE REF TO temp11.
+      DATA temp78 TYPE z2ui5_cl_cgui_selscreen=>ty_s_value.
+    READ TABLE mt_listbox REFERENCE INTO lr_listbox WITH KEY name = item-name.
     IF sy-subrc = 0.
       result = lr_listbox->values.
       RETURN.
@@ -930,17 +1000,29 @@ CLASS z2ui5_cl_cgui_selscreen IMPLEMENTATION.
     IF <field_val> IS NOT ASSIGNED.
       RETURN.
     ENDIF.
-    LOOP AT z2ui5_cl_cgui_context=>rtti_get_fixed_values( cl_abap_typedescr=>describe_by_data( <field_val> ) ) REFERENCE INTO DATA(lr_fix).
-      INSERT VALUE #( key  = lr_fix->low
-                      text = lr_fix->text ) INTO TABLE result.
+
+    temp77 = z2ui5_cl_cgui_context=>rtti_get_fixed_values( cl_abap_typedescr=>describe_by_data( <field_val> ) ).
+
+
+    LOOP AT temp77 REFERENCE INTO lr_fix.
+
+      CLEAR temp78.
+      temp78-key = lr_fix->low.
+      temp78-text = lr_fix->text.
+      INSERT temp78 INTO TABLE result.
     ENDLOOP.
 
   ENDMETHOD.
 
   METHOD set_select_option_input.
 
-    DATA(lv_name) = to_upper( name ).
-    LOOP AT mt_item REFERENCE INTO DATA(lr_item) WHERE kind = cs_kind-select AND name = lv_name.
+    DATA lv_name TYPE string.
+    DATA temp79 LIKE LINE OF mt_item.
+    DATA lr_item LIKE REF TO temp79.
+    lv_name = to_upper( name ).
+
+
+    LOOP AT mt_item REFERENCE INTO lr_item WHERE kind = cs_kind-select AND name = lv_name.
       lr_item->low_bind  = low_bind.
       lr_item->high_bind = high_bind.
     ENDLOOP.
@@ -956,16 +1038,21 @@ CLASS z2ui5_cl_cgui_selscreen IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD set_tabbed_block_binding.
+    DATA temp80 TYPE z2ui5_cl_cgui_selscreen=>ty_s_tab_bind.
 
     DELETE mt_tab_bind WHERE index = index.
-    INSERT VALUE #( index = index
-                    bind  = bind ) INTO TABLE mt_tab_bind.
+
+    CLEAR temp80.
+    temp80-index = index.
+    temp80-bind = bind.
+    INSERT temp80 INTO TABLE mt_tab_bind.
 
   ENDMETHOD.
 
   METHOD checkbox.
 
-    DATA(ls_item) = item_create( val  = val
+    DATA ls_item TYPE z2ui5_cl_cgui_selscreen=>ty_s_item.
+    ls_item = item_create( val  = val
                                  kind = cs_kind-parameter
                                  text = text ).
     ls_item-control      = cs_control-checkbox.
@@ -979,7 +1066,8 @@ CLASS z2ui5_cl_cgui_selscreen IMPLEMENTATION.
 
   METHOD radiobutton.
 
-    DATA(ls_item) = item_create( val  = val
+    DATA ls_item TYPE z2ui5_cl_cgui_selscreen=>ty_s_item.
+    ls_item = item_create( val  = val
                                  kind = cs_kind-radiobutton
                                  text = text ).
     ls_item-group        = group.
@@ -995,6 +1083,16 @@ CLASS z2ui5_cl_cgui_selscreen IMPLEMENTATION.
   METHOD select_option.
 
     DATA ls_item TYPE ty_s_item.
+    DATA temp1 TYPE xsdboolean.
+    DATA temp2 TYPE xsdboolean.
+        DATA temp81 TYPE REF TO cl_abap_structdescr.
+        DATA temp12 TYPE REF TO cl_abap_tabledescr.
+        DATA lo_low TYPE REF TO cl_abap_datadescr.
+            DATA temp82 TYPE REF TO cl_abap_elemdescr.
+          DATA temp83 TYPE REF TO cl_abap_tabledescr.
+          DATA lo_table LIKE temp83.
+          DATA temp84 TYPE REF TO cl_abap_structdescr.
+          DATA lo_line LIKE temp84.
 
     ls_item-kind       = cs_kind-select.
     IF mv_preview = abap_false.
@@ -1003,7 +1101,9 @@ CLASS z2ui5_cl_cgui_selscreen IMPLEMENTATION.
     ls_item-required     = obligatory.
     ls_item-modif_id     = modif_id.
     ls_item-no_display   = no_display.
-    ls_item-no_intervals = xsdbool( no_intervals = abap_true OR mv_block_no_int > 0 ).
+
+    temp1 = boolc( no_intervals = abap_true OR mv_block_no_int > 0 ).
+    ls_item-no_intervals = temp1.
     ls_item-no_extension = no_extension.
     ls_item-memory_id    = to_upper( memory_id ).
     ls_item-visible_len  = visible_length.
@@ -1012,22 +1112,29 @@ CLASS z2ui5_cl_cgui_selscreen IMPLEMENTATION.
     ls_item-entity_elem  = to_upper( value_help_element ).
     ls_item-lines        = lines( val ).
     ls_item-value        = z2ui5_cl_cgui_context=>range_to_text( val ).
-    ls_item-value_help   = xsdbool( value_help = abap_true OR ls_item-matchcode IS NOT INITIAL
-                                    OR ls_item-entity IS NOT INITIAL ).
+
+    temp2 = boolc( value_help = abap_true OR ls_item-matchcode IS NOT INITIAL OR ls_item-entity IS NOT INITIAL ).
+    ls_item-value_help   = temp2.
     IF ls_item-value_help = abap_false.
       ls_item-value_help = value_help_check( val ).
     ENDIF.
     ls_item-control = cs_control-input.
     TRY.
-        DATA(lo_low) = CAST cl_abap_structdescr( CAST cl_abap_tabledescr(
-            cl_abap_typedescr=>describe_by_data( val ) )->get_table_line_type( ) )->get_component_type( `LOW` ).
+
+
+        temp12 ?= cl_abap_typedescr=>describe_by_data( val ).
+        temp81 ?= temp12->get_table_line_type( ).
+
+        lo_low = temp81->get_component_type( `LOW` ).
         CASE lo_low->type_kind.
           WHEN cl_abap_typedescr=>typekind_date.
             ls_item-control = cs_control-date.
           WHEN cl_abap_typedescr=>typekind_time.
             ls_item-control = cs_control-time.
           WHEN cl_abap_typedescr=>typekind_char OR cl_abap_typedescr=>typekind_num.
-            ls_item-max_length = CAST cl_abap_elemdescr( lo_low )->output_length.
+
+            temp82 ?= lo_low.
+            ls_item-max_length = temp82->output_length.
         ENDCASE.
         ls_item-upper = upper_check( descr      = lo_low
                                      lower_case = lower_case ).
@@ -1047,8 +1154,14 @@ CLASS z2ui5_cl_cgui_selscreen IMPLEMENTATION.
     ls_item-text = text.
     IF ls_item-text IS INITIAL.
       TRY.
-          DATA(lo_table) = CAST cl_abap_tabledescr( cl_abap_typedescr=>describe_by_data( val ) ).
-          DATA(lo_line) = CAST cl_abap_structdescr( lo_table->get_table_line_type( ) ).
+
+          temp83 ?= cl_abap_typedescr=>describe_by_data( val ).
+
+          lo_table = temp83.
+
+          temp84 ?= lo_table->get_table_line_type( ).
+
+          lo_line = temp84.
           ls_item-text = z2ui5_cl_cgui_context=>rtti_get_label_by_descr( lo_line->get_component_type( `LOW` ) ).
         CATCH cx_root ##NO_HANDLER.
       ENDTRY.
@@ -1064,18 +1177,24 @@ CLASS z2ui5_cl_cgui_selscreen IMPLEMENTATION.
 
   METHOD comment.
 
-    INSERT VALUE #( kind      = cs_kind-comment
-                    text      = text
-                    modif_id  = modif_id
-                    for_field = to_upper( for_field ) ) INTO TABLE mt_item.
+    DATA temp85 TYPE z2ui5_cl_cgui_selscreen=>ty_s_item.
+    CLEAR temp85.
+    temp85-kind = cs_kind-comment.
+    temp85-text = text.
+    temp85-modif_id = modif_id.
+    temp85-for_field = to_upper( for_field ).
+    INSERT temp85 INTO TABLE mt_item.
     result = me.
 
   ENDMETHOD.
 
   METHOD custom_control.
 
-    INSERT VALUE #( kind = cs_kind-custom
-                    name = to_upper( condense( name ) ) ) INTO TABLE mt_item.
+    DATA temp86 TYPE z2ui5_cl_cgui_selscreen=>ty_s_item.
+    CLEAR temp86.
+    temp86-kind = cs_kind-custom.
+    temp86-name = to_upper( condense( name ) ).
+    INSERT temp86 INTO TABLE mt_item.
     result = me.
 
   ENDMETHOD.
@@ -1088,18 +1207,26 @@ CLASS z2ui5_cl_cgui_selscreen IMPLEMENTATION.
 
   METHOD button.
 
-    INSERT VALUE #( kind     = cs_kind-button
-                    text     = text
-                    event    = event
-                    icon     = icon
-                    modif_id = modif_id ) INTO TABLE mt_item.
+    DATA temp87 TYPE z2ui5_cl_cgui_selscreen=>ty_s_item.
+    CLEAR temp87.
+    temp87-kind = cs_kind-button.
+    temp87-text = text.
+    temp87-event = event.
+    temp87-icon = icon.
+    temp87-modif_id = modif_id.
+    INSERT temp87 INTO TABLE mt_item.
     result = me.
 
   ENDMETHOD.
 
   METHOD loop_at_screen.
 
-    LOOP AT mt_item REFERENCE INTO DATA(lr_item)
+    DATA temp88 LIKE LINE OF mt_item.
+    DATA lr_item LIKE REF TO temp88.
+      DATA temp89 TYPE z2ui5_cl_cgui_selscreen=>ty_s_screen.
+      DATA temp3 TYPE xsdboolean.
+      DATA temp4 TYPE xsdboolean.
+    LOOP AT mt_item REFERENCE INTO lr_item
          WHERE kind <> cs_kind-block_begin
            AND kind <> cs_kind-block_end
            AND kind <> cs_kind-line_begin
@@ -1110,29 +1237,43 @@ CLASS z2ui5_cl_cgui_selscreen IMPLEMENTATION.
            AND kind <> cs_kind-tab
            AND kind <> cs_kind-tabbed_end
            AND no_display = abap_false.
-      INSERT VALUE #( id        = sy-tabix
-                      name      = lr_item->name
-                      group1    = lr_item->modif_id
-                      active    = xsdbool( lr_item->inactive = abap_false )
-                      input     = xsdbool( lr_item->read_only = abap_false )
-                      required  = lr_item->required
-                      invisible = lr_item->invisible
-                      intensified = lr_item->intensified
-                      recommended = lr_item->recommended
-                      length      = lr_item->visible_len ) INTO TABLE result.
+
+      CLEAR temp89.
+      temp89-id = sy-tabix.
+      temp89-name = lr_item->name.
+      temp89-group1 = lr_item->modif_id.
+
+      temp3 = boolc( lr_item->inactive = abap_false ).
+      temp89-active = temp3.
+
+      temp4 = boolc( lr_item->read_only = abap_false ).
+      temp89-input = temp4.
+      temp89-required = lr_item->required.
+      temp89-invisible = lr_item->invisible.
+      temp89-intensified = lr_item->intensified.
+      temp89-recommended = lr_item->recommended.
+      temp89-length = lr_item->visible_len.
+      INSERT temp89 INTO TABLE result.
     ENDLOOP.
 
   ENDMETHOD.
 
   METHOD modify_screen.
 
-    READ TABLE mt_item REFERENCE INTO DATA(lr_item) INDEX screen-id.
+    DATA lr_item TYPE REF TO z2ui5_cl_cgui_selscreen=>ty_s_item.
+    DATA temp5 TYPE xsdboolean.
+    DATA temp6 TYPE xsdboolean.
+    READ TABLE mt_item REFERENCE INTO lr_item INDEX screen-id.
     IF sy-subrc <> 0 OR lr_item->no_display = abap_true.
       RETURN.
     ENDIF.
 
-    lr_item->inactive  = xsdbool( screen-active = abap_false ).
-    lr_item->read_only = xsdbool( screen-input = abap_false ).
+
+    temp5 = boolc( screen-active = abap_false ).
+    lr_item->inactive  = temp5.
+
+    temp6 = boolc( screen-input = abap_false ).
+    lr_item->read_only = temp6.
     lr_item->required  = screen-required.
     lr_item->invisible = screen-invisible.
     " SCREEN-REQUIRED = 2: marked as required, not checked
@@ -1144,9 +1285,14 @@ CLASS z2ui5_cl_cgui_selscreen IMPLEMENTATION.
 
   METHOD set_value_state.
 
-    DATA(lv_name) = to_upper( name ).
+    DATA lv_name TYPE string.
+    DATA temp90 LIKE LINE OF mt_item.
+    DATA lr_item LIKE REF TO temp90.
+    lv_name = to_upper( name ).
 
-    LOOP AT mt_item REFERENCE INTO DATA(lr_item) WHERE name = lv_name.
+
+
+    LOOP AT mt_item REFERENCE INTO lr_item WHERE name = lv_name.
       lr_item->state      = state.
       lr_item->state_text = text.
     ENDLOOP.
@@ -1162,6 +1308,7 @@ CLASS z2ui5_cl_cgui_selscreen IMPLEMENTATION.
   METHOD radio_selected.
 
     FIELD-SYMBOLS <field_val> TYPE any.
+      DATA temp7 TYPE xsdboolean.
 
     result = item-selected.
     IF item-name IS INITIAL OR mv_preview = abap_true OR mo_app IS NOT BOUND.
@@ -1169,7 +1316,9 @@ CLASS z2ui5_cl_cgui_selscreen IMPLEMENTATION.
     ENDIF.
     ASSIGN mo_app->(item-name) TO <field_val>.
     IF <field_val> IS ASSIGNED.
-      result = xsdbool( <field_val> = abap_true ).
+
+      temp7 = boolc( <field_val> = abap_true ).
+      result = temp7.
     ENDIF.
 
   ENDMETHOD.
@@ -1181,7 +1330,17 @@ CLASS z2ui5_cl_cgui_selscreen IMPLEMENTATION.
     DATA lv_block TYPE string.
     DATA lt_block TYPE string_table.
 
-    LOOP AT mt_item REFERENCE INTO DATA(lr_item).
+    DATA temp91 LIKE LINE OF mt_item.
+    DATA lr_item LIKE REF TO temp91.
+        FIELD-SYMBOLS <temp92> LIKE LINE OF lt_open.
+        DATA temp93 LIKE sy-tabix.
+      DATA lv_open LIKE LINE OF lt_open.
+      DATA temp94 TYPE z2ui5_cl_cgui_selscreen=>ty_s_field.
+      DATA temp8 TYPE xsdboolean.
+      DATA temp9 TYPE xsdboolean.
+      DATA temp13 TYPE z2ui5_cl_cgui_selscreen=>ty_s_field-kind.
+      DATA temp14 TYPE z2ui5_cl_cgui_selscreen=>ty_s_field-group.
+    LOOP AT mt_item REFERENCE INTO lr_item.
       CASE lr_item->kind.
         WHEN cs_kind-block_begin.
           INSERT lr_item->group INTO TABLE lt_open.
@@ -1197,53 +1356,91 @@ CLASS z2ui5_cl_cgui_selscreen IMPLEMENTATION.
       ENDIF.
       CLEAR: lv_block, lt_block.
       IF lt_open IS NOT INITIAL.
-        lv_block = lt_open[ lines( lt_open ) ].
+
+
+        temp93 = sy-tabix.
+        READ TABLE lt_open INDEX lines( lt_open ) ASSIGNING <temp92>.
+        sy-tabix = temp93.
+        IF sy-subrc <> 0.
+          ASSERT 1 = 0.
+        ENDIF.
+        lv_block = <temp92>.
       ENDIF.
-      LOOP AT lt_open INTO DATA(lv_open) WHERE table_line IS NOT INITIAL.
+
+      LOOP AT lt_open INTO lv_open WHERE table_line IS NOT INITIAL.
         INSERT lv_open INTO TABLE lt_block.
       ENDLOOP.
-      INSERT VALUE #( name       = lr_item->name
-                      text       = lr_item->text
-                      obligatory = xsdbool( lr_item->required = abap_true
-                                            AND lr_item->inactive = abap_false
-                                            AND lr_item->read_only = abap_false
-                                            AND lr_item->no_display = abap_false )
-                      shown      = xsdbool( lr_item->inactive = abap_false
-                                            AND lr_item->no_display = abap_false )
-                      kind       = COND #( WHEN lr_item->kind = cs_kind-select
-                                           THEN cs_field_kind-select_option
-                                           ELSE cs_field_kind-parameter )
-                      upper      = lr_item->upper
-                      no_display   = lr_item->no_display
-                      memory_id    = lr_item->memory_id
-                      value_help   = lr_item->value_help
-                      no_intervals = lr_item->no_intervals
-                      max_length   = lr_item->max_length
-                      value_check  = lr_item->value_check
-                      help         = lr_item->help
-                      dtel         = lr_item->dtel
-                      block        = lv_block
-                      group        = COND #( WHEN lr_item->kind = cs_kind-radiobutton THEN lr_item->group )
-                      matchcode    = lr_item->matchcode
-                      entity       = lr_item->entity
-                      entity_elem  = lr_item->entity_elem
-                      read_only    = lr_item->read_only
-                      blocks       = lt_block ) INTO TABLE result.
+
+      CLEAR temp94.
+      temp94-name = lr_item->name.
+      temp94-text = lr_item->text.
+
+      temp8 = boolc( lr_item->required = abap_true AND lr_item->inactive = abap_false AND lr_item->read_only = abap_false AND lr_item->no_display = abap_false ).
+      temp94-obligatory = temp8.
+
+      temp9 = boolc( lr_item->inactive = abap_false AND lr_item->no_display = abap_false ).
+      temp94-shown = temp9.
+
+      IF lr_item->kind = cs_kind-select.
+        temp13 = cs_field_kind-select_option.
+      ELSE.
+        temp13 = cs_field_kind-parameter.
+      ENDIF.
+      temp94-kind = temp13.
+      temp94-upper = lr_item->upper.
+      temp94-no_display = lr_item->no_display.
+      temp94-memory_id = lr_item->memory_id.
+      temp94-value_help = lr_item->value_help.
+      temp94-no_intervals = lr_item->no_intervals.
+      temp94-max_length = lr_item->max_length.
+      temp94-value_check = lr_item->value_check.
+      temp94-help = lr_item->help.
+      temp94-dtel = lr_item->dtel.
+      temp94-block = lv_block.
+
+      IF lr_item->kind = cs_kind-radiobutton.
+        temp14 = lr_item->group.
+      ELSE.
+        CLEAR temp14.
+      ENDIF.
+      temp94-group = temp14.
+      temp94-matchcode = lr_item->matchcode.
+      temp94-entity = lr_item->entity.
+      temp94-entity_elem = lr_item->entity_elem.
+      temp94-read_only = lr_item->read_only.
+      temp94-blocks = lt_block.
+      INSERT temp94 INTO TABLE result.
     ENDLOOP.
 
   ENDMETHOD.
 
   METHOD item_create.
+      DATA temp95 TYPE string.
+      DATA bind LIKE temp95.
+      DATA temp96 TYPE z2ui5_cl_cgui_selscreen=>ty_s_item-bind.
 
     result-kind = kind.
     IF mv_preview = abap_false.
       result-name = name_get( val ).
       " the binding of the attribute - none without a client
-      DATA(bind) = COND string( WHEN client IS BOUND THEN client->_bind( val ) ).
+
+      IF client IS BOUND.
+        temp95 = client->_bind( val ).
+      ELSE.
+        CLEAR temp95.
+      ENDIF.
+
+      bind = temp95.
       result-bind = bind.
     ELSEIF z2ui5_cl_cgui_context=>rtti_check_boolean( val ) = abap_true.
       " a preview shows a flag as it is - every other field empty
-      result-bind = COND #( WHEN val = abap_true THEN `true` ELSE `false` ).
+
+      IF val = abap_true.
+        temp96 = `true`.
+      ELSE.
+        temp96 = `false`.
+      ENDIF.
+      result-bind = temp96.
     ENDIF.
 
     result-text = text.
@@ -1323,14 +1520,29 @@ CLASS z2ui5_cl_cgui_selscreen IMPLEMENTATION.
         area  TYPE string,
         node  TYPE REF TO z2ui5_cl_ui5_view_builder,
       END OF ty_s_strip.
-    DATA lt_strip TYPE STANDARD TABLE OF ty_s_strip WITH EMPTY KEY.
+    TYPES temp3 TYPE STANDARD TABLE OF ty_s_strip WITH DEFAULT KEY.
+DATA lt_strip TYPE temp3.
     DATA lv_active TYPE string.
+    DATA temp97 LIKE LINE OF mt_item.
+    DATA lr_item LIKE REF TO temp97.
+      DATA lv_item_index LIKE sy-tabix.
+          DATA lo_bar TYPE REF TO z2ui5_cl_ui5_view_builder.
+              DATA ls_first LIKE LINE OF mt_item.
+            DATA lr_tab_bind TYPE REF TO z2ui5_cl_cgui_selscreen=>ty_s_tab_bind.
+          DATA temp98 TYPE string.
+          DATA temp99 TYPE ty_s_strip.
+          DATA lo_area LIKE lo_container.
+          DATA ls_strip TYPE ty_s_strip.
+          DATA ls_tc TYPE z2ui5_cl_cgui_selscreen=>ty_s_tc.
 
     lo_container = node.
 
-    LOOP AT mt_item REFERENCE INTO DATA(lr_item).
+
+
+    LOOP AT mt_item REFERENCE INTO lr_item.
       " read first - every ele( ) of the builder below appends and moves sy-tabix
-      DATA(lv_item_index) = sy-tabix.
+
+      lv_item_index = sy-tabix.
       CASE lr_item->kind.
 
         WHEN cs_kind-block_begin.
@@ -1352,7 +1564,8 @@ CLASS z2ui5_cl_cgui_selscreen IMPLEMENTATION.
         WHEN cs_kind-tabbed.
           CLEAR: lo_form, lo_line, lv_in_line, lv_tab, lt_strip, lv_active.
           lv_tabbed = lv_tabbed + 1.
-          DATA(lo_bar) = node->ele( `IconTabBar`
+
+          lo_bar = node->ele( `IconTabBar`
               )->a( n = `expandable` b = abap_false
               )->a( n = `class`      v = `sapUiResponsiveContentPadding` ).
           IF lr_item->name IS NOT INITIAL.
@@ -1362,7 +1575,8 @@ CLASS z2ui5_cl_cgui_selscreen IMPLEMENTATION.
               lv_active = to_upper( mi_gui->tabstrip_active( lr_item->name ) ).
             ENDIF.
             IF lv_active IS INITIAL.
-              LOOP AT mt_item INTO DATA(ls_first) FROM lv_item_index WHERE kind = cs_kind-tab.
+
+              LOOP AT mt_item INTO ls_first FROM lv_item_index WHERE kind = cs_kind-tab.
                 lv_active = ls_first-event.
                 EXIT.
               ENDLOOP.
@@ -1371,7 +1585,8 @@ CLASS z2ui5_cl_cgui_selscreen IMPLEMENTATION.
                 )->a( n = `select`      v = client->_event( val = cs_event-tab
                                                             arg = `${$source>/selectedKey}` ) ).
           ELSE.
-            READ TABLE mt_tab_bind REFERENCE INTO DATA(lr_tab_bind) WITH KEY index = lv_tabbed.
+
+            READ TABLE mt_tab_bind REFERENCE INTO lr_tab_bind WITH KEY index = lv_tabbed.
             IF sy-subrc = 0.
               lo_bar->a( n = `selectedKey` v = lr_tab_bind->bind ).
             ENDIF.
@@ -1385,19 +1600,30 @@ CLASS z2ui5_cl_cgui_selscreen IMPLEMENTATION.
             CONTINUE.
           ENDIF.
           lv_tab = lv_tab + 1.
+
+          IF lr_item->event IS NOT INITIAL.
+            temp98 = lr_item->event.
+          ELSE.
+            temp98 = |TAB{ lv_tab }|.
+          ENDIF.
           lo_container = lo_tab_items->ele( `IconTabFilter`
               )->a( n = `text` t = lr_item->text
-              )->a( n = `key`  t = COND #( WHEN lr_item->event IS NOT INITIAL THEN lr_item->event ELSE |TAB{ lv_tab }| ) ).
-          INSERT VALUE #( fcode = lr_item->event
-                          area  = lr_item->group
-                          node  = lo_container ) INTO TABLE lt_strip.
+              )->a( n = `key`  t = temp98 ).
+
+          CLEAR temp99.
+          temp99-fcode = lr_item->event.
+          temp99-area = lr_item->group.
+          temp99-node = lo_container.
+          INSERT temp99 INTO TABLE lt_strip.
 
         WHEN cs_kind-subscreen.
           CLEAR: lo_form, lo_line, lv_in_line.
           " on the tab that shows the area - the selected one where tabs
           " share it, as the classic pages in the program
-          DATA(lo_area) = lo_container.
-          READ TABLE lt_strip INTO DATA(ls_strip) WITH KEY area = lr_item->name fcode = lv_active.
+
+          lo_area = lo_container.
+
+          READ TABLE lt_strip INTO ls_strip WITH KEY area = lr_item->name fcode = lv_active.
           IF sy-subrc <> 0.
             READ TABLE lt_strip INTO ls_strip WITH KEY area = lr_item->name.
           ENDIF.
@@ -1422,7 +1648,8 @@ CLASS z2ui5_cl_cgui_selscreen IMPLEMENTATION.
 
         WHEN cs_kind-table.
           CLEAR: lo_form, lo_line, lv_in_line.
-          READ TABLE mt_tc INTO DATA(ls_tc) WITH KEY name = lr_item->name.
+
+          READ TABLE mt_tc INTO ls_tc WITH KEY name = lr_item->name.
           IF mi_gui IS BOUND AND sy-subrc = 0.
             mi_gui->tablecontrol_render( name    = lr_item->name
                                          title   = lr_item->text
@@ -1486,40 +1713,50 @@ CLASS z2ui5_cl_cgui_selscreen IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD help_check.
+    DATA temp10 TYPE xsdboolean.
 
     IF help = abap_false OR mv_preview = abap_true OR client IS NOT BOUND.
       RETURN.
     ENDIF.
     item-dtel = z2ui5_cl_cgui_context=>rtti_get_dtel_name( val ).
-    item-help = xsdbool( own = abap_true OR z2ui5_cl_cgui_context=>dtel_docu_check( item-dtel ) = abap_true ).
+
+    temp10 = boolc( own = abap_true OR z2ui5_cl_cgui_context=>dtel_docu_check( item-dtel ) = abap_true ).
+    item-help = temp10.
 
   ENDMETHOD.
 
   METHOD render_help.
+    DATA temp100 TYPE string.
 
     IF item-help = abap_false OR item-name IS INITIAL.
       RETURN.
     ENDIF.
+
+    temp100 = 'Help (F1)'(003).
     node->tag( `Button`
         )->a( n = `icon`    v = `sap-icon://sys-help`
         )->a( n = `type`    v = `Transparent`
-        )->a( n = `tooltip` t = CONV #( 'Help (F1)'(003) )
+        )->a( n = `tooltip` t = temp100
         )->a( n = `press`   v = client->_event( val = cs_event-help_request
                                                 arg = item-name ) ).
 
   ENDMETHOD.
 
   METHOD function_key.
+    DATA temp101 TYPE z2ui5_cl_cgui_selscreen=>ty_s_function_key.
 
     IF number < 1 OR number > 5.
       result = me.
       RETURN.
     ENDIF.
     DELETE mt_function_key WHERE number = number.
-    INSERT VALUE #( number = number
-                    ucomm  = |FC0{ number }|
-                    text   = text
-                    icon   = icon ) INTO TABLE mt_function_key.
+
+    CLEAR temp101.
+    temp101-number = number.
+    temp101-ucomm = |FC0{ number }|.
+    temp101-text = text.
+    temp101-icon = icon.
+    INSERT temp101 INTO TABLE mt_function_key.
     SORT mt_function_key BY number.
     result = me.
 
@@ -1556,6 +1793,7 @@ CLASS z2ui5_cl_cgui_selscreen IMPLEMENTATION.
   METHOD render_label.
 
     DATA lv_text TYPE string.
+    DATA temp11 TYPE xsdboolean.
 
     CASE item-kind.
       WHEN cs_kind-parameter.
@@ -1566,9 +1804,11 @@ CLASS z2ui5_cl_cgui_selscreen IMPLEMENTATION.
         lv_text = item-text.
     ENDCASE.
 
+
+    temp11 = boolc( item-required = abap_true OR item-recommended = abap_true ).
     node->tag( `Label`
         )->a( n = `text`     t = lv_text
-        )->a( n = `required` b = xsdbool( item-required = abap_true OR item-recommended = abap_true ) ).
+        )->a( n = `required` b = temp11 ).
     IF item-intensified = abap_true.
       node->a( n = `design` v = `Bold` ).
     ENDIF.
@@ -1576,13 +1816,27 @@ CLASS z2ui5_cl_cgui_selscreen IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD render_control.
+      DATA temp102 TYPE string.
+      DATA temp12 TYPE xsdboolean.
+        DATA temp13 TYPE xsdboolean.
+        DATA lv_ucomm TYPE string.
+          DATA temp103 TYPE string.
+        DATA temp14 TYPE xsdboolean.
 
     IF inline = abap_true AND ( item-kind = cs_kind-select
         OR ( item-kind = cs_kind-parameter AND item-control <> cs_control-checkbox ) ).
+
+      IF item-intensified = abap_true.
+        temp102 = `Bold`.
+      ELSE.
+        temp102 = `Standard`.
+      ENDIF.
+
+      temp12 = boolc( item-required = abap_true OR item-recommended = abap_true ).
       node->tag( `Label`
           )->a( n = `text`     t = item-text
-          )->a( n = `required` b = xsdbool( item-required = abap_true OR item-recommended = abap_true )
-          )->a( n = `design`   v = COND #( WHEN item-intensified = abap_true THEN `Bold` ELSE `Standard` )
+          )->a( n = `required` b = temp12
+          )->a( n = `design`   v = temp102
           )->a( n = `class`    v = `sapUiSmallMarginBegin sapUiTinyMarginEnd` ).
     ENDIF.
 
@@ -1597,17 +1851,20 @@ CLASS z2ui5_cl_cgui_selscreen IMPLEMENTATION.
                               item = item ).
 
       WHEN cs_kind-radiobutton.
+
+        temp13 = boolc( item-read_only = abap_false ).
         node->tag( `RadioButton`
             )->a( n = `text`      t = item-text
             )->a( n = `groupName` t = item-group
             )->a( n = `selected`  v = item-bind
-            )->a( n = `editable`  b = xsdbool( item-read_only = abap_false ) ).
+            )->a( n = `editable`  b = temp13 ).
         " only the buttons not selected now raise the user command: UI5 fires
         " select at the button it deselects before that button's value has
         " reached the model, and that roundtrip would carry two selected
         " buttons. The view is rendered anew after every roundtrip, so the
         " wiring follows the selection
-        DATA(lv_ucomm) = group_user_command( item-group ).
+
+        lv_ucomm = group_user_command( item-group ).
         IF lv_ucomm IS NOT INITIAL AND radio_selected( item ) = abap_false.
           node->a( n = `select` v = client->_event( lv_ucomm ) ).
         ENDIF.
@@ -1615,9 +1872,15 @@ CLASS z2ui5_cl_cgui_selscreen IMPLEMENTATION.
       WHEN cs_kind-comment.
         " COMMENT ... FOR FIELD - the label of the field
         IF item-for_field IS NOT INITIAL OR item-intensified = abap_true.
+
+          IF item-intensified = abap_true.
+            temp103 = `Bold`.
+          ELSE.
+            temp103 = `Standard`.
+          ENDIF.
           node->tag( `Label`
               )->a( n = `text`   t = item-text
-              )->a( n = `design` v = COND #( WHEN item-intensified = abap_true THEN `Bold` ELSE `Standard` ) ).
+              )->a( n = `design` v = temp103 ).
           IF item-for_field IS NOT INITIAL.
             node->a( n = `labelFor` v = field_id( item-for_field ) ).
           ENDIF.
@@ -1627,10 +1890,12 @@ CLASS z2ui5_cl_cgui_selscreen IMPLEMENTATION.
         ENDIF.
 
       WHEN cs_kind-button.
+
+        temp14 = boolc( item-read_only = abap_false ).
         node->tag( `Button`
             )->a( n = `text`    t = item-text
             )->a( n = `icon`    v = item-icon
-            )->a( n = `enabled` b = xsdbool( item-read_only = abap_false )
+            )->a( n = `enabled` b = temp14
             )->a( n = `press`   v = client->_event( item-event ) ).
 
     ENDCASE.
@@ -1638,14 +1903,24 @@ CLASS z2ui5_cl_cgui_selscreen IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD render_parameter.
+        DATA temp15 TYPE xsdboolean.
+        DATA temp16 TYPE xsdboolean.
+        DATA temp17 TYPE xsdboolean.
+        DATA lo_input TYPE REF TO z2ui5_cl_ui5_view_builder.
+        DATA temp18 TYPE xsdboolean.
+        DATA ls_history TYPE z2ui5_cl_cgui_selscreen=>ty_s_history.
+          DATA lo_items TYPE REF TO z2ui5_cl_ui5_view_builder.
+          DATA lv_value LIKE LINE OF ls_history-values.
 
     CASE item-control.
 
       WHEN cs_control-checkbox.
+
+        temp15 = boolc( item-read_only = abap_false ).
         node->tag( `CheckBox`
             )->a( n = `text`     t = item-text
             )->a( n = `selected` v = item-bind
-            )->a( n = `editable` b = xsdbool( item-read_only = abap_false ) ).
+            )->a( n = `editable` b = temp15 ).
         render_id( node = node
                    item = item ).
         IF item-user_command IS NOT INITIAL.
@@ -1653,24 +1928,28 @@ CLASS z2ui5_cl_cgui_selscreen IMPLEMENTATION.
         ENDIF.
 
       WHEN cs_control-date.
+
+        temp16 = boolc( item-read_only = abap_false ).
         node->tag( `DatePicker`
             )->a( n = `value`         v = item-bind
             )->a( n = `valueFormat`   v = `yyyy-MM-dd`
             )->a( n = `displayFormat` v = `medium`
             )->a( n = `required`      b = item-required
-            )->a( n = `editable`      b = xsdbool( item-read_only = abap_false ) ).
+            )->a( n = `editable`      b = temp16 ).
         render_id( node = node
                    item = item ).
         render_state( node = node
                       item = item ).
 
       WHEN cs_control-time.
+
+        temp17 = boolc( item-read_only = abap_false ).
         node->tag( `TimePicker`
             )->a( n = `value`         v = item-bind
             )->a( n = `valueFormat`   v = `HH:mm:ss`
             )->a( n = `displayFormat` v = `HH:mm:ss`
             )->a( n = `required`      b = item-required
-            )->a( n = `editable`      b = xsdbool( item-read_only = abap_false ) ).
+            )->a( n = `editable`      b = temp17 ).
         render_id( node = node
                    item = item ).
         render_state( node = node
@@ -1682,10 +1961,13 @@ CLASS z2ui5_cl_cgui_selscreen IMPLEMENTATION.
 
       WHEN OTHERS.
         " ele( ): the input itself - its suggestions are children of it
-        DATA(lo_input) = node->ele( `Input`
+
+
+        temp18 = boolc( item-read_only = abap_false ).
+        lo_input = node->ele( `Input`
             )->a( n = `value`    v = item-bind
             )->a( n = `required` b = item-required
-            )->a( n = `editable` b = xsdbool( item-read_only = abap_false ) ).
+            )->a( n = `editable` b = temp18 ).
         render_id( node = node
                    item = item ).
         render_state( node = node
@@ -1707,12 +1989,15 @@ CLASS z2ui5_cl_cgui_selscreen IMPLEMENTATION.
                                                                arg = item-name ) ).
         ENDIF.
         " the last entries of the field - suggested from its first character
-        READ TABLE mt_history INTO DATA(ls_history) WITH KEY name = item-name.
+
+        READ TABLE mt_history INTO ls_history WITH KEY name = item-name.
         IF sy-subrc = 0 AND item-invisible = abap_false AND item-read_only = abap_false.
           node->a( n = `xmlns:core`     v = `sap.ui.core` ).
           node->a( n = `showSuggestion` b = abap_true ).
-          DATA(lo_items) = lo_input->ele( `suggestionItems` ).
-          LOOP AT ls_history-values INTO DATA(lv_value).
+
+          lo_items = lo_input->ele( `suggestionItems` ).
+
+          LOOP AT ls_history-values INTO lv_value.
             lo_items->tag( n = `Item` ns = `core`
                 )->a( n = `key`  t = lv_value
                 )->a( n = `text` t = lv_value ).
@@ -1727,11 +2012,18 @@ CLASS z2ui5_cl_cgui_selscreen IMPLEMENTATION.
 
     " every attribute before the first item: a( ) reaches the Select only
     " while it has no children
-    DATA(lo_select) = node->ele( `Select`
+    DATA lo_select TYPE REF TO z2ui5_cl_ui5_view_builder.
+    DATA temp19 TYPE xsdboolean.
+    DATA lo_items TYPE REF TO z2ui5_cl_ui5_view_builder.
+    DATA temp104 TYPE z2ui5_cl_cgui_selscreen=>ty_t_value.
+    DATA temp15 LIKE LINE OF temp104.
+    DATA lr_value LIKE REF TO temp15.
+    temp19 = boolc( item-read_only = abap_false ).
+    lo_select = node->ele( `Select`
         )->a( n = `xmlns:core`     v = `sap.ui.core`
         )->a( n = `selectedKey`    v = item-bind
         )->a( n = `forceSelection` b = abap_false
-        )->a( n = `editable`       b = xsdbool( item-read_only = abap_false ) ).
+        )->a( n = `editable`       b = temp19 ).
     " no required: Select has it from UI5 1.74 on, the floor is 1.71 - the
     " label marks an obligatory list box, the backend checks it
     render_id( node = lo_select
@@ -1746,11 +2038,16 @@ CLASS z2ui5_cl_cgui_selscreen IMPLEMENTATION.
     ENDIF.
 
     " a blank entry first, as the classic listbox has one
-    DATA(lo_items) = lo_select->ele( `items` ).
+
+    lo_items = lo_select->ele( `items` ).
     lo_items->tag( n = `Item` ns = `core`
         )->a( n = `key`  v = ``
         )->a( n = `text` v = `` ).
-    LOOP AT listbox_values( item ) REFERENCE INTO DATA(lr_value).
+
+    temp104 = listbox_values( item ).
+
+
+    LOOP AT temp104 REFERENCE INTO lr_value.
       lo_items->tag( n = `Item` ns = `core`
           )->a( n = `key`  t = lr_value->key
           )->a( n = `text` t = lr_value->text ).
@@ -1766,6 +2063,8 @@ CLASS z2ui5_cl_cgui_selscreen IMPLEMENTATION.
     DATA lv_event TYPE string VALUE cs_event-select_option.
     DATA lo_box   TYPE REF TO z2ui5_cl_ui5_view_builder.
     DATA lo_input TYPE REF TO z2ui5_cl_ui5_view_builder.
+    DATA temp20 TYPE xsdboolean.
+    DATA temp21 TYPE xsdboolean.
 
     IF item-low_bind IS NOT INITIAL.
       render_range_input( node = node
@@ -1785,9 +2084,11 @@ CLASS z2ui5_cl_cgui_selscreen IMPLEMENTATION.
       lo_input = node->tag( `Input` ).
     ENDIF.
 
+
+    temp20 = boolc( item-read_only = abap_false ).
     lo_input->a( n = `value`            t = item-value
         )->a( n = `required`         b = item-required
-        )->a( n = `editable`         b = xsdbool( item-read_only = abap_false )
+        )->a( n = `editable`         b = temp20
         )->a( n = `showValueHelp`    b = abap_true
         )->a( n = `valueHelpOnly`    b = abap_true
         )->a( n = `valueHelpRequest` v = client->_event( val = lv_event
@@ -1805,10 +2106,12 @@ CLASS z2ui5_cl_cgui_selscreen IMPLEMENTATION.
         )->tag( `FlexItemData`
         )->a( n = `growFactor` v = `1` ).
 
+
+    temp21 = boolc( item-read_only = abap_false ).
     lo_box->tag( `Button`
         )->a( n = `icon`    v = `sap-icon://filter`
         )->a( n = `tooltip` v = `Multiple selection`
-        )->a( n = `enabled` b = xsdbool( item-read_only = abap_false )
+        )->a( n = `enabled` b = temp21
         )->a( n = `class`   v = `sapUiTinyMarginBegin`
         )->a( n = `press`   v = client->_event( val = cs_event-select_option
                                                 arg = item-name ) ).
@@ -1820,7 +2123,12 @@ CLASS z2ui5_cl_cgui_selscreen IMPLEMENTATION.
     " the classic select-option: from, to and the button of the multiple
     " selection - emphasized while the range holds more than its first line
     " on a phone from and to wrap onto lines of their own
-    DATA(lo_box) = node->ele( `HBox`
+    DATA lo_box TYPE REF TO z2ui5_cl_ui5_view_builder.
+      DATA temp105 TYPE string.
+      DATA temp106 TYPE string.
+      DATA temp16 TYPE string.
+      DATA temp22 TYPE xsdboolean.
+    lo_box = node->ele( `HBox`
         )->a( n = `width`      v = `100%`
         )->a( n = `wrap`       v = `Wrap`
         )->a( n = `alignItems` v = `Center` ).
@@ -1832,8 +2140,10 @@ CLASS z2ui5_cl_cgui_selscreen IMPLEMENTATION.
                         help = item-value_help ).
 
     IF item-no_intervals = abap_false.
+
+      temp105 = 'to'(001).
       lo_box->tag( `Text`
-          )->a( n = `text`  t = CONV #( 'to'(001) )
+          )->a( n = `text`  t = temp105
           )->a( n = `class` v = `sapUiTinyMarginBeginEnd` ).
       render_range_field( node = lo_box
                           item = item
@@ -1844,11 +2154,21 @@ CLASS z2ui5_cl_cgui_selscreen IMPLEMENTATION.
     ENDIF.
 
     IF item-no_extension = abap_false.
+
+      temp106 = 'Multiple selection'(002).
+
+      IF item-lines > 1.
+        temp16 = `Emphasized`.
+      ELSE.
+        temp16 = `Default`.
+      ENDIF.
+
+      temp22 = boolc( item-read_only = abap_false ).
       lo_box->tag( `Button`
           )->a( n = `icon`    v = `sap-icon://filter`
-          )->a( n = `type`    v = COND #( WHEN item-lines > 1 THEN `Emphasized` ELSE `Default` )
-          )->a( n = `tooltip` t = CONV #( 'Multiple selection'(002) )
-          )->a( n = `enabled` b = xsdbool( item-read_only = abap_false )
+          )->a( n = `type`    v = temp16
+          )->a( n = `tooltip` t = temp106
+          )->a( n = `enabled` b = temp22
           )->a( n = `class`   v = `sapUiTinyMarginBegin`
           )->a( n = `press`   v = client->_event( val = cs_event-select_option
                                                   arg = item-name ) ).
@@ -1859,6 +2179,11 @@ CLASS z2ui5_cl_cgui_selscreen IMPLEMENTATION.
   METHOD render_range_field.
 
     DATA lo_field TYPE REF TO z2ui5_cl_ui5_view_builder.
+          DATA temp107 TYPE string_table.
+          DATA temp17 TYPE string_table.
+          DATA temp4 TYPE string_table.
+    DATA temp23 TYPE xsdboolean.
+    DATA temp1 TYPE xsdboolean.
 
     " the buffer holds the values as the range does, as text - yyyyMMdd
     " for a date and HHmmss for a time
@@ -1881,17 +2206,32 @@ CLASS z2ui5_cl_cgui_selscreen IMPLEMENTATION.
         ENDIF.
         IF help = abap_true.
           " the event names the field - and HIGH for the upper limit
+
+          CLEAR temp107.
+          INSERT item-name INTO TABLE temp107.
+
+          CLEAR temp17.
+          INSERT item-name INTO TABLE temp17.
+          INSERT part INTO TABLE temp17.
+
+          IF part IS INITIAL.
+            temp4 = temp107.
+          ELSE.
+            temp4 = temp17.
+          ENDIF.
           lo_field->a( n = `showValueHelp`    b = abap_true
               )->a( n = `valueHelpRequest` v = client->_event( val   = cs_event-value_request
-                                                               t_arg = COND #( WHEN part IS INITIAL
-                                                                               THEN VALUE #( ( item-name ) )
-                                                                               ELSE VALUE #( ( item-name ) ( part ) ) ) ) ).
+                                                               t_arg = temp4 ) ).
         ENDIF.
     ENDCASE.
 
+
+    temp23 = boolc( item-required = abap_true AND id = field_id( item-name ) ).
+
+    temp1 = boolc( item-read_only = abap_false ).
     lo_field->a( n = `id`       t = id
-        )->a( n = `required` b = xsdbool( item-required = abap_true AND id = field_id( item-name ) )
-        )->a( n = `editable` b = xsdbool( item-read_only = abap_false ) ).
+        )->a( n = `required` b = temp23
+        )->a( n = `editable` b = temp1 ).
     IF id = field_id( item-name ).
       render_state( node = lo_field
                     item = item ).
@@ -1932,7 +2272,9 @@ CLASS z2ui5_cl_cgui_selscreen IMPLEMENTATION.
 
   METHOD group_user_command.
 
-    LOOP AT mt_item REFERENCE INTO DATA(lr_item)
+    DATA temp109 LIKE LINE OF mt_item.
+    DATA lr_item LIKE REF TO temp109.
+    LOOP AT mt_item REFERENCE INTO lr_item
          WHERE kind = cs_kind-radiobutton
            AND group = group
            AND user_command IS NOT INITIAL.
@@ -1944,14 +2286,17 @@ CLASS z2ui5_cl_cgui_selscreen IMPLEMENTATION.
 
   METHOD stringify.
 
-    DATA(view) = z2ui5_cl_ui5_view_builder=>factory(
+    DATA view TYPE REF TO z2ui5_cl_ui5_view_builder.
+    DATA page TYPE REF TO z2ui5_cl_ui5_view_builder.
+    view = z2ui5_cl_ui5_view_builder=>factory(
         )->ele( n = `View` ns = `mvc`
             )->a( n = `xmlns`        v = `sap.m`
             )->a( n = `xmlns:mvc`    v = `sap.ui.core.mvc`
             )->a( n = `displayBlock` v = `true`
             )->a( n = `height`       v = `100%` ).
 
-    DATA(page) = view->ele( `Page`
+
+    page = view->ele( `Page`
         )->a( n = `title` t = title ).
 
     render( page ).

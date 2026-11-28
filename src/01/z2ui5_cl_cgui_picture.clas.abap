@@ -79,10 +79,14 @@ ENDCLASS.
 CLASS z2ui5_cl_cgui_picture IMPLEMENTATION.
 
   METHOD constructor.
+    DATA temp1 TYPE z2ui5_if_cgui_gui=>ty_s_control.
 
     super->constructor( ).
-    IF add( VALUE #( kind   = z2ui5_if_cgui_gui=>cs_kind-picture
-                     parent = id_of( parent ) ) ) = abap_false.
+
+    CLEAR temp1.
+    temp1-kind = z2ui5_if_cgui_gui=>cs_kind-picture.
+    temp1-parent = id_of( parent ).
+    IF add( temp1 ) = abap_false.
       RAISE error.
     ENDIF.
 
@@ -90,8 +94,12 @@ CLASS z2ui5_cl_cgui_picture IMPLEMENTATION.
 
   METHOD load_picture_from_url.
 
-    DATA(ls_control) = get( ).
-    ls_control-url = z2ui5_cl_cgui_frontend=>url_content( condense( CONV string( url ) ) ).
+    DATA ls_control TYPE z2ui5_if_cgui_gui=>ty_s_control.
+    DATA temp2 TYPE string.
+    ls_control = get( ).
+
+    temp2 = url.
+    ls_control-url = z2ui5_cl_cgui_frontend=>url_content( condense( temp2 ) ).
     put( ls_control ).
     result = 1.
 
@@ -105,15 +113,20 @@ CLASS z2ui5_cl_cgui_picture IMPLEMENTATION.
 
   METHOD load_picture_from_sap_icons.
 
-    DATA(ls_control) = get( ).
-    ls_control-url = condense( CONV string( icon ) ).
+    DATA ls_control TYPE z2ui5_if_cgui_gui=>ty_s_control.
+    DATA temp3 TYPE string.
+    ls_control = get( ).
+
+    temp3 = icon.
+    ls_control-url = condense( temp3 ).
     put( ls_control ).
 
   ENDMETHOD.
 
   METHOD set_display_mode.
 
-    DATA(ls_control) = get( ).
+    DATA ls_control TYPE z2ui5_if_cgui_gui=>ty_s_control.
+    ls_control = get( ).
     ls_control-mode = display_mode.
     put( ls_control ).
 
@@ -121,7 +134,8 @@ CLASS z2ui5_cl_cgui_picture IMPLEMENTATION.
 
   METHOD clear_picture.
 
-    DATA(ls_control) = get( ).
+    DATA ls_control TYPE z2ui5_if_cgui_gui=>ty_s_control.
+    ls_control = get( ).
     CLEAR ls_control-url.
     put( ls_control ).
 

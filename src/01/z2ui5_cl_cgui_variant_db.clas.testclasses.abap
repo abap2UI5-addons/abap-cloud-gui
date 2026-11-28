@@ -43,36 +43,76 @@ CLASS ltcl_test IMPLEMENTATION.
 
   METHOD delete_test_rows.
 
-    DATA(lv_report) = CONV z2ui5_t_19-report( cv_report ).
-    DELETE FROM z2ui5_t_19 WHERE report = @lv_report.
+    DATA temp1 TYPE z2ui5_t_19-report.
+    DATA lv_report LIKE temp1.
+    temp1 = cv_report.
+
+    lv_report = temp1.
+    DELETE FROM z2ui5_t_19 WHERE report = lv_report.
     " the store commits its writes, so the cleanup commits too
     COMMIT WORK.
 
   ENDMETHOD.
 
   METHOD variant.
+    DATA temp2 TYPE z2ui5_cl_cgui_variant=>ty_t_value.
+    DATA temp3 LIKE LINE OF temp2.
+    DATA temp4 TYPE string_table.
 
     result-name = name.
     result-text = `Lufthansa in the first quarter`.
-    result-values = VALUE #( ( name = `P_CARRID` kind = z2ui5_cl_cgui_variant=>cs_kind-parameter
-                               sign = `I` option = `EQ` low = `LH` high = `` )
-                             ( name = `S_DATE` kind = z2ui5_cl_cgui_variant=>cs_kind-select_option
-                               sign = `I` option = `BT` low = `20260101` high = `20260331` ) ).
-    result-protect = VALUE #( ( `P_CARRID` ) ).
+
+    CLEAR temp2.
+
+    temp3-name = `P_CARRID`.
+    temp3-kind = z2ui5_cl_cgui_variant=>cs_kind-parameter.
+    temp3-sign = `I`.
+    temp3-option = `EQ`.
+    temp3-low = `LH`.
+    temp3-high = ``.
+    INSERT temp3 INTO TABLE temp2.
+    temp3-name = `S_DATE`.
+    temp3-kind = z2ui5_cl_cgui_variant=>cs_kind-select_option.
+    temp3-sign = `I`.
+    temp3-option = `BT`.
+    temp3-low = `20260101`.
+    temp3-high = `20260331`.
+    INSERT temp3 INTO TABLE temp2.
+    result-values = temp2.
+
+    CLEAR temp4.
+    INSERT `P_CARRID` INTO TABLE temp4.
+    result-protect = temp4.
 
   ENDMETHOD.
 
   METHOD save_load_delete.
 
-    DATA(ls_variant) = variant( `Q1` ).
+    DATA ls_variant TYPE z2ui5_cl_cgui_variant=>ty_s_variant.
+    DATA lt_variant TYPE z2ui5_cl_cgui_variant=>ty_t_variant.
+    DATA ls_loaded LIKE LINE OF lt_variant.
+    FIELD-SYMBOLS <temp1> LIKE LINE OF lt_variant.
+    DATA temp2 LIKE sy-tabix.
+    DATA temp6 TYPE string.
+    ls_variant = variant( `Q1` ).
     ls_variant-shared = abap_true.
     mo_store->save( report  = cv_report
                     variant = ls_variant ).
 
-    DATA(lt_variant) = mo_store->load( cv_report ).
+
+    lt_variant = mo_store->load( cv_report ).
     cl_abap_unit_assert=>assert_equals( act = lines( lt_variant )
                                         exp = 1 ).
-    DATA(ls_loaded) = lt_variant[ 1 ].
+
+
+
+    temp2 = sy-tabix.
+    READ TABLE lt_variant INDEX 1 ASSIGNING <temp1>.
+    sy-tabix = temp2.
+    IF sy-subrc <> 0.
+      ASSERT 1 = 0.
+    ENDIF.
+    ls_loaded = <temp1>.
     cl_abap_unit_assert=>assert_equals( act = ls_loaded-name
                                         exp = `Q1` ).
     cl_abap_unit_assert=>assert_equals( act = ls_loaded-text
@@ -81,8 +121,10 @@ CLASS ltcl_test IMPLEMENTATION.
                                         exp = ls_variant-values ).
     cl_abap_unit_assert=>assert_equals( act = ls_loaded-protect
                                         exp = ls_variant-protect ).
+
+    temp6 = sy-uname.
     cl_abap_unit_assert=>assert_equals( act = ls_loaded-owner
-                                        exp = CONV string( sy-uname ) ).
+                                        exp = temp6 ).
     cl_abap_unit_assert=>assert_true( ls_loaded-shared ).
     cl_abap_unit_assert=>assert_true( mo_store->check_sharing( ) ).
 
@@ -98,7 +140,23 @@ CLASS ltcl_test IMPLEMENTATION.
 
     " a protected, shared variant of another user and a private one,
     " written past the store
-    DATA(ls_variant) = variant( `THEIRS` ).
+    DATA ls_variant TYPE z2ui5_cl_cgui_variant=>ty_s_variant.
+    DATA lt_variant TYPE z2ui5_cl_cgui_variant=>ty_t_variant.
+    FIELD-SYMBOLS <temp7> LIKE LINE OF lt_variant.
+    DATA temp8 LIKE sy-tabix.
+    DATA temp9 TYPE z2ui5_t_19-report.
+    DATA lv_report LIKE temp9.
+    DATA temp10 TYPE z2ui5_t_19-variant.
+    DATA lv_private LIKE temp10.
+    DATA lv_owner TYPE z2ui5_t_19-owner.
+    DATA ls_open TYPE z2ui5_cl_cgui_variant=>ty_s_variant.
+    DATA temp11 TYPE z2ui5_t_19-variant.
+    DATA lv_open LIKE temp11.
+DATA BEGIN OF ls_saved.
+DATA owner TYPE z2ui5_t_19-owner.
+DATA shared TYPE z2ui5_t_19-shared.
+DATA END OF ls_saved.
+    ls_variant = variant( `THEIRS` ).
     ls_db-report    = cv_report.
     ls_db-owner     = `ZZ_OTHER`.
     ls_db-shared    = abap_true.
@@ -109,16 +167,25 @@ CLASS ltcl_test IMPLEMENTATION.
                                   protect = ls_variant-protect
                                   hide    = ls_variant-hide
                            RESULT XML ls_db-data.
-    MODIFY z2ui5_t_19 FROM @ls_db.
+    MODIFY z2ui5_t_19 FROM ls_db.
     ls_db-variant   = `PRIVATE`.
     ls_db-shared    = abap_false.
     ls_db-protected = abap_false.
-    MODIFY z2ui5_t_19 FROM @ls_db.
+    MODIFY z2ui5_t_19 FROM ls_db.
 
-    DATA(lt_variant) = mo_store->load( cv_report ).
+
+    lt_variant = mo_store->load( cv_report ).
     cl_abap_unit_assert=>assert_equals( act = lines( lt_variant )
                                         exp = 1 ).
-    cl_abap_unit_assert=>assert_equals( act = lt_variant[ 1 ]-name
+
+
+    temp8 = sy-tabix.
+    READ TABLE lt_variant INDEX 1 ASSIGNING <temp7>.
+    sy-tabix = temp8.
+    IF sy-subrc <> 0.
+      ASSERT 1 = 0.
+    ENDIF.
+    cl_abap_unit_assert=>assert_equals( act = <temp7>-name
                                         exp = `THEIRS` ).
 
     TRY.
@@ -150,11 +217,18 @@ CLASS ltcl_test IMPLEMENTATION.
       CATCH z2ui5_cx_cgui_error ##NO_HANDLER.
         " refused is fine as well - the row must stay either way
     ENDTRY.
-    DATA(lv_report) = CONV z2ui5_t_19-report( cv_report ).
-    DATA(lv_private) = CONV z2ui5_t_19-variant( `PRIVATE` ).
-    SELECT SINGLE owner FROM z2ui5_t_19
-      WHERE report = @lv_report AND variant = @lv_private
-      INTO @DATA(lv_owner).
+
+    temp9 = cv_report.
+
+    lv_report = temp9.
+
+    temp10 = `PRIVATE`.
+
+    lv_private = temp10.
+
+    SELECT SINGLE owner FROM z2ui5_t_19 INTO lv_owner
+      WHERE report = lv_report AND variant = lv_private
+      .
     cl_abap_unit_assert=>assert_subrc( exp = 0 ).
     cl_abap_unit_assert=>assert_equals( act = lv_owner
                                         exp = `ZZ_OTHER` ).
@@ -164,15 +238,20 @@ CLASS ltcl_test IMPLEMENTATION.
     ls_db-variant   = `OPEN`.
     ls_db-shared    = abap_true.
     ls_db-protected = abap_false.
-    MODIFY z2ui5_t_19 FROM @ls_db.
-    DATA(ls_open) = variant( `OPEN` ).
+    MODIFY z2ui5_t_19 FROM ls_db.
+
+    ls_open = variant( `OPEN` ).
     ls_open-shared = abap_false.
     mo_store->save( report  = cv_report
                     variant = ls_open ).
-    DATA(lv_open) = CONV z2ui5_t_19-variant( `OPEN` ).
-    SELECT SINGLE owner, shared FROM z2ui5_t_19
-      WHERE report = @lv_report AND variant = @lv_open
-      INTO @DATA(ls_saved).
+
+    temp11 = `OPEN`.
+
+    lv_open = temp11.
+
+    SELECT SINGLE owner shared FROM z2ui5_t_19 INTO ls_saved
+      WHERE report = lv_report AND variant = lv_open
+      .
     cl_abap_unit_assert=>assert_subrc( exp = 0 ).
     cl_abap_unit_assert=>assert_equals( act = ls_saved-owner
                                         exp = `ZZ_OTHER` ).

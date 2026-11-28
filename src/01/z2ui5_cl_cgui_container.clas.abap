@@ -203,7 +203,8 @@ CLASS z2ui5_cl_cgui_container DEFINITION PUBLIC
     " PROTECTED, not PRIVATE: the object is kept with the report between
     " the roundtrips, and the transpiled runtime restores PROTECTED
     " attributes of the draft but not PRIVATE ones
-    DATA mt_cell TYPE STANDARD TABLE OF REF TO z2ui5_cl_cgui_container WITH EMPTY KEY.
+    TYPES temp1_c481432a78 TYPE STANDARD TABLE OF REF TO z2ui5_cl_cgui_container WITH DEFAULT KEY.
+DATA mt_cell TYPE temp1_c481432a78.
 
   PRIVATE SECTION.
 ENDCLASS.
@@ -212,19 +213,24 @@ ENDCLASS.
 CLASS z2ui5_cl_cgui_container IMPLEMENTATION.
 
   METHOD constructor.
+    DATA temp1 TYPE z2ui5_if_cgui_gui=>ty_s_control.
+    DATA temp2 TYPE xsdboolean.
 
     super->constructor( ).
-    IF add( VALUE #( kind    = z2ui5_if_cgui_gui=>cs_kind-container
-                     parent  = id_of( parent )
-                     name    = to_upper( condense( container_name ) )
-                     dynnr   = condense( dynnr )
-                     side    = side
-                     rows    = rows
-                     columns = columns
-                     caption = caption
-                     " cl_gui_dialogbox_container: a box of its own on the screen
-                     dialog  = xsdbool( width IS SUPPLIED OR height IS SUPPLIED OR top IS SUPPLIED
-                                     OR left IS SUPPLIED ) ) ) = abap_false.
+
+    CLEAR temp1.
+    temp1-kind = z2ui5_if_cgui_gui=>cs_kind-container.
+    temp1-parent = id_of( parent ).
+    temp1-name = to_upper( condense( container_name ) ).
+    temp1-dynnr = condense( dynnr ).
+    temp1-side = side.
+    temp1-rows = rows.
+    temp1-columns = columns.
+    temp1-caption = caption.
+
+    temp2 = boolc( width IS SUPPLIED OR height IS SUPPLIED OR top IS SUPPLIED OR left IS SUPPLIED ).
+    temp1-dialog = temp2.
+    IF add( temp1 ) = abap_false.
       RAISE cntl_error.
     ENDIF.
 
@@ -233,15 +239,20 @@ CLASS z2ui5_cl_cgui_container IMPLEMENTATION.
   METHOD get_container.
 
     " the same cell is the same container
-    LOOP AT mt_cell INTO DATA(lo_cell).
-      DATA(ls_cell) = lo_cell->get( ).
+    DATA lo_cell LIKE LINE OF mt_cell.
+      DATA ls_cell TYPE z2ui5_if_cgui_gui=>ty_s_control.
+    DATA ls_control TYPE z2ui5_if_cgui_gui=>ty_s_control.
+    LOOP AT mt_cell INTO lo_cell.
+
+      ls_cell = lo_cell->get( ).
       IF ls_cell-row = row AND ls_cell-column = column.
         result = lo_cell.
         RETURN.
       ENDIF.
     ENDLOOP.
-    result = NEW #( parent = me ).
-    DATA(ls_control) = result->get( ).
+    CREATE OBJECT result EXPORTING parent = me.
+
+    ls_control = result->get( ).
     ls_control-row = row.
     ls_control-column = column.
     result->put( ls_control ).
@@ -272,7 +283,8 @@ CLASS z2ui5_cl_cgui_container IMPLEMENTATION.
 
   METHOD set_caption.
 
-    DATA(ls_control) = get( ).
+    DATA ls_control TYPE z2ui5_if_cgui_gui=>ty_s_control.
+    ls_control = get( ).
     ls_control-caption = caption.
     put( ls_control ).
 
@@ -295,7 +307,8 @@ CLASS z2ui5_cl_cgui_container IMPLEMENTATION.
 
   METHOD link.
 
-    DATA(ls_control) = get( ).
+    DATA ls_control TYPE z2ui5_if_cgui_gui=>ty_s_control.
+    ls_control = get( ).
     IF dynnr IS SUPPLIED.
       ls_control-dynnr = condense( dynnr ).
     ENDIF.

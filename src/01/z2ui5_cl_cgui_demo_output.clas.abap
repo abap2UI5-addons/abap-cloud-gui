@@ -96,7 +96,7 @@ CLASS z2ui5_cl_cgui_demo_output DEFINITION PUBLIC FINAL CREATE PRIVATE.
     " the widest a column of a table gets - the rest of a value is cut
     CONSTANTS cv_max_width TYPE i VALUE 40.
 
-    TYPES ty_t_width TYPE STANDARD TABLE OF i WITH EMPTY KEY.
+    TYPES ty_t_width TYPE STANDARD TABLE OF i WITH DEFAULT KEY.
 
     CLASS-DATA go_default TYPE REF TO z2ui5_cl_cgui_demo_output.
 
@@ -155,14 +155,14 @@ CLASS z2ui5_cl_cgui_demo_output IMPLEMENTATION.
 
   METHOD new.
 
-    output = NEW z2ui5_cl_cgui_demo_output( ).
+    CREATE OBJECT output TYPE z2ui5_cl_cgui_demo_output.
 
   ENDMETHOD.
 
   METHOD default.
 
     IF go_default IS NOT BOUND.
-      go_default = NEW #( ).
+      CREATE OBJECT go_default.
     ENDIF.
     result = go_default.
 
@@ -278,6 +278,12 @@ CLASS z2ui5_cl_cgui_demo_output IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD z2ui5_if_cgui_demo_output~write.
+    DATA lo_type TYPE REF TO cl_abap_typedescr.
+        DATA temp1 TYPE ty_t_width.
+        DATA lt_width LIKE temp1.
+        DATA temp2 TYPE string_table.
+        DATA lv_column LIKE LINE OF temp2.
+          FIELD-SYMBOLS <value> TYPE any.
 
     output = me.
     IF name IS NOT INITIAL.
@@ -286,14 +292,22 @@ CLASS z2ui5_cl_cgui_demo_output IMPLEMENTATION.
       list( )->new_line( ).
     ENDIF.
 
-    DATA(lo_type) = cl_abap_typedescr=>describe_by_data( data ).
+
+    lo_type = cl_abap_typedescr=>describe_by_data( data ).
     CASE lo_type->kind.
       WHEN cl_abap_typedescr=>kind_table.
         write_table( data ).
       WHEN cl_abap_typedescr=>kind_struct.
-        DATA(lt_width) = VALUE ty_t_width( ).
-        LOOP AT columns_of( data ) INTO DATA(lv_column).
-          ASSIGN COMPONENT sy-tabix OF STRUCTURE data TO FIELD-SYMBOL(<value>).
+
+        CLEAR temp1.
+
+        lt_width = temp1.
+
+        temp2 = columns_of( data ).
+
+        LOOP AT temp2 INTO lv_column.
+
+          ASSIGN COMPONENT sy-tabix OF STRUCTURE data TO <value>.
           APPEND nmin( val1 = cv_max_width
                        val2 = nmax( val1 = strlen( lv_column )
                                     val2 = strlen( text_of( <value> ) ) ) ) TO lt_width.
@@ -322,10 +336,14 @@ CLASS z2ui5_cl_cgui_demo_output IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD z2ui5_if_cgui_demo_output~write_text.
+    DATA lt_line TYPE STANDARD TABLE OF string WITH DEFAULT KEY.
+    DATA lv_line LIKE LINE OF lt_line.
 
     output = me.
-    SPLIT text AT cl_abap_char_utilities=>newline INTO TABLE DATA(lt_line).
-    LOOP AT lt_line INTO DATA(lv_line).
+
+    SPLIT text AT cl_abap_char_utilities=>newline INTO TABLE lt_line.
+
+    LOOP AT lt_line INTO lv_line.
       list( )->write( lv_line ).
       list( )->new_line( ).
     ENDLOOP.
@@ -343,21 +361,35 @@ CLASS z2ui5_cl_cgui_demo_output IMPLEMENTATION.
 
     " the text between the tags - a line ends at a break, the end of a
     " paragraph, a heading, a row or an item
-    DATA(lv_html) = CONV string( html ).
-    DATA(lv_at) = 0.
+    DATA temp3 TYPE string.
+    DATA lv_html LIKE temp3.
+    DATA lv_at TYPE i.
+      DATA lv_open TYPE i.
+      DATA lv_close TYPE i.
+      DATA lv_tag TYPE string.
+      DATA lv_rest TYPE string.
+    temp3 = html.
+
+    lv_html = temp3.
+
+    lv_at = 0.
     WHILE lv_at < strlen( lv_html ).
-      DATA(lv_open) = find( val = lv_html sub = `<` off = lv_at ).
+
+      lv_open = find( val = lv_html sub = `<` off = lv_at ).
       IF lv_open < 0.
         result = result && substring( val = lv_html off = lv_at ).
         EXIT.
       ENDIF.
       result = result && substring( val = lv_html off = lv_at len = lv_open - lv_at ).
-      DATA(lv_close) = find( val = lv_html sub = `>` off = lv_open ).
+
+      lv_close = find( val = lv_html sub = `>` off = lv_open ).
       IF lv_close < 0.
         EXIT.
       ENDIF.
-      DATA(lv_tag) = to_lower( substring( val = lv_html off = lv_open + 1 len = lv_close - lv_open - 1 ) ).
-      SPLIT lv_tag AT ` ` INTO lv_tag DATA(lv_rest) ##NEEDED.
+
+      lv_tag = to_lower( substring( val = lv_html off = lv_open + 1 len = lv_close - lv_open - 1 ) ).
+
+      SPLIT lv_tag AT ` ` INTO lv_tag lv_rest ##NEEDED.
       CASE lv_tag.
         WHEN `br` OR `br/` OR `/p` OR `/div` OR `/tr` OR `/li` OR `/h1` OR `/h2` OR `/h3` OR `/h4` OR `/h5` OR `/h6`.
           result = result && cl_abap_char_utilities=>newline.
@@ -428,12 +460,21 @@ CLASS z2ui5_cl_cgui_demo_output IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD z2ui5_if_cgui_demo_output~get.
+    DATA temp4 TYPE string_table.
+    DATA lt_line LIKE temp4.
 
     IF data IS SUPPLIED.
       z2ui5_if_cgui_demo_output~write( data = data
                                        name = name ).
     ENDIF.
-    DATA(lt_line) = COND #( WHEN mv_from > 0 THEN list( )->cut( mv_from ) ).
+
+    IF mv_from > 0.
+      temp4 = list( )->cut( mv_from ).
+    ELSE.
+      CLEAR temp4.
+    ENDIF.
+
+    lt_line = temp4.
     mv_from = 0.
     output = |<html><body><pre>{ escape( val    = concat_lines_of( table = lt_line
                                                                    sep   = |\n| )
@@ -454,7 +495,8 @@ CLASS z2ui5_cl_cgui_demo_output IMPLEMENTATION.
   METHOD list.
 
     " the report of the roundtrip - the one the SAP GUI stand-ins know
-    DATA(lo_report) = z2ui5_cl_cgui_gui=>get_report( ).
+    DATA lo_report TYPE REF TO z2ui5_if_cgui_gui.
+    lo_report = z2ui5_cl_cgui_gui=>get_report( ).
     IF lo_report IS NOT BOUND.
       RAISE EXCEPTION TYPE z2ui5_cx_cgui_error
         EXPORTING
@@ -488,23 +530,57 @@ CLASS z2ui5_cl_cgui_demo_output IMPLEMENTATION.
 
     FIELD-SYMBOLS <line> TYPE any.
 
-    DATA(lo_table) = CAST cl_abap_tabledescr( cl_abap_typedescr=>describe_by_data( data ) ).
+    DATA temp5 TYPE REF TO cl_abap_tabledescr.
+    DATA lo_table LIKE temp5.
     DATA lr_line TYPE REF TO data.
-    DATA(lo_line) = lo_table->get_table_line_type( ).
+    DATA lo_line TYPE REF TO cl_abap_datadescr.
+    DATA lt_column TYPE string_table.
+    DATA temp6 TYPE ty_t_width.
+    DATA lt_width LIKE temp6.
+    DATA lv_column LIKE LINE OF lt_column.
+      FIELD-SYMBOLS <width> LIKE LINE OF lt_width.
+        DATA lv_index LIKE sy-tabix.
+        FIELD-SYMBOLS <temp7> LIKE LINE OF lt_column.
+        DATA temp8 LIKE sy-tabix.
+          FIELD-SYMBOLS <value> TYPE any.
+    temp5 ?= cl_abap_typedescr=>describe_by_data( data ).
+
+    lo_table = temp5.
+
+
+    lo_line = lo_table->get_table_line_type( ).
     CREATE DATA lr_line TYPE HANDLE lo_line.
     ASSIGN lr_line->* TO <line>.
-    DATA(lt_column) = columns_of( <line> ).
+
+    lt_column = columns_of( <line> ).
 
     " the width of a column: its name, its widest value
-    DATA(lt_width) = VALUE ty_t_width( ).
-    LOOP AT lt_column INTO DATA(lv_column).
+
+    CLEAR temp6.
+
+    lt_width = temp6.
+
+    LOOP AT lt_column INTO lv_column.
       APPEND strlen( lv_column ) TO lt_width.
     ENDLOOP.
     LOOP AT data ASSIGNING <line>.
-      LOOP AT lt_width ASSIGNING FIELD-SYMBOL(<width>).
-        DATA(lv_index) = sy-tabix.
-        IF lines( lt_column ) = 1 AND lt_column[ 1 ] = `TABLE_LINE`.
-          ASSIGN <line> TO FIELD-SYMBOL(<value>).
+
+      LOOP AT lt_width ASSIGNING <width>.
+
+        lv_index = sy-tabix.
+
+
+        IF lines( lt_column ) = 1.
+          temp8 = sy-tabix.
+          READ TABLE lt_column INDEX 1 ASSIGNING <temp7>.
+          sy-tabix = temp8.
+          IF sy-subrc <> 0.
+            ASSERT 1 = 0.
+          ENDIF.
+        ENDIF.
+        IF lines( lt_column ) = 1 AND <temp7> = `TABLE_LINE`.
+
+          ASSIGN <line> TO <value>.
         ELSE.
           ASSIGN COMPONENT lv_index OF STRUCTURE <line> TO <value>.
         ENDIF.
@@ -527,11 +603,28 @@ CLASS z2ui5_cl_cgui_demo_output IMPLEMENTATION.
 
     " the names over the columns - an index of its own, the WRITEs of the
     " list change sy-tabix
-    DATA(lv_pos) = 1.
-    DATA(lv_index) = 0.
-    LOOP AT columns INTO DATA(lv_column).
+    DATA lv_pos TYPE i.
+    DATA lv_index TYPE i.
+    DATA lv_column LIKE LINE OF columns.
+      DATA lv_width LIKE LINE OF widths.
+      FIELD-SYMBOLS <temp1> LIKE LINE OF widths.
+      DATA temp2 LIKE sy-tabix.
+    lv_pos = 1.
+
+    lv_index = 0.
+
+    LOOP AT columns INTO lv_column.
       lv_index = lv_index + 1.
-      DATA(lv_width) = widths[ lv_index ].
+
+
+
+      temp2 = sy-tabix.
+      READ TABLE widths INDEX lv_index ASSIGNING <temp1>.
+      sy-tabix = temp2.
+      IF sy-subrc <> 0.
+        ASSERT 1 = 0.
+      ENDIF.
+      lv_width = <temp1>.
       list( )->write( val         = lv_column
                       pos         = lv_pos
                       len         = lv_width
@@ -544,16 +637,25 @@ CLASS z2ui5_cl_cgui_demo_output IMPLEMENTATION.
 
   METHOD write_columns.
 
-    DATA(lv_pos) = 1.
-    DATA(lv_index) = 0.
-    LOOP AT widths INTO DATA(lv_width).
+    DATA lv_pos TYPE i.
+    DATA lv_index TYPE i.
+    DATA lv_width LIKE LINE OF widths.
+        FIELD-SYMBOLS <value> TYPE any.
+      DATA lo_kind TYPE REF TO cl_abap_typedescr.
+    lv_pos = 1.
+
+    lv_index = 0.
+
+    LOOP AT widths INTO lv_width.
       lv_index = lv_index + 1.
       IF lines( widths ) = 1 AND cl_abap_typedescr=>describe_by_data( line )->kind = cl_abap_typedescr=>kind_elem.
-        ASSIGN line TO FIELD-SYMBOL(<value>).
+
+        ASSIGN line TO <value>.
       ELSE.
         ASSIGN COMPONENT lv_index OF STRUCTURE line TO <value>.
       ENDIF.
-      DATA(lo_kind) = cl_abap_typedescr=>describe_by_data( <value> ).
+
+      lo_kind = cl_abap_typedescr=>describe_by_data( <value> ).
       IF lo_kind->kind = cl_abap_typedescr=>kind_elem.
         list( )->write( val = <value>
                         pos = lv_pos
@@ -571,7 +673,8 @@ CLASS z2ui5_cl_cgui_demo_output IMPLEMENTATION.
 
   METHOD text_of.
 
-    DATA(lo_type) = cl_abap_typedescr=>describe_by_data( value ).
+    DATA lo_type TYPE REF TO cl_abap_typedescr.
+    lo_type = cl_abap_typedescr=>describe_by_data( value ).
     CASE lo_type->kind.
       WHEN cl_abap_typedescr=>kind_elem.
         CASE lo_type->type_kind.
@@ -594,14 +697,26 @@ CLASS z2ui5_cl_cgui_demo_output IMPLEMENTATION.
 
   METHOD columns_of.
 
-    DATA(lo_type) = cl_abap_typedescr=>describe_by_data( line ).
+    DATA lo_type TYPE REF TO cl_abap_typedescr.
+    DATA temp3 TYPE REF TO cl_abap_structdescr.
+    DATA temp9 LIKE temp3->components.
+    DATA ls_component LIKE LINE OF temp9.
+      DATA temp10 LIKE LINE OF result.
+    lo_type = cl_abap_typedescr=>describe_by_data( line ).
     IF lo_type->kind <> cl_abap_typedescr=>kind_struct.
       INSERT `TABLE_LINE` INTO TABLE result.
       RETURN.
     ENDIF.
     " flat - the components of an include are columns of their own
-    LOOP AT CAST cl_abap_structdescr( lo_type )->components INTO DATA(ls_component).
-      INSERT CONV string( ls_component-name ) INTO TABLE result.
+
+    temp3 ?= lo_type.
+
+    temp9 = temp3->components.
+
+    LOOP AT temp9 INTO ls_component.
+
+      temp10 = ls_component-name.
+      INSERT temp10 INTO TABLE result.
     ENDLOOP.
 
   ENDMETHOD.

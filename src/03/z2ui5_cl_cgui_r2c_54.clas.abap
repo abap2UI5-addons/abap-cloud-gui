@@ -80,8 +80,24 @@ CLASS z2ui5_cl_cgui_r2c_54 IMPLEMENTATION.
 
   METHOD start_of_selection.
 
-    gt_item = VALUE ty_t_item( ( id = 1 name = 'Rent'  amount = '1200.50' curr = 'EUR' due = '20260105' )
-                                 ( id = 2 name = 'Train' amount = '89.00'   curr = 'JPY' due = '20260212' ) ).
+    DATA temp1 TYPE ty_t_item.
+    DATA temp2 LIKE LINE OF temp1.
+      DATA temp3 TYPE REF TO lcl_lines.
+    CLEAR temp1.
+
+    temp2-id = 1.
+    temp2-name = 'Rent'.
+    temp2-amount = '1200.50'.
+    temp2-curr = 'EUR'.
+    temp2-due = '20260105'.
+    INSERT temp2 INTO TABLE temp1.
+    temp2-id = 2.
+    temp2-name = 'Train'.
+    temp2-amount = '89.00'.
+    temp2-curr = 'JPY'.
+    temp2-due = '20260212'.
+    INSERT temp2 INTO TABLE temp1.
+    gt_item = temp1.
     mark_due( CHANGING
                 ut_item = gt_item ).
 
@@ -103,7 +119,9 @@ CLASS z2ui5_cl_cgui_r2c_54 IMPLEMENTATION.
     ENDLOOP.
 
     IF p_total = abap_true.
-      NEW lcl_lines( )->write_totals( ).
+
+      CREATE OBJECT temp3 TYPE lcl_lines.
+      temp3->write_totals( ).
     ENDIF.
 
     message( text = 'List written'
@@ -117,19 +135,49 @@ CLASS z2ui5_cl_cgui_r2c_54 IMPLEMENTATION.
   METHOD at_line_selection.
 
     " HIDE - the fields the clicked line was written with
-    SPLIT hide AT |\t| INTO TABLE DATA(lt_hide).
-    wa_gt_item-id = VALUE #( lt_hide[ 1 ] OPTIONAL ).
-    wa_gt_item-name = VALUE #( lt_hide[ 2 ] OPTIONAL ).
+    DATA lt_hide TYPE STANDARD TABLE OF string WITH DEFAULT KEY.
+    DATA temp4 TYPE z2ui5_cl_cgui_r2c_54=>ty_item-id.
+    DATA temp5 TYPE string.
+    DATA temp6 TYPE z2ui5_cl_cgui_r2c_54=>ty_item-name.
+    DATA temp7 TYPE string.
+    SPLIT hide AT |\t| INTO TABLE lt_hide.
+
+    CLEAR temp4.
+
+    READ TABLE lt_hide INTO temp5 INDEX 1.
+    IF sy-subrc = 0.
+      temp4 = temp5.
+    ENDIF.
+    wa_gt_item-id = temp4.
+
+    CLEAR temp6.
+
+    READ TABLE lt_hide INTO temp7 INDEX 2.
+    IF sy-subrc = 0.
+      temp6 = temp7.
+    ENDIF.
+    wa_gt_item-name = temp6.
 
     detail( ).
 
   ENDMETHOD.
 
   METHOD at_value_request.
+        DATA temp8 LIKE gt_value.
+        DATA temp9 LIKE LINE OF temp8.
 
     CASE field.
       WHEN `P_ID`.
-        gt_value = VALUE #( ( id = 'A01' text = 'First' ) ( id = 'B02' text = 'Second' ) ).
+
+        CLEAR temp8.
+
+        temp9-id = 'A01'.
+        temp9-text = 'First'.
+        INSERT temp9 INTO TABLE temp8.
+        temp9-id = 'B02'.
+        temp9-text = 'Second'.
+        INSERT temp9 INTO TABLE temp8.
+        gt_value = temp8.
         CLEAR gt_ret.
         value_help_popup( tab = gt_value
                           col = `ID` ).

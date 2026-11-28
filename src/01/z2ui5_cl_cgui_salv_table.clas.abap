@@ -170,7 +170,7 @@ CLASS z2ui5_cl_cgui_salv_table DEFINITION PUBLIC
         tooltip   TYPE string,
         just      TYPE c LENGTH 1,
       END OF ty_s_fcat.
-    TYPES ty_t_fcat TYPE STANDARD TABLE OF ty_s_fcat WITH EMPTY KEY.
+    TYPES ty_t_fcat TYPE STANDARD TABLE OF ty_s_fcat WITH DEFAULT KEY.
     TYPES:
       "! LVC_S_SORT - what set_sort_classic( ) of the grid reads
       BEGIN OF ty_s_sort,
@@ -180,7 +180,7 @@ CLASS z2ui5_cl_cgui_salv_table DEFINITION PUBLIC
         down      TYPE abap_bool,
         subtot    TYPE abap_bool,
       END OF ty_s_sort.
-    TYPES ty_t_sort TYPE STANDARD TABLE OF ty_s_sort WITH EMPTY KEY.
+    TYPES ty_t_sort TYPE STANDARD TABLE OF ty_s_sort WITH DEFAULT KEY.
     TYPES:
       BEGIN OF ty_s_layout,
         grid_title TYPE string,
@@ -209,23 +209,29 @@ CLASS z2ui5_cl_cgui_salv_table IMPLEMENTATION.
   METHOD factory.
 
     DATA lr_line TYPE REF TO data.
+    FIELD-SYMBOLS <line> TYPE data.
 
-    r_salv_table = NEW #( r_container ).
+    CREATE OBJECT r_salv_table EXPORTING CONTAINER = r_container.
     r_salv_table->table_keep( CHANGING t_table = t_table ).
     CREATE DATA lr_line LIKE LINE OF t_table.
-    ASSIGN lr_line->* TO FIELD-SYMBOL(<line>).
-    r_salv_table->mo_columns = NEW #( <line> ).
+
+    ASSIGN lr_line->* TO <line>.
+    CREATE OBJECT r_salv_table->mo_columns EXPORTING LINE = <line>.
 
   ENDMETHOD.
 
   METHOD constructor.
+    DATA temp1 TYPE z2ui5_if_cgui_gui=>ty_s_control.
 
     super->constructor( ).
     " no part of the screen of its own - the grid of display( ) is
-    add( VALUE #( kind   = z2ui5_if_cgui_gui=>cs_kind-salv
-                  hidden = abap_true ) ).
+
+    CLEAR temp1.
+    temp1-kind = z2ui5_if_cgui_gui=>cs_kind-salv.
+    temp1-hidden = abap_true.
+    add( temp1 ).
     mo_container = container.
-    mo_settings = NEW #( ).
+    CREATE OBJECT mo_settings.
 
   ENDMETHOD.
 
@@ -234,13 +240,26 @@ CLASS z2ui5_cl_cgui_salv_table IMPLEMENTATION.
     DATA lt_button TYPE z2ui5_if_cgui_gui=>ty_t_button.
     FIELD-SYMBOLS <table> TYPE STANDARD TABLE.
 
-    DATA(lr_table) = table( ).
+    DATA lr_table TYPE REF TO data.
+    DATA temp2 TYPE ty_s_layout.
+    DATA temp1 TYPE z2ui5_cl_cgui_salv_table=>ty_s_layout-sel_mode.
+    DATA ls_layout LIKE temp2.
+    DATA lt_fcat TYPE z2ui5_cl_cgui_salv_table=>ty_t_fcat.
+    DATA temp3 TYPE ty_t_sort.
+    DATA lt_sort LIKE temp3.
+    DATA ls_sort LIKE LINE OF mo_settings->mt_sort.
+      DATA temp4 TYPE z2ui5_cl_cgui_salv_table=>ty_s_sort.
+      DATA temp7 TYPE xsdboolean.
+    DATA ls_function LIKE LINE OF mo_settings->mt_function.
+      DATA temp5 TYPE z2ui5_if_cgui_gui=>ty_s_button.
+      DATA temp6 LIKE REF TO lt_button.
+    lr_table = table( ).
     IF go_report IS NOT BOUND OR lr_table IS NOT BOUND.
       RETURN.
     ENDIF.
     ASSIGN lr_table->* TO <table>.
     IF mo_grid IS NOT BOUND.
-      mo_grid = NEW #( i_parent = mo_container ).
+      CREATE OBJECT mo_grid EXPORTING i_parent = mo_container.
       mo_grid->set_handler( event   = `USER_COMMAND`
                             method  = `ON_GRID_COMMAND`
                             handler = me ).
@@ -251,22 +270,41 @@ CLASS z2ui5_cl_cgui_salv_table IMPLEMENTATION.
                             method  = `ON_GRID_HOTSPOT`
                             handler = me ).
     ENDIF.
-    DATA(ls_layout) = VALUE ty_s_layout(
-        grid_title = mo_settings->mv_title
-        zebra      = mo_settings->mv_striped
-        sel_mode   = SWITCH #( mo_settings->mv_selection_mode
-                               WHEN z2ui5_if_cgui_salv_c=>selection_mode-none THEN ``
-                               WHEN z2ui5_if_cgui_salv_c=>selection_mode-single THEN `B`
-                               ELSE `A` ) ).
-    DATA(lt_fcat) = fieldcat( ).
+
+    CLEAR temp2.
+    temp2-grid_title = mo_settings->mv_title.
+    temp2-zebra = mo_settings->mv_striped.
+
+    CASE mo_settings->mv_selection_mode.
+      WHEN z2ui5_if_cgui_salv_c=>selection_mode-none.
+        temp1 = ``.
+      WHEN z2ui5_if_cgui_salv_c=>selection_mode-single.
+        temp1 = `B`.
+      WHEN OTHERS.
+        temp1 = `A`.
+    ENDCASE.
+    temp2-sel_mode = temp1.
+
+    ls_layout = temp2.
+
+    lt_fcat = fieldcat( ).
     " the sorts added - with them the subtotals
-    DATA(lt_sort) = VALUE ty_t_sort( ).
-    LOOP AT mo_settings->mt_sort INTO DATA(ls_sort).
-      INSERT VALUE #( spos      = sy-tabix
-                      fieldname = ls_sort-columnname
-                      up        = xsdbool( ls_sort-descending = abap_false )
-                      down      = ls_sort-descending
-                      subtot    = ls_sort-subtotal ) INTO TABLE lt_sort.
+
+    CLEAR temp3.
+
+    lt_sort = temp3.
+
+    LOOP AT mo_settings->mt_sort INTO ls_sort.
+
+      CLEAR temp4.
+      temp4-spos = sy-tabix.
+      temp4-fieldname = ls_sort-columnname.
+
+      temp7 = boolc( ls_sort-descending = abap_false ).
+      temp4-up = temp7.
+      temp4-down = ls_sort-descending.
+      temp4-subtot = ls_sort-subtotal.
+      INSERT temp4 INTO TABLE lt_sort.
     ENDLOOP.
     IF lt_sort IS INITIAL.
       mo_grid->set_table_for_first_display( EXPORTING  is_layout       = ls_layout
@@ -283,15 +321,21 @@ CLASS z2ui5_cl_cgui_salv_table IMPLEMENTATION.
     IF sy-subrc <> 0.
       RETURN.
     ENDIF.
-    LOOP AT mo_settings->mt_function INTO DATA(ls_function).
-      INSERT VALUE #( fcode     = ls_function-name
-                      icon      = ls_function-icon
-                      text      = ls_function-text
-                      quickinfo = ls_function-tooltip ) INTO TABLE lt_button.
+
+    LOOP AT mo_settings->mt_function INTO ls_function.
+
+      CLEAR temp5.
+      temp5-fcode = ls_function-name.
+      temp5-icon = ls_function-icon.
+      temp5-text = ls_function-text.
+      temp5-quickinfo = ls_function-tooltip.
+      INSERT temp5 INTO TABLE lt_button.
     ENDLOOP.
     IF lt_button IS NOT INITIAL.
-      go_report->grid_display( id        = mo_grid->get_id( )
-                               functions = REF #( lt_button ) ).
+
+      GET REFERENCE OF lt_button INTO temp6.
+go_report->grid_display( id        = mo_grid->get_id( )
+                               functions = temp6 ).
     ENDIF.
     mo_settings->set_grid( mo_grid ).
 
@@ -300,21 +344,44 @@ CLASS z2ui5_cl_cgui_salv_table IMPLEMENTATION.
   METHOD fieldcat.
 
     " the columns in the order of get( ) - set_column_position( ) moves them
-    LOOP AT mo_columns->get( ) INTO DATA(ls_ref).
-      DATA(lv_position) = sy-tabix.
-      DATA(lo_column) = ls_ref-r_column.
-      INSERT VALUE #( fieldname = lo_column->mv_name
-                      scrtext_l = lo_column->get_text( )
-                      no_out    = lo_column->mv_hidden
-                      tech      = lo_column->mv_technical
-                      hotspot   = lo_column->mv_hotspot
-                      key       = lo_column->mv_key
-                      outputlen = lo_column->mv_length
-                      do_sum    = xsdbool( line_exists( mo_settings->mt_aggregation[ table_line = lo_column->mv_name ] ) )
-                      no_zero   = lo_column->mv_no_zero
-                      col_pos   = lv_position
-                      tooltip   = lo_column->mv_tooltip
-                      just      = lo_column->mv_just ) INTO TABLE result.
+    DATA temp7 TYPE z2ui5_cl_cgui_salv_cols=>ty_t_column_ref.
+    DATA ls_ref LIKE LINE OF temp7.
+      DATA lv_position LIKE sy-tabix.
+      DATA lo_column LIKE ls_ref-r_column.
+      DATA temp8 TYPE z2ui5_cl_cgui_salv_table=>ty_s_fcat.
+      DATA temp2 LIKE sy-subrc.
+      DATA temp3 LIKE sy-tabix.
+      DATA temp9 TYPE xsdboolean.
+    temp7 = mo_columns->get( ).
+
+    LOOP AT temp7 INTO ls_ref.
+
+      lv_position = sy-tabix.
+
+      lo_column = ls_ref-r_column.
+
+      CLEAR temp8.
+      temp8-fieldname = lo_column->mv_name.
+      temp8-scrtext_l = lo_column->get_text( ).
+      temp8-no_out = lo_column->mv_hidden.
+      temp8-tech = lo_column->mv_technical.
+      temp8-hotspot = lo_column->mv_hotspot.
+      temp8-key = lo_column->mv_key.
+      temp8-outputlen = lo_column->mv_length.
+
+
+      temp3 = sy-tabix.
+      READ TABLE mo_settings->mt_aggregation WITH KEY table_line = lo_column->mv_name TRANSPORTING NO FIELDS.
+      temp2 = sy-subrc.
+      sy-tabix = temp3.
+
+      temp9 = boolc( temp2 = 0 ).
+      temp8-do_sum = temp9.
+      temp8-no_zero = lo_column->mv_no_zero.
+      temp8-col_pos = lv_position.
+      temp8-tooltip = lo_column->mv_tooltip.
+      temp8-just = lo_column->mv_just.
+      INSERT temp8 INTO TABLE result.
     ENDLOOP.
 
   ENDMETHOD.
@@ -322,11 +389,13 @@ CLASS z2ui5_cl_cgui_salv_table IMPLEMENTATION.
   METHOD refresh.
 
     FIELD-SYMBOLS <table> TYPE STANDARD TABLE.
+    DATA lr_table TYPE REF TO data.
 
     IF mo_grid IS NOT BOUND.
       RETURN.
     ENDIF.
-    DATA(lr_table) = table( ).
+
+    lr_table = table( ).
     IF t_table IS SUPPLIED.
       mo_grid->refresh_table_display( CHANGING it_outtab = t_table ).
     ELSEIF lr_table IS BOUND.
@@ -344,7 +413,7 @@ CLASS z2ui5_cl_cgui_salv_table IMPLEMENTATION.
 
   METHOD table_keep.
 
-    mr_table = REF #( t_table ).
+    GET REFERENCE OF t_table INTO mr_table.
     CLEAR mv_table.
     IF go_report IS BOUND.
       mv_table = z2ui5_cl_cgui_context=>attri_name_by_ref( app = go_report
@@ -362,7 +431,7 @@ CLASS z2ui5_cl_cgui_salv_table IMPLEMENTATION.
       lo_report = go_report.
       ASSIGN lo_report->(mv_table) TO <table>.
       IF <table> IS ASSIGNED.
-        result = REF #( <table> ).
+        GET REFERENCE OF <table> INTO result.
         RETURN.
       ENDIF.
     ENDIF.
@@ -444,31 +513,85 @@ CLASS z2ui5_cl_cgui_salv_table IMPLEMENTATION.
 
   METHOD on_grid_command.
 
-    DATA(lv_function) = CONV ty_function( e_ucomm ).
-    raise_event( event  = `ADDED_FUNCTION`
-                 params = VALUE #( ( name = `E_SALV_FUNCTION` kind = cl_abap_objectdescr=>exporting value = REF #( lv_function ) ) ) ).
+    DATA temp9 TYPE ty_function.
+    DATA lv_function LIKE temp9.
+    DATA temp10 LIKE REF TO lv_function.
+DATA temp4 TYPE abap_parmbind_tab.
+DATA temp5 LIKE LINE OF temp4.
+    temp9 = e_ucomm.
+
+    lv_function = temp9.
+
+    GET REFERENCE OF lv_function INTO temp10.
+
+CLEAR temp4.
+
+temp5-name = `E_SALV_FUNCTION`.
+temp5-kind = cl_abap_objectdescr=>exporting.
+temp5-value = temp10.
+INSERT temp5 INTO TABLE temp4.
+raise_event( event  = `ADDED_FUNCTION`
+                 params = temp4 ).
 
   ENDMETHOD.
 
   METHOD on_grid_double_click.
 
     DATA lv_column TYPE ty_column.
-    DATA(lv_row) = e_row-index.
+    DATA lv_row LIKE e_row-index.
+    DATA temp11 LIKE REF TO lv_column.
+DATA temp6 LIKE REF TO lv_row.
+DATA temp1 TYPE abap_parmbind_tab.
+DATA temp2 LIKE LINE OF temp1.
+    lv_row = e_row-index.
     lv_column = e_column-fieldname.
-    raise_event( event  = `DOUBLE_CLICK`
-                 params = VALUE #( ( name = `ROW`    kind = cl_abap_objectdescr=>exporting value = REF #( lv_row ) )
-                                   ( name = `COLUMN` kind = cl_abap_objectdescr=>exporting value = REF #( lv_column ) ) ) ).
+
+    GET REFERENCE OF lv_column INTO temp11.
+
+GET REFERENCE OF lv_row INTO temp6.
+
+CLEAR temp1.
+
+temp2-name = `ROW`.
+temp2-kind = cl_abap_objectdescr=>exporting.
+temp2-value = temp6.
+INSERT temp2 INTO TABLE temp1.
+temp2-name = `COLUMN`.
+temp2-kind = cl_abap_objectdescr=>exporting.
+temp2-value = temp11.
+INSERT temp2 INTO TABLE temp1.
+raise_event( event  = `DOUBLE_CLICK`
+                 params = temp1 ).
 
   ENDMETHOD.
 
   METHOD on_grid_hotspot.
 
     DATA lv_column TYPE ty_column.
-    DATA(lv_row) = e_row_id-index.
+    DATA lv_row LIKE e_row_id-index.
+    DATA temp12 LIKE REF TO lv_column.
+DATA temp7 LIKE REF TO lv_row.
+DATA temp3 TYPE abap_parmbind_tab.
+DATA temp4 LIKE LINE OF temp3.
+    lv_row = e_row_id-index.
     lv_column = e_column_id-fieldname.
-    raise_event( event  = `LINK_CLICK`
-                 params = VALUE #( ( name = `ROW`    kind = cl_abap_objectdescr=>exporting value = REF #( lv_row ) )
-                                   ( name = `COLUMN` kind = cl_abap_objectdescr=>exporting value = REF #( lv_column ) ) ) ).
+
+    GET REFERENCE OF lv_column INTO temp12.
+
+GET REFERENCE OF lv_row INTO temp7.
+
+CLEAR temp3.
+
+temp4-name = `ROW`.
+temp4-kind = cl_abap_objectdescr=>exporting.
+temp4-value = temp7.
+INSERT temp4 INTO TABLE temp3.
+temp4-name = `COLUMN`.
+temp4-kind = cl_abap_objectdescr=>exporting.
+temp4-value = temp12.
+INSERT temp4 INTO TABLE temp3.
+raise_event( event  = `LINK_CLICK`
+                 params = temp3 ).
 
   ENDMETHOD.
 

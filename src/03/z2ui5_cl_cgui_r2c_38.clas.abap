@@ -52,18 +52,35 @@ CLASS z2ui5_cl_cgui_r2c_38 IMPLEMENTATION.
 
   METHOD start_of_selection.
 
-    gt_todo = VALUE #( ( task = `Write the report` done = abap_true )
-                       ( task = `Test it`          done = abap_false )
-                       ( task = `Ship it`          done = abap_true ) ).
+    DATA temp1 LIKE gt_todo.
+    DATA temp2 LIKE LINE OF temp1.
+    DATA temp3 TYPE string_table.
+    CLEAR temp1.
 
+    temp2-task = `Write the report`.
+    temp2-done = abap_true.
+    INSERT temp2 INTO TABLE temp1.
+    temp2-task = `Test it`.
+    temp2-done = abap_false.
+    INSERT temp2 INTO TABLE temp1.
+    temp2-task = `Ship it`.
+    temp2-done = abap_true.
+    INSERT temp2 INTO TABLE temp1.
+    gt_todo = temp1.
+
+
+    CLEAR temp3.
+    INSERT `Delete` INTO TABLE temp3.
+    INSERT `Keep` INTO TABLE temp3.
     popup_to_decide( question = 'Delete the tasks that are done?'
-                     options  = VALUE #( ( `Delete` ) ( `Keep` ) )
+                     options  = temp3
                      then     = `ON_POPUP_1`
                      title    = 'Clean up' ).
 
   ENDMETHOD.
 
   METHOD on_popup_1.
+    DATA ls_todo LIKE LINE OF gt_todo.
 
     lv_answer = answer.
     IF lv_answer = '1' AND p_keep = abap_false.
@@ -75,7 +92,8 @@ CLASS z2ui5_cl_cgui_r2c_38 IMPLEMENTATION.
           )->write( 'Nothing was deleted.' ).
     ENDIF.
     list( )->uline( ).
-    LOOP AT gt_todo INTO DATA(ls_todo).
+
+    LOOP AT gt_todo INTO ls_todo.
       list( )->new_line(
           )->write_as_checkbox( ls_todo-done
           )->write( ls_todo-task ).

@@ -50,7 +50,7 @@ CLASS z2ui5_cl_cgui_select DEFINITION PUBLIC FINAL CREATE PRIVATE.
         name  TYPE string,
         label TYPE string,
       END OF ty_s_column.
-    TYPES ty_t_column TYPE STANDARD TABLE OF ty_s_column WITH EMPTY KEY.
+    TYPES ty_t_column TYPE STANDARD TABLE OF ty_s_column WITH DEFAULT KEY.
 
     "! the rows shown - a text column per column of the table, ZZSELKZ and
     "! ZZROW: the hits loaded so far, in their order. PUBLIC, the dialog is
@@ -107,7 +107,7 @@ CLASS z2ui5_cl_cgui_select DEFINITION PUBLIC FINAL CREATE PRIVATE.
     DATA mv_table_line   TYPE abap_bool.
     DATA mt_column       TYPE ty_t_column.
     " the hits of the search - per hit its row of mr_all, in their order
-    DATA mt_hit          TYPE STANDARD TABLE OF i WITH EMPTY KEY.
+    DATA mt_hit          TYPE STANDARD TABLE OF i WITH DEFAULT KEY.
 
   PRIVATE SECTION.
 
@@ -149,16 +149,29 @@ CLASS z2ui5_cl_cgui_select IMPLEMENTATION.
   METHOD factory.
 
     FIELD-SYMBOLS <source> TYPE STANDARD TABLE.
+      DATA temp27 TYPE string.
+    DATA temp28 TYPE REF TO cl_abap_tabledescr.
+    DATA lo_line TYPE REF TO cl_abap_datadescr.
+      DATA temp29 TYPE z2ui5_cl_cgui_context=>ty_t_comp.
+      DATA ls_comp LIKE LINE OF temp29.
+        DATA temp30 TYPE z2ui5_cl_cgui_select=>ty_s_column.
+      DATA lv_label TYPE string.
+      DATA temp31 TYPE z2ui5_cl_cgui_select=>ty_s_column.
+      DATA temp6 TYPE z2ui5_cl_cgui_select=>ty_s_column-label.
 
-    result = NEW #( ).
+    CREATE OBJECT result.
     result->mv_multi        = multiselect.
     result->mv_event        = event.
     result->mv_event_cancel = event_cancel.
     result->mv_title        = title.
     IF result->mv_title IS INITIAL.
-      result->mv_title = COND #( WHEN multiselect = abap_true
-                                 THEN 'Select Values'(001)
-                                 ELSE 'Select a Value'(002) ).
+
+      IF multiselect = abap_true.
+        temp27 = 'Select Values'(001).
+      ELSE.
+        temp27 = 'Select a Value'(002).
+      ENDIF.
+      result->mv_title = temp27.
     ENDIF.
 
     CREATE DATA result->mr_source LIKE tab.
@@ -171,17 +184,36 @@ CLASS z2ui5_cl_cgui_select IMPLEMENTATION.
     CLEAR <source>.
 
     " the columns: the elementary components, or the line itself
-    DATA(lo_line) = CAST cl_abap_tabledescr( cl_abap_typedescr=>describe_by_data( tab ) )->get_table_line_type( ).
+
+    temp28 ?= cl_abap_typedescr=>describe_by_data( tab ).
+
+    lo_line = temp28->get_table_line_type( ).
     IF lo_line->kind = cl_abap_typedescr=>kind_struct.
-      LOOP AT z2ui5_cl_cgui_context=>rtti_get_t_comp( tab ) INTO DATA(ls_comp) WHERE name <> cv_selkz.
-        INSERT VALUE #( name  = ls_comp-name
-                        label = ls_comp-label ) INTO TABLE result->mt_column.
+
+      temp29 = z2ui5_cl_cgui_context=>rtti_get_t_comp( tab ).
+
+      LOOP AT temp29 INTO ls_comp WHERE name <> cv_selkz.
+
+        CLEAR temp30.
+        temp30-name = ls_comp-name.
+        temp30-label = ls_comp-label.
+        INSERT temp30 INTO TABLE result->mt_column.
       ENDLOOP.
     ELSE.
       result->mv_table_line = abap_true.
-      DATA(lv_label) = z2ui5_cl_cgui_context=>rtti_get_label_by_descr( lo_line ).
-      INSERT VALUE #( name  = `TAB_LINE`
-                      label = COND #( WHEN lv_label IS NOT INITIAL THEN lv_label ELSE 'Value'(003) ) )
+
+      lv_label = z2ui5_cl_cgui_context=>rtti_get_label_by_descr( lo_line ).
+
+      CLEAR temp31.
+      temp31-name = `TAB_LINE`.
+
+      IF lv_label IS NOT INITIAL.
+        temp6 = lv_label.
+      ELSE.
+        temp6 = 'Value'(003).
+      ENDIF.
+      temp31-label = temp6.
+      INSERT temp31
              INTO TABLE result->mt_column.
     ENDIF.
 
@@ -204,15 +236,33 @@ CLASS z2ui5_cl_cgui_select IMPLEMENTATION.
     FIELD-SYMBOLS <mark>   TYPE any.
 
     " every column as text - the user's format and a search on all of them
-    LOOP AT mt_column INTO DATA(ls_column).
-      INSERT VALUE #( name = ls_column-name
-                      type = cl_abap_elemdescr=>get_string( ) ) INTO TABLE lt_comp.
+    DATA ls_column LIKE LINE OF mt_column.
+      DATA temp32 TYPE abap_componentdescr.
+    DATA temp33 TYPE abap_componentdescr.
+    DATA temp7 TYPE REF TO cl_abap_datadescr.
+    DATA temp34 TYPE abap_componentdescr.
+    DATA lo_table TYPE REF TO cl_abap_tabledescr.
+    LOOP AT mt_column INTO ls_column.
+
+      CLEAR temp32.
+      temp32-name = ls_column-name.
+      temp32-type = cl_abap_elemdescr=>get_string( ).
+      INSERT temp32 INTO TABLE lt_comp.
     ENDLOOP.
-    INSERT VALUE #( name = cv_selkz
-                    type = CAST #( cl_abap_typedescr=>describe_by_data( lv_flag ) ) ) INTO TABLE lt_comp.
-    INSERT VALUE #( name = cv_row
-                    type = cl_abap_elemdescr=>get_i( ) ) INTO TABLE lt_comp.
-    DATA(lo_table) = cl_abap_tabledescr=>create( cl_abap_structdescr=>create( lt_comp ) ).
+
+    CLEAR temp33.
+    temp33-name = cv_selkz.
+
+    temp7 ?= cl_abap_typedescr=>describe_by_data( lv_flag ).
+    temp33-type = temp7.
+    INSERT temp33 INTO TABLE lt_comp.
+
+    CLEAR temp34.
+    temp34-name = cv_row.
+    temp34-type = cl_abap_elemdescr=>get_i( ).
+    INSERT temp34 INTO TABLE lt_comp.
+
+    lo_table = cl_abap_tabledescr=>create( cl_abap_structdescr=>create( lt_comp ) ).
 
     CREATE DATA mr_all TYPE HANDLE lo_table.
     CREATE DATA mr_view TYPE HANDLE lo_table.
@@ -262,17 +312,21 @@ CLASS z2ui5_cl_cgui_select IMPLEMENTATION.
 
     FIELD-SYMBOLS <view> TYPE STANDARD TABLE.
     FIELD-SYMBOLS <all>  TYPE STANDARD TABLE.
+    DATA lv_hit LIKE LINE OF mt_hit.
+      FIELD-SYMBOLS <row> TYPE any.
 
     ASSIGN mr_view->* TO <view>.
     ASSIGN mr_all->* TO <all>.
     IF skip = 0.
       CLEAR <view>.
     ENDIF.
-    LOOP AT mt_hit INTO DATA(lv_hit) FROM lines( <view> ) + 1.
+
+    LOOP AT mt_hit INTO lv_hit FROM lines( <view> ) + 1.
       IF lines( <view> ) >= skip + top.
         EXIT.
       ENDIF.
-      READ TABLE <all> ASSIGNING FIELD-SYMBOL(<row>) INDEX lv_hit.
+
+      READ TABLE <all> ASSIGNING <row> INDEX lv_hit.
       IF sy-subrc = 0.
         INSERT <row> INTO TABLE <view>.
       ENDIF.
@@ -286,7 +340,8 @@ CLASS z2ui5_cl_cgui_select IMPLEMENTATION.
     FIELD-SYMBOLS <request> TYPE z2ui5_if_client=>ty_s_window_request.
     FIELD-SYMBOLS <view>    TYPE STANDARD TABLE.
 
-    DATA(lr_request) = client->get( )-r_event_data.
+    DATA lr_request TYPE REF TO data.
+    lr_request = client->get( )-r_event_data.
     IF lr_request IS NOT BOUND.
       RETURN.
     ENDIF.
@@ -308,9 +363,10 @@ CLASS z2ui5_cl_cgui_select IMPLEMENTATION.
 
   METHOD result.
 
-    result = VALUE #( confirmed = mv_confirmed
-                      row       = mr_result_row
-                      table     = mr_result_table ).
+    CLEAR result.
+    result-confirmed = mv_confirmed.
+    result-row = mr_result_row.
+    result-table = mr_result_table.
 
   ENDMETHOD.
 
@@ -325,11 +381,17 @@ CLASS z2ui5_cl_cgui_select IMPLEMENTATION.
     FIELD-SYMBOLS <tab>  TYPE STANDARD TABLE.
     FIELD-SYMBOLS <row>  TYPE any.
     FIELD-SYMBOLS <comp> TYPE any.
-    DATA lt_tab TYPE STANDARD TABLE OF REF TO data WITH EMPTY KEY.
+    DATA lt_tab TYPE STANDARD TABLE OF REF TO data WITH DEFAULT KEY.
 
     " the rows shown and all rows - a row need not be loaded to be picked
-    lt_tab = VALUE #( ( mr_view ) ( mr_all ) ).
-    LOOP AT lt_tab INTO DATA(lr_tab).
+    DATA temp35 LIKE lt_tab.
+    DATA lr_tab LIKE LINE OF lt_tab.
+    CLEAR temp35.
+    INSERT mr_view INTO TABLE temp35.
+    INSERT mr_all INTO TABLE temp35.
+    lt_tab = temp35.
+
+    LOOP AT lt_tab INTO lr_tab.
       ASSIGN lr_tab->* TO <tab>.
       LOOP AT <tab> ASSIGNING <row>.
         ASSIGN COMPONENT cv_row OF STRUCTURE <row> TO <comp>.
@@ -349,7 +411,7 @@ CLASS z2ui5_cl_cgui_select IMPLEMENTATION.
 
     me->client = client.
 
-    IF client->check_on_init( ).
+    IF client->check_on_init( ) IS NOT INITIAL.
       view_display( ).
       RETURN.
     ENDIF.
@@ -397,17 +459,23 @@ CLASS z2ui5_cl_cgui_select IMPLEMENTATION.
     FIELD-SYMBOLS <all>  TYPE STANDARD TABLE.
     FIELD-SYMBOLS <row>  TYPE any.
     FIELD-SYMBOLS <text> TYPE any.
+    DATA lv_search TYPE string.
+      DATA lv_index LIKE sy-tabix.
+      DATA ls_column LIKE LINE OF mt_column.
 
     marks_keep( ).
     ASSIGN mr_all->* TO <all>.
 
     " the hits anew and their first window - the response sends both
     CLEAR mt_hit.
-    DATA(lv_search) = condense( val ).
+
+    lv_search = condense( val ).
     " CS ignores the case
     LOOP AT <all> ASSIGNING <row>.
-      DATA(lv_index) = sy-tabix.
-      LOOP AT mt_column INTO DATA(ls_column).
+
+      lv_index = sy-tabix.
+
+      LOOP AT mt_column INTO ls_column.
         ASSIGN COMPONENT ls_column-name OF STRUCTURE <row> TO <text>.
         IF lv_search IS INITIAL OR <text> CS lv_search.
           INSERT lv_index INTO TABLE mt_hit.
@@ -432,6 +500,7 @@ CLASS z2ui5_cl_cgui_select IMPLEMENTATION.
     FIELD-SYMBOLS <src>    TYPE any.
     DATA lv_pick  TYPE i.
     DATA lv_index TYPE i.
+      DATA lv_last TYPE string.
 
     marks_keep( ).
     ASSIGN mr_view->* TO <view>.
@@ -443,7 +512,8 @@ CLASS z2ui5_cl_cgui_select IMPLEMENTATION.
 
     " a single pick comes as the path of the row clicked: /NAME/index
     IF mv_multi = abap_false AND path IS NOT INITIAL.
-      DATA(lv_last) = segment( val   = path
+
+      lv_last = segment( val   = path
                                sep   = `/`
                                index = -1 ).
       IF lv_last CO `0123456789`.
@@ -504,10 +574,22 @@ CLASS z2ui5_cl_cgui_select IMPLEMENTATION.
   METHOD view_display.
 
     FIELD-SYMBOLS <view> TYPE STANDARD TABLE.
+    DATA temp37 TYPE string.
+    DATA lo_dialog TYPE REF TO z2ui5_cl_ui5_view_builder.
+    DATA lo_cells TYPE REF TO z2ui5_cl_ui5_view_builder.
+    DATA ls_column LIKE LINE OF mt_column.
+    DATA lo_columns TYPE REF TO z2ui5_cl_ui5_view_builder.
 
     ASSIGN mr_view->* TO <view>.
 
-    DATA(lo_dialog) = z2ui5_cl_ui5_view_builder=>factory(
+
+    IF lines( mt_column ) > 3.
+      temp37 = `60rem`.
+    ELSE.
+      temp37 = `40rem`.
+    ENDIF.
+
+    lo_dialog = z2ui5_cl_ui5_view_builder=>factory(
         )->ele( n = `FragmentDefinition` ns = `core`
         )->a( n = `xmlns`      v = `sap.m`
         )->a( n = `xmlns:core` v = `sap.ui.core`
@@ -522,7 +604,7 @@ CLASS z2ui5_cl_cgui_select IMPLEMENTATION.
                                                                   window = cv_window )
         )->a( n = `multiSelect`      b = mv_multi
         )->a( n = `growing`          b = abap_true
-        )->a( n = `contentWidth`     v = COND #( WHEN lines( mt_column ) > 3 THEN `60rem` ELSE `40rem` )
+        )->a( n = `contentWidth`     v = temp37
         )->a( n = `search`           v = client->_event( val   = cs_event-search
                                                          arg   = `${$parameters>/value}` )
         " the path of the row picked - selectedContexts[0] cannot be read in
@@ -531,16 +613,19 @@ CLASS z2ui5_cl_cgui_select IMPLEMENTATION.
                                                          arg   = `${$parameters>/selectedItem} ? ${$parameters>/selectedItem}.getBindingContext().getPath() : ''` )
         )->a( n = `cancel`           v = client->_event( cs_event-cancel ) ).
 
-    DATA(lo_cells) = lo_dialog->ele( `ColumnListItem`
+
+    lo_cells = lo_dialog->ele( `ColumnListItem`
         )->a( n = `vAlign`   v = `Top`
         )->a( n = `selected` v = |\{{ cv_selkz }\}|
         )->ele( `cells` ).
-    LOOP AT mt_column INTO DATA(ls_column).
+
+    LOOP AT mt_column INTO ls_column.
       lo_cells->tag( `Text`
           )->a( n = `text` v = |\{{ z2ui5_cl_ui5_view_builder=>component_path( ls_column-name ) }\}| ).
     ENDLOOP.
 
-    DATA(lo_columns) = lo_dialog->ele( `columns` ).
+
+    lo_columns = lo_dialog->ele( `columns` ).
     LOOP AT mt_column INTO ls_column.
       lo_columns->ele( `Column`
           )->ele( `header`

@@ -9,14 +9,14 @@ CLASS ltcl_test DEFINITION FINAL FOR TESTING
         name   TYPE c LENGTH 20,
         seats  TYPE i,
       END OF ty_s_air.
-    TYPES ty_t_air TYPE STANDARD TABLE OF ty_s_air WITH EMPTY KEY.
+    TYPES ty_t_air TYPE STANDARD TABLE OF ty_s_air WITH DEFAULT KEY.
     TYPES:
       BEGIN OF ty_s_flight,
         carrid TYPE c LENGTH 3,
         fldate TYPE d,
         deptime TYPE t,
       END OF ty_s_flight.
-    TYPES ty_t_flight TYPE STANDARD TABLE OF ty_s_flight WITH EMPTY KEY.
+    TYPES ty_t_flight TYPE STANDARD TABLE OF ty_s_flight WITH DEFAULT KEY.
 
     METHODS file_name_without_folder FOR TESTING.
     METHODS text_into_columns FOR TESTING.
@@ -53,8 +53,31 @@ CLASS ltcl_test IMPLEMENTATION.
 
     " a file written with GUI_DOWNLOAD and read back: the date and the time
     " in the user's format come back as they were, not cut to 8 characters
-    DATA(lt_flight) = VALUE ty_t_flight( ( carrid = `LH` fldate = `20260105` deptime = `123000` )
-                                         ( carrid = `AA` ) ).
+    DATA temp1 TYPE ty_t_flight.
+    DATA temp2 LIKE LINE OF temp1.
+    DATA lt_flight LIKE temp1.
+    DATA temp3 TYPE d.
+    FIELD-SYMBOLS <temp1> LIKE LINE OF lt_back.
+    DATA temp5 LIKE sy-tabix.
+    DATA temp4 TYPE t.
+    FIELD-SYMBOLS <temp6> LIKE LINE OF lt_back.
+    DATA temp7 LIKE sy-tabix.
+    FIELD-SYMBOLS <temp5> LIKE LINE OF lt_back.
+    DATA temp6 LIKE sy-tabix.
+    FIELD-SYMBOLS <temp7> LIKE LINE OF lt_back.
+    DATA temp8 LIKE sy-tabix.
+    CLEAR temp1.
+
+    CLEAR temp2.
+    temp2-carrid = `LH`.
+    temp2-fldate = `20260105`.
+    temp2-deptime = `123000`.
+    INSERT temp2 INTO TABLE temp1.
+    CLEAR temp2.
+    temp2-carrid = `AA`.
+    INSERT temp2 INTO TABLE temp1.
+
+    lt_flight = temp1.
     z2ui5_cl_cgui_frontend=>text_to_table( EXPORTING text      = z2ui5_cl_cgui_frontend=>table_to_text( data_tab  = lt_flight
                                                                                                          separator = abap_true )
                                                      separator = abap_true
@@ -67,12 +90,48 @@ CLASS ltcl_test IMPLEMENTATION.
     z2ui5_cl_cgui_frontend=>text_to_table( EXPORTING text      = |LH\t20261231\t01:15:00 PM\r\nAA\tno date\t25:00:00|
                                                      separator = abap_true
                                            CHANGING  data_tab  = lt_back ).
-    cl_abap_unit_assert=>assert_equals( exp = CONV d( `20261231` )
-                                        act = lt_back[ 1 ]-fldate ).
-    cl_abap_unit_assert=>assert_equals( exp = CONV t( `131500` )
-                                        act = lt_back[ 1 ]-deptime ).
-    cl_abap_unit_assert=>assert_initial( lt_back[ 2 ]-fldate ).
-    cl_abap_unit_assert=>assert_initial( lt_back[ 2 ]-deptime ).
+
+    temp3 = `20261231`.
+
+
+    temp5 = sy-tabix.
+    READ TABLE lt_back INDEX 1 ASSIGNING <temp1>.
+    sy-tabix = temp5.
+    IF sy-subrc <> 0.
+      ASSERT 1 = 0.
+    ENDIF.
+    cl_abap_unit_assert=>assert_equals( exp = temp3
+                                        act = <temp1>-fldate ).
+
+    temp4 = `131500`.
+
+
+    temp7 = sy-tabix.
+    READ TABLE lt_back INDEX 1 ASSIGNING <temp6>.
+    sy-tabix = temp7.
+    IF sy-subrc <> 0.
+      ASSERT 1 = 0.
+    ENDIF.
+    cl_abap_unit_assert=>assert_equals( exp = temp4
+                                        act = <temp6>-deptime ).
+
+
+    temp6 = sy-tabix.
+    READ TABLE lt_back INDEX 2 ASSIGNING <temp5>.
+    sy-tabix = temp6.
+    IF sy-subrc <> 0.
+      ASSERT 1 = 0.
+    ENDIF.
+    cl_abap_unit_assert=>assert_initial( <temp5>-fldate ).
+
+
+    temp8 = sy-tabix.
+    READ TABLE lt_back INDEX 2 ASSIGNING <temp7>.
+    sy-tabix = temp8.
+    IF sy-subrc <> 0.
+      ASSERT 1 = 0.
+    ENDIF.
+    cl_abap_unit_assert=>assert_initial( <temp7>-deptime ).
 
   ENDMETHOD.
 
@@ -90,6 +149,12 @@ CLASS ltcl_test IMPLEMENTATION.
   METHOD text_into_columns.
 
     DATA lt_air TYPE ty_t_air.
+    FIELD-SYMBOLS <temp9> LIKE LINE OF lt_air.
+    DATA temp10 LIKE sy-tabix.
+    FIELD-SYMBOLS <temp11> LIKE LINE OF lt_air.
+    DATA temp12 LIKE sy-tabix.
+    FIELD-SYMBOLS <temp13> LIKE LINE OF lt_air.
+    DATA temp14 LIKE sy-tabix.
 
     " the tab splits a line into its columns; the line end of the last line
     " opens none, a value of another type stays initial
@@ -98,35 +163,84 @@ CLASS ltcl_test IMPLEMENTATION.
                                            CHANGING  data_tab  = lt_air ).
     cl_abap_unit_assert=>assert_equals( exp = 2
                                         act = lines( lt_air ) ).
+
+
+    temp10 = sy-tabix.
+    READ TABLE lt_air INDEX 1 ASSIGNING <temp9>.
+    sy-tabix = temp10.
+    IF sy-subrc <> 0.
+      ASSERT 1 = 0.
+    ENDIF.
     cl_abap_unit_assert=>assert_equals( exp = `Lufthansa`
-                                        act = lt_air[ 1 ]-name ).
+                                        act = <temp9>-name ).
+
+
+    temp12 = sy-tabix.
+    READ TABLE lt_air INDEX 1 ASSIGNING <temp11>.
+    sy-tabix = temp12.
+    IF sy-subrc <> 0.
+      ASSERT 1 = 0.
+    ENDIF.
     cl_abap_unit_assert=>assert_equals( exp = 300
-                                        act = lt_air[ 1 ]-seats ).
+                                        act = <temp11>-seats ).
+
+
+    temp14 = sy-tabix.
+    READ TABLE lt_air INDEX 2 ASSIGNING <temp13>.
+    sy-tabix = temp14.
+    IF sy-subrc <> 0.
+      ASSERT 1 = 0.
+    ENDIF.
     cl_abap_unit_assert=>assert_equals( exp = `AA`
-                                        act = lt_air[ 2 ]-carrid ).
+                                        act = <temp13>-carrid ).
 
   ENDMETHOD.
 
   METHOD text_into_lines.
 
     DATA lt_line TYPE string_table.
+    DATA temp15 TYPE string_table.
 
     z2ui5_cl_cgui_frontend=>text_to_table( EXPORTING text     = |first\nsecond\n\nfourth|
                                            CHANGING  data_tab = lt_line ).
-    cl_abap_unit_assert=>assert_equals( exp = VALUE string_table( ( `first` ) ( `second` ) ( `` ) ( `fourth` ) )
+
+    CLEAR temp15.
+    INSERT `first` INTO TABLE temp15.
+    INSERT `second` INTO TABLE temp15.
+    INSERT `` INTO TABLE temp15.
+    INSERT `fourth` INTO TABLE temp15.
+    cl_abap_unit_assert=>assert_equals( exp = temp15
                                         act = lt_line ).
 
   ENDMETHOD.
 
   METHOD table_as_text.
 
-    DATA(lt_air) = VALUE ty_t_air( ( carrid = `LH` name = `Lufthansa` seats = 300 )
-                                   ( carrid = `AA` name = `American` seats = 120 ) ).
+    DATA temp17 TYPE ty_t_air.
+    DATA temp18 LIKE LINE OF temp17.
+    DATA lt_air LIKE temp17.
+    DATA temp19 TYPE string_table.
+    CLEAR temp17.
+
+    temp18-carrid = `LH`.
+    temp18-name = `Lufthansa`.
+    temp18-seats = 300.
+    INSERT temp18 INTO TABLE temp17.
+    temp18-carrid = `AA`.
+    temp18-name = `American`.
+    temp18-seats = 120.
+    INSERT temp18 INTO TABLE temp17.
+
+    lt_air = temp17.
     cl_abap_unit_assert=>assert_equals( exp = |LH\tLufthansa\t300\r\nAA\tAmerican\t120\r\n|
                                         act = z2ui5_cl_cgui_frontend=>table_to_text( data_tab  = lt_air
                                                                                      separator = abap_true ) ).
+
+    CLEAR temp19.
+    INSERT `a` INTO TABLE temp19.
+    INSERT `b` INTO TABLE temp19.
     cl_abap_unit_assert=>assert_equals( exp = |a\r\nb|
-                                        act = z2ui5_cl_cgui_frontend=>table_to_text( data_tab      = VALUE string_table( ( `a` ) ( `b` ) )
+                                        act = z2ui5_cl_cgui_frontend=>table_to_text( data_tab      = temp19
                                                                                      last_line_end = abap_false ) ).
 
   ENDMETHOD.
@@ -134,11 +248,21 @@ CLASS ltcl_test IMPLEMENTATION.
   METHOD url_of_bytes.
 
     TYPES ty_line TYPE x LENGTH 4.
-    DATA lt_bin TYPE STANDARD TABLE OF ty_line WITH EMPTY KEY.
+    DATA lt_bin TYPE STANDARD TABLE OF ty_line WITH DEFAULT KEY.
     DATA lv_url TYPE c LENGTH 255.
 
     " two lines of four bytes, size cuts the last one: 4D 61 6E 21 4D 61
-    lt_bin = VALUE #( ( CONV ty_line( '4D616E21' ) ) ( CONV ty_line( '4D61FFFF' ) ) ).
+    DATA temp21 LIKE lt_bin.
+    DATA temp8 LIKE LINE OF temp21.
+    DATA temp9 LIKE LINE OF temp21.
+    CLEAR temp21.
+
+    temp8 = '4D616E21'.
+    INSERT temp8 INTO TABLE temp21.
+
+    temp9 = '4D61FFFF'.
+    INSERT temp9 INTO TABLE temp21.
+    lt_bin = temp21.
     z2ui5_cl_cgui_frontend=>dp_create_url( EXPORTING  type    = 'image'
                                                       subtype = 'gif'
                                                       size    = 6
@@ -165,13 +289,17 @@ CLASS ltcl_test IMPLEMENTATION.
   METHOD bytes_lines_base64.
 
     TYPES ty_line TYPE x LENGTH 4.
-    DATA lt_bin TYPE STANDARD TABLE OF ty_line WITH EMPTY KEY.
+    DATA lt_bin TYPE STANDARD TABLE OF ty_line WITH DEFAULT KEY.
     DATA lv_length TYPE i.
     DATA lv_back TYPE xstring.
     DATA lv_b64 TYPE string.
 
     " six bytes are two lines of four, the last one filled up
-    z2ui5_cl_cgui_frontend=>scms_xstring_to_binary( EXPORTING buffer        = CONV xstring( '4D616E214D61' )
+    DATA temp23 TYPE xstring.
+    DATA temp24 TYPE xstring.
+    DATA temp25 TYPE xstring.
+    temp23 = '4D616E214D61'.
+    z2ui5_cl_cgui_frontend=>scms_xstring_to_binary( EXPORTING buffer        = temp23
                                                     IMPORTING output_length = lv_length
                                                     CHANGING  binary_tab    = lt_bin ).
     cl_abap_unit_assert=>assert_equals( exp = 6
@@ -183,7 +311,9 @@ CLASS ltcl_test IMPLEMENTATION.
                                                                binary_tab   = lt_bin
                                                     IMPORTING  buffer       = lv_back
                                                     EXCEPTIONS OTHERS       = 1 ).
-    cl_abap_unit_assert=>assert_equals( exp = CONV xstring( '4D616E214D61' )
+
+    temp24 = '4D616E214D61'.
+    cl_abap_unit_assert=>assert_equals( exp = temp24
                                         act = lv_back ).
 
     z2ui5_cl_cgui_frontend=>ssfc_base64_encode( EXPORTING  bindata = lv_back
@@ -195,7 +325,9 @@ CLASS ltcl_test IMPLEMENTATION.
     z2ui5_cl_cgui_frontend=>ssfc_base64_decode( EXPORTING  b64data = lv_b64
                                                 IMPORTING  bindata = lv_back
                                                 EXCEPTIONS OTHERS  = 1 ).
-    cl_abap_unit_assert=>assert_equals( exp = CONV xstring( '4D616E214D61' )
+
+    temp25 = '4D616E214D61'.
+    cl_abap_unit_assert=>assert_equals( exp = temp25
                                         act = lv_back ).
 
   ENDMETHOD.

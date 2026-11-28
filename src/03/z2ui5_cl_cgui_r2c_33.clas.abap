@@ -42,7 +42,13 @@ CLASS z2ui5_cl_cgui_r2c_33 IMPLEMENTATION.
 
   METHOD start_of_selection.
 
-    DATA(lv_clean) = condense( p_name ).
+    DATA lv_clean TYPE string.
+    DATA lv_part LIKE LINE OF lt_part.
+      DATA lv_word TYPE string.
+    DATA lv_upper TYPE string.
+    DATA lv_dashed LIKE lv_clean.
+    DATA lv_vowels LIKE lv_clean.
+    lv_clean = condense( p_name ).
     SPLIT lv_clean AT space INTO TABLE lt_part.
 
     list( )->new_line(
@@ -56,8 +62,10 @@ CLASS z2ui5_cl_cgui_r2c_33 IMPLEMENTATION.
         )->write( lines( lt_part ) ).
     list( )->uline( ).
 
-    LOOP AT lt_part INTO DATA(lv_part).
-      DATA(lv_word) = to_upper( substring( val = lv_part len = 1 ) ) && substring( val = lv_part off = 1 ).
+
+    LOOP AT lt_part INTO lv_part.
+
+      lv_word = to_upper( substring( val = lv_part len = 1 ) ) && substring( val = lv_part off = 1 ).
       list( )->new_line(
           )->write( sy-tabix
           )->write( lv_word
@@ -66,10 +74,13 @@ CLASS z2ui5_cl_cgui_r2c_33 IMPLEMENTATION.
     ENDLOOP.
     list( )->uline( ).
 
-    DATA(lv_upper) = to_upper( lv_clean ).
-    DATA(lv_dashed) = lv_clean.
+
+    lv_upper = to_upper( lv_clean ).
+
+    lv_dashed = lv_clean.
     REPLACE ALL OCCURRENCES OF ` ` IN lv_dashed WITH `-`.
-    DATA(lv_vowels) = lv_clean.
+
+    lv_vowels = lv_clean.
     TRANSLATE lv_vowels USING 'aAeEiIoOuU'.
 
     list( )->new_line(

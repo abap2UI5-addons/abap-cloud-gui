@@ -38,7 +38,7 @@ CLASS z2ui5_cl_cgui_list_tree DEFINITION PUBLIC
         item_name TYPE ty_item_name,
       END OF ty_s_first.
     " the name of the first item of each node - kept between roundtrips
-    DATA mt_first TYPE STANDARD TABLE OF ty_s_first WITH EMPTY KEY.
+    DATA mt_first TYPE STANDARD TABLE OF ty_s_first WITH DEFAULT KEY.
 
     METHODS hierarchy_item REDEFINITION.
 
@@ -69,14 +69,23 @@ CLASS z2ui5_cl_cgui_list_tree IMPLEMENTATION.
     DATA ls_item TYPE ty_s_item.
 
     " the first item of each node new here is the text of the node
-    LOOP AT item_table ASSIGNING FIELD-SYMBOL(<line>).
+    FIELD-SYMBOLS <line> TYPE ANY.
+      DATA temp1 LIKE sy-subrc.
+        DATA temp2 TYPE z2ui5_cl_cgui_list_tree=>ty_s_first.
+    LOOP AT item_table ASSIGNING <line>.
       CLEAR ls_item.
       MOVE-CORRESPONDING <line> TO ls_item.
+
+      READ TABLE lt_item WITH KEY node_key = ls_item-node_key item_name = mv_hierarchy TRANSPORTING NO FIELDS.
+      temp1 = sy-subrc.
       IF ls_item-node_key IS NOT INITIAL AND ls_item-hidden = abap_false
-          AND NOT line_exists( lt_item[ node_key = ls_item-node_key item_name = mv_hierarchy ] ).
+          AND NOT temp1 = 0.
         DELETE mt_first WHERE node_key = ls_item-node_key.
-        INSERT VALUE #( node_key  = ls_item-node_key
-                        item_name = to_upper( ls_item-item_name ) ) INTO TABLE mt_first.
+
+        CLEAR temp2.
+        temp2-node_key = ls_item-node_key.
+        temp2-item_name = to_upper( ls_item-item_name ).
+        INSERT temp2 INTO TABLE mt_first.
         ls_item-item_name = mv_hierarchy.
       ENDIF.
       INSERT ls_item INTO TABLE lt_item.
@@ -88,8 +97,16 @@ CLASS z2ui5_cl_cgui_list_tree IMPLEMENTATION.
 
   METHOD hierarchy_item.
 
-    READ TABLE mt_first INTO DATA(ls_first) WITH KEY node_key = node_key.
-    result = COND #( WHEN sy-subrc = 0 THEN ls_first-item_name ELSE mv_hierarchy ).
+    DATA ls_first TYPE z2ui5_cl_cgui_list_tree=>ty_s_first.
+    DATA temp3 TYPE z2ui5_cl_cgui_column_tree=>ty_item_name.
+    READ TABLE mt_first INTO ls_first WITH KEY node_key = node_key.
+
+    IF sy-subrc = 0.
+      temp3 = ls_first-item_name.
+    ELSE.
+      temp3 = mv_hierarchy.
+    ENDIF.
+    result = temp3.
 
   ENDMETHOD.
 
@@ -98,8 +115,11 @@ CLASS z2ui5_cl_cgui_list_tree IMPLEMENTATION.
 
   METHOD cells.
 
-    DATA(lv_node_key) = node_key_of( key ).
-    LOOP AT mt_item INTO DATA(ls_item) WHERE node_key = lv_node_key.
+    DATA lv_node_key TYPE z2ui5_cl_cgui_simple_tree=>ty_node_key.
+    DATA ls_item LIKE LINE OF mt_item.
+    lv_node_key = node_key_of( key ).
+
+    LOOP AT mt_item INTO ls_item WHERE node_key = lv_node_key.
       INSERT cell_of( ls_item ) INTO TABLE result.
     ENDLOOP.
 

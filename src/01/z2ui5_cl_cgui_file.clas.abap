@@ -19,7 +19,7 @@ CLASS z2ui5_cl_cgui_file DEFINITION PUBLIC FINAL CREATE PRIVATE.
         name    TYPE string,
         content TYPE xstring,
       END OF ty_s_file.
-    TYPES ty_t_file TYPE STANDARD TABLE OF ty_s_file WITH EMPTY KEY.
+    TYPES ty_t_file TYPE STANDARD TABLE OF ty_s_file WITH DEFAULT KEY.
 
     TYPES:
       BEGIN OF ty_s_result,
@@ -92,7 +92,7 @@ CLASS z2ui5_cl_cgui_file IMPLEMENTATION.
 
   METHOD factory.
 
-    result = NEW #( ).
+    CREATE OBJECT result.
     result->mv_title    = title.
     result->mv_multiple = multiple.
     result->mv_types    = file_types( filter ).
@@ -107,23 +107,39 @@ CLASS z2ui5_cl_cgui_file IMPLEMENTATION.
 
     DATA lt_part TYPE string_table.
     DATA lt_type TYPE string_table.
+    DATA lv_part LIKE LINE OF lt_part.
+      TYPES temp1 TYPE STANDARD TABLE OF string WITH DEFAULT KEY.
+DATA lt_pattern TYPE temp1.
+      DATA lv_pattern LIKE LINE OF lt_pattern.
+          DATA temp4 LIKE sy-subrc.
+          DATA temp5 LIKE sy-tabix.
 
     SPLIT filter AT `|` INTO TABLE lt_part.
     " the filter alternates text and patterns - the patterns are every
     " second part, separated by ;
-    LOOP AT lt_part INTO DATA(lv_part).
+
+    LOOP AT lt_part INTO lv_part.
       IF sy-tabix MOD 2 = 1.
         CONTINUE.
       ENDIF.
-      SPLIT lv_part AT `;` INTO TABLE DATA(lt_pattern).
-      LOOP AT lt_pattern INTO DATA(lv_pattern).
+
+
+      SPLIT lv_part AT `;` INTO TABLE lt_pattern.
+
+      LOOP AT lt_pattern INTO lv_pattern.
         lv_pattern = to_lower( condense( lv_pattern ) ).
         IF lv_pattern = `*.*` OR lv_pattern = `*`.
           RETURN.
         ENDIF.
         IF strlen( lv_pattern ) > 2 AND substring( val = lv_pattern len = 2 ) = `*.`.
           lv_pattern = substring( val = lv_pattern off = 2 ).
-          IF NOT line_exists( lt_type[ table_line = lv_pattern ] ).
+
+
+          temp5 = sy-tabix.
+          READ TABLE lt_type WITH KEY table_line = lv_pattern TRANSPORTING NO FIELDS.
+          temp4 = sy-subrc.
+          sy-tabix = temp5.
+          IF NOT temp4 = 0.
             INSERT lv_pattern INTO TABLE lt_type.
           ENDIF.
         ENDIF.
@@ -136,12 +152,17 @@ CLASS z2ui5_cl_cgui_file IMPLEMENTATION.
 
   METHOD content_of_data_uri.
 
-    DATA(lv_at) = find( val = val sub = `,` ).
+    DATA lv_at TYPE i.
+    DATA lv_head TYPE string.
+    DATA lv_data TYPE string.
+    lv_at = find( val = val sub = `,` ).
     IF lv_at < 0.
       RETURN.
     ENDIF.
-    DATA(lv_head) = substring( val = val len = lv_at ).
-    DATA(lv_data) = substring( val = val off = lv_at + 1 ).
+
+    lv_head = substring( val = val len = lv_at ).
+
+    lv_data = substring( val = val off = lv_at + 1 ).
     IF find( val = lv_head sub = `;base64` ) >= 0.
       result = z2ui5_cl_cgui_context=>conv_decode_x_base64( lv_data ).
     ELSE.
@@ -158,10 +179,11 @@ CLASS z2ui5_cl_cgui_file IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD z2ui5_if_app~main.
+        DATA temp1 TYPE xsdboolean.
 
     me->client = client.
 
-    IF client->check_on_init( ).
+    IF client->check_on_init( ) IS NOT INITIAL.
       view_display( ).
       RETURN.
     ENDIF.
@@ -172,7 +194,9 @@ CLASS z2ui5_cl_cgui_file IMPLEMENTATION.
         view_display( ).
 
       WHEN cs_event-ok.
-        ms_result-confirmed = xsdbool( ms_result-files IS NOT INITIAL ).
+
+        temp1 = boolc( ms_result-files IS NOT INITIAL ).
+        ms_result-confirmed = temp1.
         leave( ).
 
       WHEN cs_event-cancel.
@@ -219,7 +243,14 @@ CLASS z2ui5_cl_cgui_file IMPLEMENTATION.
 
   METHOD view_display.
 
-    DATA(lo_dialog) = z2ui5_cl_ui5_view_builder=>factory(
+    DATA lo_dialog TYPE REF TO z2ui5_cl_ui5_view_builder.
+    DATA lo_content TYPE REF TO z2ui5_cl_ui5_view_builder.
+    DATA temp6 TYPE string.
+    DATA ls_file LIKE LINE OF ms_result-files.
+    DATA temp7 TYPE string.
+    DATA temp1 TYPE string.
+    DATA temp2 TYPE xsdboolean.
+    lo_dialog = z2ui5_cl_ui5_view_builder=>factory(
         )->ele( n = `FragmentDefinition` ns = `core`
         )->a( n = `xmlns`       v = `sap.m`
         )->a( n = `xmlns:core`  v = `sap.ui.core`
@@ -228,34 +259,44 @@ CLASS z2ui5_cl_cgui_file IMPLEMENTATION.
         )->a( n = `title`      t = mv_title
         )->a( n = `afterClose` v = client->_event( cs_event-cancel ) ).
 
-    DATA(lo_content) = lo_dialog->ele( `content`
+
+    lo_content = lo_dialog->ele( `content`
         )->ele( `VBox`
         )->a( n = `class` v = `sapUiSmallMargin` ).
 
+
+    temp6 = 'Choose a file'(002).
     lo_content->tag( n = `FileUploader` ns = `z2ui5`
         )->a( n = `value`             v = client->_bind( mv_value )
         )->a( n = `path`              v = client->_bind( mv_path )
         )->a( n = `fileType`          t = mv_types
         )->a( n = `multiple`          b = mv_multiple
         )->a( n = `checkDirectUpload` b = abap_true
-        )->a( n = `placeholder`       t = CONV #( 'Choose a file'(002) )
+        )->a( n = `placeholder`       t = temp6
         )->a( n = `upload`            v = client->_event( cs_event-upload ) ).
 
-    LOOP AT ms_result-files INTO DATA(ls_file).
+
+    LOOP AT ms_result-files INTO ls_file.
       lo_content->tag( `ObjectStatus`
           )->a( n = `text`  t = |{ ls_file-name } ({ xstrlen( ls_file-content ) } B)|
           )->a( n = `icon`  v = `sap-icon://document`
           )->a( n = `class` v = `sapUiTinyMarginTop` ).
     ENDLOOP.
 
+
+    temp7 = 'OK'(003).
+
+    temp1 = 'Cancel'(004).
+
+    temp2 = boolc( ms_result-files IS NOT INITIAL ).
     lo_dialog->ele( `buttons`
         )->tag( `Button`
-            )->a( n = `text`    t = CONV #( 'OK'(003) )
+            )->a( n = `text`    t = temp7
             )->a( n = `type`    v = `Emphasized`
-            )->a( n = `enabled` b = xsdbool( ms_result-files IS NOT INITIAL )
+            )->a( n = `enabled` b = temp2
             )->a( n = `press`   v = client->_event( cs_event-ok )
         )->tag( `Button`
-            )->a( n = `text`  t = CONV #( 'Cancel'(004) )
+            )->a( n = `text`  t = temp1
             )->a( n = `press` v = client->_event( cs_event-cancel ) ).
 
     client->popup_display( lo_dialog->stringify( ) ).

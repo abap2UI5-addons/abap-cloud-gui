@@ -114,23 +114,36 @@ ENDCLASS.
 CLASS z2ui5_cl_cgui_browser IMPLEMENTATION.
 
   METHOD show_html.
+    DATA lv_html LIKE html_string.
+      DATA lv_line LIKE LINE OF html.
+    DATA lt_line TYPE z2ui5_cl_cgui_browser=>html_table.
+    DATA lo_viewer TYPE REF TO z2ui5_cl_cgui_html_viewer.
+    DATA temp1 TYPE xsdboolean.
+    DATA lv_url TYPE string.
 
     CLEAR html_errors.
-    DATA(lv_html) = html_string.
+
+    lv_html = html_string.
     IF lv_html IS INITIAL AND html_xstring IS NOT INITIAL.
       lv_html = z2ui5_cl_cgui_context=>conv_get_string_by_xstring( html_xstring ).
     ENDIF.
     IF lv_html IS INITIAL.
-      LOOP AT html INTO DATA(lv_line).
+
+      LOOP AT html INTO lv_line.
         lv_html = lv_html && lv_line.
       ENDLOOP.
     ENDIF.
 
-    DATA(lt_line) = lines_of( lv_html ).
-    DATA(lo_viewer) = viewer( container = container
-                              window    = xsdbool( container IS NOT SUPPLIED )
+
+    lt_line = lines_of( lv_html ).
+
+
+    temp1 = boolc( container IS NOT SUPPLIED ).
+    lo_viewer = viewer( container = container
+                              window    = temp1
                               title     = title ).
-    lo_viewer->load_data( IMPORTING  assigned_url = DATA(lv_url)
+
+    lo_viewer->load_data( IMPORTING  assigned_url = lv_url
                           CHANGING   data_table   = lt_line
                           EXCEPTIONS OTHERS       = 1 ).
     IF sy-subrc = 0.
@@ -142,20 +155,26 @@ CLASS z2ui5_cl_cgui_browser IMPLEMENTATION.
 
   METHOD show_url.
 
-    viewer( container = container
-            window    = xsdbool( container IS NOT SUPPLIED )
-            title     = title )->show_url( EXPORTING  url    = url
+    DATA temp2 TYPE xsdboolean.
+    DATA temp1 TYPE REF TO z2ui5_cl_cgui_html_viewer.
+    temp2 = boolc( container IS NOT SUPPLIED ).
+
+    temp1 = viewer( container = container window = temp2 title = title ).
+    temp1->show_url( EXPORTING  url    = url
                                            EXCEPTIONS OTHERS = 1 ).
 
   ENDMETHOD.
 
   METHOD show_xml.
 
-    DATA(lv_xml) = xml_string.
+    DATA lv_xml LIKE xml_string.
+    DATA lv_html TYPE string.
+    lv_xml = xml_string.
     IF lv_xml IS INITIAL AND xml_xstring IS NOT INITIAL.
       lv_xml = z2ui5_cl_cgui_context=>conv_get_string_by_xstring( xml_xstring ).
     ENDIF.
-    DATA(lv_html) = |<pre>{ escape( val    = lv_xml
+
+    lv_html = |<pre>{ escape( val    = lv_xml
                                     format = cl_abap_format=>e_html_text ) }</pre>|.
     IF container IS SUPPLIED.
       show_html( html_string = lv_html
@@ -185,7 +204,8 @@ CLASS z2ui5_cl_cgui_browser IMPLEMENTATION.
 
   METHOD lines_of.
 
-    DATA(lv_at) = 0.
+    DATA lv_at TYPE i.
+    lv_at = 0.
     WHILE lv_at < strlen( html ).
       APPEND substring( val = html
                         off = lv_at
@@ -202,20 +222,21 @@ CLASS z2ui5_cl_cgui_browser IMPLEMENTATION.
     " reference, never a literal naming the class
     DATA lo_self TYPE REF TO z2ui5_cl_cgui_browser.
 
-    DATA(lo_parent) = container.
+    DATA lo_parent LIKE container.
+      DATA temp1 TYPE REF TO cl_abap_refdescr.
+    lo_parent = container.
     IF window = abap_true.
       " the window of its own - a dialog box, title its caption
       close_browser( ).
-      go_box = NEW z2ui5_cl_cgui_container( caption = title
-                                            width   = 800
-                                            height  = 600 ).
-      go_box->set_handler( class  = CAST cl_abap_refdescr(
-                                        cl_abap_typedescr=>describe_by_data( lo_self ) )->get_referenced_type( )->get_relative_name( )
+      CREATE OBJECT go_box TYPE z2ui5_cl_cgui_container EXPORTING caption = title width = 800 height = 600.
+
+      temp1 ?= cl_abap_typedescr=>describe_by_data( lo_self ).
+      go_box->set_handler( class  = temp1->get_referenced_type( )->get_relative_name( )
                            method = `ON_CLOSE`
                            event  = `CLOSE` ).
       lo_parent = go_box.
     ENDIF.
-    result = NEW z2ui5_cl_cgui_html_viewer( parent = lo_parent ).
+    CREATE OBJECT result TYPE z2ui5_cl_cgui_html_viewer EXPORTING parent = lo_parent.
 
   ENDMETHOD.
 

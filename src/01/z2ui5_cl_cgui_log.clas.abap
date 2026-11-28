@@ -31,8 +31,11 @@ CLASS z2ui5_cl_cgui_log IMPLEMENTATION.
 
   METHOD z2ui5_if_cgui_log~add.
 
-    INSERT VALUE #( type = to_upper( type )
-                    text = text ) INTO TABLE mt_message.
+    DATA temp1 TYPE z2ui5_if_cgui_log=>ty_s_message.
+    CLEAR temp1.
+    temp1-type = to_upper( type ).
+    temp1-text = text.
+    INSERT temp1 INTO TABLE mt_message.
 
   ENDMETHOD.
 
@@ -47,7 +50,8 @@ CLASS z2ui5_cl_cgui_log IMPLEMENTATION.
     FIELD-SYMBOLS <type> TYPE any.
     FIELD-SYMBOLS <text> TYPE any.
 
-    LOOP AT tab ASSIGNING FIELD-SYMBOL(<row>).
+    FIELD-SYMBOLS <row> TYPE ANY.
+    LOOP AT tab ASSIGNING <row>.
       ASSIGN COMPONENT `TYPE` OF STRUCTURE <row> TO <type>.
       IF sy-subrc <> 0.
         CONTINUE.

@@ -37,18 +37,26 @@ CLASS z2ui5_cl_cgui_r2c_31 IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD start_of_selection.
+    DATA temp2 TYPE z2ui5_cl_cgui_gui=>ty_s_simple_event.
+    DATA temp3 TYPE REF TO lcl_counter.
 
-    go_toolbar = NEW z2ui5_cl_cgui_toolbar( parent = z2ui5_cl_cgui_container=>default_screen ).
+    CREATE OBJECT go_toolbar TYPE z2ui5_cl_cgui_toolbar EXPORTING parent = z2ui5_cl_cgui_container=>default_screen.
     go_toolbar->add_button( fcode = 'UP'   icon = `sap-icon://add` butn_type = z2ui5_cl_cgui_toolbar=>cntb_btype_button text = 'Up' ).
     go_toolbar->add_button( fcode = 'DOWN' icon = `sap-icon://less` butn_type = z2ui5_cl_cgui_toolbar=>cntb_btype_button text = 'Down' ).
 
-    APPEND VALUE #( eventid = z2ui5_cl_cgui_toolbar=>m_id_function_selected appl_event = abap_true ) TO lt_event.
+
+    CLEAR temp2.
+    temp2-eventid = z2ui5_cl_cgui_toolbar=>m_id_function_selected.
+    temp2-appl_event = abap_true.
+    APPEND temp2 TO lt_event.
     go_toolbar->set_registered_events( lt_event ).
-    go_toolbar->set_handler( handler = NEW lcl_counter( )
+
+    CREATE OBJECT temp3 TYPE lcl_counter.
+    go_toolbar->set_handler( handler = temp3
                              method  = `ON_FUNCTION`
                              event   = `FUNCTION_SELECTED` ).
 
-    lcl_counter=>go_html = NEW z2ui5_cl_cgui_html_viewer( parent = z2ui5_cl_cgui_container=>default_screen ).
+    CREATE OBJECT lcl_counter=>go_html TYPE z2ui5_cl_cgui_html_viewer EXPORTING parent = z2ui5_cl_cgui_container=>default_screen.
     lcl_counter=>show( ).
     write( space ).
 

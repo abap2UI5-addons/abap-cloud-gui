@@ -66,17 +66,58 @@ CLASS z2ui5_cl_cgui_salv_nodes IMPLEMENTATION.
 
   METHOD add_node.
 
-    DATA(lo_tree) = mo_tree.
-    DATA(lv_related) = COND i( WHEN condense( CONV string( related_node ) ) CO `0123456789` AND related_node IS NOT INITIAL
-                               THEN CONV i( related_node ) ).
-    " a child below the related node, a sibling below its parent
-    DATA(lv_parent) = lo_tree->parent_of_related( related      = lv_related
-                                                  relationship = relationship ).
-    DATA(lv_icon) = COND string( WHEN expanded_icon IS NOT INITIAL THEN expanded_icon ELSE collapsed_icon ).
-    DATA(lv_folder) = xsdbool( folder = abap_true OR expander = abap_true ).
-    DATA(lv_icon_ui5) = COND string( WHEN lv_icon CP `sap-icon://*` THEN lv_icon ).
-    " a folder has no data row - passed only when there is one
+    DATA lo_tree LIKE mo_tree.
+    DATA temp1 TYPE string.
+    DATA temp4 TYPE i.
+    DATA temp5 TYPE i.
+    DATA lv_related LIKE temp5.
+    DATA lv_parent TYPE i.
+    DATA temp2 TYPE string.
+    DATA lv_icon LIKE temp2.
+    DATA lv_folder TYPE abap_bool.
+    DATA temp6 TYPE xsdboolean.
+    DATA temp3 TYPE string.
+    DATA lv_icon_ui5 LIKE temp3.
     DATA lv_key TYPE i.
+    lo_tree = mo_tree.
+
+    temp1 = related_node.
+
+    temp4 = related_node.
+
+    IF condense( temp1 ) CO `0123456789` AND related_node IS NOT INITIAL.
+      temp5 = temp4.
+    ELSE.
+      CLEAR temp5.
+    ENDIF.
+
+    lv_related = temp5.
+    " a child below the related node, a sibling below its parent
+
+    lv_parent = lo_tree->parent_of_related( related      = lv_related
+                                                  relationship = relationship ).
+
+    IF expanded_icon IS NOT INITIAL.
+      temp2 = expanded_icon.
+    ELSE.
+      temp2 = collapsed_icon.
+    ENDIF.
+
+    lv_icon = temp2.
+
+
+    temp6 = boolc( folder = abap_true OR expander = abap_true ).
+    lv_folder = temp6.
+
+    IF lv_icon CP `sap-icon://*`.
+      temp3 = lv_icon.
+    ELSE.
+      CLEAR temp3.
+    ENDIF.
+
+    lv_icon_ui5 = temp3.
+    " a folder has no data row - passed only when there is one
+
     " an expander opens without children - EXPAND_EMPTY_FOLDER adds them
     IF data_row IS SUPPLIED.
       lv_key = lo_tree->add_node( parent = lv_parent
@@ -92,31 +133,46 @@ CLASS z2ui5_cl_cgui_salv_nodes IMPLEMENTATION.
                                   folder = lv_folder
                                   lazy   = expander ).
     ENDIF.
-    value = NEW #( tree = mo_tree
-                   key  = lv_key ).
+    CREATE OBJECT value EXPORTING tree = mo_tree key = lv_key.
 
   ENDMETHOD.
 
   METHOD get_node.
 
-    DATA(lv_key) = condense( CONV string( node_key ) ).
+    DATA temp4 TYPE string.
+    DATA lv_key TYPE string.
+    DATA temp5 TYPE i.
+    DATA temp6 TYPE i.
+    temp4 = node_key.
+
+    lv_key = condense( temp4 ).
     IF lv_key IS INITIAL OR lv_key CN `0123456789`.
       RETURN.
     ENDIF.
-    IF mo_tree->get_node( CONV i( lv_key ) )-key IS INITIAL.
+
+    temp5 = lv_key.
+    IF mo_tree->get_node( temp5 )-key IS INITIAL.
       RETURN.
     ENDIF.
-    value = NEW #( tree = mo_tree
-                   key  = CONV i( lv_key ) ).
+
+    temp6 = lv_key.
+    CREATE OBJECT value EXPORTING tree = mo_tree key = temp6.
 
   ENDMETHOD.
 
   METHOD get_all_nodes.
 
-    LOOP AT mo_tree->get_nodes( ) INTO DATA(ls_node).
-      INSERT VALUE #( key  = z2ui5_cl_cgui_salv_node=>to_key( ls_node-key )
-                      node = NEW #( tree = mo_tree
-                                    key  = ls_node-key ) ) INTO TABLE value.
+    DATA temp7 TYPE z2ui5_cl_cgui_tree=>ty_t_node.
+    DATA ls_node LIKE LINE OF temp7.
+      DATA temp8 TYPE z2ui5_cl_cgui_salv_node=>ty_s_node_ref.
+    temp7 = mo_tree->get_nodes( ).
+
+    LOOP AT temp7 INTO ls_node.
+
+      CLEAR temp8.
+      temp8-key = z2ui5_cl_cgui_salv_node=>to_key( ls_node-key ).
+      CREATE OBJECT temp8-node EXPORTING tree = mo_tree key = ls_node-key.
+      INSERT temp8 INTO TABLE value.
     ENDLOOP.
 
   ENDMETHOD.
@@ -135,7 +191,11 @@ CLASS z2ui5_cl_cgui_salv_nodes IMPLEMENTATION.
 
   METHOD delete_all.
 
-    LOOP AT mo_tree->get_children( 0 ) INTO DATA(ls_node).
+    DATA temp9 TYPE z2ui5_cl_cgui_tree=>ty_t_node.
+    DATA ls_node LIKE LINE OF temp9.
+    temp9 = mo_tree->get_children( 0 ).
+
+    LOOP AT temp9 INTO ls_node.
       mo_tree->delete_node( ls_node-key ).
     ENDLOOP.
 

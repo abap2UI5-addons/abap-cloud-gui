@@ -206,10 +206,14 @@ ENDCLASS.
 CLASS z2ui5_cl_cgui_alv_grid IMPLEMENTATION.
 
   METHOD constructor.
+    DATA temp1 TYPE z2ui5_if_cgui_gui=>ty_s_control.
 
     super->constructor( ).
-    IF add( VALUE #( kind   = z2ui5_if_cgui_gui=>cs_kind-grid
-                     parent = id_of( i_parent ) ) ) = abap_false.
+
+    CLEAR temp1.
+    temp1-kind = z2ui5_if_cgui_gui=>cs_kind-grid.
+    temp1-parent = id_of( i_parent ).
+    IF add( temp1 ) = abap_false.
       RAISE error_cntl_create.
     ENDIF.
 
@@ -220,25 +224,31 @@ CLASS z2ui5_cl_cgui_alv_grid IMPLEMENTATION.
     DATA lr_fieldcat TYPE REF TO data.
     DATA lr_layout   TYPE REF TO data.
     DATA lr_sort     TYPE REF TO data.
+    DATA temp2 TYPE REF TO data.
+    DATA temp3 TYPE REF TO data.
 
     IF go_report IS NOT BOUND.
       RAISE program_error.
     ENDIF.
     IF it_fieldcatalog IS SUPPLIED.
-      lr_fieldcat = REF #( it_fieldcatalog ).
+      GET REFERENCE OF it_fieldcatalog INTO lr_fieldcat.
       mr_fieldcat = copy( lr_fieldcat ).
     ENDIF.
     IF is_layout IS SUPPLIED.
-      lr_layout = REF #( is_layout ).
+      GET REFERENCE OF is_layout INTO lr_layout.
       mr_layout = copy( lr_layout ).
     ENDIF.
     IF it_sort IS SUPPLIED.
-      lr_sort = REF #( it_sort ).
+      GET REFERENCE OF it_sort INTO lr_sort.
       mr_sort = copy( lr_sort ).
     ENDIF.
-    mr_outtab = copy( REF #( it_outtab ) ).
-    go_report->grid_display( id       = mv_id
-                             tab      = REF #( it_outtab )
+
+    GET REFERENCE OF it_outtab INTO temp2.
+mr_outtab = copy( temp2 ).
+
+    GET REFERENCE OF it_outtab INTO temp3.
+go_report->grid_display( id       = mv_id
+                             tab      = temp3
                              fieldcat = lr_fieldcat
                              layout   = lr_layout
                              sort     = lr_sort
@@ -248,16 +258,22 @@ CLASS z2ui5_cl_cgui_alv_grid IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD refresh_table_display.
+      DATA temp4 TYPE REF TO data.
+      DATA temp5 TYPE REF TO data.
 
     IF go_report IS BOUND AND it_outtab IS SUPPLIED.
-      mr_outtab = copy( REF #( it_outtab ) ).
+
+      GET REFERENCE OF it_outtab INTO temp4.
+mr_outtab = copy( temp4 ).
       IF go_report->grid_get( mv_id )-shown = abap_false.
         " it shows now, with its field catalog and layout
         show( ).
         RETURN.
       ENDIF.
-      go_report->grid_display( id  = mv_id
-                               tab = REF #( it_outtab ) ).
+
+      GET REFERENCE OF it_outtab INTO temp5.
+go_report->grid_display( id  = mv_id
+                               tab = temp5 ).
     ENDIF.
 
   ENDMETHOD.
@@ -280,6 +296,7 @@ CLASS z2ui5_cl_cgui_alv_grid IMPLEMENTATION.
 
     FIELD-SYMBOLS <tab>   TYPE STANDARD TABLE.
     FIELD-SYMBOLS <title> TYPE any.
+        DATA temp6 TYPE string.
 
     IF mr_outtab IS NOT BOUND.
       RETURN.
@@ -288,7 +305,9 @@ CLASS z2ui5_cl_cgui_alv_grid IMPLEMENTATION.
     IF mr_layout IS BOUND.
       ASSIGN mr_layout->('GRID_TITLE') TO <title>.
       IF <title> IS ASSIGNED AND <title> IS NOT INITIAL.
-        result = |{ condense( CONV string( <title> ) ) } |.
+
+        temp6 = <title>.
+        result = |{ condense( temp6 ) } |.
       ENDIF.
     ENDIF.
     result = |{ result }({ lines( <tab> ) })|.
@@ -309,10 +328,15 @@ CLASS z2ui5_cl_cgui_alv_grid IMPLEMENTATION.
 
   METHOD set_frontend_fieldcatalog.
 
-    mr_fieldcat = copy( REF #( it_fieldcatalog ) ).
+    DATA temp7 TYPE REF TO data.
+      DATA temp8 TYPE REF TO data.
+    GET REFERENCE OF it_fieldcatalog INTO temp7.
+mr_fieldcat = copy( temp7 ).
     IF go_report IS BOUND.
-      go_report->grid_display( id       = mv_id
-                               fieldcat = REF #( it_fieldcatalog ) ).
+
+      GET REFERENCE OF it_fieldcatalog INTO temp8.
+go_report->grid_display( id       = mv_id
+                               fieldcat = temp8 ).
     ENDIF.
 
   ENDMETHOD.
@@ -320,12 +344,14 @@ CLASS z2ui5_cl_cgui_alv_grid IMPLEMENTATION.
   METHOD get_frontend_fieldcatalog.
 
     FIELD-SYMBOLS <fieldcat> TYPE STANDARD TABLE.
+    DATA ls_grid TYPE z2ui5_if_cgui_gui=>ty_s_grid.
 
     CLEAR et_fieldcatalog.
     IF go_report IS NOT BOUND.
       RETURN.
     ENDIF.
-    DATA(ls_grid) = go_report->grid_get( mv_id ).
+
+    ls_grid = go_report->grid_get( mv_id ).
     IF ls_grid-fieldcat IS BOUND.
       ASSIGN ls_grid-fieldcat->* TO <fieldcat>.
       et_fieldcatalog = <fieldcat>.
@@ -335,10 +361,15 @@ CLASS z2ui5_cl_cgui_alv_grid IMPLEMENTATION.
 
   METHOD set_frontend_layout.
 
-    mr_layout = copy( REF #( is_layout ) ).
+    DATA temp9 TYPE REF TO data.
+      DATA temp10 TYPE REF TO data.
+GET REFERENCE OF is_layout INTO temp9.
+mr_layout = copy( temp9 ).
     IF go_report IS BOUND.
-      go_report->grid_display( id     = mv_id
-                               layout = REF #( is_layout ) ).
+
+GET REFERENCE OF is_layout INTO temp10.
+go_report->grid_display( id     = mv_id
+                               layout = temp10 ).
     ENDIF.
 
   ENDMETHOD.
@@ -346,12 +377,14 @@ CLASS z2ui5_cl_cgui_alv_grid IMPLEMENTATION.
   METHOD get_frontend_layout.
 
     FIELD-SYMBOLS <layout> TYPE any.
+    DATA ls_grid TYPE z2ui5_if_cgui_gui=>ty_s_grid.
 
     CLEAR es_layout.
     IF go_report IS NOT BOUND.
       RETURN.
     ENDIF.
-    DATA(ls_grid) = go_report->grid_get( mv_id ).
+
+    ls_grid = go_report->grid_get( mv_id ).
     IF ls_grid-layout IS BOUND.
       ASSIGN ls_grid-layout->* TO <layout>.
       MOVE-CORRESPONDING <layout> TO es_layout.
@@ -361,10 +394,15 @@ CLASS z2ui5_cl_cgui_alv_grid IMPLEMENTATION.
 
   METHOD set_sort_criteria.
 
-    mr_sort = copy( REF #( it_sort ) ).
+    DATA temp11 TYPE REF TO data.
+      DATA temp12 TYPE REF TO data.
+    GET REFERENCE OF it_sort INTO temp11.
+mr_sort = copy( temp11 ).
     IF go_report IS BOUND.
-      go_report->grid_display( id   = mv_id
-                               sort = REF #( it_sort ) ).
+
+      GET REFERENCE OF it_sort INTO temp12.
+go_report->grid_display( id   = mv_id
+                               sort = temp12 ).
     ENDIF.
 
   ENDMETHOD.
@@ -373,12 +411,17 @@ CLASS z2ui5_cl_cgui_alv_grid IMPLEMENTATION.
 
     FIELD-SYMBOLS <line>  TYPE any.
     FIELD-SYMBOLS <value> TYPE any.
+    DATA temp13 TYPE z2ui5_cl_cgui_alv=>ty_t_row.
+    DATA lv_row LIKE LINE OF temp13.
 
     CLEAR: et_index_rows, et_row_no.
     IF go_report IS NOT BOUND.
       RETURN.
     ENDIF.
-    LOOP AT go_report->grid_selected( ) INTO DATA(lv_row).
+
+    temp13 = go_report->grid_selected( ).
+
+    LOOP AT temp13 INTO lv_row.
       APPEND INITIAL LINE TO et_index_rows ASSIGNING <line>.
       ASSIGN COMPONENT `INDEX` OF STRUCTURE <line> TO <value>.
       IF sy-subrc = 0.
@@ -415,24 +458,54 @@ CLASS z2ui5_cl_cgui_alv_grid IMPLEMENTATION.
 
     DATA lt_function TYPE z2ui5_if_cgui_gui=>ty_t_button.
 
-    DATA(lo_toolbar) = NEW z2ui5_cl_cgui_alv_toolbar( ).
-    DATA(lv_interactive) = interactive.
-    raise_event( event  = `TOOLBAR`
-                 params = VALUE #( ( name = `E_OBJECT`      kind = cl_abap_objectdescr=>exporting value = REF #( lo_toolbar ) )
-                                   ( name = `E_INTERACTIVE` kind = cl_abap_objectdescr=>exporting value = REF #( lv_interactive ) ) ) ).
+    DATA lo_toolbar TYPE REF TO z2ui5_cl_cgui_alv_toolbar.
+    DATA lv_interactive LIKE interactive.
+    DATA temp14 LIKE REF TO lv_interactive.
+DATA temp1 LIKE REF TO lo_toolbar.
+DATA temp2 TYPE abap_parmbind_tab.
+DATA temp3 LIKE LINE OF temp2.
+    DATA ls_button LIKE LINE OF lo_toolbar->mt_toolbar.
+      DATA temp15 TYPE z2ui5_if_cgui_gui=>ty_s_button.
+      DATA temp16 LIKE REF TO lt_function.
+    CREATE OBJECT lo_toolbar TYPE z2ui5_cl_cgui_alv_toolbar.
+
+    lv_interactive = interactive.
+
+    GET REFERENCE OF lv_interactive INTO temp14.
+
+GET REFERENCE OF lo_toolbar INTO temp1.
+
+CLEAR temp2.
+
+temp3-name = `E_OBJECT`.
+temp3-kind = cl_abap_objectdescr=>exporting.
+temp3-value = temp1.
+INSERT temp3 INTO TABLE temp2.
+temp3-name = `E_INTERACTIVE`.
+temp3-kind = cl_abap_objectdescr=>exporting.
+temp3-value = temp14.
+INSERT temp3 INTO TABLE temp2.
+raise_event( event  = `TOOLBAR`
+                 params = temp2 ).
     " a separator (butn_type 3) is no function
-    LOOP AT lo_toolbar->mt_toolbar INTO DATA(ls_button) WHERE function IS NOT INITIAL AND butn_type <> 3.
-      INSERT VALUE #( fcode     = to_upper( condense( ls_button-function ) )
-                      icon      = condense( ls_button-icon )
-                      text      = condense( ls_button-text )
-                      quickinfo = condense( ls_button-quickinfo )
-                      type      = ls_button-butn_type
-                      disabled  = ls_button-disabled
-                      checked   = ls_button-checked ) INTO TABLE lt_function.
+
+    LOOP AT lo_toolbar->mt_toolbar INTO ls_button WHERE function IS NOT INITIAL AND butn_type <> 3.
+
+      CLEAR temp15.
+      temp15-fcode = to_upper( condense( ls_button-function ) ).
+      temp15-icon = condense( ls_button-icon ).
+      temp15-text = condense( ls_button-text ).
+      temp15-quickinfo = condense( ls_button-quickinfo ).
+      temp15-type = ls_button-butn_type.
+      temp15-disabled = ls_button-disabled.
+      temp15-checked = ls_button-checked.
+      INSERT temp15 INTO TABLE lt_function.
     ENDLOOP.
     IF lt_function IS NOT INITIAL AND go_report IS BOUND.
-      go_report->grid_display( id        = mv_id
-                               functions = REF #( lt_function ) ).
+
+      GET REFERENCE OF lt_function INTO temp16.
+go_report->grid_display( id        = mv_id
+                               functions = temp16 ).
     ENDIF.
 
   ENDMETHOD.
@@ -441,29 +514,115 @@ CLASS z2ui5_cl_cgui_alv_grid IMPLEMENTATION.
 
     DATA lv_ucomm TYPE c LENGTH 70.
 
-    DATA(lv_event) = to_upper( event ).
+    DATA lv_event TYPE string.
+        DATA lv_row TYPE string.
+        DATA lv_column TYPE string.
+        DATA temp17 TYPE z2ui5_cl_cgui_alv=>ty_s_lvc_row.
+        DATA temp2 TYPE i.
+        DATA ls_row LIKE temp17.
+        DATA temp18 TYPE z2ui5_cl_cgui_alv=>ty_s_lvc_col.
+        DATA ls_col LIKE temp18.
+        DATA temp19 TYPE z2ui5_cl_cgui_alv=>ty_s_lvc_roid.
+        DATA ls_roid LIKE temp19.
+          DATA temp20 LIKE REF TO ls_roid.
+DATA temp3 LIKE REF TO ls_col.
+DATA temp7 LIKE REF TO ls_row.
+DATA temp1 TYPE abap_parmbind_tab.
+DATA temp9 LIKE LINE OF temp1.
+          DATA temp21 LIKE REF TO ls_roid.
+DATA temp4 LIKE REF TO ls_col.
+DATA temp8 LIKE REF TO ls_row.
+DATA temp10 TYPE abap_parmbind_tab.
+DATA temp11 LIKE LINE OF temp10.
+        DATA temp22 LIKE REF TO lv_ucomm.
+DATA temp5 TYPE abap_parmbind_tab.
+DATA temp6 LIKE LINE OF temp5.
+    lv_event = to_upper( event ).
     CASE lv_event.
       WHEN `DOUBLE_CLICK` OR `HOTSPOT_CLICK`.
         " row, or row and column apart by a tab
-        SPLIT value AT cl_abap_char_utilities=>horizontal_tab INTO DATA(lv_row) DATA(lv_column).
-        DATA(ls_row) = VALUE z2ui5_cl_cgui_alv=>ty_s_lvc_row( index = CONV i( lv_row ) ).
-        DATA(ls_col) = VALUE z2ui5_cl_cgui_alv=>ty_s_lvc_col( fieldname = to_upper( lv_column ) ).
-        DATA(ls_roid) = VALUE z2ui5_cl_cgui_alv=>ty_s_lvc_roid( row_id = ls_row-index ).
+
+
+        SPLIT value AT cl_abap_char_utilities=>horizontal_tab INTO lv_row lv_column.
+
+        CLEAR temp17.
+
+        temp2 = lv_row.
+        temp17-index = temp2.
+
+        ls_row = temp17.
+
+        CLEAR temp18.
+        temp18-fieldname = to_upper( lv_column ).
+
+        ls_col = temp18.
+
+        CLEAR temp19.
+        temp19-row_id = ls_row-index.
+
+        ls_roid = temp19.
         IF lv_event = `DOUBLE_CLICK`.
-          raise_event( event  = lv_event
-                       params = VALUE #( ( name = `E_ROW`    kind = cl_abap_objectdescr=>exporting value = REF #( ls_row ) )
-                                         ( name = `E_COLUMN` kind = cl_abap_objectdescr=>exporting value = REF #( ls_col ) )
-                                         ( name = `ES_ROW_NO` kind = cl_abap_objectdescr=>exporting value = REF #( ls_roid ) ) ) ).
+
+          GET REFERENCE OF ls_roid INTO temp20.
+
+GET REFERENCE OF ls_col INTO temp3.
+
+GET REFERENCE OF ls_row INTO temp7.
+
+CLEAR temp1.
+
+temp9-name = `E_ROW`.
+temp9-kind = cl_abap_objectdescr=>exporting.
+temp9-value = temp7.
+INSERT temp9 INTO TABLE temp1.
+temp9-name = `E_COLUMN`.
+temp9-kind = cl_abap_objectdescr=>exporting.
+temp9-value = temp3.
+INSERT temp9 INTO TABLE temp1.
+temp9-name = `ES_ROW_NO`.
+temp9-kind = cl_abap_objectdescr=>exporting.
+temp9-value = temp20.
+INSERT temp9 INTO TABLE temp1.
+raise_event( event  = lv_event
+                       params = temp1 ).
         ELSE.
-          raise_event( event  = lv_event
-                       params = VALUE #( ( name = `E_ROW_ID`    kind = cl_abap_objectdescr=>exporting value = REF #( ls_row ) )
-                                         ( name = `E_COLUMN_ID` kind = cl_abap_objectdescr=>exporting value = REF #( ls_col ) )
-                                         ( name = `ES_ROW_NO`   kind = cl_abap_objectdescr=>exporting value = REF #( ls_roid ) ) ) ).
+
+          GET REFERENCE OF ls_roid INTO temp21.
+
+GET REFERENCE OF ls_col INTO temp4.
+
+GET REFERENCE OF ls_row INTO temp8.
+
+CLEAR temp10.
+
+temp11-name = `E_ROW_ID`.
+temp11-kind = cl_abap_objectdescr=>exporting.
+temp11-value = temp8.
+INSERT temp11 INTO TABLE temp10.
+temp11-name = `E_COLUMN_ID`.
+temp11-kind = cl_abap_objectdescr=>exporting.
+temp11-value = temp4.
+INSERT temp11 INTO TABLE temp10.
+temp11-name = `ES_ROW_NO`.
+temp11-kind = cl_abap_objectdescr=>exporting.
+temp11-value = temp21.
+INSERT temp11 INTO TABLE temp10.
+raise_event( event  = lv_event
+                       params = temp10 ).
         ENDIF.
       WHEN `USER_COMMAND`.
         lv_ucomm = value.
-        raise_event( event  = lv_event
-                     params = VALUE #( ( name = `E_UCOMM` kind = cl_abap_objectdescr=>exporting value = REF #( lv_ucomm ) ) ) ).
+
+        GET REFERENCE OF lv_ucomm INTO temp22.
+
+CLEAR temp5.
+
+temp6-name = `E_UCOMM`.
+temp6-kind = cl_abap_objectdescr=>exporting.
+temp6-value = temp22.
+INSERT temp6 INTO TABLE temp5.
+raise_event( event  = lv_event
+                     params = temp5 ).
       WHEN OTHERS.
         super->dispatch( event = event
                          value = value ).

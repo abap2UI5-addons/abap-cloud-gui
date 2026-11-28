@@ -54,8 +54,27 @@ CLASS z2ui5_cl_cgui_pdf IMPLEMENTATION.
 
     " the longest line decides the page: A4 portrait at 9 points, else
     " landscape with the font as small as it has to be (4 points at least)
-    DATA(lv_max) = 1.
-    LOOP AT lines INTO DATA(lv_line).
+    DATA lv_max TYPE i.
+    DATA lv_line LIKE LINE OF lines.
+    DATA lv_lead10 TYPE i.
+    DATA lv_per_page TYPE i.
+    DATA lv_pages TYPE i.
+    DATA temp9 LIKE LINE OF lt_obj.
+      DATA lv_page LIKE sy-index.
+      DATA lv_content TYPE string.
+      DATA lv_from TYPE i.
+      DATA lv_no TYPE i.
+      DATA temp10 LIKE LINE OF lt_obj.
+      DATA temp11 LIKE LINE OF lt_obj.
+      DATA temp12 LIKE LINE OF lt_kids.
+    FIELD-SYMBOLS <temp13> LIKE LINE OF lt_obj.
+    DATA temp14 LIKE sy-tabix.
+    DATA lv_pdf TYPE string.
+    DATA lv_xref TYPE string.
+    DATA lv_obj LIKE LINE OF lt_obj.
+    lv_max = 1.
+
+    LOOP AT lines INTO lv_line.
       lv_max = nmax( val1 = lv_max val2 = strlen( lv_line ) ).
     ENDLOOP.
     " a character of Courier is 0.6 of its size wide
@@ -69,11 +88,14 @@ CLASS z2ui5_cl_cgui_pdf IMPLEMENTATION.
       lv_fs10 = nmax( val1 = 40
                       val2 = nmin( val1 = 90 val2 = 100 * ( 842 - 2 * lc_margin ) DIV ( 6 * lv_max ) ) ).
     ENDIF.
-    DATA(lv_lead10) = lv_fs10 * 12 DIV 10.
+
+    lv_lead10 = lv_fs10 * 12 DIV 10.
     " the lines of a page: the height without the margins and the foot
-    DATA(lv_per_page) = nmax( val1 = 1
+
+    lv_per_page = nmax( val1 = 1
                               val2 = ( lv_height - 2 * lc_margin - 20 ) * 10 DIV lv_lead10 ).
-    DATA(lv_pages) = nmax( val1 = 1
+
+    lv_pages = nmax( val1 = 1
                            val2 = ( lines( lines ) + lv_per_page - 1 ) DIV lv_per_page ).
 
     " 1 the catalog, 2 the pages, 3 the font, 4 the info - then a page and
@@ -81,30 +103,52 @@ CLASS z2ui5_cl_cgui_pdf IMPLEMENTATION.
     INSERT `<< /Type /Catalog /Pages 2 0 R >>` INTO TABLE lt_obj.
     INSERT `` INTO TABLE lt_obj.
     INSERT `<< /Type /Font /Subtype /Type1 /BaseFont /Courier /Encoding /WinAnsiEncoding >>` INTO TABLE lt_obj.
-    INSERT |<< /Title ({ literal( title ) }) /Producer (abap-cloud-gui) >>| INTO TABLE lt_obj.
+
+    temp9 = |<< /Title ({ literal( title ) }) /Producer (abap-cloud-gui) >>|.
+    INSERT temp9 INTO TABLE lt_obj.
 
     DO lv_pages TIMES.
-      DATA(lv_page) = sy-index.
-      DATA(lv_content) = |BT /F1 { dec( lv_fs10 ) } Tf { dec( lv_lead10 ) } TL | &&
+
+      lv_page = sy-index.
+
+      lv_content = |BT /F1 { dec( lv_fs10 ) } Tf { dec( lv_lead10 ) } TL | &&
                          |{ lc_margin } { dec( ( lv_height - lc_margin ) * 10 - lv_fs10 ) } Td|.
-      DATA(lv_from) = ( lv_page - 1 ) * lv_per_page + 1.
+
+      lv_from = ( lv_page - 1 ) * lv_per_page + 1.
       LOOP AT lines INTO lv_line FROM lv_from TO lv_from + lv_per_page - 1.
         lv_content = |{ lv_content }\n({ literal( lv_line ) }) Tj T*|.
       ENDLOOP.
       lv_content = |{ lv_content } ET\nBT /F1 8 Tf { lv_width - lc_margin - 60 } { lc_margin - 12 } Td | &&
                    |({ lv_page } / { lv_pages }) Tj ET|.
-      DATA(lv_no) = lines( lt_obj ) + 1.
-      INSERT |<< /Type /Page /Parent 2 0 R /MediaBox [0 0 { lv_width } { lv_height }] | &&
-             |/Resources << /Font << /F1 3 0 R >> >> /Contents { lv_no + 1 } 0 R >>| INTO TABLE lt_obj.
-      INSERT |<< /Length { strlen( lv_content ) } >>\nstream\n{ lv_content }\nendstream| INTO TABLE lt_obj.
-      INSERT |{ lv_no } 0 R| INTO TABLE lt_kids.
+
+      lv_no = lines( lt_obj ) + 1.
+
+      temp10 = |<< /Type /Page /Parent 2 0 R /MediaBox [0 0 { lv_width } { lv_height }] | && |/Resources << /Font << /F1 3 0 R >> >> /Contents { lv_no + 1 } 0 R >>|.
+      INSERT temp10 INTO TABLE lt_obj.
+
+      temp11 = |<< /Length { strlen( lv_content ) } >>\nstream\n{ lv_content }\nendstream|.
+      INSERT temp11 INTO TABLE lt_obj.
+
+      temp12 = |{ lv_no } 0 R|.
+      INSERT temp12 INTO TABLE lt_kids.
     ENDDO.
-    lt_obj[ 2 ] = |<< /Type /Pages /Kids [{ concat_lines_of( table = lt_kids sep = ` ` ) }] /Count { lv_pages } >>|.
+
+
+    temp14 = sy-tabix.
+    READ TABLE lt_obj INDEX 2 ASSIGNING <temp13>.
+    sy-tabix = temp14.
+    IF sy-subrc <> 0.
+      ASSERT 1 = 0.
+    ENDIF.
+    <temp13> = |<< /Type /Pages /Kids [{ concat_lines_of( table = lt_kids sep = ` ` ) }] /Count { lv_pages } >>|.
 
     " every byte is ASCII - the length of the text is its offset in bytes
-    DATA(lv_pdf) = |%PDF-1.4\n|.
-    DATA(lv_xref) = |xref\n0 { lines( lt_obj ) + 1 }\n0000000000 65535 f \n|.
-    LOOP AT lt_obj INTO DATA(lv_obj).
+
+    lv_pdf = |%PDF-1.4\n|.
+
+    lv_xref = |xref\n0 { lines( lt_obj ) + 1 }\n0000000000 65535 f \n|.
+
+    LOOP AT lt_obj INTO lv_obj.
       lv_xref = |{ lv_xref }{ strlen( lv_pdf ) WIDTH = 10 ALIGN = RIGHT PAD = `0` } 00000 n \n|.
       lv_pdf = |{ lv_pdf }{ sy-tabix } 0 obj\n{ lv_obj }\nendobj\n|.
     ENDLOOP.
@@ -117,12 +161,23 @@ CLASS z2ui5_cl_cgui_pdf IMPLEMENTATION.
   METHOD literal.
 
     CONSTANTS lc_ascii TYPE string VALUE ` !"#$%&'*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[]^_abcdefghijklmnopqrstuvwxyz{|}~`.
-    DATA(lv_text) = CONV string( val ).
-    DATA(lv_len) = strlen( lv_text ).
-    DATA(lv_off) = 0.
+    DATA temp15 TYPE string.
+    DATA lv_text LIKE temp15.
+    DATA lv_len TYPE i.
+    DATA lv_off TYPE i.
+      DATA lv_char TYPE string.
+        DATA lv_code TYPE i.
+    temp15 = val.
+
+    lv_text = temp15.
+
+    lv_len = strlen( lv_text ).
+
+    lv_off = 0.
 
     WHILE lv_off < lv_len.
-      DATA(lv_char) = substring( val = lv_text off = lv_off len = 1 ).
+
+      lv_char = substring( val = lv_text off = lv_off len = 1 ).
       lv_off = lv_off + 1.
       IF lv_char = `(` OR lv_char = `)` OR lv_char = `\`.
         result = |{ result }\\{ lv_char }|.
@@ -132,7 +187,8 @@ CLASS z2ui5_cl_cgui_pdf IMPLEMENTATION.
       ELSEIF lv_char CO lc_ascii OR lv_char = '`'.
         result = result && lv_char.
       ELSE.
-        DATA(lv_code) = win_ansi( lv_char ).
+
+        lv_code = win_ansi( lv_char ).
         IF lv_code = 0.
           result = |{ result }?|.
         ELSE.
@@ -148,7 +204,11 @@ CLASS z2ui5_cl_cgui_pdf IMPLEMENTATION.
     DATA lv_b1 TYPE x LENGTH 1.
     DATA lv_b2 TYPE x LENGTH 1.
 
-    DATA(lv_utf8) = z2ui5_cl_cgui_context=>conv_get_xstring_by_string( val ).
+    DATA lv_utf8 TYPE xstring.
+    DATA temp16 TYPE i.
+    DATA temp3 TYPE i.
+    DATA lv_code TYPE i.
+    lv_utf8 = z2ui5_cl_cgui_context=>conv_get_xstring_by_string( val ).
     IF xstrlen( lv_utf8 ) = 3 AND lv_utf8 = 'E282AC'.
       " the euro sign
       result = 128.
@@ -160,7 +220,12 @@ CLASS z2ui5_cl_cgui_pdf IMPLEMENTATION.
     lv_b1 = lv_utf8(1).
     lv_b2 = lv_utf8+1(1).
     " U+00A0 to U+00FF: Latin-1, the same codes in WinAnsi
-    DATA(lv_code) = ( CONV i( lv_b1 ) - 192 ) * 64 + CONV i( lv_b2 ) - 128.
+
+    temp16 = lv_b1.
+
+    temp3 = lv_b2.
+
+    lv_code = ( temp16 - 192 ) * 64 + temp3 - 128.
     IF lv_code >= 160 AND lv_code <= 255.
       result = lv_code.
     ENDIF.

@@ -61,7 +61,7 @@ CLASS z2ui5_cl_cgui_range DEFINITION PUBLIC FINAL CREATE PRIVATE.
         low    TYPE string,
         high   TYPE string,
       END OF ty_s_row.
-    TYPES ty_t_row TYPE STANDARD TABLE OF ty_s_row WITH EMPTY KEY.
+    TYPES ty_t_row TYPE STANDARD TABLE OF ty_s_row WITH DEFAULT KEY.
 
     " title - the text of the select-option; control - cs_control, the
     " input of from and to; value_help - F4 on the lines; upper - the
@@ -209,7 +209,7 @@ CLASS z2ui5_cl_cgui_range DEFINITION PUBLIC FINAL CREATE PRIVATE.
         key  TYPE string,
         text TYPE string,
       END OF ty_s_option.
-    TYPES ty_t_option TYPE STANDARD TABLE OF ty_s_option WITH EMPTY KEY.
+    TYPES ty_t_option TYPE STANDARD TABLE OF ty_s_option WITH DEFAULT KEY.
 
     METHODS on_event.
 
@@ -238,8 +238,9 @@ CLASS z2ui5_cl_cgui_range IMPLEMENTATION.
   METHOD factory.
 
     DATA lt_row TYPE ty_t_row.
+    DATA ls_row LIKE LINE OF lt_row.
 
-    result = NEW #( ).
+    CREATE OBJECT result.
     result->ms_setting = setting.
     result->mv_error   = error.
     IF result->ms_setting-control IS INITIAL.
@@ -256,7 +257,8 @@ CLASS z2ui5_cl_cgui_range IMPLEMENTATION.
                                 control = result->ms_setting-control ).
     ENDIF.
 
-    LOOP AT lt_row INTO DATA(ls_row).
+
+    LOOP AT lt_row INTO ls_row.
       result->row_add( ls_row ).
     ENDLOOP.
     IF result->mt_row IS INITIAL.
@@ -348,6 +350,8 @@ CLASS z2ui5_cl_cgui_range IMPLEMENTATION.
     DATA lr_tab   TYPE REF TO data.
     DATA lr_line  TYPE REF TO data.
     DATA lv_index TYPE i.
+    DATA ls_row LIKE LINE OF rows.
+        DATA temp49 TYPE z2ui5_cl_cgui_range=>ty_s_row-option.
 
     CLEAR error.
     CREATE DATA lr_tab LIKE range.
@@ -355,7 +359,8 @@ CLASS z2ui5_cl_cgui_range IMPLEMENTATION.
     " empty - the transpiled runtime copies the rows along with LIKE
     CLEAR <tab>.
 
-    LOOP AT rows INTO DATA(ls_row).
+
+    LOOP AT rows INTO ls_row.
       lv_index = sy-tabix.
 
       IF upper = abap_true.
@@ -366,7 +371,13 @@ CLASS z2ui5_cl_cgui_range IMPLEMENTATION.
         ls_row-sign = `I`.
       ENDIF.
       IF ls_row-option IS INITIAL.
-        ls_row-option = COND #( WHEN ls_row-high IS NOT INITIAL THEN `BT` ELSE `EQ` ).
+
+        IF ls_row-high IS NOT INITIAL.
+          temp49 = `BT`.
+        ELSE.
+          temp49 = `EQ`.
+        ENDIF.
+        ls_row-option = temp49.
       ENDIF.
       IF ls_row-option <> `BT` AND ls_row-option <> `NB`.
         CLEAR ls_row-high.
@@ -466,9 +477,14 @@ CLASS z2ui5_cl_cgui_range IMPLEMENTATION.
 
     DATA lv_decimal TYPE string.
     DATA lv_group   TYPE string.
+    DATA lv_kind TYPE string.
+      DATA temp50 TYPE decfloat34.
+      DATA lv_sample TYPE string.
+      DATA lv_len TYPE i.
 
     result = val.
-    DATA(lv_kind) = z2ui5_cl_cgui_context=>rtti_get_type_kind( cell ).
+
+    lv_kind = z2ui5_cl_cgui_context=>rtti_get_type_kind( cell ).
     IF val IS INITIAL OR NOT ( lv_kind = cl_abap_typedescr=>typekind_packed
                             OR lv_kind = cl_abap_typedescr=>typekind_float
                             OR lv_kind = cl_abap_typedescr=>typekind_decfloat16
@@ -486,8 +502,12 @@ CLASS z2ui5_cl_cgui_range IMPLEMENTATION.
       lv_decimal = decimal.
       lv_group = group.
     ELSE.
-      DATA(lv_sample) = |{ CONV decfloat34( `1234.5` ) NUMBER = USER DECIMALS = 1 }|.
-      DATA(lv_len) = strlen( lv_sample ).
+
+      temp50 = `1234.5`.
+
+      lv_sample = |{ temp50 NUMBER = USER DECIMALS = 1 }|.
+
+      lv_len = strlen( lv_sample ).
       IF lv_len >= 3.
         lv_decimal = substring( val = lv_sample off = lv_len - 2 len = 1 ).
       ENDIF.
@@ -512,26 +532,37 @@ CLASS z2ui5_cl_cgui_range IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD value_invalid.
+    DATA lv_kind TYPE string.
+    DATA lv_value TYPE string.
+      DATA lv_date TYPE d.
+      DATA temp1 TYPE xsdboolean.
+      DATA temp2 TYPE xsdboolean.
 
     IF val IS INITIAL.
       RETURN.
     ENDIF.
-    DATA(lv_kind) = z2ui5_cl_cgui_context=>rtti_get_type_kind( cell ).
+
+    lv_kind = z2ui5_cl_cgui_context=>rtti_get_type_kind( cell ).
     IF lv_kind <> cl_abap_typedescr=>typekind_date AND lv_kind <> cl_abap_typedescr=>typekind_time.
       RETURN.
     ENDIF.
-    DATA(lv_value) = condense( val ).
+
+    lv_value = condense( val ).
     IF lv_value CN `0123456789`.
       result = abap_true.
       RETURN.
     ENDIF.
     IF lv_kind = cl_abap_typedescr=>typekind_date.
-      DATA lv_date TYPE d.
+
       lv_date = lv_value.
       " an impossible date such as 20261340 falls back to 0 when added to
-      result = xsdbool( strlen( lv_value ) <> 8 OR lv_date + 0 = 0 ).
+
+      temp1 = boolc( strlen( lv_value ) <> 8 OR lv_date + 0 = 0 ).
+      result = temp1.
     ELSE.
-      result = xsdbool( strlen( lv_value ) <> 6 OR lv_value+0(2) > `23` OR lv_value+2(2) > `59` OR lv_value+4(2) > `59` ).
+
+      temp2 = boolc( strlen( lv_value ) <> 6 OR lv_value+0(2) > `23` OR lv_value+2(2) > `59` OR lv_value+4(2) > `59` ).
+      result = temp2.
     ENDIF.
 
   ENDMETHOD.
@@ -542,31 +573,58 @@ CLASS z2ui5_cl_cgui_range IMPLEMENTATION.
 
     " tabs and semicolons separate as line breaks do - Excel copies a
     " column with CR LF, a block with tabs between its cells
-    DATA(lv_text) = translate( val  = CONV string( text )
+    DATA temp51 TYPE string.
+    DATA lv_text TYPE string.
+    DATA lv_value LIKE LINE OF lt_value.
+      DATA temp52 TYPE z2ui5_cl_cgui_range=>ty_s_row.
+      DATA temp3 TYPE z2ui5_cl_cgui_range=>ty_s_row-option.
+    temp51 = text.
+
+    lv_text = translate( val  = temp51
                                from = |\t;\r|
                                to   = |\n\n\n| ).
     SPLIT lv_text AT |\n| INTO TABLE lt_value.
 
-    LOOP AT lt_value INTO DATA(lv_value).
+
+    LOOP AT lt_value INTO lv_value.
       lv_value = shift_right( val = shift_left( val = lv_value
                                                 sub = ` ` )
                               sub = ` ` ).
       IF lv_value IS INITIAL.
         CONTINUE.
       ENDIF.
-      INSERT VALUE #( sign   = `I`
-                      option = COND #( WHEN lv_value CA `*+` THEN `CP` ELSE `EQ` )
-                      low    = lv_value ) INTO TABLE result.
+
+      CLEAR temp52.
+      temp52-sign = `I`.
+
+      IF lv_value CA `*+`.
+        temp3 = `CP`.
+      ELSE.
+        temp3 = `EQ`.
+      ENDIF.
+      temp52-option = temp3.
+      temp52-low = lv_value.
+      INSERT temp52 INTO TABLE result.
     ENDLOOP.
 
   ENDMETHOD.
 
   METHOD row_set_value.
 
-    DATA(lv_key) = CONV string( row_key ).
-    DATA(lv_part) = to_upper( part ).
+    DATA temp53 TYPE string.
+    DATA lv_key LIKE temp53.
+    DATA lv_part TYPE string.
+    DATA temp54 LIKE LINE OF rows.
+    DATA lr_row LIKE REF TO temp54.
+    temp53 = row_key.
 
-    LOOP AT rows REFERENCE INTO DATA(lr_row) WHERE key = lv_key.
+    lv_key = temp53.
+
+    lv_part = to_upper( part ).
+
+
+
+    LOOP AT rows REFERENCE INTO lr_row WHERE key = lv_key.
       IF lv_part = cs_part-high.
         lr_row->high = value.
       ELSE.
@@ -581,13 +639,23 @@ CLASS z2ui5_cl_cgui_range IMPLEMENTATION.
 
     DATA lv_done TYPE abap_bool.
 
-    LOOP AT values INTO DATA(lv_value).
-      IF line_exists( rows[ sign = `I` option = `EQ` low = lv_value ] ).
+    DATA lv_value LIKE LINE OF values.
+      DATA temp55 LIKE sy-subrc.
+      DATA temp56 LIKE LINE OF rows.
+      DATA lr_row LIKE REF TO temp56.
+        DATA temp57 TYPE z2ui5_cl_cgui_range=>ty_s_row.
+    LOOP AT values INTO lv_value.
+
+      READ TABLE rows WITH KEY sign = `I` option = `EQ` low = lv_value TRANSPORTING NO FIELDS.
+      temp55 = sy-subrc.
+      IF temp55 = 0.
         CONTINUE.
       ENDIF.
 
       lv_done = abap_false.
-      LOOP AT rows REFERENCE INTO DATA(lr_row) WHERE low IS INITIAL AND high IS INITIAL.
+
+
+      LOOP AT rows REFERENCE INTO lr_row WHERE low IS INITIAL AND high IS INITIAL.
         lr_row->sign   = `I`.
         lr_row->option = `EQ`.
         lr_row->low    = lv_value.
@@ -595,9 +663,12 @@ CLASS z2ui5_cl_cgui_range IMPLEMENTATION.
         EXIT.
       ENDLOOP.
       IF lv_done = abap_false.
-        INSERT VALUE #( sign   = `I`
-                        option = `EQ`
-                        low    = lv_value ) INTO TABLE rows.
+
+        CLEAR temp57.
+        temp57-sign = `I`.
+        temp57-option = `EQ`.
+        temp57-low = lv_value.
+        INSERT temp57 INTO TABLE rows.
       ENDIF.
     ENDLOOP.
 
@@ -613,7 +684,7 @@ CLASS z2ui5_cl_cgui_range IMPLEMENTATION.
 
     me->client = client.
 
-    IF client->check_on_init( ).
+    IF client->check_on_init( ) IS NOT INITIAL.
       view_display( ).
       RETURN.
     ENDIF.
@@ -623,6 +694,10 @@ CLASS z2ui5_cl_cgui_range IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD on_event.
+        DATA lv_key TYPE string.
+        DATA temp3 TYPE xsdboolean.
+        DATA lt_new TYPE z2ui5_cl_cgui_range=>ty_t_row.
+          DATA ls_new LIKE LINE OF lt_new.
 
     CASE client->get_event( ).
 
@@ -637,7 +712,8 @@ CLASS z2ui5_cl_cgui_range IMPLEMENTATION.
         row_add( ).
 
       WHEN cs_event-delete.
-        DATA(lv_key) = client->get_event_arg( ).
+
+        lv_key = client->get_event_arg( ).
         DELETE mt_row WHERE key = lv_key.
 
       WHEN cs_event-delete_all.
@@ -655,14 +731,18 @@ CLASS z2ui5_cl_cgui_range IMPLEMENTATION.
         leave( ).
 
       WHEN cs_event-paste.
-        mv_paste_open = xsdbool( mv_paste_open = abap_false ).
+
+        temp3 = boolc( mv_paste_open = abap_false ).
+        mv_paste_open = temp3.
 
       WHEN cs_event-paste_ok.
-        DATA(lt_new) = rows_from_text( mv_paste ).
+
+        lt_new = rows_from_text( mv_paste ).
         IF lt_new IS NOT INITIAL.
           " the empty lines give way to the values pasted
           DELETE mt_row WHERE low IS INITIAL AND high IS INITIAL.
-          LOOP AT lt_new INTO DATA(ls_new).
+
+          LOOP AT lt_new INTO ls_new.
             row_add( ls_new ).
           ENDLOOP.
         ENDIF.
@@ -674,17 +754,24 @@ CLASS z2ui5_cl_cgui_range IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD row_add.
+    DATA ls_row LIKE row.
+      DATA temp58 TYPE z2ui5_cl_cgui_range=>ty_s_row-option.
 
     mv_next = mv_next + 1.
-    DATA(ls_row) = row.
+
+    ls_row = row.
     ls_row-key = |{ mv_next }|.
     IF ls_row-sign IS INITIAL.
       ls_row-sign = `I`.
     ENDIF.
     IF ls_row-option IS INITIAL.
-      ls_row-option = COND #( WHEN ls_row-high IS NOT INITIAL AND ms_setting-no_intervals = abap_false
-                              THEN `BT`
-                              ELSE `EQ` ).
+
+      IF ls_row-high IS NOT INITIAL AND ms_setting-no_intervals = abap_false.
+        temp58 = `BT`.
+      ELSE.
+        temp58 = `EQ`.
+      ENDIF.
+      ls_row-option = temp58.
     ENDIF.
     INSERT ls_row INTO TABLE mt_row.
 
@@ -700,35 +787,105 @@ CLASS z2ui5_cl_cgui_range IMPLEMENTATION.
 
   METHOD options.
 
-    result = VALUE #( ( key = `EQ` text = |=  { 'equal to'(020) }| )
-                      ( key = `NE` text = |<> { 'not equal to'(021) }| )
-                      ( key = `GT` text = |>  { 'greater than'(022) }| )
-                      ( key = `GE` text = |>= { 'greater than or equal to'(023) }| )
-                      ( key = `LT` text = |<  { 'less than'(024) }| )
-                      ( key = `LE` text = |<= { 'less than or equal to'(025) }| ) ).
+    DATA temp59 TYPE z2ui5_cl_cgui_range=>ty_t_option.
+    DATA temp60 LIKE LINE OF temp59.
+      DATA temp61 TYPE z2ui5_cl_cgui_range=>ty_s_option.
+      DATA temp62 TYPE z2ui5_cl_cgui_range=>ty_s_option.
+    DATA temp63 TYPE z2ui5_cl_cgui_range=>ty_s_option.
+    DATA temp64 TYPE z2ui5_cl_cgui_range=>ty_s_option.
+    CLEAR temp59.
+
+    temp60-key = `EQ`.
+    temp60-text = |=  { 'equal to'(020) }|.
+    INSERT temp60 INTO TABLE temp59.
+    temp60-key = `NE`.
+    temp60-text = |<> { 'not equal to'(021) }|.
+    INSERT temp60 INTO TABLE temp59.
+    temp60-key = `GT`.
+    temp60-text = |>  { 'greater than'(022) }|.
+    INSERT temp60 INTO TABLE temp59.
+    temp60-key = `GE`.
+    temp60-text = |>= { 'greater than or equal to'(023) }|.
+    INSERT temp60 INTO TABLE temp59.
+    temp60-key = `LT`.
+    temp60-text = |<  { 'less than'(024) }|.
+    INSERT temp60 INTO TABLE temp59.
+    temp60-key = `LE`.
+    temp60-text = |<= { 'less than or equal to'(025) }|.
+    INSERT temp60 INTO TABLE temp59.
+    result = temp59.
     IF ms_setting-no_intervals = abap_false.
-      INSERT VALUE #( key = `BT` text = |[] { 'between'(026) }| ) INTO TABLE result.
-      INSERT VALUE #( key = `NB` text = |][ { 'not between'(027) }| ) INTO TABLE result.
+
+      CLEAR temp61.
+      temp61-key = `BT`.
+      temp61-text = |[] { 'between'(026) }|.
+      INSERT temp61 INTO TABLE result.
+
+      CLEAR temp62.
+      temp62-key = `NB`.
+      temp62-text = |][ { 'not between'(027) }|.
+      INSERT temp62 INTO TABLE result.
     ENDIF.
-    INSERT VALUE #( key = `CP` text = |*  { 'pattern'(028) }| ) INTO TABLE result.
-    INSERT VALUE #( key = `NP` text = |!* { 'not pattern'(029) }| ) INTO TABLE result.
+
+    CLEAR temp63.
+    temp63-key = `CP`.
+    temp63-text = |*  { 'pattern'(028) }|.
+    INSERT temp63 INTO TABLE result.
+
+    CLEAR temp64.
+    temp64-key = `NP`.
+    temp64-text = |!* { 'not pattern'(029) }|.
+    INSERT temp64 INTO TABLE result.
 
   ENDMETHOD.
 
   METHOD view_display.
 
-    DATA(lo_dialog) = z2ui5_cl_ui5_view_builder=>factory(
+    DATA temp65 TYPE string.
+    DATA lo_dialog TYPE REF TO z2ui5_cl_ui5_view_builder.
+    DATA lo_content TYPE REF TO z2ui5_cl_ui5_view_builder.
+    DATA temp66 TYPE string.
+    DATA temp4 TYPE string.
+    DATA temp67 TYPE string.
+    DATA lo_table TYPE REF TO z2ui5_cl_ui5_view_builder.
+    DATA lo_toolbar TYPE REF TO z2ui5_cl_ui5_view_builder.
+    DATA temp68 TYPE string.
+      DATA temp69 TYPE string.
+    DATA temp70 TYPE string.
+    DATA temp5 TYPE string.
+    DATA lo_columns TYPE REF TO z2ui5_cl_ui5_view_builder.
+    DATA temp71 TYPE string.
+    DATA temp72 TYPE string.
+    DATA temp73 TYPE string.
+      DATA temp74 TYPE string.
+    DATA lo_cells TYPE REF TO z2ui5_cl_ui5_view_builder.
+    DATA temp75 TYPE string.
+    DATA temp6 TYPE string.
+    DATA lo_options TYPE REF TO z2ui5_cl_ui5_view_builder.
+    DATA temp76 TYPE z2ui5_cl_cgui_range=>ty_t_option.
+    DATA ls_option LIKE LINE OF temp76.
+    DATA temp77 TYPE string.
+    DATA temp78 TYPE string.
+    DATA temp7 TYPE string.
+    IF ms_setting-no_intervals = abap_true.
+      temp65 = `36rem`.
+    ELSE.
+      temp65 = `52rem`.
+    ENDIF.
+
+    lo_dialog = z2ui5_cl_ui5_view_builder=>factory(
         )->ele( n = `FragmentDefinition` ns = `core`
         )->a( n = `xmlns`      v = `sap.m`
         )->a( n = `xmlns:core` v = `sap.ui.core`
         )->ele( `Dialog`
         )->a( n = `title`        t = ms_setting-title
-        )->a( n = `contentWidth` v = COND #( WHEN ms_setting-no_intervals = abap_true THEN `36rem` ELSE `52rem` )
+        )->a( n = `contentWidth` v = temp65
         )->a( n = `resizable`    b = abap_true
         )->a( n = `draggable`    b = abap_true
         )->a( n = `afterClose`   v = client->_event( cs_event-cancel ) ).
 
-    DATA(lo_content) = lo_dialog->ele( `content`
+
+    lo_content = lo_dialog->ele( `content`
         )->ele( `VBox`
         )->a( n = `class` v = `sapUiSmallMargin` ).
 
@@ -741,6 +898,10 @@ CLASS z2ui5_cl_cgui_range IMPLEMENTATION.
     ENDIF.
 
     " the values pasted from the clipboard - shown on demand
+
+    temp66 = 'Paste values, one per line'(014).
+
+    temp4 = 'Take over'(013).
     lo_content->ele( `VBox`
         )->a( n = `visible` v = client->_bind( mv_paste_open )
         )->a( n = `class`   v = `sapUiSmallMarginBottom`
@@ -748,78 +909,108 @@ CLASS z2ui5_cl_cgui_range IMPLEMENTATION.
         )->a( n = `value`       v = client->_bind( mv_paste )
         )->a( n = `width`       v = `100%`
         )->a( n = `rows`        v = `6`
-        )->a( n = `placeholder` t = CONV #( 'Paste values, one per line'(014) )
+        )->a( n = `placeholder` t = temp66
         )->tag( `Button`
-        )->a( n = `text`  t = CONV #( 'Take over'(013) )
+        )->a( n = `text`  t = temp4
         )->a( n = `icon`  v = `sap-icon://accept`
         )->a( n = `press` v = client->_event( cs_event-paste_ok ) ).
 
-    DATA(lo_table) = lo_content->ele( `Table`
-        )->a( n = `items`      v = client->_bind( mt_row )
-        )->a( n = `noDataText` t = CONV #( 'No conditions'(019) ) ).
 
-    DATA(lo_toolbar) = lo_table->ele( `headerToolbar`
+    temp67 = 'No conditions'(019).
+
+    lo_table = lo_content->ele( `Table`
+        )->a( n = `items`      v = client->_bind( mt_row )
+        )->a( n = `noDataText` t = temp67 ).
+
+
+    lo_toolbar = lo_table->ele( `headerToolbar`
         )->ele( `OverflowToolbar` ).
+
+    temp68 = 'Add'(004).
     lo_toolbar->tag( `ToolbarSpacer`
         )->tag( `Button`
         )->a( n = `icon`  v = `sap-icon://add`
-        )->a( n = `text`  t = CONV #( 'Add'(004) )
+        )->a( n = `text`  t = temp68
         )->a( n = `press` v = client->_event( cs_event-add ) ).
     IF ms_setting-value_help = abap_true.
+
+      temp69 = 'Pick values'(005).
       lo_toolbar->tag( `Button`
           )->a( n = `icon`  v = `sap-icon://value-help`
-          )->a( n = `text`  t = CONV #( 'Pick values'(005) )
+          )->a( n = `text`  t = temp69
           )->a( n = `press` v = client->_event( cs_event-f4_multi ) ).
     ENDIF.
+
+    temp70 = 'Insert from clipboard'(006).
+
+    temp5 = 'Delete all'(007).
     lo_toolbar->tag( `Button`
         )->a( n = `icon`  v = `sap-icon://paste`
-        )->a( n = `text`  t = CONV #( 'Insert from clipboard'(006) )
+        )->a( n = `text`  t = temp70
         )->a( n = `press` v = client->_event( cs_event-paste )
         )->tag( `Button`
         )->a( n = `icon`  v = `sap-icon://delete`
-        )->a( n = `text`  t = CONV #( 'Delete all'(007) )
+        )->a( n = `text`  t = temp5
         )->a( n = `press` v = client->_event( cs_event-delete_all ) ).
 
-    DATA(lo_columns) = lo_table->ele( `columns` ).
+
+    lo_columns = lo_table->ele( `columns` ).
+
+    temp71 = 'Selection'(009).
     lo_columns->ele( `Column`
         )->a( n = `width` v = `9rem`
         )->tag( `Text`
-        )->a( n = `text` t = CONV #( 'Selection'(009) ) ).
+        )->a( n = `text` t = temp71 ).
+
+    temp72 = 'Option'(010).
     lo_columns->ele( `Column`
         )->a( n = `width` v = `13rem`
         )->tag( `Text`
-        )->a( n = `text` t = CONV #( 'Option'(010) ) ).
+        )->a( n = `text` t = temp72 ).
+
+    temp73 = 'From'(011).
     lo_columns->ele( `Column`
         )->tag( `Text`
-        )->a( n = `text` t = CONV #( 'From'(011) ) ).
+        )->a( n = `text` t = temp73 ).
     IF ms_setting-no_intervals = abap_false.
+
+      temp74 = 'To'(012).
       lo_columns->ele( `Column`
           )->tag( `Text`
-          )->a( n = `text` t = CONV #( 'To'(012) ) ).
+          )->a( n = `text` t = temp74 ).
     ENDIF.
     lo_columns->ele( `Column`
         )->a( n = `width` v = `3rem` ).
 
-    DATA(lo_cells) = lo_table->ele( `items`
+
+    lo_cells = lo_table->ele( `items`
         )->ele( `ColumnListItem`
         )->ele( `cells` ).
 
+
+    temp75 = 'Include'(002).
+
+    temp6 = 'Exclude'(003).
     lo_cells->ele( `Select`
         )->a( n = `selectedKey` v = `{SIGN}`
         )->a( n = `width`       v = `100%`
         )->ele( `items`
         )->tag( n = `Item` ns = `core`
         )->a( n = `key`  v = `I`
-        )->a( n = `text` t = CONV #( 'Include'(002) )
+        )->a( n = `text` t = temp75
         )->tag( n = `Item` ns = `core`
         )->a( n = `key`  v = `E`
-        )->a( n = `text` t = CONV #( 'Exclude'(003) ) ).
+        )->a( n = `text` t = temp6 ).
 
-    DATA(lo_options) = lo_cells->ele( `Select`
+
+    lo_options = lo_cells->ele( `Select`
         )->a( n = `selectedKey` v = `{OPTION}`
         )->a( n = `width`       v = `100%`
         )->ele( `items` ).
-    LOOP AT options( ) INTO DATA(ls_option).
+
+    temp76 = options( ).
+
+    LOOP AT temp76 INTO ls_option.
       lo_options->tag( n = `Item` ns = `core`
           )->a( n = `key`  t = ls_option-key
           )->a( n = `text` t = ls_option-text ).
@@ -832,20 +1023,26 @@ CLASS z2ui5_cl_cgui_range IMPLEMENTATION.
                     part = cs_part-high ).
     ENDIF.
 
+
+    temp77 = 'Delete line'(008).
     lo_cells->tag( `Button`
         )->a( n = `icon`    v = `sap-icon://decline`
         )->a( n = `type`    v = `Transparent`
-        )->a( n = `tooltip` t = CONV #( 'Delete line'(008) )
+        )->a( n = `tooltip` t = temp77
         )->a( n = `press`   v = client->_event( val   = cs_event-delete
                                                 arg   = `${KEY}` ) ).
 
+
+    temp78 = 'OK'(015).
+
+    temp7 = 'Cancel'(016).
     lo_dialog->ele( `buttons`
         )->tag( `Button`
-        )->a( n = `text`  t = CONV #( 'OK'(015) )
+        )->a( n = `text`  t = temp78
         )->a( n = `type`  v = `Emphasized`
         )->a( n = `press` v = client->_event( cs_event-ok )
         )->tag( `Button`
-        )->a( n = `text`  t = CONV #( 'Cancel'(016) )
+        )->a( n = `text`  t = temp7
         )->a( n = `press` v = client->_event( cs_event-cancel ) ).
 
     client->popup_display( lo_dialog->stringify( ) ).
@@ -858,11 +1055,16 @@ CLASS z2ui5_cl_cgui_range IMPLEMENTATION.
 
     " a box per cell - the table maps its cells to the columns by index,
     " and the box is one cell whichever field it holds
-    DATA(lo_cell) = node->ele( `VBox` ).
+    DATA lo_cell TYPE REF TO z2ui5_cl_ui5_view_builder.
+    DATA lv_bind TYPE string.
+          DATA temp79 TYPE string.
+          DATA temp80 TYPE string_table.
+    lo_cell = node->ele( `VBox` ).
     IF part = cs_part-high.
       lo_cell->a( n = `visible` v = `{= ${OPTION} === 'BT' || ${OPTION} === 'NB' }` ).
     ENDIF.
-    DATA(lv_bind) = |\{{ part }\}|.
+
+    lv_bind = |\{{ part }\}|.
 
     CASE ms_setting-control.
       WHEN cs_control-date.
@@ -879,12 +1081,18 @@ CLASS z2ui5_cl_cgui_range IMPLEMENTATION.
         lo_field = lo_cell->ele( `Input`
             )->a( n = `value` v = lv_bind ).
         IF ms_setting-max_length > 0.
-          lo_field->a( n = `maxLength` t = CONV string( ms_setting-max_length ) ).
+
+          temp79 = ms_setting-max_length.
+          lo_field->a( n = `maxLength` t = temp79 ).
         ENDIF.
         IF ms_setting-value_help = abap_true.
+
+          CLEAR temp80.
+          INSERT `${KEY}` INTO TABLE temp80.
+          INSERT part INTO TABLE temp80.
           lo_field->a( n = `showValueHelp`    b = abap_true
               )->a( n = `valueHelpRequest` v = client->_event( val   = cs_event-f4
-                                                               t_arg = VALUE #( ( `${KEY}` ) ( part ) ) ) ).
+                                                               t_arg = temp80 ) ).
         ENDIF.
     ENDCASE.
 

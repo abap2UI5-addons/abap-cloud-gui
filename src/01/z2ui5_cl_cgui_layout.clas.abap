@@ -50,7 +50,7 @@ CLASS z2ui5_cl_cgui_layout DEFINITION PUBLIC FINAL CREATE PRIVATE.
         subtotal TYPE abap_bool,
         numeric  TYPE abap_bool,
       END OF ty_s_row.
-    TYPES ty_t_row TYPE STANDARD TABLE OF ty_s_row WITH EMPTY KEY.
+    TYPES ty_t_row TYPE STANDARD TABLE OF ty_s_row WITH DEFAULT KEY.
 
     TYPES:
       "! a saved layout - shared: every user sees it, protected: only its
@@ -64,7 +64,7 @@ CLASS z2ui5_cl_cgui_layout DEFINITION PUBLIC FINAL CREATE PRIVATE.
         owner      TYPE string,
       END OF ty_s_saved.
 
-    TYPES ty_t_saved TYPE STANDARD TABLE OF ty_s_saved WITH EMPTY KEY.
+    TYPES ty_t_saved TYPE STANDARD TABLE OF ty_s_saved WITH DEFAULT KEY.
 
     TYPES:
       BEGIN OF ty_s_result,
@@ -178,14 +178,16 @@ ENDCLASS.
 CLASS z2ui5_cl_cgui_layout IMPLEMENTATION.
 
   METHOD factory.
+    DATA ls_saved TYPE z2ui5_cl_cgui_layout=>ty_s_saved.
 
-    result = NEW #( ).
+    CREATE OBJECT result.
     result->mt_base  = layout.
     result->mt_saved = saved.
     result->mt_row   = layout_to_rows( layout ).
     result->mv_selected = current.
     result->mv_sharing = sharing.
-    READ TABLE saved INTO DATA(ls_saved) WITH KEY name = current.
+
+    READ TABLE saved INTO ls_saved WITH KEY name = current.
     IF sy-subrc = 0.
       result->mv_default   = ls_saved-is_default.
       result->mv_shared    = ls_saved-shared.
@@ -207,64 +209,121 @@ CLASS z2ui5_cl_cgui_layout IMPLEMENTATION.
         rank TYPE i,
         name TYPE string,
       END OF ty_s_rank.
-    DATA lt_rank TYPE STANDARD TABLE OF ty_s_rank WITH EMPTY KEY.
+    TYPES temp1 TYPE STANDARD TABLE OF ty_s_rank WITH DEFAULT KEY.
+DATA lt_rank TYPE temp1.
 
     " the sort rank: the one a row came with first, then the rows sorted in
     " the dialog in their order
-    LOOP AT rows INTO DATA(ls_row) WHERE sort IS NOT INITIAL.
-      INSERT VALUE #( rank = COND #( WHEN ls_row-sort_seq > 0 THEN ls_row-sort_seq ELSE 100000 + sy-tabix )
-                      name = ls_row-name ) INTO TABLE lt_rank.
+    DATA ls_row LIKE LINE OF rows.
+      DATA temp95 TYPE ty_s_rank.
+      DATA temp5 TYPE ty_s_rank-rank.
+      DATA lv_index LIKE sy-tabix.
+      DATA lv_seq TYPE i.
+      DATA temp96 TYPE z2ui5_cl_cgui_alv=>ty_s_layout.
+      DATA temp2 TYPE xsdboolean.
+      DATA temp3 TYPE xsdboolean.
+      DATA temp4 TYPE xsdboolean.
+    LOOP AT rows INTO ls_row WHERE sort IS NOT INITIAL.
+
+      CLEAR temp95.
+
+      IF ls_row-sort_seq > 0.
+        temp5 = ls_row-sort_seq.
+      ELSE.
+        temp5 = 100000 + sy-tabix.
+      ENDIF.
+      temp95-rank = temp5.
+      temp95-name = ls_row-name.
+      INSERT temp95 INTO TABLE lt_rank.
     ENDLOOP.
     SORT lt_rank BY rank.
 
     LOOP AT rows INTO ls_row.
-      DATA(lv_index) = sy-tabix.
-      DATA(lv_seq) = 0.
+
+      lv_index = sy-tabix.
+
+      lv_seq = 0.
       IF ls_row-sort IS NOT INITIAL.
         READ TABLE lt_rank TRANSPORTING NO FIELDS WITH KEY name = ls_row-name.
         lv_seq = sy-tabix.
       ENDIF.
-      INSERT VALUE #( name     = ls_row-name
-                      text     = ls_row-text
-                      hidden   = xsdbool( ls_row-visible = abap_false )
-                      position = lv_index
-                      sort     = ls_row-sort
-                      sort_seq = lv_seq
-                      sum      = xsdbool( ls_row-sum = abap_true AND ls_row-numeric = abap_true )
-                      subtotal = xsdbool( ls_row-subtotal = abap_true AND ls_row-sort IS NOT INITIAL )
-                      numeric  = ls_row-numeric ) INTO TABLE result.
+
+      CLEAR temp96.
+      temp96-name = ls_row-name.
+      temp96-text = ls_row-text.
+
+      temp2 = boolc( ls_row-visible = abap_false ).
+      temp96-hidden = temp2.
+      temp96-position = lv_index.
+      temp96-sort = ls_row-sort.
+      temp96-sort_seq = lv_seq.
+
+      temp3 = boolc( ls_row-sum = abap_true AND ls_row-numeric = abap_true ).
+      temp96-sum = temp3.
+
+      temp4 = boolc( ls_row-subtotal = abap_true AND ls_row-sort IS NOT INITIAL ).
+      temp96-subtotal = temp4.
+      temp96-numeric = ls_row-numeric.
+      INSERT temp96 INTO TABLE result.
     ENDLOOP.
 
   ENDMETHOD.
 
   METHOD layout_to_rows.
 
-    DATA(lt_layout) = layout.
+    DATA lt_layout LIKE layout.
+    DATA ls_layout LIKE LINE OF lt_layout.
+      DATA temp97 TYPE z2ui5_cl_cgui_layout=>ty_s_row.
+      DATA temp5 TYPE xsdboolean.
+      DATA temp6 TYPE z2ui5_cl_cgui_layout=>ty_s_row-sort_seq.
+    lt_layout = layout.
     SORT lt_layout STABLE BY position.
-    LOOP AT lt_layout INTO DATA(ls_layout).
-      INSERT VALUE #( name     = ls_layout-name
-                      text     = ls_layout-text
-                      visible  = xsdbool( ls_layout-hidden = abap_false )
-                      sort     = ls_layout-sort
-                      sort_seq = COND #( WHEN ls_layout-sort IS NOT INITIAL THEN ls_layout-sort_seq )
-                      sum      = ls_layout-sum
-                      subtotal = ls_layout-subtotal
-                      numeric  = ls_layout-numeric ) INTO TABLE result.
+
+    LOOP AT lt_layout INTO ls_layout.
+
+      CLEAR temp97.
+      temp97-name = ls_layout-name.
+      temp97-text = ls_layout-text.
+
+      temp5 = boolc( ls_layout-hidden = abap_false ).
+      temp97-visible = temp5.
+      temp97-sort = ls_layout-sort.
+
+      IF ls_layout-sort IS NOT INITIAL.
+        temp6 = ls_layout-sort_seq.
+      ELSE.
+        CLEAR temp6.
+      ENDIF.
+      temp97-sort_seq = temp6.
+      temp97-sum = ls_layout-sum.
+      temp97-subtotal = ls_layout-subtotal.
+      temp97-numeric = ls_layout-numeric.
+      INSERT temp97 INTO TABLE result.
     ENDLOOP.
 
   ENDMETHOD.
 
   METHOD layout_merge.
 
-    LOOP AT base INTO DATA(ls_base).
-      DATA(ls_layout) = ls_base.
-      READ TABLE saved INTO DATA(ls_saved) WITH KEY name = ls_base-name.
+    DATA ls_base LIKE LINE OF base.
+      DATA ls_layout LIKE ls_base.
+      DATA ls_saved TYPE z2ui5_cl_cgui_alv=>ty_s_layout.
+        DATA temp6 TYPE xsdboolean.
+    DATA temp98 LIKE LINE OF result.
+    DATA lr_layout LIKE REF TO temp98.
+    LOOP AT base INTO ls_base.
+
+      ls_layout = ls_base.
+
+      READ TABLE saved INTO ls_saved WITH KEY name = ls_base-name.
       IF sy-subrc = 0.
         ls_layout-hidden   = ls_saved-hidden.
         ls_layout-position = ls_saved-position.
         ls_layout-sort     = ls_saved-sort.
         ls_layout-sort_seq = ls_saved-sort_seq.
-        ls_layout-sum      = xsdbool( ls_saved-sum = abap_true AND ls_base-numeric = abap_true ).
+
+        temp6 = boolc( ls_saved-sum = abap_true AND ls_base-numeric = abap_true ).
+        ls_layout-sum      = temp6.
         ls_layout-subtotal = ls_saved-subtotal.
       ELSE.
         ls_layout-position = 1000 + ls_base-position.
@@ -273,27 +332,61 @@ CLASS z2ui5_cl_cgui_layout IMPLEMENTATION.
     ENDLOOP.
 
     SORT result STABLE BY position.
-    LOOP AT result REFERENCE INTO DATA(lr_layout).
+
+
+    LOOP AT result REFERENCE INTO lr_layout.
       lr_layout->position = sy-tabix.
     ENDLOOP.
 
   ENDMETHOD.
 
   METHOD to_variant.
+    DATA temp99 TYPE z2ui5_cl_cgui_variant=>ty_s_variant-text.
+    DATA ls_layout LIKE LINE OF layout.
+      DATA temp100 TYPE z2ui5_cl_cgui_variant=>ty_s_value.
+      DATA temp7 TYPE string.
+      DATA temp1 TYPE string.
+      DATA temp2 TYPE string.
 
     result-name = |{ cv_prefix }{ name }|.
-    result-text = COND #( WHEN is_default = abap_true THEN `DEFAULT` ).
+
+    IF is_default = abap_true.
+      temp99 = `DEFAULT`.
+    ELSE.
+      CLEAR temp99.
+    ENDIF.
+    result-text = temp99.
     " the flags in sign: H hidden, S summed, T subtotals - low the position,
     " high the sort rank, option the sort
-    LOOP AT layout INTO DATA(ls_layout).
-      INSERT VALUE #( name   = ls_layout-name
-                      kind   = `L`
-                      sign   = |{ COND #( WHEN ls_layout-hidden = abap_true THEN `H` ) }|
-                            && |{ COND #( WHEN ls_layout-sum = abap_true THEN `S` ) }|
-                            && |{ COND #( WHEN ls_layout-subtotal = abap_true THEN `T` ) }|
-                      option = ls_layout-sort
-                      low    = |{ ls_layout-position }|
-                      high   = |{ ls_layout-sort_seq }| ) INTO TABLE result-values.
+
+    LOOP AT layout INTO ls_layout.
+
+      CLEAR temp100.
+      temp100-name = ls_layout-name.
+      temp100-kind = `L`.
+
+      IF ls_layout-hidden = abap_true.
+        temp7 = `H`.
+      ELSE.
+        CLEAR temp7.
+      ENDIF.
+
+      IF ls_layout-sum = abap_true.
+        temp1 = `S`.
+      ELSE.
+        CLEAR temp1.
+      ENDIF.
+
+      IF ls_layout-subtotal = abap_true.
+        temp2 = `T`.
+      ELSE.
+        CLEAR temp2.
+      ENDIF.
+      temp100-sign = |{ temp7 }| && |{ temp1 }| && |{ temp2 }|.
+      temp100-option = ls_layout-sort.
+      temp100-low = |{ ls_layout-position }|.
+      temp100-high = |{ ls_layout-sort_seq }|.
+      INSERT temp100 INTO TABLE result-values.
     ENDLOOP.
 
   ENDMETHOD.
@@ -302,23 +395,50 @@ CLASS z2ui5_cl_cgui_layout IMPLEMENTATION.
 
     DATA ls_saved TYPE ty_s_saved.
 
-    DATA(lv_length) = strlen( cv_prefix ).
-    LOOP AT variants INTO DATA(ls_variant).
+    DATA lv_length TYPE i.
+    DATA ls_variant LIKE LINE OF variants.
+      DATA temp7 TYPE xsdboolean.
+      DATA ls_value LIKE LINE OF ls_variant-values.
+            DATA temp101 TYPE z2ui5_cl_cgui_alv=>ty_s_layout.
+            DATA temp10 TYPE xsdboolean.
+            DATA temp11 TYPE xsdboolean.
+            DATA temp12 TYPE xsdboolean.
+            DATA temp8 TYPE i.
+            DATA temp9 TYPE i.
+    lv_length = strlen( cv_prefix ).
+
+    LOOP AT variants INTO ls_variant.
       IF strlen( ls_variant-name ) <= lv_length OR substring( val = ls_variant-name len = lv_length ) <> cv_prefix.
         CONTINUE.
       ENDIF.
       CLEAR ls_saved.
       ls_saved-name    = substring( val = ls_variant-name off = lv_length ).
-      ls_saved-is_default = xsdbool( ls_variant-text = `DEFAULT` ).
-      LOOP AT ls_variant-values INTO DATA(ls_value) WHERE kind = `L`.
+
+      temp7 = boolc( ls_variant-text = `DEFAULT` ).
+      ls_saved-is_default = temp7.
+
+      LOOP AT ls_variant-values INTO ls_value WHERE kind = `L`.
         TRY.
-            INSERT VALUE #( name     = ls_value-name
-                            hidden   = xsdbool( ls_value-sign CS `H` )
-                            sum      = xsdbool( ls_value-sign CS `S` )
-                            subtotal = xsdbool( ls_value-sign CS `T` )
-                            sort     = ls_value-option
-                            position = CONV i( ls_value-low )
-                            sort_seq = CONV i( ls_value-high ) ) INTO TABLE ls_saved-layout.
+
+            CLEAR temp101.
+            temp101-name = ls_value-name.
+
+            temp10 = boolc( ls_value-sign CS `H` ).
+            temp101-hidden = temp10.
+
+            temp11 = boolc( ls_value-sign CS `S` ).
+            temp101-sum = temp11.
+
+            temp12 = boolc( ls_value-sign CS `T` ).
+            temp101-subtotal = temp12.
+            temp101-sort = ls_value-option.
+
+            temp8 = ls_value-low.
+            temp101-position = temp8.
+
+            temp9 = ls_value-high.
+            temp101-sort_seq = temp9.
+            INSERT temp101 INTO TABLE ls_saved-layout.
           CATCH cx_sy_conversion_error.
             CONTINUE.
         ENDTRY.
@@ -333,7 +453,7 @@ CLASS z2ui5_cl_cgui_layout IMPLEMENTATION.
 
     me->client = client.
 
-    IF client->check_on_init( ).
+    IF client->check_on_init( ) IS NOT INITIAL.
       view_display( ).
       RETURN.
     ENDIF.
@@ -343,6 +463,9 @@ CLASS z2ui5_cl_cgui_layout IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD on_event.
+          DATA temp13 TYPE xsdboolean.
+          DATA temp14 TYPE xsdboolean.
+        DATA ls_saved TYPE z2ui5_cl_cgui_layout=>ty_s_saved.
 
     CASE client->get_event( ).
 
@@ -359,8 +482,12 @@ CLASS z2ui5_cl_cgui_layout IMPLEMENTATION.
         ELSEIF ms_result-name IS NOT INITIAL.
           ms_result-action     = cs_action-save.
           ms_result-is_default = mv_default.
-          ms_result-shared     = xsdbool( mv_sharing = abap_true AND mv_shared = abap_true ).
-          ms_result-protected  = xsdbool( mv_sharing = abap_true AND mv_protected = abap_true ).
+
+          temp13 = boolc( mv_sharing = abap_true AND mv_shared = abap_true ).
+          ms_result-shared     = temp13.
+
+          temp14 = boolc( mv_sharing = abap_true AND mv_protected = abap_true ).
+          ms_result-protected  = temp14.
         ELSE.
           ms_result-action = cs_action-apply.
         ENDIF.
@@ -379,7 +506,8 @@ CLASS z2ui5_cl_cgui_layout IMPLEMENTATION.
               delta = 1 ).
 
       WHEN cs_event-load.
-        READ TABLE mt_saved INTO DATA(ls_saved) WITH KEY name = mv_selected.
+
+        READ TABLE mt_saved INTO ls_saved WITH KEY name = mv_selected.
         IF sy-subrc = 0.
           mt_row = layout_to_rows( layout_merge( base  = mt_base
                                                  saved = ls_saved-layout ) ).
@@ -387,10 +515,11 @@ CLASS z2ui5_cl_cgui_layout IMPLEMENTATION.
           mv_default   = ls_saved-is_default.
           mv_shared    = ls_saved-shared.
           mv_protected = ls_saved-protected.
-          ms_loaded = VALUE #( name       = mv_name
-                               is_default = mv_default
-                               shared     = mv_shared
-                               protected  = mv_protected ).
+          CLEAR ms_loaded.
+          ms_loaded-name = mv_name.
+          ms_loaded-is_default = mv_default.
+          ms_loaded-shared = mv_shared.
+          ms_loaded-protected = mv_protected.
           mt_loaded = mt_row.
         ELSE.
           mt_row = layout_to_rows( mt_base ).
@@ -411,17 +540,31 @@ CLASS z2ui5_cl_cgui_layout IMPLEMENTATION.
   METHOD move.
 
     DATA lv_index TYPE i.
+    DATA lv_target TYPE i.
+    DATA ls_row LIKE LINE OF mt_row.
+    FIELD-SYMBOLS <temp10> LIKE LINE OF mt_row.
+    DATA temp11 LIKE sy-tabix.
 
     LOOP AT mt_row TRANSPORTING NO FIELDS WHERE name = name.
       lv_index = sy-tabix.
       EXIT.
     ENDLOOP.
-    DATA(lv_target) = lv_index + delta.
+
+    lv_target = lv_index + delta.
     IF lv_index = 0 OR lv_target < 1 OR lv_target > lines( mt_row ).
       RETURN.
     ENDIF.
 
-    DATA(ls_row) = mt_row[ lv_index ].
+
+
+
+    temp11 = sy-tabix.
+    READ TABLE mt_row INDEX lv_index ASSIGNING <temp10>.
+    sy-tabix = temp11.
+    IF sy-subrc <> 0.
+      ASSERT 1 = 0.
+    ENDIF.
+    ls_row = <temp10>.
     DELETE mt_row INDEX lv_index.
     INSERT ls_row INTO mt_row INDEX lv_target.
 
@@ -436,102 +579,186 @@ CLASS z2ui5_cl_cgui_layout IMPLEMENTATION.
 
   METHOD view_display.
 
-    DATA(lo_dialog) = z2ui5_cl_ui5_view_builder=>factory(
+    DATA temp102 TYPE string.
+    DATA lo_dialog TYPE REF TO z2ui5_cl_ui5_view_builder.
+    DATA lo_content TYPE REF TO z2ui5_cl_ui5_view_builder.
+      DATA lo_saved TYPE REF TO z2ui5_cl_ui5_view_builder.
+      DATA temp103 TYPE string.
+      DATA lo_items TYPE REF TO z2ui5_cl_ui5_view_builder.
+      DATA temp104 TYPE string.
+      DATA ls_saved LIKE LINE OF mt_saved.
+        DATA temp105 TYPE string.
+        DATA temp12 TYPE string.
+      DATA temp106 TYPE string.
+    DATA lo_table TYPE REF TO z2ui5_cl_ui5_view_builder.
+    DATA lo_columns TYPE REF TO z2ui5_cl_ui5_view_builder.
+    DATA temp107 TYPE string.
+    DATA temp108 TYPE string.
+    DATA temp109 TYPE string.
+    DATA temp110 TYPE string.
+    DATA temp111 TYPE string.
+    DATA lo_cells TYPE REF TO z2ui5_cl_ui5_view_builder.
+    DATA temp112 TYPE string.
+    DATA temp13 TYPE string.
+    DATA temp2 TYPE string.
+    DATA temp113 TYPE string.
+    DATA temp14 TYPE string.
+    DATA temp114 TYPE string.
+    DATA temp15 TYPE string.
+    DATA temp3 TYPE string.
+    DATA temp4 TYPE string.
+    DATA temp115 TYPE string.
+    DATA temp16 TYPE string.
+    temp102 = 'Change Layout'(001).
+
+    lo_dialog = z2ui5_cl_ui5_view_builder=>factory(
         )->ele( n = `FragmentDefinition` ns = `core`
         )->a( n = `xmlns`      v = `sap.m`
         )->a( n = `xmlns:core` v = `sap.ui.core`
         )->ele( `Dialog`
-        )->a( n = `title`        t = CONV #( 'Change Layout'(001) )
+        )->a( n = `title`        t = temp102
         )->a( n = `contentWidth` v = `46rem`
         )->a( n = `resizable`    b = abap_true
         )->a( n = `draggable`    b = abap_true
         )->a( n = `afterClose`   v = client->_event( cs_event-cancel ) ).
 
-    DATA(lo_content) = lo_dialog->ele( `content`
+
+    lo_content = lo_dialog->ele( `content`
         )->ele( `VBox`
         )->a( n = `class` v = `sapUiSmallMargin` ).
 
     " the saved layouts
     IF mt_saved IS NOT INITIAL.
-      DATA(lo_saved) = lo_content->ele( `HBox`
+
+      lo_saved = lo_content->ele( `HBox`
           )->a( n = `alignItems` v = `Center`
           )->a( n = `class`      v = `sapUiSmallMarginBottom` ).
+
+      temp103 = 'Saved layout'(002).
       lo_saved->tag( `Label`
-          )->a( n = `text`  t = CONV #( 'Saved layout'(002) )
+          )->a( n = `text`  t = temp103
           )->a( n = `class` v = `sapUiSmallMarginEnd` ).
-      DATA(lo_items) = lo_saved->ele( `Select`
+
+      lo_items = lo_saved->ele( `Select`
           )->a( n = `selectedKey`    v = client->_bind( mv_selected )
           )->a( n = `forceSelection` b = abap_false
           )->a( n = `change`         v = client->_event( cs_event-load )
           )->ele( `items` ).
+
+      temp104 = 'Current layout'(003).
       lo_items->tag( n = `Item` ns = `core`
           )->a( n = `key`  v = ``
-          )->a( n = `text` t = CONV #( 'Current layout'(003) ) ).
-      LOOP AT mt_saved INTO DATA(ls_saved).
+          )->a( n = `text` t = temp104 ).
+
+      LOOP AT mt_saved INTO ls_saved.
+
+        IF ls_saved-is_default = abap_true.
+          temp105 = | ({ 'Default'(004) })|.
+        ELSE.
+          CLEAR temp105.
+        ENDIF.
+
+        IF ls_saved-shared = abap_true AND ls_saved-owner IS NOT INITIAL.
+          temp12 = | - { ls_saved-owner }|.
+        ELSE.
+          CLEAR temp12.
+        ENDIF.
         lo_items->tag( n = `Item` ns = `core`
             )->a( n = `key`  t = ls_saved-name
             )->a( n = `text` t = |{ ls_saved-name }|
-                              && |{ COND #( WHEN ls_saved-is_default = abap_true THEN | ({ 'Default'(004) })| ) }|
-                              && |{ COND #( WHEN ls_saved-shared = abap_true AND ls_saved-owner IS NOT INITIAL
-                                            THEN | - { ls_saved-owner }| ) }| ).
+                              && |{ temp105 }|
+                              && |{ temp12 }| ).
       ENDLOOP.
+
+      temp106 = 'Delete layout'(005).
       lo_saved->tag( `Button`
           )->a( n = `icon`    v = `sap-icon://delete`
           )->a( n = `type`    v = `Transparent`
-          )->a( n = `tooltip` t = CONV #( 'Delete layout'(005) )
+          )->a( n = `tooltip` t = temp106
           )->a( n = `press`   v = client->_event( cs_event-delete ) ).
     ENDIF.
 
-    DATA(lo_table) = lo_content->ele( `Table`
+
+    lo_table = lo_content->ele( `Table`
         )->a( n = `items` v = client->_bind( mt_row ) ).
-    DATA(lo_columns) = lo_table->ele( `columns` ).
-    lo_columns->ele( `Column` )->a( n = `width` v = `5rem` )->tag( `Text` )->a( n = `text` t = CONV #( 'Visible'(006) ) ).
-    lo_columns->ele( `Column` )->tag( `Text` )->a( n = `text` t = CONV #( 'Column'(007) ) ).
-    lo_columns->ele( `Column` )->a( n = `width` v = `10rem` )->tag( `Text` )->a( n = `text` t = CONV #( 'Sort'(008) ) ).
-    lo_columns->ele( `Column` )->a( n = `width` v = `5rem` )->tag( `Text` )->a( n = `text` t = CONV #( 'Total'(009) ) ).
-    lo_columns->ele( `Column` )->a( n = `width` v = `6rem` )->tag( `Text` )->a( n = `text` t = CONV #( 'Subtotals'(010) ) ).
+
+    lo_columns = lo_table->ele( `columns` ).
+
+    temp107 = 'Visible'(006).
+    lo_columns->ele( `Column` )->a( n = `width` v = `5rem` )->tag( `Text` )->a( n = `text` t = temp107 ).
+
+    temp108 = 'Column'(007).
+    lo_columns->ele( `Column` )->tag( `Text` )->a( n = `text` t = temp108 ).
+
+    temp109 = 'Sort'(008).
+    lo_columns->ele( `Column` )->a( n = `width` v = `10rem` )->tag( `Text` )->a( n = `text` t = temp109 ).
+
+    temp110 = 'Total'(009).
+    lo_columns->ele( `Column` )->a( n = `width` v = `5rem` )->tag( `Text` )->a( n = `text` t = temp110 ).
+
+    temp111 = 'Subtotals'(010).
+    lo_columns->ele( `Column` )->a( n = `width` v = `6rem` )->tag( `Text` )->a( n = `text` t = temp111 ).
     lo_columns->ele( `Column` )->a( n = `width` v = `6rem` ).
 
-    DATA(lo_cells) = lo_table->ele( `items`
+
+    lo_cells = lo_table->ele( `items`
         )->ele( `ColumnListItem`
         )->ele( `cells` ).
     lo_cells->tag( `CheckBox`
         )->a( n = `selected` v = `{VISIBLE}`
         )->tag( `Text`
         )->a( n = `text` v = `{TEXT}` ).
+
+    temp112 = 'not sorted'(011).
+
+    temp13 = 'ascending'(012).
+
+    temp2 = 'descending'(013).
     lo_cells->ele( `Select`
         )->a( n = `selectedKey` v = `{SORT}`
         )->a( n = `width`       v = `100%`
         )->ele( `items`
         )->tag( n = `Item` ns = `core`
         )->a( n = `key`  v = ``
-        )->a( n = `text` t = CONV #( 'not sorted'(011) )
+        )->a( n = `text` t = temp112
         )->tag( n = `Item` ns = `core`
         )->a( n = `key`  v = z2ui5_cl_cgui_alv=>cs_sort-ascending
-        )->a( n = `text` t = CONV #( 'ascending'(012) )
+        )->a( n = `text` t = temp13
         )->tag( n = `Item` ns = `core`
         )->a( n = `key`  v = z2ui5_cl_cgui_alv=>cs_sort-descending
-        )->a( n = `text` t = CONV #( 'descending'(013) ) ).
+        )->a( n = `text` t = temp2 ).
     lo_cells->tag( `CheckBox`
         )->a( n = `selected` v = `{SUM}`
         )->a( n = `enabled`  v = `{NUMERIC}`
         )->tag( `CheckBox`
         )->a( n = `selected` v = `{SUBTOTAL}`
         )->a( n = `enabled`  v = `{= ${SORT} !== '' }` ).
+
+    temp113 = 'Up'(014).
+
+    temp14 = 'Down'(015).
     lo_cells->ele( `HBox`
         )->tag( `Button`
         )->a( n = `icon`    v = `sap-icon://navigation-up-arrow`
         )->a( n = `type`    v = `Transparent`
-        )->a( n = `tooltip` t = CONV #( 'Up'(014) )
+        )->a( n = `tooltip` t = temp113
         )->a( n = `press`   v = client->_event( val   = cs_event-up
                                                 arg   = `${NAME}` )
         )->tag( `Button`
         )->a( n = `icon`    v = `sap-icon://navigation-down-arrow`
         )->a( n = `type`    v = `Transparent`
-        )->a( n = `tooltip` t = CONV #( 'Down'(015) )
+        )->a( n = `tooltip` t = temp14
         )->a( n = `press`   v = client->_event( val   = cs_event-down
                                                 arg   = `${NAME}` ) ).
 
+
+    temp114 = 'Save as layout (name)'(016).
+
+    temp15 = 'Default layout'(017).
+
+    temp3 = 'Shared'(020).
+
+    temp4 = 'Protected'(021).
     lo_content->ele( `HBox`
         )->a( n = `alignItems` v = `Center`
         )->a( n = `class`      v = `sapUiSmallMarginTop`
@@ -539,29 +766,33 @@ CLASS z2ui5_cl_cgui_layout IMPLEMENTATION.
         )->a( n = `value`       v = client->_bind( mv_name )
         )->a( n = `maxLength`   v = `30`
         )->a( n = `width`       v = `16rem`
-        )->a( n = `placeholder` t = CONV #( 'Save as layout (name)'(016) )
+        )->a( n = `placeholder` t = temp114
         )->tag( `CheckBox`
         )->a( n = `selected` v = client->_bind( mv_default )
-        )->a( n = `text`     t = CONV #( 'Default layout'(017) )
+        )->a( n = `text`     t = temp15
         )->a( n = `class`    v = `sapUiSmallMarginBegin`
         )->tag( `CheckBox`
         )->a( n = `selected` v = client->_bind( mv_shared )
-        )->a( n = `text`     t = CONV #( 'Shared'(020) )
+        )->a( n = `text`     t = temp3
         )->a( n = `visible`  b = mv_sharing
         )->a( n = `class`    v = `sapUiSmallMarginBegin`
         )->tag( `CheckBox`
         )->a( n = `selected` v = client->_bind( mv_protected )
-        )->a( n = `text`     t = CONV #( 'Protected'(021) )
+        )->a( n = `text`     t = temp4
         )->a( n = `visible`  b = mv_sharing
         )->a( n = `class`    v = `sapUiSmallMarginBegin` ).
 
+
+    temp115 = 'OK'(018).
+
+    temp16 = 'Cancel'(019).
     lo_dialog->ele( `buttons`
         )->tag( `Button`
-        )->a( n = `text`  t = CONV #( 'OK'(018) )
+        )->a( n = `text`  t = temp115
         )->a( n = `type`  v = `Emphasized`
         )->a( n = `press` v = client->_event( cs_event-ok )
         )->tag( `Button`
-        )->a( n = `text`  t = CONV #( 'Cancel'(019) )
+        )->a( n = `text`  t = temp16
         )->a( n = `press` v = client->_event( cs_event-cancel ) ).
 
     client->popup_display( lo_dialog->stringify( ) ).

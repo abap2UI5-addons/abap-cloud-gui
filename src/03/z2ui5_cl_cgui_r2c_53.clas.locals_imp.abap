@@ -18,7 +18,8 @@ CLASS lcl_events IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD on_link_click.
-    READ TABLE lcl_r2c=>app->gt_call INDEX row INTO DATA(ls_call).
+    DATA ls_call TYPE z2ui5_cl_cgui_r2c_53=>ty_call.
+    READ TABLE lcl_r2c=>app->gt_call INDEX row INTO ls_call.
     IF sy-subrc = 0.
       lcl_r2c=>app->message( |{ ls_call-interface } ({ column }): { ls_call-message }| ).
     ENDIF.

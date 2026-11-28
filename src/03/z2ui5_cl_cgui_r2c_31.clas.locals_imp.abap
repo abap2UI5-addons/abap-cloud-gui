@@ -38,7 +38,9 @@ CLASS lcl_counter IMPLEMENTATION.
     TYPES ty_line TYPE c LENGTH 255.
     DATA lt_html TYPE STANDARD TABLE OF ty_line WITH DEFAULT KEY.
     DATA lv_url  TYPE c LENGTH 255.
-    APPEND |<h1>Count: { gv_count }</h1>| TO lt_html.
+    DATA temp1 LIKE LINE OF lt_html.
+    temp1 = |<h1>Count: { gv_count }</h1>|.
+    APPEND temp1 TO lt_html.
     go_html->load_data( IMPORTING assigned_url = lv_url
                         CHANGING  data_table   = lt_html ).
     go_html->show_url( lv_url ).

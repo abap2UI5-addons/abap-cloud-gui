@@ -95,7 +95,7 @@ CLASS z2ui5_cl_cgui_list DEFINITION PUBLIC FINAL CREATE PUBLIC.
         col         TYPE i,
         no_heading  TYPE abap_bool,
       END OF ty_s_item.
-    TYPES ty_t_item TYPE STANDARD TABLE OF ty_s_item WITH EMPTY KEY.
+    TYPES ty_t_item TYPE STANDARD TABLE OF ty_s_item WITH DEFAULT KEY.
 
     TYPES:
       "! the value of an input field of the list - bound by the app
@@ -105,7 +105,7 @@ CLASS z2ui5_cl_cgui_list DEFINITION PUBLIC FINAL CREATE PUBLIC.
         value TYPE string,
         flag  TYPE abap_bool,
       END OF ty_s_input.
-    TYPES ty_t_input TYPE STANDARD TABLE OF ty_s_input WITH EMPTY KEY.
+    TYPES ty_t_input TYPE STANDARD TABLE OF ty_s_input WITH DEFAULT KEY.
 
     TYPES:
       "! the bindings of an input field - its value and its flag, as the app
@@ -115,7 +115,7 @@ CLASS z2ui5_cl_cgui_list DEFINITION PUBLIC FINAL CREATE PUBLIC.
         value TYPE string,
         flag  TYPE string,
       END OF ty_s_input_bind.
-    TYPES ty_t_input_bind TYPE STANDARD TABLE OF ty_s_input_bind WITH EMPTY KEY.
+    TYPES ty_t_input_bind TYPE STANDARD TABLE OF ty_s_input_bind WITH DEFAULT KEY.
 
     "! the width of chars characters of a list or screen - in em, 0.6 em a character
     "! (a CSSSize of UI5 has no unit ch)
@@ -588,13 +588,20 @@ CLASS z2ui5_cl_cgui_list IMPLEMENTATION.
 
   METHOD factory.
 
-    result = NEW #( ).
+    CREATE OBJECT result.
 
   ENDMETHOD.
 
   METHOD write.
 
     DATA ls_item TYPE ty_s_item.
+    DATA temp74 TYPE z2ui5_cl_cgui_list=>ty_s_item-color.
+    DATA temp75 TYPE abap_bool.
+    DATA temp76 TYPE abap_bool.
+    DATA temp77 TYPE abap_bool.
+    DATA temp78 TYPE abap_bool.
+      DATA lv_under TYPE string.
+      DATA ls_under LIKE LINE OF mt_item.
 
     " hide first: `hide = sy-tabix` is read before anything else can run a
     " LOOP - the transpiled runtime passes even a VALUE( ) of type any by
@@ -615,11 +622,41 @@ CLASS z2ui5_cl_cgui_list IMPLEMENTATION.
                                        date_format = date_format
                                        time_zone   = time_zone ).
     " FORMAT gives what is not passed
-    ls_item-color       = COND #( WHEN color IS SUPPLIED THEN color ELSE ms_format-color ).
-    ls_item-hotspot     = COND #( WHEN hotspot IS SUPPLIED THEN hotspot ELSE ms_format-hotspot ).
-    ls_item-intensified = COND #( WHEN intensified IS SUPPLIED THEN intensified ELSE ms_format-intensified ).
-    ls_item-inverse     = COND #( WHEN inverse IS SUPPLIED THEN inverse ELSE ms_format-inverse ).
-    ls_item-input       = COND #( WHEN input IS SUPPLIED THEN input ELSE ms_format-input ).
+
+    IF color IS SUPPLIED.
+      temp74 = color.
+    ELSE.
+      temp74 = ms_format-color.
+    ENDIF.
+    ls_item-color       = temp74.
+
+    IF hotspot IS SUPPLIED.
+      temp75 = hotspot.
+    ELSE.
+      temp75 = ms_format-hotspot.
+    ENDIF.
+    ls_item-hotspot     = temp75.
+
+    IF intensified IS SUPPLIED.
+      temp76 = intensified.
+    ELSE.
+      temp76 = ms_format-intensified.
+    ENDIF.
+    ls_item-intensified = temp76.
+
+    IF inverse IS SUPPLIED.
+      temp77 = inverse.
+    ELSE.
+      temp77 = ms_format-inverse.
+    ENDIF.
+    ls_item-inverse     = temp77.
+
+    IF input IS SUPPLIED.
+      temp78 = input.
+    ELSE.
+      temp78 = ms_format-input.
+    ENDIF.
+    ls_item-input       = temp78.
     ls_item-pos         = pos.
     ls_item-len         = len.
     ls_item-justify     = to_upper( justify ).
@@ -629,8 +666,10 @@ CLASS z2ui5_cl_cgui_list IMPLEMENTATION.
 
     " WRITE UNDER g - the column g was written at
     IF under IS NOT INITIAL.
-      DATA(lv_under) = to_upper( under ).
-      LOOP AT mt_item INTO DATA(ls_under) WHERE name = lv_under.
+
+      lv_under = to_upper( under ).
+
+      LOOP AT mt_item INTO ls_under WHERE name = lv_under.
         ls_item-pos = ls_under-col.
       ENDLOOP.
     ENDIF.
@@ -693,12 +732,18 @@ CLASS z2ui5_cl_cgui_list IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD skip_to_line.
+    DATA temp79 LIKE sy-subrc.
+    DATA lv_gap TYPE i.
 
     result = me.
-    IF line_exists( mt_item[ line = mv_line ] ).
+
+    READ TABLE mt_item WITH KEY line = mv_line TRANSPORTING NO FIELDS.
+    temp79 = sy-subrc.
+    IF temp79 = 0.
       new_line( ).
     ENDIF.
-    DATA(lv_gap) = line - 1 - mv_page_lines.
+
+    lv_gap = line - 1 - mv_page_lines.
     IF lv_gap > 0.
       skip( lv_gap ).
     ENDIF.
@@ -725,9 +770,15 @@ CLASS z2ui5_cl_cgui_list IMPLEMENTATION.
 
   METHOD current_column.
 
-    result = COND #( WHEN mv_next_pos > 0 THEN mv_next_pos
-                     WHEN mv_col_line = mv_line THEN mv_col + 1
-                     ELSE 1 ).
+    DATA temp80 TYPE i.
+    IF mv_next_pos > 0.
+      temp80 = mv_next_pos.
+    ELSEIF mv_col_line = mv_line.
+      temp80 = mv_col + 1.
+    ELSE.
+      temp80 = 1.
+    ENDIF.
+    result = temp80.
 
   ENDMETHOD.
 
@@ -741,7 +792,8 @@ CLASS z2ui5_cl_cgui_list IMPLEMENTATION.
 
     DATA lv_last TYPE i.
 
-    LOOP AT mt_item INTO DATA(ls_item) WHERE header = abap_false AND footer = abap_false.
+    DATA ls_item LIKE LINE OF mt_item.
+    LOOP AT mt_item INTO ls_item WHERE header = abap_false AND footer = abap_false.
       IF ls_item-line <> lv_last.
         lv_last = ls_item-line.
         result = result + 1.
@@ -754,10 +806,13 @@ CLASS z2ui5_cl_cgui_list IMPLEMENTATION.
 
     DATA lt_item TYPE ty_t_item.
 
-    LOOP AT mt_item INTO DATA(ls_item) WHERE line = line.
+    DATA ls_item LIKE LINE OF mt_item.
+    DATA lt_text TYPE string_table.
+    LOOP AT mt_item INTO ls_item WHERE line = line.
       INSERT ls_item INTO TABLE lt_item.
     ENDLOOP.
-    DATA(lt_text) = items_to_text( lt_item ).
+
+    lt_text = items_to_text( lt_item ).
     READ TABLE lt_text INTO result INDEX 1.
 
   ENDMETHOD.
@@ -770,8 +825,13 @@ CLASS z2ui5_cl_cgui_list IMPLEMENTATION.
 
   METHOD hide.
 
-    DATA(lv_hide) = hide_text( val ).
-    LOOP AT mt_item REFERENCE INTO DATA(lr_item) WHERE line = mv_line AND kind = cs_kind-text.
+    DATA lv_hide TYPE string.
+    DATA temp81 LIKE LINE OF mt_item.
+    DATA lr_item LIKE REF TO temp81.
+    lv_hide = hide_text( val ).
+
+
+    LOOP AT mt_item REFERENCE INTO lr_item WHERE line = mv_line AND kind = cs_kind-text.
       lr_item->hide    = lv_hide.
       lr_item->hotspot = abap_true.
     ENDLOOP.
@@ -781,18 +841,24 @@ CLASS z2ui5_cl_cgui_list IMPLEMENTATION.
 
   METHOD write_as_checkbox.
 
-    item_add( VALUE #( kind  = cs_kind-checkbox
-                       flag  = val
-                       input = input
-                       name  = to_upper( name ) ) ).
+    DATA temp82 TYPE z2ui5_cl_cgui_list=>ty_s_item.
+    CLEAR temp82.
+    temp82-kind = cs_kind-checkbox.
+    temp82-flag = val.
+    temp82-input = input.
+    temp82-name = to_upper( name ).
+    item_add( temp82 ).
     result = me.
 
   ENDMETHOD.
 
   METHOD write_as_icon.
 
-    item_add( VALUE #( kind = cs_kind-icon
-                       text = val ) ).
+    DATA temp83 TYPE z2ui5_cl_cgui_list=>ty_s_item.
+    CLEAR temp83.
+    temp83-kind = cs_kind-icon.
+    temp83-text = val.
+    item_add( temp83 ).
     result = me.
 
   ENDMETHOD.
@@ -805,35 +871,47 @@ CLASS z2ui5_cl_cgui_list IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD skip.
+    DATA temp84 TYPE z2ui5_cl_cgui_list=>ty_s_item.
 
     new_line( ).
-    item_add( VALUE #( kind = cs_kind-skip
-                       text = |{ val }| ) ).
+
+    CLEAR temp84.
+    temp84-kind = cs_kind-skip.
+    temp84-text = |{ val }|.
+    item_add( temp84 ).
     new_line( ).
     result = me.
 
   ENDMETHOD.
 
   METHOD uline.
+    DATA temp85 TYPE z2ui5_cl_cgui_list=>ty_s_item.
 
     new_line( ).
-    item_add( VALUE #( kind = cs_kind-uline
-                       pos  = pos
-                       len  = len ) ).
+
+    CLEAR temp85.
+    temp85-kind = cs_kind-uline.
+    temp85-pos = pos.
+    temp85-len = len.
+    item_add( temp85 ).
     new_line( ).
     result = me.
 
   ENDMETHOD.
 
   METHOD new_page.
+    DATA temp86 TYPE z2ui5_cl_cgui_list=>ty_s_item.
 
     IF line_count IS SUPPLIED.
       mv_line_count = line_count.
     ENDIF.
     new_line( ).
-    item_add( VALUE #( kind       = cs_kind-page
-                       text       = title
-                       no_heading = no_heading ) ).
+
+    CLEAR temp86.
+    temp86-kind = cs_kind-page.
+    temp86-text = title.
+    temp86-no_heading = no_heading.
+    item_add( temp86 ).
     new_line( ).
     result = me.
 
@@ -863,7 +941,14 @@ CLASS z2ui5_cl_cgui_list IMPLEMENTATION.
 
   METHOD item_add.
 
-    DATA(ls_item) = val.
+    DATA ls_item LIKE val.
+        DATA temp87 TYPE i.
+        DATA temp9 TYPE i.
+          DATA temp88 TYPE z2ui5_cl_cgui_list=>ty_s_item.
+      DATA temp89 TYPE i.
+      DATA lv_width LIKE temp89.
+      DATA temp90 TYPE i.
+    ls_item = val.
     ls_item-line   = mv_line.
     ls_item-header = mv_header.
     ls_item-footer = mv_footer.
@@ -876,14 +961,23 @@ CLASS z2ui5_cl_cgui_list IMPLEMENTATION.
       ELSEIF ls_item-line <> mv_body_line.
         mv_body_line = ls_item-line.
         " SKIP n is n lines of the page
-        mv_page_lines = mv_page_lines + COND i( WHEN ls_item-kind = cs_kind-skip
-                                                THEN nmax( val1 = 1 val2 = CONV i( ls_item-text ) )
-                                                ELSE 1 ).
+
+        temp87 = ls_item-text.
+
+        IF ls_item-kind = cs_kind-skip.
+          temp9 = nmax( val1 = 1 val2 = temp87 ).
+        ELSE.
+          temp9 = 1.
+        ENDIF.
+        mv_page_lines = mv_page_lines + temp9.
         IF mv_line_count > 0 AND mv_page_lines > mv_line_count.
           mv_id = mv_id + 1.
-          INSERT VALUE #( line = mv_line
-                          kind = cs_kind-page
-                          id   = mv_id ) INTO TABLE mt_item.
+
+          CLEAR temp88.
+          temp88-line = mv_line.
+          temp88-kind = cs_kind-page.
+          temp88-id = mv_id.
+          INSERT temp88 INTO TABLE mt_item.
           mv_line = mv_line + 1.
           ls_item-line = mv_line.
           mv_body_line = mv_line.
@@ -906,11 +1000,25 @@ CLASS z2ui5_cl_cgui_list IMPLEMENTATION.
         mv_col = ls_item-pos - 1.
       ENDIF.
       ls_item-col = mv_col + 1.
-      DATA(lv_width) = COND i( WHEN ls_item-len > 0 THEN ls_item-len
-                               WHEN ls_item-kind = cs_kind-checkbox THEN 3
-                               WHEN ls_item-kind = cs_kind-icon THEN 2
-                               ELSE strlen( ls_item-text ) ).
-      mv_col = mv_col + lv_width + COND i( WHEN ls_item-no_gap = abap_true THEN 0 ELSE 1 ).
+
+      IF ls_item-len > 0.
+        temp89 = ls_item-len.
+      ELSEIF ls_item-kind = cs_kind-checkbox.
+        temp89 = 3.
+      ELSEIF ls_item-kind = cs_kind-icon.
+        temp89 = 2.
+      ELSE.
+        temp89 = strlen( ls_item-text ).
+      ENDIF.
+
+      lv_width = temp89.
+
+      IF ls_item-no_gap = abap_true.
+        temp90 = 0.
+      ELSE.
+        temp90 = 1.
+      ENDIF.
+      mv_col = mv_col + lv_width + temp90.
     ENDIF.
 
     mv_id = mv_id + 1.
@@ -928,7 +1036,10 @@ CLASS z2ui5_cl_cgui_list IMPLEMENTATION.
   METHOD header_end.
 
     " the header ends with its line - the list starts on a line of its own
-    IF mv_header = abap_true AND line_exists( mt_item[ line = mv_line ] ).
+    DATA temp91 LIKE sy-subrc.
+    READ TABLE mt_item WITH KEY line = mv_line TRANSPORTING NO FIELDS.
+    temp91 = sy-subrc.
+    IF mv_header = abap_true AND temp91 = 0.
       new_line( ).
     ENDIF.
     mv_header = abap_false.
@@ -937,7 +1048,10 @@ CLASS z2ui5_cl_cgui_list IMPLEMENTATION.
 
   METHOD footer_begin.
 
-    IF line_exists( mt_item[ line = mv_line ] ).
+    DATA temp92 LIKE sy-subrc.
+    READ TABLE mt_item WITH KEY line = mv_line TRANSPORTING NO FIELDS.
+    temp92 = sy-subrc.
+    IF temp92 = 0.
       new_line( ).
     ENDIF.
     mv_footer = abap_true.
@@ -946,7 +1060,10 @@ CLASS z2ui5_cl_cgui_list IMPLEMENTATION.
 
   METHOD footer_end.
 
-    IF mv_footer = abap_true AND line_exists( mt_item[ line = mv_line ] ).
+    DATA temp93 LIKE sy-subrc.
+    READ TABLE mt_item WITH KEY line = mv_line TRANSPORTING NO FIELDS.
+    temp93 = sy-subrc.
+    IF mv_footer = abap_true AND temp93 = 0.
       new_line( ).
     ENDIF.
     mv_footer = abap_false.
@@ -970,11 +1087,16 @@ CLASS z2ui5_cl_cgui_list IMPLEMENTATION.
 
   METHOD get_inputs.
 
-    LOOP AT mt_item INTO DATA(ls_item) WHERE input = abap_true.
-      INSERT VALUE #( id    = ls_item-id
-                      line  = ls_item-line
-                      value = ls_item-text
-                      flag  = ls_item-flag ) INTO TABLE result.
+    DATA ls_item LIKE LINE OF mt_item.
+      DATA temp94 TYPE z2ui5_cl_cgui_list=>ty_s_input.
+    LOOP AT mt_item INTO ls_item WHERE input = abap_true.
+
+      CLEAR temp94.
+      temp94-id = ls_item-id.
+      temp94-line = ls_item-line.
+      temp94-value = ls_item-text.
+      temp94-flag = ls_item-flag.
+      INSERT temp94 INTO TABLE result.
     ENDLOOP.
 
   ENDMETHOD.
@@ -987,8 +1109,13 @@ CLASS z2ui5_cl_cgui_list IMPLEMENTATION.
 
   METHOD set_inputs.
 
-    LOOP AT val INTO DATA(ls_input).
-      LOOP AT mt_item REFERENCE INTO DATA(lr_item) WHERE id = ls_input-id AND input = abap_true.
+    DATA ls_input LIKE LINE OF val.
+      DATA temp95 LIKE LINE OF mt_item.
+      DATA lr_item LIKE REF TO temp95.
+    LOOP AT val INTO ls_input.
+
+
+      LOOP AT mt_item REFERENCE INTO lr_item WHERE id = ls_input-id AND input = abap_true.
         lr_item->text = ls_input-value.
         lr_item->flag = ls_input-flag.
       ENDLOOP.
@@ -998,7 +1125,8 @@ CLASS z2ui5_cl_cgui_list IMPLEMENTATION.
 
   METHOD read_line.
 
-    LOOP AT mt_item INTO DATA(ls_item) WHERE line = line
+    DATA ls_item LIKE LINE OF mt_item.
+    LOOP AT mt_item INTO ls_item WHERE line = line
          AND ( kind = cs_kind-text OR kind = cs_kind-checkbox OR kind = cs_kind-icon ).
       INSERT ls_item INTO TABLE result.
     ENDLOOP.
@@ -1007,13 +1135,23 @@ CLASS z2ui5_cl_cgui_list IMPLEMENTATION.
 
   METHOD read_value.
 
-    DATA(lt_item) = read_line( line ).
-    READ TABLE lt_item INTO DATA(ls_item) INDEX index.
+    DATA lt_item TYPE z2ui5_cl_cgui_list=>ty_t_item.
+    DATA ls_item TYPE z2ui5_cl_cgui_list=>ty_s_item.
+      DATA temp96 TYPE string.
+    lt_item = read_line( line ).
+
+    READ TABLE lt_item INTO ls_item INDEX index.
     IF sy-subrc <> 0.
       RETURN.
     ENDIF.
     IF ls_item-kind = cs_kind-checkbox.
-      result = COND #( WHEN ls_item-flag = abap_true THEN `X` ).
+
+      IF ls_item-flag = abap_true.
+        temp96 = `X`.
+      ELSE.
+        CLEAR temp96.
+      ENDIF.
+      result = temp96.
     ELSE.
       result = ls_item-text.
     ENDIF.
@@ -1022,17 +1160,34 @@ CLASS z2ui5_cl_cgui_list IMPLEMENTATION.
 
   METHOD read_field.
 
-    IF line < 1 OR NOT line_exists( mt_item[ line = line ] ).
+    DATA temp97 LIKE sy-subrc.
+    DATA temp98 TYPE string.
+    DATA lv_name TYPE string.
+    DATA ls_item LIKE LINE OF mt_item.
+        DATA temp99 TYPE string.
+    READ TABLE mt_item WITH KEY line = line TRANSPORTING NO FIELDS.
+    temp97 = sy-subrc.
+    IF line < 1 OR NOT temp97 = 0.
       RAISE no_line.
     ENDIF.
     IF name IS INITIAL OR value IS NOT SUPPLIED.
       RETURN.
     ENDIF.
-    DATA(lv_name) = to_upper( condense( CONV string( name ) ) ).
-    LOOP AT mt_item INTO DATA(ls_item) WHERE line = line AND name = lv_name
+
+    temp98 = name.
+
+    lv_name = to_upper( condense( temp98 ) ).
+
+    LOOP AT mt_item INTO ls_item WHERE line = line AND name = lv_name
          AND ( kind = cs_kind-text OR kind = cs_kind-checkbox ).
       IF ls_item-kind = cs_kind-checkbox.
-        value = COND #( WHEN ls_item-flag = abap_true THEN `X` ELSE `` ).
+
+        IF ls_item-flag = abap_true.
+          temp99 = `X`.
+        ELSE.
+          temp99 = ``.
+        ENDIF.
+        value = temp99.
       ELSE.
         value = ls_item-text.
       ENDIF.
@@ -1043,15 +1198,30 @@ CLASS z2ui5_cl_cgui_list IMPLEMENTATION.
 
   METHOD modify_field.
 
-    IF line < 1 OR NOT line_exists( mt_item[ line = line ] ).
+    DATA temp100 LIKE sy-subrc.
+    DATA temp101 TYPE string.
+    DATA lv_name TYPE string.
+    DATA temp102 LIKE LINE OF mt_item.
+    DATA lr_item LIKE REF TO temp102.
+          DATA temp1 TYPE xsdboolean.
+    READ TABLE mt_item WITH KEY line = line TRANSPORTING NO FIELDS.
+    temp100 = sy-subrc.
+    IF line < 1 OR NOT temp100 = 0.
       RAISE no_line.
     ENDIF.
-    DATA(lv_name) = to_upper( condense( CONV string( name ) ) ).
-    LOOP AT mt_item REFERENCE INTO DATA(lr_item) WHERE line = line AND name = lv_name
+
+    temp101 = name.
+
+    lv_name = to_upper( condense( temp101 ) ).
+
+
+    LOOP AT mt_item REFERENCE INTO lr_item WHERE line = line AND name = lv_name
          AND ( kind = cs_kind-text OR kind = cs_kind-checkbox ).
       IF value IS SUPPLIED.
         IF lr_item->kind = cs_kind-checkbox.
-          lr_item->flag = xsdbool( value IS NOT INITIAL ).
+
+          temp1 = boolc( value IS NOT INITIAL ).
+          lr_item->flag = temp1.
         ELSE.
           lr_item->text = z2ui5_cl_cgui_context=>conv_to_text( value ).
         ENDIF.
@@ -1068,14 +1238,19 @@ CLASS z2ui5_cl_cgui_list IMPLEMENTATION.
 
     DATA lv_count TYPE i.
 
-    LOOP AT mt_item REFERENCE INTO DATA(lr_item) WHERE line = line
+    DATA temp103 LIKE LINE OF mt_item.
+    DATA lr_item LIKE REF TO temp103.
+        DATA temp2 TYPE xsdboolean.
+    LOOP AT mt_item REFERENCE INTO lr_item WHERE line = line
          AND ( kind = cs_kind-text OR kind = cs_kind-checkbox OR kind = cs_kind-icon ).
       lv_count = lv_count + 1.
       IF lv_count <> index.
         CONTINUE.
       ENDIF.
       IF lr_item->kind = cs_kind-checkbox.
-        lr_item->flag = xsdbool( value IS NOT INITIAL ).
+
+        temp2 = boolc( value IS NOT INITIAL ).
+        lr_item->flag = temp2.
       ELSE.
         lr_item->text = z2ui5_cl_cgui_context=>conv_to_text( value ).
       ENDIF.
@@ -1097,13 +1272,32 @@ CLASS z2ui5_cl_cgui_list IMPLEMENTATION.
     DATA lv_ts     TYPE timestamp.
     DATA lv_tsl    TYPE timestampl.
 
-    DATA(lo_descr) = cl_abap_typedescr=>describe_by_data( val ).
-    DATA(lv_kind) = lo_descr->type_kind.
+    DATA lo_descr TYPE REF TO cl_abap_typedescr.
+    DATA lv_kind LIKE lo_descr->type_kind.
+    DATA lv_numeric TYPE abap_bool.
+        DATA temp104 TYPE REF TO cl_abap_elemdescr.
+        DATA temp10 TYPE REF TO cl_abap_elemdescr.
+          DATA temp105 TYPE tznzone.
+          DATA lv_zone LIKE temp105.
+          DATA lv_cur_decimals TYPE i.
+          DATA temp106 TYPE REF TO cl_abap_elemdescr.
+          DATA temp11 TYPE i.
+          DATA lv_own_decimals LIKE temp11.
+          DATA temp107 TYPE decfloat34.
+            DATA temp108 TYPE decfloat34.
+          DATA temp109 TYPE REF TO cl_abap_elemdescr.
+          DATA temp12 TYPE i.
+          DATA lv_decimals LIKE temp12.
+      DATA lv_group TYPE string.
+    lo_descr = cl_abap_typedescr=>describe_by_data( val ).
+
+    lv_kind = lo_descr->type_kind.
     " the one list of the number kinds (i, int1, int2, int8, p, f, the two
     " decfloats) - spelled out here as xsdbool( a OR b OR ... ) it came out
     " of the 7.02 downport as one line of 371 characters, which a 7.02
     " system cuts on import
-    DATA(lv_numeric) = z2ui5_cl_cgui_context=>rtti_check_typekind_number( lv_kind ).
+
+    lv_numeric = z2ui5_cl_cgui_context=>rtti_check_typekind_number( lv_kind ).
 
     IF no_zero = abap_true AND val IS INITIAL.
       RETURN.
@@ -1119,11 +1313,18 @@ CLASS z2ui5_cl_cgui_list IMPLEMENTATION.
           lv_date = val.
           result = date_text( val    = lv_date
                               format = date_format ).
+
+        temp104 ?= lo_descr.
+
+        temp10 ?= lo_descr.
         ELSEIF time_zone IS NOT INITIAL AND lv_kind = cl_abap_typedescr=>typekind_packed
-            AND ( ( lo_descr->length = 8 AND CAST cl_abap_elemdescr( lo_descr )->decimals = 0 )
-               OR ( lo_descr->length = 11 AND CAST cl_abap_elemdescr( lo_descr )->decimals = 7 ) ).
+            AND ( ( lo_descr->length = 8 AND temp104->decimals = 0 )
+               OR ( lo_descr->length = 11 AND temp10->decimals = 7 ) ).
           " a time stamp in the time zone given
-          DATA(lv_zone) = CONV tznzone( time_zone ).
+
+          temp105 = time_zone.
+
+          lv_zone = temp105.
           IF lo_descr->length = 8.
             lv_ts = val.
             result = |{ lv_ts TIMESTAMP = USER TIMEZONE = lv_zone }|.
@@ -1137,12 +1338,22 @@ CLASS z2ui5_cl_cgui_list IMPLEMENTATION.
           " count. The decimals as ISO 4217 has them: TCURX is not released
           " on ABAP Cloud, and the CURRENCY of a string template is not in
           " the transpiled runtime
-          DATA(lv_cur_decimals) = currency_decimals( currency ).
-          DATA(lv_own_decimals) = COND i( WHEN lv_kind = cl_abap_typedescr=>typekind_packed
-                                          THEN CAST cl_abap_elemdescr( lo_descr )->decimals
-                                          ELSE 0 ).
+
+          lv_cur_decimals = currency_decimals( currency ).
+
+          temp106 ?= lo_descr.
+
+          IF lv_kind = cl_abap_typedescr=>typekind_packed.
+            temp11 = temp106->decimals.
+          ELSE.
+            temp11 = 0.
+          ENDIF.
+
+          lv_own_decimals = temp11.
           lv_number = val.
-          lv_number = lv_number * ( CONV decfloat34( 10 ) ** ( lv_own_decimals - lv_cur_decimals ) ).
+
+          temp107 = 10.
+          lv_number = lv_number * ( temp107 ** ( lv_own_decimals - lv_cur_decimals ) ).
           CASE lv_cur_decimals.
             WHEN 0.
               lv_amount0 = lv_number.
@@ -1163,12 +1374,22 @@ CLASS z2ui5_cl_cgui_list IMPLEMENTATION.
           " ROUND r: the value times 10 ** -r
           lv_number = val.
           IF round <> 0.
-            lv_number = lv_number / ( CONV decfloat34( 10 ) ** round ).
+
+            temp108 = 10.
+            lv_number = lv_number / ( temp108 ** round ).
           ENDIF.
-          DATA(lv_decimals) = COND i( WHEN decimals >= 0 THEN decimals
-                                      WHEN lv_kind = cl_abap_typedescr=>typekind_packed
-                                      THEN CAST cl_abap_elemdescr( lo_descr )->decimals
-                                      ELSE 0 ).
+
+          temp109 ?= lo_descr.
+
+          IF decimals >= 0.
+            temp12 = decimals.
+          ELSEIF lv_kind = cl_abap_typedescr=>typekind_packed.
+            temp12 = temp109->decimals.
+          ELSE.
+            temp12 = 0.
+          ENDIF.
+
+          lv_decimals = temp12.
           " a whole number rounded first - the same on a system, and the
           " transpiled runtime does not round for DECIMALS = 0
           IF lv_decimals = 0.
@@ -1189,7 +1410,8 @@ CLASS z2ui5_cl_cgui_list IMPLEMENTATION.
 
     " NO-GROUPING: without the thousands separator
     IF no_grouping = abap_true AND lv_numeric = abap_true.
-      DATA(lv_group) = grouping_char( ).
+
+      lv_group = grouping_char( ).
       IF lv_group IS NOT INITIAL.
         result = replace( val = result sub = lv_group with = `` occ = 0 ).
       ENDIF.
@@ -1206,7 +1428,8 @@ CLASS z2ui5_cl_cgui_list IMPLEMENTATION.
 
   METHOD currency_decimals.
 
-    DATA(lv_currency) = to_upper( condense( currency ) ).
+    DATA lv_currency TYPE string.
+    lv_currency = to_upper( condense( currency ) ).
     CASE lv_currency.
       WHEN `BIF` OR `CLP` OR `DJF` OR `GNF` OR `ISK` OR `JPY` OR `KMF` OR `KRW` OR `PYG`
           OR `RWF` OR `UGX` OR `UYI` OR `VND` OR `VUV` OR `XAF` OR `XOF` OR `XPF`.
@@ -1224,34 +1447,59 @@ CLASS z2ui5_cl_cgui_list IMPLEMENTATION.
     DATA lt_char TYPE string_table.
     DATA lv_pos  TYPE i.
 
-    DATA(lv_value) = |{ val }|.
-    DATA(lv_mask) = |{ mask }|.
+    DATA lv_value TYPE string.
+    DATA lv_mask TYPE string.
+        DATA temp110 TYPE string.
+    DATA lv_right LIKE abap_false.
+      DATA lv_prefix TYPE string.
+        DATA temp3 TYPE xsdboolean.
+    DATA lv_mask_len TYPE i.
+    DATA lv_value_len TYPE i.
+        DATA lv_index TYPE i.
+        DATA lv_char TYPE string.
+    lv_value = |{ val }|.
+
+    lv_mask = |{ mask }|.
 
     IF strlen( lv_mask ) > 2 AND substring( val = lv_mask len = 2 ) = `==`.
       IF to_upper( substring( val = lv_mask off = 2 ) ) = `ALPHA`.
-        result = |{ lv_value ALPHA = OUT }|.
+
+        CALL FUNCTION 'CONVERSION_EXIT_ALPHA_OUTPUT'
+          EXPORTING
+            input  = lv_value
+          IMPORTING
+            output = temp110.
+result = |{ temp110 }|.
       ELSE.
         result = lv_value.
       ENDIF.
       RETURN.
     ENDIF.
 
-    DATA(lv_right) = abap_false.
+
+    lv_right = abap_false.
     IF strlen( lv_mask ) >= 2.
-      DATA(lv_prefix) = to_upper( substring( val = lv_mask len = 2 ) ).
+
+      lv_prefix = to_upper( substring( val = lv_mask len = 2 ) ).
       IF lv_prefix = `LL` OR lv_prefix = `RR`.
-        lv_right = xsdbool( lv_prefix = `RR` ).
+
+        temp3 = boolc( lv_prefix = `RR` ).
+        lv_right = temp3.
         lv_mask = substring( val = lv_mask off = 2 ).
       ENDIF.
     ENDIF.
 
-    DATA(lv_mask_len) = strlen( lv_mask ).
-    DATA(lv_value_len) = strlen( lv_value ).
+
+    lv_mask_len = strlen( lv_mask ).
+
+    lv_value_len = strlen( lv_value ).
     IF lv_right = abap_false.
       lv_pos = 0.
       DO lv_mask_len TIMES.
-        DATA(lv_index) = sy-index - 1.
-        DATA(lv_char) = substring( val = lv_mask off = lv_index len = 1 ).
+
+        lv_index = sy-index - 1.
+
+        lv_char = substring( val = lv_mask off = lv_index len = 1 ).
         IF lv_char = `_`.
           IF lv_pos < lv_value_len.
             lv_char = substring( val = lv_value off = lv_pos len = 1 ).
@@ -1288,22 +1536,40 @@ CLASS z2ui5_cl_cgui_list IMPLEMENTATION.
 
     " the separator of the user's date format: the first character of the
     " formatted date that is no digit
-    DATA(lv_user) = |{ val DATE = USER }|.
-    DATA(lv_len) = strlen( lv_user ).
+    DATA lv_user TYPE string.
+    DATA lv_len TYPE i.
+      DATA lv_index TYPE i.
+      DATA lv_char TYPE string.
+    DATA lv_year TYPE string.
+    DATA lv_yy TYPE string.
+    DATA lv_month TYPE string.
+    DATA lv_day TYPE string.
+    DATA lv_format TYPE string.
+        DATA lv_user_len TYPE i.
+    lv_user = |{ val DATE = USER }|.
+
+    lv_len = strlen( lv_user ).
     DO lv_len TIMES.
-      DATA(lv_index) = sy-index - 1.
-      DATA(lv_char) = substring( val = lv_user off = lv_index len = 1 ).
+
+      lv_index = sy-index - 1.
+
+      lv_char = substring( val = lv_user off = lv_index len = 1 ).
       IF lv_char CN `0123456789`.
         lv_sep = lv_char.
         EXIT.
       ENDIF.
     ENDDO.
 
-    DATA(lv_year) = |{ val+0(4) }|.
-    DATA(lv_yy) = |{ val+2(2) }|.
-    DATA(lv_month) = |{ val+4(2) }|.
-    DATA(lv_day) = |{ val+6(2) }|.
-    DATA(lv_format) = to_upper( format ).
+
+    lv_year = |{ val+0(4) }|.
+
+    lv_yy = |{ val+2(2) }|.
+
+    lv_month = |{ val+4(2) }|.
+
+    lv_day = |{ val+6(2) }|.
+
+    lv_format = to_upper( format ).
     CASE lv_format.
       WHEN cs_date_format-dd_mm_yyyy OR cs_date_format-mm_dd_yyyy.
         " the classic DD/MM/YYYY and MM/DD/YYYY mean the same: the user's
@@ -1312,7 +1578,8 @@ CLASS z2ui5_cl_cgui_list IMPLEMENTATION.
       WHEN cs_date_format-dd_mm_yy OR cs_date_format-mm_dd_yy.
         " the user's date format with a two-digit year - the year stands
         " at its start (YYYY.MM.DD, YYYY-MM-DD) or at its end
-        DATA(lv_user_len) = strlen( lv_user ).
+
+        lv_user_len = strlen( lv_user ).
         IF lv_user_len > 4 AND substring( val = lv_user len = 4 ) = lv_year.
           result = lv_yy && substring( val = lv_user off = 4 ).
         ELSEIF lv_user_len > 4 AND substring( val = lv_user off = lv_user_len - 4 ) = lv_year.
@@ -1334,7 +1601,11 @@ CLASS z2ui5_cl_cgui_list IMPLEMENTATION.
 
   METHOD grouping_char.
 
-    DATA(lv_sample) = |{ CONV decfloat34( 1000 ) NUMBER = USER DECIMALS = 0 }|.
+    DATA temp111 TYPE decfloat34.
+    DATA lv_sample TYPE string.
+    temp111 = 1000.
+
+    lv_sample = |{ temp111 NUMBER = USER DECIMALS = 0 }|.
     IF strlen( lv_sample ) = 5.
       result = lv_sample+1(1).
     ENDIF.
@@ -1342,9 +1613,13 @@ CLASS z2ui5_cl_cgui_list IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD page_copy.
+    DATA temp112 LIKE LINE OF result.
+    DATA lr_item LIKE REF TO temp112.
 
     result = items.
-    LOOP AT result REFERENCE INTO DATA(lr_item) WHERE text CS cv_page.
+
+
+    LOOP AT result REFERENCE INTO lr_item WHERE text CS cv_page.
       lr_item->text = replace( val = lr_item->text sub = cv_page with = |{ page }| occ = 0 ).
     ENDLOOP.
 
@@ -1356,7 +1631,8 @@ CLASS z2ui5_cl_cgui_list IMPLEMENTATION.
     DATA lt_footer TYPE ty_t_item.
     DATA lv_page   TYPE i VALUE 1.
 
-    LOOP AT mt_item INTO DATA(ls_item).
+    DATA ls_item LIKE LINE OF mt_item.
+    LOOP AT mt_item INTO ls_item.
       IF ls_item-header = abap_true.
         INSERT ls_item INTO TABLE lt_header.
       ELSEIF ls_item-footer = abap_true.
@@ -1398,7 +1674,8 @@ CLASS z2ui5_cl_cgui_list IMPLEMENTATION.
 
     DATA lt_cut TYPE ty_t_item.
 
-    LOOP AT mt_item INTO DATA(ls_item) WHERE line >= from AND header = abap_false AND footer = abap_false.
+    DATA ls_item LIKE LINE OF mt_item.
+    LOOP AT mt_item INTO ls_item WHERE line >= from AND header = abap_false AND footer = abap_false.
       INSERT ls_item INTO TABLE lt_cut.
     ENDLOOP.
     result = items_to_text( lt_cut ).
@@ -1421,7 +1698,14 @@ CLASS z2ui5_cl_cgui_list IMPLEMENTATION.
     DATA lv_line TYPE i.
     DATA lv_gap  TYPE abap_bool.
 
-    LOOP AT items REFERENCE INTO DATA(lr_item).
+    DATA temp113 LIKE LINE OF items.
+    DATA lr_item LIKE REF TO temp113.
+          DATA temp114 TYPE i.
+          DATA temp115 TYPE i.
+            DATA temp116 TYPE string.
+      DATA temp117 LIKE LINE OF result.
+      DATA lr_text LIKE REF TO temp117.
+    LOOP AT items REFERENCE INTO lr_item.
       IF lr_item->line <> lv_line AND lv_line > 0.
         INSERT lv_text INTO TABLE result.
         CLEAR: lv_text, lv_gap.
@@ -1430,17 +1714,25 @@ CLASS z2ui5_cl_cgui_list IMPLEMENTATION.
       CASE lr_item->kind.
         WHEN cs_kind-skip.
           " SKIP n: n empty lines - the last one is this line itself
-          DO nmax( val1 = 1 val2 = CONV i( lr_item->text ) ) - 1 TIMES.
+
+          temp114 = lr_item->text.
+          DO nmax( val1 = 1 val2 = temp114 ) - 1 TIMES.
             INSERT `` INTO TABLE result.
           ENDDO.
         WHEN cs_kind-uline.
           IF lr_item->pos > 1.
             lv_text = repeat( val = ` ` occ = lr_item->pos - 1 ).
           ENDIF.
+
+          IF lr_item->len > 0.
+            temp115 = lr_item->len.
+          ELSEIF mv_line_size > 0.
+            temp115 = mv_line_size.
+          ELSE.
+            temp115 = 80.
+          ENDIF.
           lv_text = lv_text && repeat( val = `-`
-                                       occ = COND i( WHEN lr_item->len > 0 THEN lr_item->len
-                                                     WHEN mv_line_size > 0 THEN mv_line_size
-                                                     ELSE 80 ) ).
+                                       occ = temp115 ).
         WHEN cs_kind-page OR cs_kind-text OR cs_kind-icon OR cs_kind-checkbox.
           IF lr_item->pos > 0 AND strlen( lv_text ) < lr_item->pos - 1.
             lv_text = lv_text && repeat( val = ` ` occ = lr_item->pos - 1 - strlen( lv_text ) ).
@@ -1449,7 +1741,13 @@ CLASS z2ui5_cl_cgui_list IMPLEMENTATION.
           ENDIF.
           lv_gap = lr_item->no_gap.
           IF lr_item->kind = cs_kind-checkbox.
-            lv_text = lv_text && COND string( WHEN lr_item->flag = abap_true THEN `[X]` ELSE `[ ]` ).
+
+            IF lr_item->flag = abap_true.
+              temp116 = `[X]`.
+            ELSE.
+              temp116 = `[ ]`.
+            ENDIF.
+            lv_text = lv_text && temp116.
           ELSEIF lr_item->len > 0 AND lr_item->justify = cs_justify-right.
             lv_text = lv_text && substring( val = z2ui5_cl_cgui_context=>text_align( val   = lr_item->text
                                                                                      width = lr_item->len
@@ -1474,7 +1772,9 @@ CLASS z2ui5_cl_cgui_list IMPLEMENTATION.
 
     " LINE-SIZE cuts the lines
     IF mv_line_size > 0.
-      LOOP AT result REFERENCE INTO DATA(lr_text) WHERE table_line IS NOT INITIAL.
+
+
+      LOOP AT result REFERENCE INTO lr_text WHERE table_line IS NOT INITIAL.
         IF strlen( lr_text->* ) > mv_line_size.
           lr_text->* = substring( val = lr_text->* len = mv_line_size ).
         ENDIF.
@@ -1486,7 +1786,8 @@ CLASS z2ui5_cl_cgui_list IMPLEMENTATION.
   METHOD render.
 
     " TOP-OF-PAGE and END-OF-PAGE: header and footer around every page
-    DATA(lo_list) = node->ele( `VBox`
+    DATA lo_list TYPE REF TO z2ui5_cl_ui5_view_builder.
+    lo_list = node->ele( `VBox`
         )->a( n = `class` v = `sapUiSmallMargin` ).
 
     render_items( node   = lo_list
@@ -1499,9 +1800,12 @@ CLASS z2ui5_cl_cgui_list IMPLEMENTATION.
   METHOD render_text_tooltip.
 
     " the box takes the tooltip, the text inside is rendered as without
-    DATA(ls_item) = item.
+    DATA ls_item LIKE item.
+    DATA lo_box TYPE REF TO z2ui5_cl_ui5_view_builder.
+    ls_item = item.
     CLEAR ls_item-quickinfo.
-    DATA(lo_box) = node->ele( `HBox`
+
+    lo_box = node->ele( `HBox`
         )->a( n = `tooltip` t = item-quickinfo ).
     render_item( node   = lo_box
                  client = client
@@ -1515,6 +1819,10 @@ CLASS z2ui5_cl_cgui_list IMPLEMENTATION.
     FIELD-SYMBOLS <copy> TYPE any.
     FIELD-SYMBOLS <comp> TYPE any.
     DATA lr_copy TYPE REF TO data.
+    DATA lv_index TYPE i.
+      DATA temp118 TYPE string.
+      DATA lv_text LIKE temp118.
+      DATA temp119 TYPE string.
 
     " a copy first: the transpiled runtime passes val by reference, and its
     " RTTI is ABAP code that loops - `hide = sy-tabix` would change on the way
@@ -1525,16 +1833,29 @@ CLASS z2ui5_cl_cgui_list IMPLEMENTATION.
       result = |{ <copy> }|.
       RETURN.
     ENDIF.
-    DATA(lv_index) = 0.
+
+    lv_index = 0.
     DO.
       lv_index = lv_index + 1.
       ASSIGN COMPONENT lv_index OF STRUCTURE <copy> TO <comp>.
       IF sy-subrc <> 0.
         EXIT.
       ENDIF.
-      DATA(lv_text) = COND string( WHEN cl_abap_typedescr=>describe_by_data( <comp> )->kind = cl_abap_typedescr=>kind_elem
-                                   THEN |{ <comp> }| ).
-      result = COND #( WHEN lv_index = 1 THEN lv_text ELSE |{ result }\t{ lv_text }| ).
+
+      IF cl_abap_typedescr=>describe_by_data( <comp> )->kind = cl_abap_typedescr=>kind_elem.
+        temp118 = |{ <comp> }|.
+      ELSE.
+        CLEAR temp118.
+      ENDIF.
+
+      lv_text = temp118.
+
+      IF lv_index = 1.
+        temp119 = lv_text.
+      ELSE.
+        temp119 = |{ result }\t{ lv_text }|.
+      ENDIF.
+      result = temp119.
     ENDDO.
 
   ENDMETHOD.
@@ -1542,14 +1863,20 @@ CLASS z2ui5_cl_cgui_list IMPLEMENTATION.
   METHOD hide_restore.
 
     FIELD-SYMBOLS <comp> TYPE any.
+    TYPES temp1 TYPE STANDARD TABLE OF string WITH DEFAULT KEY.
+DATA lt_part TYPE temp1.
+    DATA lv_part LIKE LINE OF lt_part.
 
     IF cl_abap_typedescr=>describe_by_data( val )->kind <> cl_abap_typedescr=>kind_struct.
       val = hide.
       RETURN.
     ENDIF.
     CLEAR val.
-    SPLIT hide AT |\t| INTO TABLE DATA(lt_part).
-    LOOP AT lt_part INTO DATA(lv_part).
+
+
+    SPLIT hide AT |\t| INTO TABLE lt_part.
+
+    LOOP AT lt_part INTO lv_part.
       ASSIGN COMPONENT sy-tabix OF STRUCTURE val TO <comp>.
       IF sy-subrc <> 0.
         EXIT.
@@ -1563,7 +1890,8 @@ CLASS z2ui5_cl_cgui_list IMPLEMENTATION.
 
   METHOD width_of.
 
-    DATA(lv_tenths) = nmax( val1 = chars
+    DATA lv_tenths TYPE i.
+    lv_tenths = nmax( val1 = chars
                             val2 = 0 ) * 6.
     result = |{ lv_tenths DIV 10 }.{ lv_tenths MOD 10 }em|.
 
@@ -1579,13 +1907,23 @@ CLASS z2ui5_cl_cgui_list IMPLEMENTATION.
     DATA lo_line TYPE REF TO z2ui5_cl_ui5_view_builder.
     DATA lv_line TYPE i.
     DATA lv_col  TYPE i.
-    DATA lt_columned TYPE SORTED TABLE OF i WITH UNIQUE KEY table_line.
+    TYPES temp2 TYPE SORTED TABLE OF i WITH UNIQUE KEY table_line.
+DATA lt_columned TYPE temp2.
 
-    LOOP AT items REFERENCE INTO DATA(lr_pos) WHERE pos > 0.
+    DATA temp120 LIKE LINE OF items.
+    DATA lr_pos LIKE REF TO temp120.
+    DATA temp121 LIKE LINE OF items.
+    DATA lr_item LIKE REF TO temp121.
+      DATA temp122 TYPE i.
+      DATA lv_width LIKE temp122.
+      DATA temp123 LIKE sy-subrc.
+    LOOP AT items REFERENCE INTO lr_pos WHERE pos > 0.
       INSERT lr_pos->line INTO TABLE lt_columned.
     ENDLOOP.
 
-    LOOP AT items REFERENCE INTO DATA(lr_item).
+
+
+    LOOP AT items REFERENCE INTO lr_item.
 
       IF lr_item->kind = cs_kind-skip OR lr_item->kind = cs_kind-uline OR lr_item->kind = cs_kind-page.
         render_item( node   = node
@@ -1611,10 +1949,20 @@ CLASS z2ui5_cl_cgui_list IMPLEMENTATION.
         lv_col = lr_item->pos - 1.
       ENDIF.
 
-      DATA(lv_width) = COND i( WHEN lr_item->len > 0 THEN lr_item->len
-                               WHEN lr_item->no_gap = abap_true THEN strlen( lr_item->text )
-                               ELSE strlen( lr_item->text ) + 1 ).
-      IF line_exists( lt_columned[ table_line = lr_item->line ] ) AND lv_width > 0.
+
+      IF lr_item->len > 0.
+        temp122 = lr_item->len.
+      ELSEIF lr_item->no_gap = abap_true.
+        temp122 = strlen( lr_item->text ).
+      ELSE.
+        temp122 = strlen( lr_item->text ) + 1.
+      ENDIF.
+
+      lv_width = temp122.
+
+      READ TABLE lt_columned WITH KEY table_line = lr_item->line TRANSPORTING NO FIELDS.
+      temp123 = sy-subrc.
+      IF temp123 = 0 AND lv_width > 0.
         render_item( node   = lo_line->ele( `HBox`
                                   )->a( n = `width` v = width_of( lv_width ) )
                      client = client
@@ -1636,34 +1984,85 @@ CLASS z2ui5_cl_cgui_list IMPLEMENTATION.
     FIELD-SYMBOLS <input> TYPE ty_s_input.
 
     " NO-GAP: no space to the next item
-    DATA(lv_class) = COND string( WHEN item-no_gap = abap_true THEN `` ELSE `sapUiTinyMarginEnd` ).
+    DATA temp124 TYPE string.
+    DATA lv_class LIKE temp124.
+      DATA ls_bind TYPE z2ui5_cl_cgui_list=>ty_s_input_bind.
+      DATA lv_bound TYPE abap_bool.
+      DATA temp4 TYPE xsdboolean.
+      DATA temp125 TYPE i.
+      DATA lv_index LIKE temp125.
+          DATA temp126 TYPE string.
+          DATA lv_flag_bind LIKE temp126.
+          DATA temp127 TYPE string.
+          DATA lv_value_bind LIKE temp127.
+          DATA temp128 TYPE i.
+          DATA temp129 TYPE string.
+          DATA temp130 TYPE string_table.
+          DATA temp13 LIKE LINE OF temp130.
+          DATA temp14 LIKE LINE OF temp130.
+          DATA temp15 TYPE z2ui5_if_client=>ty_s_event_control.
+            DATA temp132 TYPE string.
+          DATA lo_rule TYPE REF TO z2ui5_cl_ui5_view_builder.
+          DATA temp133 TYPE string.
+    IF item-no_gap = abap_true.
+      temp124 = ``.
+    ELSE.
+      temp124 = `sapUiTinyMarginEnd`.
+    ENDIF.
+
+    lv_class = temp124.
 
     " an input field is bound to its line of inputs - by the app
     " (set_input_binds( )), or here
     IF item-input = abap_true.
-      READ TABLE mt_input_bind INTO DATA(ls_bind) WITH KEY id = item-id.
-      DATA(lv_bound) = xsdbool( sy-subrc = 0 ).
+
+      READ TABLE mt_input_bind INTO ls_bind WITH KEY id = item-id.
+
+
+      temp4 = boolc( sy-subrc = 0 ).
+      lv_bound = temp4.
       READ TABLE inputs TRANSPORTING NO FIELDS WITH KEY id = item-id.
-      DATA(lv_index) = COND i( WHEN sy-subrc = 0 THEN sy-tabix ).
+
+      IF sy-subrc = 0.
+        temp125 = sy-tabix.
+      ELSE.
+        CLEAR temp125.
+      ENDIF.
+
+      lv_index = temp125.
       IF lv_bound = abap_true OR lv_index > 0.
         IF lv_index > 0.
-          ASSIGN inputs[ lv_index ] TO <input>.
+          READ TABLE inputs INDEX lv_index ASSIGNING <input>.
         ENDIF.
         IF item-kind = cs_kind-checkbox.
-          DATA(lv_flag_bind) = COND string( WHEN lv_bound = abap_true THEN ls_bind-flag
-                                            ELSE client->_bind( val       = <input>-flag
-                                                                tab       = inputs
-                                                                tab_index = lv_index ) ).
+
+          IF lv_bound = abap_true.
+            temp126 = ls_bind-flag.
+          ELSE.
+            temp126 = client->_bind( val = <input>-flag tab = inputs tab_index = lv_index ).
+          ENDIF.
+
+          lv_flag_bind = temp126.
           node->tag( `CheckBox`
               )->a( n = `selected` v = lv_flag_bind ).
         ELSE.
-          DATA(lv_value_bind) = COND string( WHEN lv_bound = abap_true THEN ls_bind-value
-                                             ELSE client->_bind( val       = <input>-value
-                                                                 tab       = inputs
-                                                                 tab_index = lv_index ) ).
+
+          IF lv_bound = abap_true.
+            temp127 = ls_bind-value.
+          ELSE.
+            temp127 = client->_bind( val = <input>-value tab = inputs tab_index = lv_index ).
+          ENDIF.
+
+          lv_value_bind = temp127.
+
+          IF item-len > 0.
+            temp128 = item-len.
+          ELSE.
+            temp128 = nmax( val1 = strlen( item-text ) val2 = 10 ).
+          ENDIF.
           node->tag( `Input`
               )->a( n = `value` v = lv_value_bind
-              )->a( n = `width` v = width_of( COND i( WHEN item-len > 0 THEN item-len ELSE nmax( val1 = strlen( item-text ) val2 = 10 ) ) + 2 )
+              )->a( n = `width` v = width_of( temp128 + 2 )
               )->a( n = `class` t = lv_class ).
         ENDIF.
         RETURN.
@@ -1682,9 +2081,15 @@ CLASS z2ui5_cl_cgui_list IMPLEMENTATION.
 
       WHEN cs_kind-text.
         IF item-hotspot = abap_false AND ( item-inverse = abap_true OR ( item-intensified = abap_true AND item-color IS NOT INITIAL ) ).
+
+          IF item-color IS NOT INITIAL.
+            temp129 = item-color.
+          ELSE.
+            temp129 = `Information`.
+          ENDIF.
           node->tag( `ObjectStatus`
               )->a( n = `text`     t = item-text
-              )->a( n = `state`    t = COND #( WHEN item-color IS NOT INITIAL THEN item-color ELSE `Information` )
+              )->a( n = `state`    t = temp129
               )->a( n = `inverted` b = item-inverse
               )->a( n = `class`    t = lv_class ).
           RETURN.
@@ -1700,14 +2105,24 @@ CLASS z2ui5_cl_cgui_list IMPLEMENTATION.
           RETURN.
         ENDIF.
         IF item-hotspot = abap_true.
+
+          CLEAR temp130.
+
+          temp13 = |{ item-line }|.
+          INSERT temp13 INTO TABLE temp130.
+          INSERT item-hide INTO TABLE temp130.
+
+          temp14 = |{ item-id }|.
+          INSERT temp14 INTO TABLE temp130.
+
+          CLEAR temp15.
+          temp15-check_arg_literal = abap_true.
           node->tag( `Link`
               )->a( n = `text`  t = item-text
               )->a( n = `class` t = lv_class
               )->a( n = `press` v = client->_event( val   = cs_event-line_selection
-                                                    t_arg = VALUE #( ( |{ item-line }| )
-                                                                     ( item-hide )
-                                                                     ( |{ item-id }| ) )
-                                                    s_ctrl = VALUE #( check_arg_literal = abap_true ) ) ).
+                                                    t_arg = temp130
+                                                    s_ctrl = temp15 ) ).
         ELSEIF item-color IS NOT INITIAL.
           node->tag( `ObjectStatus`
               )->a( n = `text`  t = item-text
@@ -1720,11 +2135,17 @@ CLASS z2ui5_cl_cgui_list IMPLEMENTATION.
               )->a( n = `wrapping`         b = abap_false
               )->a( n = `class`            t = lv_class ).
           IF item-len > 0.
+
+            CASE item-justify.
+              WHEN cs_justify-right.
+                temp132 = `End`.
+              WHEN cs_justify-center.
+                temp132 = `Center`.
+              WHEN OTHERS.
+                temp132 = `Begin`.
+            ENDCASE.
             node->a( n = `width`     v = width_of( item-len )
-               )->a( n = `textAlign` v = SWITCH #( item-justify
-                                                   WHEN cs_justify-right THEN `End`
-                                                   WHEN cs_justify-center THEN `Center`
-                                                   ELSE `Begin` ) ).
+               )->a( n = `textAlign` v = temp132 ).
           ENDIF.
         ENDIF.
 
@@ -1752,14 +2173,21 @@ CLASS z2ui5_cl_cgui_list IMPLEMENTATION.
       WHEN cs_kind-uline.
         IF item-pos > 1 OR item-len > 0.
           " ULINE AT pos(len)
-          DATA(lo_rule) = node->ele( `HBox` ).
+
+          lo_rule = node->ele( `HBox` ).
           IF item-pos > 1.
             lo_rule->tag( `HBox`
                 )->a( n = `width` v = width_of( item-pos - 1 ) ).
           ENDIF.
+
+          IF item-len > 0.
+            temp133 = width_of( item-len ).
+          ELSE.
+            temp133 = `100%`.
+          ENDIF.
           lo_rule->tag( `Toolbar`
               )->a( n = `height` v = `2px`
-              )->a( n = `width`  v = COND #( WHEN item-len > 0 THEN width_of( item-len ) ELSE `100%` )
+              )->a( n = `width`  v = temp133
               )->a( n = `design` v = `Solid` ).
         ELSE.
           node->tag( `Toolbar`
@@ -1779,14 +2207,17 @@ CLASS z2ui5_cl_cgui_list IMPLEMENTATION.
 
   METHOD stringify.
 
-    DATA(view) = z2ui5_cl_ui5_view_builder=>factory(
+    DATA view TYPE REF TO z2ui5_cl_ui5_view_builder.
+    DATA page TYPE REF TO z2ui5_cl_ui5_view_builder.
+    view = z2ui5_cl_ui5_view_builder=>factory(
         )->ele( n = `View` ns = `mvc`
             )->a( n = `xmlns`        v = `sap.m`
             )->a( n = `xmlns:mvc`    v = `sap.ui.core.mvc`
             )->a( n = `displayBlock` v = `true`
             )->a( n = `height`       v = `100%` ).
 
-    DATA(page) = view->ele( `Page`
+
+    page = view->ele( `Page`
         )->a( n = `title` t = title ).
 
     render( node   = page

@@ -27,10 +27,28 @@ CLASS z2ui5_cl_cgui_easy_split IMPLEMENTATION.
 
   METHOD constructor.
 
-    DATA(lv_vertical) = xsdbool( orientation = z2ui5_cl_cgui_container=>orientation_vertical ).
+    DATA lv_vertical TYPE abap_bool.
+    DATA temp4 TYPE xsdboolean.
+    DATA temp1 TYPE i.
+    DATA temp3 TYPE i.
+    DATA temp2 TYPE REF TO z2ui5_cl_cgui_container.
+    temp4 = boolc( orientation = z2ui5_cl_cgui_container=>orientation_vertical ).
+    lv_vertical = temp4.
+
+    IF lv_vertical = abap_true.
+      temp1 = 2.
+    ELSE.
+      temp1 = 1.
+    ENDIF.
+
+    IF lv_vertical = abap_true.
+      temp3 = 1.
+    ELSE.
+      temp3 = 2.
+    ENDIF.
     super->constructor( EXPORTING  parent     = parent
-                                   rows       = COND #( WHEN lv_vertical = abap_true THEN 2 ELSE 1 )
-                                   columns    = COND #( WHEN lv_vertical = abap_true THEN 1 ELSE 2 )
+                                   rows       = temp1
+                                   columns    = temp3
                         EXCEPTIONS cntl_error = 1
                                    OTHERS     = 2 ).
     IF sy-subrc <> 0.
@@ -38,9 +56,13 @@ CLASS z2ui5_cl_cgui_easy_split IMPLEMENTATION.
     ENDIF.
     top_left_container = get_container( row    = 1
                                         column = 1 ).
-    bottom_right_container = COND #( WHEN lv_vertical = abap_true
-                                     THEN get_container( row = 2 column = 1 )
-                                     ELSE get_container( row = 1 column = 2 ) ).
+
+    IF lv_vertical = abap_true.
+      temp2 = get_container( row = 2 column = 1 ).
+    ELSE.
+      temp2 = get_container( row = 1 column = 2 ).
+    ENDIF.
+    bottom_right_container = temp2.
 
   ENDMETHOD.
 

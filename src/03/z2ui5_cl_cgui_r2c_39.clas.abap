@@ -43,7 +43,7 @@ CLASS z2ui5_cl_cgui_r2c_39 IMPLEMENTATION.
 
   METHOD start_of_selection.
 
-    go_note = NEW lcl_note( ).
+    CREATE OBJECT go_note TYPE lcl_note.
     write( space ).
 
   ENDMETHOD.

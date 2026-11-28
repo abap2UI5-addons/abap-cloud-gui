@@ -22,7 +22,7 @@ CLASS z2ui5_cl_cgui_context DEFINITION PUBLIC FINAL CREATE PUBLIC.
         length    TYPE i,
         boolean   TYPE abap_bool,
       END OF ty_s_comp.
-    TYPES ty_t_comp TYPE STANDARD TABLE OF ty_s_comp WITH EMPTY KEY.
+    TYPES ty_t_comp TYPE STANDARD TABLE OF ty_s_comp WITH DEFAULT KEY.
 
     TYPES:
       BEGIN OF ty_s_fix_val,
@@ -30,7 +30,7 @@ CLASS z2ui5_cl_cgui_context DEFINITION PUBLIC FINAL CREATE PUBLIC.
         high TYPE string,
         text TYPE string,
       END OF ty_s_fix_val.
-    TYPES ty_t_fix_val TYPE STANDARD TABLE OF ty_s_fix_val WITH EMPTY KEY.
+    TYPES ty_t_fix_val TYPE STANDARD TABLE OF ty_s_fix_val WITH DEFAULT KEY.
 
     TYPES:
       "! the value table of a domain: the table, its key field with the
@@ -466,7 +466,7 @@ CLASS z2ui5_cl_cgui_context DEFINITION PUBLIC FINAL CREATE PUBLIC.
         name    TYPE string,
         content TYPE xstring,
       END OF ty_s_zip_file.
-    TYPES ty_t_zip_file TYPE STANDARD TABLE OF ty_s_zip_file WITH EMPTY KEY.
+    TYPES ty_t_zip_file TYPE STANDARD TABLE OF ty_s_zip_file WITH DEFAULT KEY.
 
     "! the files as one ZIP archive
     CLASS-METHODS zip_pack
@@ -487,7 +487,7 @@ CLASS z2ui5_cl_cgui_context DEFINITION PUBLIC FINAL CREATE PUBLIC.
         name  TYPE string,
         value TYPE string,
       END OF ty_s_xml_attribute.
-    TYPES ty_t_xml_attribute TYPE STANDARD TABLE OF ty_s_xml_attribute WITH EMPTY KEY.
+    TYPES ty_t_xml_attribute TYPE STANDARD TABLE OF ty_s_xml_attribute WITH DEFAULT KEY.
 
     CONSTANTS:
       "! the kinds of node xml_reader_next( ) hands out - `end` (initial) when
@@ -665,15 +665,33 @@ CLASS z2ui5_cl_cgui_context IMPLEMENTATION.
     DATA lt_part TYPE string_table.
     DATA lv_off  TYPE i.
 
-    DATA(lv_len) = strlen( val ).
+    DATA lv_len TYPE i.
+      DATA lv_char TYPE string.
+        DATA lv_rest TYPE string.
+        DATA temp28 TYPE string.
+        DATA lv_close LIKE temp28.
+        DATA lv_end TYPE i.
+          DATA lv_inner TYPE string.
+    lv_len = strlen( val ).
     WHILE lv_off < lv_len.
-      DATA(lv_char) = substring( val = val off = lv_off len = 1 ).
+
+      lv_char = substring( val = val off = lv_off len = 1 ).
       IF lv_char = `<` OR lv_char = `&`.
-        DATA(lv_rest) = substring( val = val off = lv_off + 1 ).
-        DATA(lv_close) = COND string( WHEN lv_char = `<` THEN `>` ELSE `&` ).
-        DATA(lv_end) = find( val = lv_rest sub = lv_close ).
+
+        lv_rest = substring( val = val off = lv_off + 1 ).
+
+        IF lv_char = `<`.
+          temp28 = `>`.
+        ELSE.
+          temp28 = `&`.
+        ENDIF.
+
+        lv_close = temp28.
+
+        lv_end = find( val = lv_rest sub = lv_close ).
         IF lv_end >= 0.
-          DATA(lv_inner) = substring( val = lv_rest len = lv_end ).
+
+          lv_inner = substring( val = lv_rest len = lv_end ).
           " a tag is anything up to >, a symbol a name of A-Z, 0-9 and _
           IF lv_char = `<` OR ( lv_end > 0 AND lv_inner CO `ABCDEFGHIJKLMNOPQRSTUVWXYZ_0123456789` ).
             lv_off = lv_off + lv_end + 2.
@@ -774,7 +792,8 @@ CLASS z2ui5_cl_cgui_context IMPLEMENTATION.
     DATA classname        TYPE c LENGTH 15.
 
     " the line breaks of a wrapped encoding are no characters of it
-    DATA(lv_val) = val.
+    DATA lv_val LIKE val.
+    lv_val = val.
     REPLACE ALL OCCURRENCES OF |\n| IN lv_val WITH ``.
     REPLACE ALL OCCURRENCES OF |\r| IN lv_val WITH ``.
     REPLACE ALL OCCURRENCES OF ` ` IN lv_val WITH ``.
@@ -816,15 +835,20 @@ CLASS z2ui5_cl_cgui_context IMPLEMENTATION.
     DATA lv_power TYPE i.
     DATA lv_char  TYPE string.
 
-    DATA(lv_len) = strlen( val ).
-    DATA(lv_off) = 0.
+    DATA lv_len TYPE i.
+    DATA lv_off TYPE i.
+      DATA lv_value TYPE i.
+    lv_len = strlen( val ).
+
+    lv_off = 0.
     WHILE lv_off < lv_len.
       lv_char = substring( val = val off = lv_off len = 1 ).
       lv_off = lv_off + 1.
       IF lv_char = `=`.
         EXIT.
       ENDIF.
-      DATA(lv_value) = find( val = lc_alphabet sub = lv_char ).
+
+      lv_value = find( val = lc_alphabet sub = lv_char ).
       IF lv_value < 0.
         " a line break of a wrapped encoding is no character of it
         IF lv_char = |\n| OR lv_char = |\r| OR lv_char = ` `.
@@ -893,7 +917,8 @@ CLASS z2ui5_cl_cgui_context IMPLEMENTATION.
     DATA lv_triple TYPE i.
     DATA lv_part   TYPE string.
 
-    DATA(lv_len) = xstrlen( val ).
+    DATA lv_len TYPE i.
+    lv_len = xstrlen( val ).
     WHILE lv_off < lv_len.
       lv_rest = lv_len - lv_off.
       lv_triple = 0.
@@ -930,12 +955,19 @@ CLASS z2ui5_cl_cgui_context IMPLEMENTATION.
     DATA lv_text TYPE string.
     DATA lv_utf8 TYPE xstring.
 
-    DATA(lv_len) = strlen( val ).
-    DATA(lv_off) = 0.
+    DATA lv_len TYPE i.
+    DATA lv_off TYPE i.
+      DATA lv_char TYPE string.
+      DATA lv_hex TYPE string.
+    lv_len = strlen( val ).
+
+    lv_off = 0.
     WHILE lv_off < lv_len.
-      DATA(lv_char) = substring( val = val off = lv_off len = 1 ).
+
+      lv_char = substring( val = val off = lv_off len = 1 ).
       " only two hex digits make an escape - %ZZ stays as it is
-      DATA(lv_hex) = ``.
+
+      lv_hex = ``.
       IF lv_char = `%` AND lv_off + 2 < lv_len.
         lv_hex = to_upper( substring( val = val off = lv_off + 1 len = 2 ) ).
       ENDIF.
@@ -962,6 +994,9 @@ CLASS z2ui5_cl_cgui_context IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD c_escape_xml.
+      DATA temp29 TYPE xstring.
+      DATA lv_off TYPE i.
+      DATA lv_len TYPE i.
 
     " copied from abap-util - the line break, carriage return and tab as
     " string templates instead of its cv_char_util_* constants (this class
@@ -975,9 +1010,10 @@ CLASS z2ui5_cl_cgui_context IMPLEMENTATION.
       " UTF-8 bytes; behind them the two non-characters U+FFFE and U+FFFF.
       " Without a codepage API the set stays empty - the controls are then
       " kept, everything else is escaped as before
+
+      temp29 = `000102030405060708` && `0B0C` && `0E0F101112131415161718191A1B1C1D1E1F` && `EFBFBE` && `EFBFBF`.
       gv_xml_escape_controls = conv_get_string_by_xstring(
-          CONV xstring( `000102030405060708` && `0B0C` && `0E0F101112131415161718191A1B1C1D1E1F`
-                        && `EFBFBE` && `EFBFBF` ) ).
+          temp29 ).
       gv_xml_escape_specials = `&<>"` && |\n| && |\r| && |\t| && gv_xml_escape_controls.
     ENDIF.
     result = val.
@@ -1022,8 +1058,10 @@ CLASS z2ui5_cl_cgui_context IMPLEMENTATION.
     " refuses the view). It carries no meaning in a text, so it is dropped
     IF result CA gv_xml_escape_controls.
       " one replace per character, no regex
-      DATA(lv_off) = 0.
-      DATA(lv_len) = strlen( gv_xml_escape_controls ).
+
+      lv_off = 0.
+
+      lv_len = strlen( gv_xml_escape_controls ).
       WHILE lv_off < lv_len.
         result = replace( val  = result
                           sub  = gv_xml_escape_controls+lv_off(1)
@@ -1036,11 +1074,13 @@ CLASS z2ui5_cl_cgui_context IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD c_trim.
+      DATA lv_before LIKE result.
 
     result = val.
     " blanks and tabs alternate at either end - strip until nothing changes
     DO.
-      DATA(lv_before) = result.
+
+      lv_before = result.
       result = shift_left( shift_right( result ) ).
       result = shift_right( val = result
                             sub = |\t| ).
@@ -1055,14 +1095,31 @@ CLASS z2ui5_cl_cgui_context IMPLEMENTATION.
 
   METHOD file_get_mimetype.
 
-    DATA(lv_name) = to_lower( c_trim( val ) ).
-    SPLIT lv_name AT `.` INTO TABLE DATA(lt_parts).
+    DATA lv_name TYPE string.
+    TYPES temp1 TYPE STANDARD TABLE OF string WITH DEFAULT KEY.
+DATA lt_parts TYPE temp1.
+    DATA lv_ext LIKE LINE OF lt_parts.
+    FIELD-SYMBOLS <temp3> LIKE LINE OF lt_parts.
+    DATA temp4 LIKE sy-tabix.
+    lv_name = to_lower( c_trim( val ) ).
+
+
+    SPLIT lv_name AT `.` INTO TABLE lt_parts.
     " no name, no extension - an empty name splits into no part at all
     IF lt_parts IS INITIAL.
       result = `application/octet-stream`.
       RETURN.
     ENDIF.
-    DATA(lv_ext) = lt_parts[ lines( lt_parts ) ].
+
+
+
+    temp4 = sy-tabix.
+    READ TABLE lt_parts INDEX lines( lt_parts ) ASSIGNING <temp3>.
+    sy-tabix = temp4.
+    IF sy-subrc <> 0.
+      ASSERT 1 = 0.
+    ENDIF.
+    lv_ext = <temp3>.
 
     CASE lv_ext.
       WHEN `txt` OR `text` OR `log` OR `md`.
@@ -1127,7 +1184,9 @@ CLASS z2ui5_cl_cgui_context IMPLEMENTATION.
 
   METHOD text_align.
 
-    DATA(lv_fill) = width - strlen( val ).
+    DATA lv_fill TYPE i.
+        DATA lv_left TYPE i.
+    lv_fill = width - strlen( val ).
     IF lv_fill <= 0.
       result = val.
       RETURN.
@@ -1137,7 +1196,8 @@ CLASS z2ui5_cl_cgui_context IMPLEMENTATION.
         result = repeat( val = ` `
                          occ = lv_fill ) && val.
       WHEN `CENTER`.
-        DATA(lv_left) = lv_fill DIV 2.
+
+        lv_left = lv_fill DIV 2.
         result = repeat( val = ` `
                          occ = lv_left ) && val && repeat( val = ` `
                                                            occ = lv_fill - lv_left ).
@@ -1161,8 +1221,12 @@ CLASS z2ui5_cl_cgui_context IMPLEMENTATION.
     DATA lv_off   TYPE i.
     DATA lv_char  TYPE string.
 
-    DATA(lv_utf8) = conv_get_xstring_by_string( val ).
-    DATA(lv_len) = xstrlen( lv_utf8 ).
+    DATA lv_utf8 TYPE xstring.
+    DATA lv_len TYPE i.
+      DATA temp30 LIKE LINE OF lt_part.
+    lv_utf8 = conv_get_xstring_by_string( val ).
+
+    lv_len = xstrlen( lv_utf8 ).
     WHILE lv_off < lv_len.
       lv_byte = lv_utf8+lv_off(1).
       lv_value = lv_byte.
@@ -1175,7 +1239,9 @@ CLASS z2ui5_cl_cgui_context IMPLEMENTATION.
         ENDIF.
       ENDIF.
       lv_hex = lv_byte.
-      INSERT |%{ lv_hex }| INTO TABLE lt_part.
+
+      temp30 = |%{ lv_hex }|.
+      INSERT temp30 INTO TABLE lt_part.
     ENDWHILE.
     result = concat_lines_of( lt_part ).
 
@@ -1187,15 +1253,24 @@ CLASS z2ui5_cl_cgui_context IMPLEMENTATION.
     DATA lr_val   TYPE REF TO data.
     DATA lr_attri TYPE REF TO data.
     FIELD-SYMBOLS <attri> TYPE any.
+    DATA temp31 TYPE REF TO cl_abap_classdescr.
+    DATA lo_class LIKE temp31.
+    DATA temp32 LIKE LINE OF lo_class->attributes.
+    DATA lr_attri_descr LIKE REF TO temp32.
 
     IF app IS NOT BOUND.
       RETURN.
     ENDIF.
 
     GET REFERENCE OF val INTO lr_val.
-    DATA(lo_class) = CAST cl_abap_classdescr( cl_abap_typedescr=>describe_by_object_ref( app ) ).
 
-    LOOP AT lo_class->attributes REFERENCE INTO DATA(lr_attri_descr)
+    temp31 ?= cl_abap_typedescr=>describe_by_object_ref( app ).
+
+    lo_class = temp31.
+
+
+
+    LOOP AT lo_class->attributes REFERENCE INTO lr_attri_descr
          WHERE visibility = cl_abap_classdescr=>public
            AND is_constant = abap_false.
 
@@ -1221,6 +1296,8 @@ CLASS z2ui5_cl_cgui_context IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD rtti_get_label_by_descr.
+    DATA lv_name TYPE string.
+    DATA ls_texts TYPE z2ui5_cl_cgui_context=>ty_s_data_element_text.
 
     IF descr->kind <> cl_abap_typedescr=>kind_elem.
       RETURN.
@@ -1232,13 +1309,15 @@ CLASS z2ui5_cl_cgui_context IMPLEMENTATION.
       RETURN.
     ENDIF.
 
-    DATA(lv_name) = substring_after( val = descr->absolute_name
+
+    lv_name = substring_after( val = descr->absolute_name
                                      sub = `\TYPE=` ).
     IF lv_name IS INITIAL.
       RETURN.
     ENDIF.
 
-    DATA(ls_texts) = rtti_get_data_element_texts( lv_name ).
+
+    ls_texts = rtti_get_data_element_texts( lv_name ).
     result = ls_texts-medium.
     IF result IS INITIAL.
       result = ls_texts-long.
@@ -1283,8 +1362,23 @@ CLASS z2ui5_cl_cgui_context IMPLEMENTATION.
 
     DATA lo_struct TYPE REF TO cl_abap_structdescr.
 
-    DATA(lo_table) = CAST cl_abap_tabledescr( cl_abap_typedescr=>describe_by_data( val ) ).
-    DATA(lo_line) = lo_table->get_table_line_type( ).
+    DATA temp33 TYPE REF TO cl_abap_tabledescr.
+    DATA lo_table LIKE temp33.
+    DATA lo_line TYPE REF TO cl_abap_datadescr.
+    DATA temp34 LIKE LINE OF lo_struct->components.
+    DATA lr_comp LIKE REF TO temp34.
+      DATA temp35 TYPE string.
+      DATA lv_name LIKE temp35.
+      DATA lo_comp TYPE REF TO cl_abap_datadescr.
+      DATA lv_label TYPE string.
+      DATA temp36 TYPE REF TO cl_abap_elemdescr.
+      DATA lo_elem LIKE temp36.
+      DATA temp37 TYPE z2ui5_cl_cgui_context=>ty_s_comp.
+    temp33 ?= cl_abap_typedescr=>describe_by_data( val ).
+
+    lo_table = temp33.
+
+    lo_line = lo_table->get_table_line_type( ).
     IF lo_line->kind <> cl_abap_typedescr=>kind_struct.
       RAISE EXCEPTION TYPE z2ui5_cx_cgui_error
         EXPORTING
@@ -1292,25 +1386,38 @@ CLASS z2ui5_cl_cgui_context IMPLEMENTATION.
     ENDIF.
     lo_struct ?= lo_line.
 
-    LOOP AT lo_struct->components REFERENCE INTO DATA(lr_comp).
-      DATA(lv_name) = CONV string( lr_comp->name ).
-      DATA(lo_comp) = lo_struct->get_component_type( lv_name ).
+
+
+    LOOP AT lo_struct->components REFERENCE INTO lr_comp.
+
+      temp35 = lr_comp->name.
+
+      lv_name = temp35.
+
+      lo_comp = lo_struct->get_component_type( lv_name ).
       IF lo_comp->kind <> cl_abap_typedescr=>kind_elem.
         CONTINUE.
       ENDIF.
 
-      DATA(lv_label) = rtti_get_label_by_descr( lo_comp ).
+
+      lv_label = rtti_get_label_by_descr( lo_comp ).
       IF lv_label IS INITIAL.
         lv_label = lv_name.
       ENDIF.
 
-      DATA(lo_elem) = CAST cl_abap_elemdescr( lo_comp ).
-      INSERT VALUE #( name      = lv_name
-                      label     = lv_label
-                      type_kind = lr_comp->type_kind
-                      decimals  = lo_elem->decimals
-                      length    = lo_elem->output_length
-                      boolean   = rtti_check_boolean_descr( lo_comp ) ) INTO TABLE result.
+
+      temp36 ?= lo_comp.
+
+      lo_elem = temp36.
+
+      CLEAR temp37.
+      temp37-name = lv_name.
+      temp37-label = lv_label.
+      temp37-type_kind = lr_comp->type_kind.
+      temp37-decimals = lo_elem->decimals.
+      temp37-length = lo_elem->output_length.
+      temp37-boolean = rtti_check_boolean_descr( lo_comp ).
+      INSERT temp37 INTO TABLE result.
     ENDLOOP.
 
   ENDMETHOD.
@@ -1367,6 +1474,8 @@ CLASS z2ui5_cl_cgui_context IMPLEMENTATION.
     FIELD-SYMBOLS <option> TYPE any.
     FIELD-SYMBOLS <low>    TYPE any.
     FIELD-SYMBOLS <high>   TYPE any.
+    DATA lv_low TYPE string.
+    DATA lv_high TYPE string.
 
     ASSIGN COMPONENT `SIGN` OF STRUCTURE val TO <sign>.
     ASSIGN COMPONENT `OPTION` OF STRUCTURE val TO <option>.
@@ -1377,8 +1486,10 @@ CLASS z2ui5_cl_cgui_context IMPLEMENTATION.
       RETURN.
     ENDIF.
 
-    DATA(lv_low) = conv_to_text( <low> ).
-    DATA(lv_high) = conv_to_text( <high> ).
+
+    lv_low = conv_to_text( <low> ).
+
+    lv_high = conv_to_text( <high> ).
 
     CASE <option>.
       WHEN `EQ` OR ``.
@@ -1409,6 +1520,7 @@ CLASS z2ui5_cl_cgui_context IMPLEMENTATION.
     DATA lv_has_include TYPE abap_bool.
     DATA lv_included    TYPE abap_bool.
     DATA lv_match       TYPE abap_bool.
+    DATA temp1 TYPE xsdboolean.
 
     LOOP AT range ASSIGNING <line>.
       UNASSIGN: <sign>, <option>, <low>, <high>.
@@ -1438,33 +1550,65 @@ CLASS z2ui5_cl_cgui_context IMPLEMENTATION.
     ENDLOOP.
 
     " no include line at all selects everything the excludes left over
-    result = xsdbool( lv_has_include = abap_false OR lv_included = abap_true ).
+
+    temp1 = boolc( lv_has_include = abap_false OR lv_included = abap_true ).
+    result = temp1.
 
   ENDMETHOD.
 
   METHOD range_line_check.
+        DATA temp2 TYPE xsdboolean.
+        DATA temp3 TYPE xsdboolean.
+        DATA temp4 TYPE xsdboolean.
+        DATA temp5 TYPE xsdboolean.
+        DATA temp6 TYPE xsdboolean.
+        DATA temp7 TYPE xsdboolean.
+        DATA temp8 TYPE xsdboolean.
+        DATA temp9 TYPE xsdboolean.
+        DATA temp10 TYPE xsdboolean.
+        DATA temp11 TYPE xsdboolean.
 
     CASE option.
       WHEN `EQ` OR ``.
-        result = xsdbool( val = low ).
+
+        temp2 = boolc( val = low ).
+        result = temp2.
       WHEN `NE`.
-        result = xsdbool( val <> low ).
+
+        temp3 = boolc( val <> low ).
+        result = temp3.
       WHEN `GT`.
-        result = xsdbool( val > low ).
+
+        temp4 = boolc( val > low ).
+        result = temp4.
       WHEN `GE`.
-        result = xsdbool( val >= low ).
+
+        temp5 = boolc( val >= low ).
+        result = temp5.
       WHEN `LT`.
-        result = xsdbool( val < low ).
+
+        temp6 = boolc( val < low ).
+        result = temp6.
       WHEN `LE`.
-        result = xsdbool( val <= low ).
+
+        temp7 = boolc( val <= low ).
+        result = temp7.
       WHEN `BT`.
-        result = xsdbool( val >= low AND val <= high ).
+
+        temp8 = boolc( val >= low AND val <= high ).
+        result = temp8.
       WHEN `NB`.
-        result = xsdbool( val < low OR val > high ).
+
+        temp9 = boolc( val < low OR val > high ).
+        result = temp9.
       WHEN `CP`.
-        result = xsdbool( val CP low ).
+
+        temp10 = boolc( val CP low ).
+        result = temp10.
       WHEN `NP`.
-        result = xsdbool( val NP low ).
+
+        temp11 = boolc( val NP low ).
+        result = temp11.
     ENDCASE.
 
   ENDMETHOD.
@@ -1472,13 +1616,16 @@ CLASS z2ui5_cl_cgui_context IMPLEMENTATION.
   METHOD rtti_get_value_descr.
 
     DATA lo_line TYPE REF TO cl_abap_structdescr.
+        DATA temp38 TYPE REF TO cl_abap_tabledescr.
 
     TRY.
         result = cl_abap_typedescr=>describe_by_data( val ).
         IF result->kind <> cl_abap_typedescr=>kind_table.
           RETURN.
         ENDIF.
-        lo_line ?= CAST cl_abap_tabledescr( result )->get_table_line_type( ).
+
+        temp38 ?= result.
+        lo_line ?= temp38->get_table_line_type( ).
         result = lo_line->get_component_type( `LOW` ).
       CATCH cx_root.
         CLEAR result.
@@ -1502,6 +1649,9 @@ CLASS z2ui5_cl_cgui_context IMPLEMENTATION.
     DATA lt_values TYPE ty_t_fixvalue.
     DATA lo_elem   TYPE REF TO cl_abap_elemdescr.
     DATA lv_langu  TYPE c LENGTH 1.
+    DATA temp39 LIKE LINE OF lt_values.
+    DATA lr_value LIKE REF TO temp39.
+      DATA temp40 TYPE z2ui5_cl_cgui_context=>ty_s_fix_val.
 
     IF descr IS NOT BOUND OR descr->kind <> cl_abap_typedescr=>kind_elem.
       RETURN.
@@ -1530,10 +1680,15 @@ CLASS z2ui5_cl_cgui_context IMPLEMENTATION.
         RETURN.
     ENDTRY.
 
-    LOOP AT lt_values REFERENCE INTO DATA(lr_value).
-      INSERT VALUE #( low  = lr_value->low
-                      high = lr_value->high
-                      text = lr_value->ddtext ) INTO TABLE result.
+
+
+    LOOP AT lt_values REFERENCE INTO lr_value.
+
+      CLEAR temp40.
+      temp40-low = lr_value->low.
+      temp40-high = lr_value->high.
+      temp40-text = lr_value->ddtext.
+      INSERT temp40 INTO TABLE result.
     ENDLOOP.
 
   ENDMETHOD.
@@ -1553,6 +1708,7 @@ CLASS z2ui5_cl_cgui_context IMPLEMENTATION.
     FIELD-SYMBOLS <key>    TYPE any.
     FIELD-SYMBOLS <dom>    TYPE any.
     FIELD-SYMBOLS <type>   TYPE any.
+          DATA temp41 LIKE LINE OF result-fields.
 
     IF descr IS NOT BOUND OR descr->kind <> cl_abap_typedescr=>kind_elem.
       RETURN.
@@ -1620,7 +1776,9 @@ CLASS z2ui5_cl_cgui_context IMPLEMENTATION.
           IF <type> = `CLNT`.
             CONTINUE.
           ENDIF.
-          INSERT CONV string( <comp> ) INTO TABLE result-fields.
+
+          temp41 = <comp>.
+          INSERT temp41 INTO TABLE result-fields.
           IF result-field IS INITIAL AND <key> = abap_true AND <dom> = lv_domain.
             result-field = <comp>.
           ENDIF.
@@ -1643,6 +1801,7 @@ CLASS z2ui5_cl_cgui_context IMPLEMENTATION.
     DATA lv_name  TYPE c LENGTH 30.
     DATA lv_shlp  TYPE c LENGTH 30.
     DATA lv_field TYPE c LENGTH 30.
+        DATA lv_dd04l TYPE string.
 
     IF descr IS NOT BOUND OR descr->kind <> cl_abap_typedescr=>kind_elem.
       RETURN.
@@ -1655,10 +1814,11 @@ CLASS z2ui5_cl_cgui_context IMPLEMENTATION.
         lv_name = descr->get_relative_name( ).
         " DD04L is not released on ABAP Cloud - there the select raises and
         " the field has no search help
-        DATA(lv_dd04l) = `DD04L`.
-        SELECT SINGLE shlpname, shlpfield FROM (lv_dd04l)
-          WHERE rollname = @lv_name AND as4local = 'A'
-          INTO (@lv_shlp, @lv_field).
+
+        lv_dd04l = `DD04L`.
+        SELECT SINGLE shlpname shlpfield FROM (lv_dd04l) INTO (lv_shlp, lv_field)
+          WHERE rollname = lv_name AND as4local = 'A'
+          .
         IF sy-subrc = 0 AND lv_shlp IS NOT INITIAL AND lv_field IS NOT INITIAL.
           result-name  = lv_shlp.
           result-field = lv_field.
@@ -1693,24 +1853,52 @@ CLASS z2ui5_cl_cgui_context IMPLEMENTATION.
     FIELD-SYMBOLS <tab>    TYPE STANDARD TABLE.
     FIELD-SYMBOLS <row>    TYPE any.
     FIELD-SYMBOLS <cell>   TYPE any.
+        DATA temp42 TYPE REF TO cl_abap_datadescr.
+        DATA lo_shlp LIKE temp42.
+        DATA temp43 TYPE REF TO cl_abap_datadescr.
+        DATA lo_shlps LIKE temp43.
+        DATA temp44 TYPE REF TO cl_abap_datadescr.
+        DATA lo_return TYPE REF TO cl_abap_tabledescr.
+        DATA temp45 TYPE char30.
+        DATA lv_name LIKE temp45.
+          FIELD-SYMBOLS <first> TYPE any.
+        FIELD-SYMBOLS <prop> TYPE ANY.
+          DATA temp46 TYPE string.
+          DATA lv_field LIKE temp46.
+          FIELD-SYMBOLS <fd> TYPE ANY.
+          DATA temp47 TYPE abap_componentdescr.
+        DATA lo_tab TYPE REF TO cl_abap_tabledescr.
+        FIELD-SYMBOLS <ret> TYPE ANY.
 
     IF help-name IS INITIAL.
       RETURN.
     ENDIF.
 
     TRY.
-        DATA(lo_shlp) = CAST cl_abap_datadescr( cl_abap_typedescr=>describe_by_name( `SHLP_DESCR` ) ).
+
+        temp42 ?= cl_abap_typedescr=>describe_by_name( `SHLP_DESCR` ).
+
+        lo_shlp = temp42.
         CREATE DATA lr_shlp TYPE HANDLE lo_shlp.
         ASSIGN lr_shlp->* TO <shlp>.
-        DATA(lo_shlps) = CAST cl_abap_datadescr( cl_abap_typedescr=>describe_by_name( `SHLP_DESCT` ) ).
+
+        temp43 ?= cl_abap_typedescr=>describe_by_name( `SHLP_DESCT` ).
+
+        lo_shlps = temp43.
         CREATE DATA lr_shlps TYPE HANDLE lo_shlps.
         ASSIGN lr_shlps->* TO <shlps>.
-        DATA(lo_return) = cl_abap_tabledescr=>create(
-            CAST cl_abap_datadescr( cl_abap_typedescr=>describe_by_name( `DDSHRETVAL` ) ) ).
+
+        temp44 ?= cl_abap_typedescr=>describe_by_name( `DDSHRETVAL` ).
+
+        lo_return = cl_abap_tabledescr=>create(
+            temp44 ).
         CREATE DATA lr_return TYPE HANDLE lo_return.
         ASSIGN lr_return->* TO <return>.
 
-        DATA(lv_name) = CONV char30( help-name ).
+
+        temp45 = help-name.
+
+        lv_name = temp45.
         lv_function = `F4IF_GET_SHLP_DESCR`.
         CALL FUNCTION lv_function
           EXPORTING
@@ -1730,7 +1918,8 @@ CLASS z2ui5_cl_cgui_context IMPLEMENTATION.
           IF <shlps> IS INITIAL.
             RETURN.
           ENDIF.
-          READ TABLE <shlps> ASSIGNING FIELD-SYMBOL(<first>) INDEX 1.
+
+          READ TABLE <shlps> ASSIGNING <first> INDEX 1.
           <shlp> = <first>.
         ENDIF.
 
@@ -1738,9 +1927,13 @@ CLASS z2ui5_cl_cgui_context IMPLEMENTATION.
         " output field, so that the hit list returns it
         ASSIGN COMPONENT `FIELDPROP` OF STRUCTURE <shlp> TO <props>.
         ASSIGN COMPONENT `FIELDDESCR` OF STRUCTURE <shlp> TO <descrs>.
-        LOOP AT <props> ASSIGNING FIELD-SYMBOL(<prop>).
+
+        LOOP AT <props> ASSIGNING <prop>.
           ASSIGN COMPONENT `FIELDNAME` OF STRUCTURE <prop> TO <comp>.
-          DATA(lv_field) = CONV string( <comp> ).
+
+          temp46 = <comp>.
+
+          lv_field = temp46.
           ASSIGN COMPONENT `SHLPLISPOS` OF STRUCTURE <prop> TO <comp>.
           lv_pos = <comp>.
           IF lv_pos = 0 AND lv_field <> help-field.
@@ -1771,7 +1964,8 @@ CLASS z2ui5_cl_cgui_context IMPLEMENTATION.
         " the columns typed by the data elements of the search help
         LOOP AT lt_field INTO lv_field.
           CLEAR lo_type.
-          LOOP AT <descrs> ASSIGNING FIELD-SYMBOL(<fd>).
+
+          LOOP AT <descrs> ASSIGNING <fd>.
             ASSIGN COMPONENT `FIELDNAME` OF STRUCTURE <fd> TO <comp>.
             IF <comp> <> lv_field.
               CONTINUE.
@@ -1790,16 +1984,21 @@ CLASS z2ui5_cl_cgui_context IMPLEMENTATION.
           IF lo_type IS NOT BOUND.
             lo_type = cl_abap_elemdescr=>get_string( ).
           ENDIF.
-          INSERT VALUE #( name = lv_field
-                          type = lo_type ) INTO TABLE lt_comp.
+
+          CLEAR temp47.
+          temp47-name = lv_field.
+          temp47-type = lo_type.
+          INSERT temp47 INTO TABLE lt_comp.
         ENDLOOP.
 
-        DATA(lo_tab) = cl_abap_tabledescr=>create( cl_abap_structdescr=>create( lt_comp ) ).
+
+        lo_tab = cl_abap_tabledescr=>create( cl_abap_structdescr=>create( lt_comp ) ).
         CREATE DATA result TYPE HANDLE lo_tab.
         ASSIGN result->* TO <tab>.
 
         " one line of DDSHRETVAL per field and hit, the hit is RECORDPOS
-        LOOP AT <return> ASSIGNING FIELD-SYMBOL(<ret>).
+
+        LOOP AT <return> ASSIGNING <ret>.
           ASSIGN COMPONENT `RECORDPOS` OF STRUCTURE <ret> TO <comp>.
           lv_pos = <comp>.
           IF lv_pos <> lv_last.
@@ -1834,34 +2033,49 @@ CLASS z2ui5_cl_cgui_context IMPLEMENTATION.
 
     DATA lv_entity TYPE c LENGTH 30.
     FIELD-SYMBOLS <tab> TYPE STANDARD TABLE.
+    DATA lo_type TYPE REF TO cl_abap_typedescr.
+        DATA temp48 TYPE REF TO cl_abap_structdescr.
+        DATA lo_struct LIKE temp48.
+        DATA lo_table TYPE REF TO cl_abap_tabledescr.
+        DATA lv_order TYPE string.
+          DATA ls_first TYPE abap_compdescr.
+        DATA lv_where TYPE string.
 
     IF entity IS INITIAL.
       RETURN.
     ENDIF.
     lv_entity = to_upper( entity ).
     " an unknown name is a classic exception, no class-based one
+
     cl_abap_typedescr=>describe_by_name( EXPORTING  p_name         = lv_entity
-                                         RECEIVING  p_descr_ref    = DATA(lo_type)
+                                         RECEIVING  p_descr_ref    = lo_type
                                          EXCEPTIONS type_not_found = 1
                                                     OTHERS         = 2 ).
     IF sy-subrc <> 0 OR lo_type->kind <> cl_abap_typedescr=>kind_struct.
       RETURN.
     ENDIF.
     TRY.
-        DATA(lo_struct) = CAST cl_abap_structdescr( lo_type ).
-        DATA(lo_table) = cl_abap_tabledescr=>create( lo_struct ).
+
+        temp48 ?= lo_type.
+
+        lo_struct = temp48.
+
+        lo_table = cl_abap_tabledescr=>create( lo_struct ).
         CREATE DATA result TYPE HANDLE lo_table.
         ASSIGN result->* TO <tab>.
         " the first rows of the sort order, not any - and those the user
         " asked for with a pattern
-        DATA(lv_order) = to_upper( column ).
+
+        lv_order = to_upper( column ).
         IF lv_order IS INITIAL.
-          READ TABLE lo_struct->components INTO DATA(ls_first) INDEX 1.
+
+          READ TABLE lo_struct->components INTO ls_first INDEX 1.
           lv_order = ls_first-name.
         ENDIF.
-        DATA(lv_where) = sql_like( column  = lv_order
+
+        lv_where = sql_like( column  = lv_order
                                    pattern = pattern ).
-        SELECT * FROM (lv_entity) WHERE (lv_where) ORDER BY (lv_order) INTO TABLE @<tab> UP TO @max ROWS.
+        SELECT * FROM (lv_entity) UP TO max ROWS INTO TABLE <tab> WHERE (lv_where) ORDER BY (lv_order)  .
       CATCH cx_root.
         " no such entity, no structure, or no read access
         CLEAR result.
@@ -1880,7 +2094,8 @@ CLASS z2ui5_cl_cgui_context IMPLEMENTATION.
     DATA lt_text_comp  TYPE cl_abap_structdescr=>component_table.
     DATA lt_join       TYPE string_table.
     DATA lt_in         TYPE string_table.
-    DATA lt_text_by_key TYPE HASHED TABLE OF ty_s_text WITH UNIQUE KEY key.
+    TYPES temp2 TYPE HASHED TABLE OF ty_s_text WITH UNIQUE KEY key.
+DATA lt_text_by_key TYPE temp2.
     DATA lr_text       TYPE REF TO data.
     DATA lr_tcomp      TYPE REF TO abap_componentdescr.
     DATA lo_text       TYPE REF TO cl_abap_structdescr.
@@ -1895,15 +2110,66 @@ CLASS z2ui5_cl_cgui_context IMPLEMENTATION.
     FIELD-SYMBOLS <key>   TYPE any.
     FIELD-SYMBOLS <cell>  TYPE any.
     FIELD-SYMBOLS <ttext> TYPE any.
+        DATA temp49 TYPE REF TO cl_abap_structdescr.
+        DATA lo_struct LIKE temp49.
+        DATA temp50 TYPE abap_component_tab.
+        DATA temp5 LIKE LINE OF temp50.
+        DATA lr_comp LIKE REF TO temp5.
+          DATA temp51 LIKE sy-subrc.
+          DATA temp52 LIKE sy-subrc.
+            DATA lv_dd08l TYPE string.
+            DATA temp53 TYPE char30.
+            DATA lv_check LIKE temp53.
+              DATA temp54 TYPE REF TO cl_abap_structdescr.
+              DATA temp55 TYPE abap_component_tab.
+                DATA lo_tcomp LIKE lr_tcomp->type.
+                DATA temp56 TYPE REF TO cl_abap_elemdescr.
+                DATA temp6 LIKE sy-subrc.
+                DATA temp7 LIKE sy-subrc.
+                DATA temp57 TYPE REF TO cl_abap_elemdescr.
+                  DATA temp58 TYPE abap_componentdescr.
+        DATA lo_tab TYPE REF TO cl_abap_tabledescr.
+        DATA temp59 TYPE abap_component_tab.
+          DATA temp60 LIKE sy-subrc.
+          DATA temp61 LIKE sy-subrc.
+            DATA temp62 LIKE LINE OF lt_join.
+            DATA temp63 TYPE abap_componentdescr.
+            DATA temp8 TYPE REF TO cl_abap_datadescr.
+        DATA temp64 LIKE sy-subrc.
+        DATA temp65 LIKE sy-subrc.
+        DATA temp66 TYPE abap_componentdescr.
+        DATA temp9 TYPE REF TO cl_abap_datadescr.
+        DATA lo_text_tab TYPE REF TO cl_abap_tabledescr.
+        DATA lt_fields LIKE lt_join.
+          DATA lv_literal TYPE string.
+          DATA temp67 LIKE sy-subrc.
+          DATA temp68 LIKE sy-subrc.
+        FIELD-SYMBOLS <text> TYPE ANY.
+          DATA temp69 TYPE ty_s_text.
+          DATA lv_row_key TYPE string.
+          DATA ls_text TYPE ty_s_text.
 
     IF table-table IS INITIAL.
       RETURN.
     ENDIF.
 
     TRY.
-        DATA(lo_struct) = CAST cl_abap_structdescr( cl_abap_typedescr=>describe_by_name( table-table ) ).
-        LOOP AT lo_struct->get_components( ) REFERENCE INTO DATA(lr_comp).
-          IF line_exists( table-fields[ table_line = lr_comp->name ] ).
+
+        temp49 ?= cl_abap_typedescr=>describe_by_name( table-table ).
+
+        lo_struct = temp49.
+
+        temp50 = lo_struct->get_components( ).
+
+
+        LOOP AT temp50 REFERENCE INTO lr_comp.
+
+
+          temp52 = sy-subrc.
+          READ TABLE table-fields WITH KEY table_line = lr_comp->name TRANSPORTING NO FIELDS.
+          temp51 = sy-subrc.
+          sy-subrc = temp52.
+          IF temp51 = 0.
             INSERT lr_comp->* INTO TABLE lt_comp.
           ENDIF.
         ENDLOOP.
@@ -1911,27 +2177,49 @@ CLASS z2ui5_cl_cgui_context IMPLEMENTATION.
         " the text table: DD08L knows it as the table with a TEXT foreign
         " key to the value table - not released on ABAP Cloud
         TRY.
-            DATA(lv_dd08l) = `DD08L`.
-            DATA(lv_check) = CONV char30( table-table ).
-            SELECT SINGLE tabname FROM (lv_dd08l)
-              WHERE checktable = @lv_check AND frkart = 'TEXT' AND as4local = 'A'
-              INTO @lv_text_table.
+
+            lv_dd08l = `DD08L`.
+
+            temp53 = table-table.
+
+            lv_check = temp53.
+            SELECT SINGLE tabname FROM (lv_dd08l) INTO lv_text_table
+              WHERE checktable = lv_check AND frkart = 'TEXT' AND as4local = 'A'
+              .
             IF sy-subrc = 0.
-              lo_text = CAST cl_abap_structdescr( cl_abap_typedescr=>describe_by_name( lv_text_table ) ).
-              LOOP AT lo_text->get_components( ) REFERENCE INTO lr_tcomp.
-                DATA(lo_tcomp) = lr_tcomp->type.
+
+              temp54 ?= cl_abap_typedescr=>describe_by_name( lv_text_table ).
+              lo_text = temp54.
+
+              temp55 = lo_text->get_components( ).
+              LOOP AT temp55 REFERENCE INTO lr_tcomp.
+
+                lo_tcomp = lr_tcomp->type.
+
+                temp56 ?= lo_tcomp.
+
+
+                temp7 = sy-subrc.
+                READ TABLE lt_comp WITH KEY name = lr_tcomp->name TRANSPORTING NO FIELDS.
+                temp6 = sy-subrc.
+                sy-subrc = temp7.
                 IF lo_tcomp->type_kind = cl_abap_typedescr=>typekind_char
-                    AND CAST cl_abap_elemdescr( lo_tcomp )->get_relative_name( ) = `SPRAS`.
+                    AND temp56->get_relative_name( ) = `SPRAS`.
                   lv_lang_field = lr_tcomp->name.
                 ELSEIF lr_tcomp->name = table-field.
                   lv_key_field = lr_tcomp->name.
+
+                temp57 ?= lo_tcomp.
                 ELSEIF lv_text_field IS INITIAL AND lv_lang_field IS NOT INITIAL AND lv_key_field IS NOT INITIAL
                     AND lo_tcomp->type_kind = cl_abap_typedescr=>typekind_char
-                    AND CAST cl_abap_elemdescr( lo_tcomp )->output_length >= 10
-                    AND NOT line_exists( lt_comp[ name = lr_tcomp->name ] ).
+                    AND temp57->output_length >= 10
+                    AND NOT temp6 = 0.
                   lv_text_field = lr_tcomp->name.
-                  INSERT VALUE #( name = lr_tcomp->name
-                                  type = lr_tcomp->type ) INTO TABLE lt_comp.
+
+                  CLEAR temp58.
+                  temp58-name = lr_tcomp->name.
+                  temp58-type = lr_tcomp->type.
+                  INSERT temp58 INTO TABLE lt_comp.
                 ENDIF.
               ENDLOOP.
             ENDIF.
@@ -1939,15 +2227,16 @@ CLASS z2ui5_cl_cgui_context IMPLEMENTATION.
             CLEAR: lv_text_field, lv_lang_field, lv_key_field.
         ENDTRY.
 
-        DATA(lo_tab) = cl_abap_tabledescr=>create( cl_abap_structdescr=>create( lt_comp ) ).
+
+        lo_tab = cl_abap_tabledescr=>create( cl_abap_structdescr=>create( lt_comp ) ).
         CREATE DATA result TYPE HANDLE lo_tab.
         ASSIGN result->* TO <tab>.
         " the first rows by the key, not any - and those the user asked
         " for with a pattern
         lv_where = sql_like( column  = table-field
                              pattern = pattern ).
-        SELECT (table-fields) FROM (table-table) WHERE (lv_where) ORDER BY (table-field)
-          INTO CORRESPONDING FIELDS OF TABLE @<tab> UP TO @max ROWS.
+        SELECT (table-fields) FROM (table-table) UP TO max ROWS INTO CORRESPONDING FIELDS OF TABLE <tab> WHERE (lv_where) ORDER BY (table-field)
+           .
 
       CATCH cx_root.
         CLEAR result.
@@ -1962,49 +2251,89 @@ CLASS z2ui5_cl_cgui_context IMPLEMENTATION.
     " every field the text table shares with the value table: a region's
     " text belongs to its country too. Without them the values stay
     TRY.
-        LOOP AT lo_text->get_components( ) REFERENCE INTO lr_tcomp.
+
+        temp59 = lo_text->get_components( ).
+        LOOP AT temp59 REFERENCE INTO lr_tcomp.
+
+
+          temp61 = sy-subrc.
+          READ TABLE lt_comp WITH KEY name = lr_tcomp->name TRANSPORTING NO FIELDS.
+          temp60 = sy-subrc.
+          sy-subrc = temp61.
           IF lr_tcomp->name <> lv_lang_field AND lr_tcomp->name <> lv_text_field
-              AND line_exists( lt_comp[ name = lr_tcomp->name ] ).
-            INSERT CONV string( lr_tcomp->name ) INTO TABLE lt_join.
-            INSERT VALUE #( name = lr_tcomp->name
-                            type = CAST #( lr_tcomp->type ) ) INTO TABLE lt_text_comp.
+              AND temp60 = 0.
+
+            temp62 = lr_tcomp->name.
+            INSERT temp62 INTO TABLE lt_join.
+
+            CLEAR temp63.
+            temp63-name = lr_tcomp->name.
+
+            temp8 ?= lr_tcomp->type.
+            temp63-type = temp8.
+            INSERT temp63 INTO TABLE lt_text_comp.
           ENDIF.
         ENDLOOP.
-        IF NOT line_exists( lt_join[ table_line = lv_key_field ] ).
+
+
+        temp65 = sy-subrc.
+        READ TABLE lt_join WITH KEY table_line = lv_key_field TRANSPORTING NO FIELDS.
+        temp64 = sy-subrc.
+        sy-subrc = temp65.
+        IF NOT temp64 = 0.
           RETURN.
         ENDIF.
-        INSERT VALUE #( name = lv_text_field
-                        type = CAST #( lo_text->get_component_type( lv_text_field ) ) ) INTO TABLE lt_text_comp.
-        DATA(lo_text_tab) = cl_abap_tabledescr=>create( cl_abap_structdescr=>create( lt_text_comp ) ).
+
+        CLEAR temp66.
+        temp66-name = lv_text_field.
+
+        temp9 ?= lo_text->get_component_type( lv_text_field ).
+        temp66-type = temp9.
+        INSERT temp66 INTO TABLE lt_text_comp.
+
+        lo_text_tab = cl_abap_tabledescr=>create( cl_abap_structdescr=>create( lt_text_comp ) ).
         CREATE DATA lr_text TYPE HANDLE lo_text_tab.
         ASSIGN lr_text->* TO <texts>.
-        DATA(lt_fields) = lt_join.
+
+        lt_fields = lt_join.
         INSERT lv_text_field INTO TABLE lt_fields.
 
         " the key values as literals - a dynamic condition naming a host
         " variable is written differently on 7.02 and in strict mode
         LOOP AT <tab> ASSIGNING <row>.
           ASSIGN COMPONENT table-field OF STRUCTURE <row> TO <key>.
-          DATA(lv_literal) = |'{ replace( val = |{ <key> }| sub = `'` with = `''` occ = 0 ) }'|.
-          IF NOT line_exists( lt_in[ table_line = lv_literal ] ).
+
+          lv_literal = |'{ replace( val = |{ <key> }| sub = `'` with = `''` occ = 0 ) }'|.
+
+
+          temp68 = sy-subrc.
+          READ TABLE lt_in WITH KEY table_line = lv_literal TRANSPORTING NO FIELDS.
+          temp67 = sy-subrc.
+          sy-subrc = temp68.
+          IF NOT temp67 = 0.
             INSERT lv_literal INTO TABLE lt_in.
           ENDIF.
         ENDLOOP.
         lv_where = |{ lv_lang_field } = '{ sy-langu }' AND { lv_key_field } IN ( { concat_lines_of( table = lt_in sep = `, ` ) } )|.
 
-        SELECT (lt_fields) FROM (lv_text_table) WHERE (lv_where) INTO CORRESPONDING FIELDS OF TABLE @<texts>.
+        SELECT (lt_fields) FROM (lv_text_table) INTO CORRESPONDING FIELDS OF TABLE <texts> WHERE (lv_where) .
 
-        LOOP AT <texts> ASSIGNING FIELD-SYMBOL(<text>).
+
+        LOOP AT <texts> ASSIGNING <text>.
           ASSIGN COMPONENT lv_text_field OF STRUCTURE <text> TO <ttext>.
-          INSERT VALUE #( key  = row_key( row    = <text>
-                                          fields = lt_join )
-                          text = <ttext> ) INTO TABLE lt_text_by_key.
+
+          CLEAR temp69.
+          temp69-key = row_key( row = <text> fields = lt_join ).
+          temp69-text = <ttext>.
+          INSERT temp69 INTO TABLE lt_text_by_key.
         ENDLOOP.
         LOOP AT <tab> ASSIGNING <row>.
           ASSIGN COMPONENT lv_text_field OF STRUCTURE <row> TO <cell>.
-          DATA(lv_row_key) = row_key( row    = <row>
+
+          lv_row_key = row_key( row    = <row>
                                       fields = lt_join ).
-          READ TABLE lt_text_by_key INTO DATA(ls_text) WITH TABLE KEY key = lv_row_key.
+
+          READ TABLE lt_text_by_key INTO ls_text WITH TABLE KEY key = lv_row_key.
           IF sy-subrc = 0.
             <cell> = ls_text-text.
           ENDIF.
@@ -2018,9 +2347,15 @@ CLASS z2ui5_cl_cgui_context IMPLEMENTATION.
   METHOD conv_alpha_in.
 
     FIELD-SYMBOLS <char> TYPE c.
+        DATA temp70 TYPE REF TO cl_abap_elemdescr.
+        DATA lo_elem LIKE temp70.
+        DATA temp71 TYPE string.
 
     TRY.
-        DATA(lo_elem) = CAST cl_abap_elemdescr( cl_abap_typedescr=>describe_by_data( val ) ).
+
+        temp70 ?= cl_abap_typedescr=>describe_by_data( val ).
+
+        lo_elem = temp70.
         IF lo_elem->type_kind <> cl_abap_typedescr=>typekind_char OR lo_elem->is_ddic_type( ) = abap_false.
           RETURN.
         ENDIF.
@@ -2028,7 +2363,13 @@ CLASS z2ui5_cl_cgui_context IMPLEMENTATION.
           RETURN.
         ENDIF.
         ASSIGN val TO <char>.
-        <char> = |{ <char> ALPHA = IN }|.
+
+        CALL FUNCTION 'CONVERSION_EXIT_ALPHA_INPUT'
+          EXPORTING
+            input  = <char>
+          IMPORTING
+            output = temp71.
+<char> = |{ temp71 }|.
       CATCH cx_root ##NO_HANDLER.
         " no DDIC (ABAP Cloud, a type of the program) - no conversion
     ENDTRY.
@@ -2040,10 +2381,14 @@ CLASS z2ui5_cl_cgui_context IMPLEMENTATION.
     DATA lt_value TYPE string_table.
     FIELD-SYMBOLS <value> TYPE any.
 
-    LOOP AT fields INTO DATA(lv_field).
+    DATA lv_field LIKE LINE OF fields.
+        DATA temp72 LIKE LINE OF lt_value.
+    LOOP AT fields INTO lv_field.
       ASSIGN COMPONENT lv_field OF STRUCTURE row TO <value>.
       IF sy-subrc = 0.
-        INSERT |{ <value> }| INTO TABLE lt_value.
+
+        temp72 = |{ <value> }|.
+        INSERT temp72 INTO TABLE lt_value.
       ENDIF.
     ENDLOOP.
     result = concat_lines_of( table = lt_value sep = cl_abap_char_utilities=>horizontal_tab ).
@@ -2052,7 +2397,11 @@ CLASS z2ui5_cl_cgui_context IMPLEMENTATION.
 
   METHOD sql_like.
 
-    DATA(lv_pattern) = condense( CONV string( pattern ) ).
+    DATA temp73 TYPE string.
+    DATA lv_pattern TYPE string.
+    temp73 = pattern.
+
+    lv_pattern = condense( temp73 ).
     IF lv_pattern NA `*+` OR column IS INITIAL.
       RETURN.
     ENDIF.
@@ -2069,6 +2418,7 @@ CLASS z2ui5_cl_cgui_context IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD rtti_check_value_help.
+    DATA temp12 TYPE xsdboolean.
 
     IF rtti_get_fixed_values( descr ) IS NOT INITIAL.
       result = abap_true.
@@ -2080,7 +2430,9 @@ CLASS z2ui5_cl_cgui_context IMPLEMENTATION.
       RETURN.
     ENDIF.
 
-    result = xsdbool( rtti_get_value_table( descr )-table IS NOT INITIAL ).
+
+    temp12 = boolc( rtti_get_value_table( descr )-table IS NOT INITIAL ).
+    result = temp12.
 
   ENDMETHOD.
 
@@ -2240,7 +2592,8 @@ CLASS z2ui5_cl_cgui_context IMPLEMENTATION.
 
   METHOD rtti_get_dtel_name.
 
-    DATA(lo_descr) = rtti_get_value_descr( val ).
+    DATA lo_descr TYPE REF TO cl_abap_typedescr.
+    lo_descr = rtti_get_value_descr( val ).
     IF lo_descr IS NOT BOUND OR lo_descr->kind <> cl_abap_typedescr=>kind_elem
         OR lo_descr->is_ddic_type( ) = abap_false OR lo_descr->absolute_name CS `\TYPE-POOL=`.
       RETURN.
@@ -2254,17 +2607,22 @@ CLASS z2ui5_cl_cgui_context IMPLEMENTATION.
 
     DATA lv_object TYPE c LENGTH 60.
     DATA lv_found  TYPE c LENGTH 60.
+        DATA lv_table TYPE string.
+        DATA temp13 TYPE xsdboolean.
 
     IF name IS INITIAL.
       RETURN.
     ENDIF.
     lv_object = to_upper( name ).
     TRY.
-        DATA(lv_table) = `DOKIL`.
-        SELECT SINGLE object FROM (lv_table)
-          WHERE id = 'DE' AND object = @lv_object AND typ = 'E'
-          INTO @lv_found.
-        result = xsdbool( sy-subrc = 0 ).
+
+        lv_table = `DOKIL`.
+        SELECT SINGLE object FROM (lv_table) INTO lv_found
+          WHERE id = 'DE' AND object = lv_object AND typ = 'E'
+          .
+
+        temp13 = boolc( sy-subrc = 0 ).
+        result = temp13.
 
       CATCH cx_root.
         CLEAR result.
@@ -2279,18 +2637,34 @@ CLASS z2ui5_cl_cgui_context IMPLEMENTATION.
         tdformat TYPE c LENGTH 2,
         tdline   TYPE c LENGTH 132,
       END OF ty_s_line.
-    DATA lt_line   TYPE STANDARD TABLE OF ty_s_line WITH EMPTY KEY.
+    TYPES temp3 TYPE STANDARD TABLE OF ty_s_line WITH DEFAULT KEY.
+DATA lt_line   TYPE temp3.
     DATA lv_object TYPE c LENGTH 60.
     DATA lv_text   TYPE string.
+    DATA lv_function TYPE string.
+      DATA temp74 TYPE sy-langu.
+      DATA lv_langu LIKE temp74.
+    DATA ls_line LIKE LINE OF lt_line.
+      DATA temp75 TYPE string.
+      DATA lv_part TYPE string.
+        DATA temp1 TYPE string.
 
     IF name IS INITIAL.
       RETURN.
     ENDIF.
     lv_object = to_upper( name ).
 
-    DATA(lv_function) = `DOCU_GET`.
+
+    lv_function = `DOCU_GET`.
     DO 2 TIMES.
-      DATA(lv_langu) = COND sy-langu( WHEN sy-index = 1 THEN sy-langu ELSE 'E' ).
+
+      IF sy-index = 1.
+        temp74 = sy-langu.
+      ELSE.
+        temp74 = 'E'.
+      ENDIF.
+
+      lv_langu = temp74.
       CLEAR lt_line.
       TRY.
           CALL FUNCTION lv_function
@@ -2313,11 +2687,17 @@ CLASS z2ui5_cl_cgui_context IMPLEMENTATION.
     " a paragraph format (anything but the continuation '=' or ' ') starts
     " a new paragraph; tags <..>, symbols &..& and the headings of the
     " standard template go
-    LOOP AT lt_line INTO DATA(ls_line).
-      DATA(lv_part) = docu_strip( CONV string( ls_line-tdline ) ).
+
+    LOOP AT lt_line INTO ls_line.
+
+      temp75 = ls_line-tdline.
+
+      lv_part = docu_strip( temp75 ).
       lv_part = replace( val = lv_part sub = `,,` with = ` ` occ = 0 ).
       IF ls_line-tdformat <> `=` AND ls_line-tdformat <> ` ` AND ls_line-tdformat <> `/=` AND lv_text IS NOT INITIAL.
-        INSERT condense( lv_text ) INTO TABLE result.
+
+        temp1 = condense( lv_text ).
+        INSERT temp1 INTO TABLE result.
         CLEAR lv_text.
       ENDIF.
       IF ls_line-tdformat = `/:` OR ls_line-tdformat = `/*`.
@@ -2338,18 +2718,28 @@ CLASS z2ui5_cl_cgui_context IMPLEMENTATION.
     DATA lv_where TYPE string.
     DATA lr_found TYPE REF TO data.
     FIELD-SYMBOLS <found> TYPE any.
+    DATA lo_descr TYPE REF TO cl_abap_typedescr.
+    DATA lt_fix TYPE z2ui5_cl_cgui_context=>ty_t_fix_val.
+      DATA lv_value TYPE string.
+      DATA ls_fix LIKE LINE OF lt_fix.
+    DATA ls_table TYPE z2ui5_cl_cgui_context=>ty_s_value_table.
+        DATA temp14 TYPE xsdboolean.
 
     result = abap_true.
     IF val IS INITIAL.
       RETURN.
     ENDIF.
-    DATA(lo_descr) = rtti_get_value_descr( val ).
 
-    DATA(lt_fix) = rtti_get_fixed_values( lo_descr ).
+    lo_descr = rtti_get_value_descr( val ).
+
+
+    lt_fix = rtti_get_fixed_values( lo_descr ).
     IF lt_fix IS NOT INITIAL.
-      DATA(lv_value) = |{ val }|.
+
+      lv_value = |{ val }|.
       result = abap_false.
-      LOOP AT lt_fix INTO DATA(ls_fix).
+
+      LOOP AT lt_fix INTO ls_fix.
         IF ( ls_fix-high IS INITIAL AND lv_value = ls_fix-low )
             OR ( ls_fix-high IS NOT INITIAL AND lv_value >= ls_fix-low AND lv_value <= ls_fix-high ).
           result = abap_true.
@@ -2359,7 +2749,8 @@ CLASS z2ui5_cl_cgui_context IMPLEMENTATION.
       RETURN.
     ENDIF.
 
-    DATA(ls_table) = rtti_get_value_table( lo_descr ).
+
+    ls_table = rtti_get_value_table( lo_descr ).
     IF ls_table-table IS INITIAL OR ls_table-field IS INITIAL.
       RETURN.
     ENDIF.
@@ -2369,8 +2760,10 @@ CLASS z2ui5_cl_cgui_context IMPLEMENTATION.
         lv_where = |{ ls_table-field } = '{ replace( val = |{ val }| sub = `'` with = `''` occ = 0 ) }'|.
         CREATE DATA lr_found LIKE val.
         ASSIGN lr_found->* TO <found>.
-        SELECT SINGLE (ls_table-field) FROM (ls_table-table) WHERE (lv_where) INTO @<found>.
-        result = xsdbool( sy-subrc = 0 ).
+        SELECT SINGLE (ls_table-field) FROM (ls_table-table) INTO <found> WHERE (lv_where) .
+
+        temp14 = boolc( sy-subrc = 0 ).
+        result = temp14.
       CATCH cx_root.
         result = abap_true.
     ENDTRY.
@@ -2444,10 +2837,21 @@ CLASS z2ui5_cl_cgui_context IMPLEMENTATION.
 
   METHOD ui5_binding_by_kind.
 
-    DATA(lv_currency) = xsdbool( currency_path IS NOT INITIAL ).
-    DATA(lv_unit) = xsdbool( lv_currency = abap_false AND unit_path IS NOT INITIAL ).
+    DATA lv_currency TYPE abap_bool.
+    DATA temp15 TYPE xsdboolean.
+    DATA lv_unit TYPE abap_bool.
+    DATA temp16 TYPE xsdboolean.
+    DATA lv_type TYPE string.
+    DATA lv_options TYPE string.
+    temp15 = boolc( currency_path IS NOT INITIAL ).
+    lv_currency = temp15.
 
-    DATA(lv_type) = ui5_get_model_type( type_kind      = type_kind
+
+    temp16 = boolc( lv_currency = abap_false AND unit_path IS NOT INITIAL ).
+    lv_unit = temp16.
+
+
+    lv_type = ui5_get_model_type( type_kind      = type_kind
                                         check_currency = lv_currency
                                         check_unit     = lv_unit ).
     IF lv_type IS INITIAL.
@@ -2455,7 +2859,8 @@ CLASS z2ui5_cl_cgui_context IMPLEMENTATION.
       RETURN.
     ENDIF.
 
-    DATA(lv_options) = ui5_get_format_options( type_kind      = type_kind
+
+    lv_options = ui5_get_format_options( type_kind      = type_kind
                                                decimals       = decimals
                                                check_currency = lv_currency
                                                check_unit     = lv_unit ).
@@ -2472,7 +2877,10 @@ CLASS z2ui5_cl_cgui_context IMPLEMENTATION.
 
   METHOD ui5_binding_typed.
 
-    DATA(lo_descr) = cl_abap_typedescr=>describe_by_data( val ).
+    DATA lo_descr TYPE REF TO cl_abap_typedescr.
+    DATA temp76 TYPE REF TO cl_abap_elemdescr.
+    DATA lo_elem LIKE temp76.
+    lo_descr = cl_abap_typedescr=>describe_by_data( val ).
     " a TIMESTAMP / TIMESTAMPL is a packed number here and an ISO text in
     " the model - a FloatType would refuse to parse it
     IF lo_descr->kind <> cl_abap_typedescr=>kind_elem
@@ -2482,7 +2890,10 @@ CLASS z2ui5_cl_cgui_context IMPLEMENTATION.
       RETURN.
     ENDIF.
 
-    DATA(lo_elem) = CAST cl_abap_elemdescr( lo_descr ).
+
+    temp76 ?= lo_descr.
+
+    lo_elem = temp76.
     result = ui5_binding_by_kind( path          = path
                                   type_kind     = lo_descr->type_kind
                                   decimals      = lo_elem->decimals
@@ -2497,14 +2908,17 @@ CLASS z2ui5_cl_cgui_context IMPLEMENTATION.
     DATA lv_unit     TYPE string.
     FIELD-SYMBOLS <val> TYPE any.
 
-    DATA(lv_comp) = to_upper( condense( comp ) ).
+    DATA lv_comp TYPE string.
+    DATA ls_ref TYPE z2ui5_cl_cgui_context=>ty_s_ref_field.
+    lv_comp = to_upper( condense( comp ) ).
     ASSIGN COMPONENT lv_comp OF STRUCTURE struc TO <val>.
     IF sy-subrc <> 0.
       result = |\{{ lv_comp }\}|.
       RETURN.
     ENDIF.
 
-    DATA(ls_ref) = rtti_get_ref_field( struc = struc
+
+    ls_ref = rtti_get_ref_field( struc = struc
                                        comp  = lv_comp ).
     IF ls_ref-currency = abap_true.
       lv_currency = ls_ref-name.
@@ -2531,14 +2945,25 @@ CLASS z2ui5_cl_cgui_context IMPLEMENTATION.
     FIELD-SYMBOLS <datatype> TYPE any.
     FIELD-SYMBOLS <ref>      TYPE any.
 
-    DATA(lv_comp) = to_upper( condense( comp ) ).
+    DATA lv_comp TYPE string.
+        DATA lo_descr TYPE REF TO cl_abap_typedescr.
+        DATA temp77 TYPE REF TO cl_abap_structdescr.
+        DATA lo_struct LIKE temp77.
+          DATA temp78 TYPE string.
+          DATA temp79 TYPE string.
+          DATA temp17 TYPE xsdboolean.
+    lv_comp = to_upper( condense( comp ) ).
 
     TRY.
-        DATA(lo_descr) = cl_abap_typedescr=>describe_by_data( struc ).
+
+        lo_descr = cl_abap_typedescr=>describe_by_data( struc ).
         IF lo_descr->kind <> cl_abap_typedescr=>kind_struct OR lo_descr->is_ddic_type( ) = abap_false.
           RETURN.
         ENDIF.
-        DATA(lo_struct) = CAST cl_abap_structdescr( lo_descr ).
+
+        temp77 ?= lo_descr.
+
+        lo_struct = temp77.
 
         " DDFIELDS is not released on ABAP Cloud - there the lookup raises
         " and the field has no reference field
@@ -2563,7 +2988,9 @@ CLASS z2ui5_cl_cgui_context IMPLEMENTATION.
           IF <name> IS NOT ASSIGNED.
             RETURN.
           ENDIF.
-          IF to_upper( condense( CONV string( <name> ) ) ) <> lv_comp.
+
+          temp78 = <name>.
+          IF to_upper( condense( temp78 ) ) <> lv_comp.
             CONTINUE.
           ENDIF.
 
@@ -2575,7 +3002,9 @@ CLASS z2ui5_cl_cgui_context IMPLEMENTATION.
           IF <datatype> <> `CURR` AND <datatype> <> `QUAN`.
             RETURN.
           ENDIF.
-          lv_ref = to_upper( condense( CONV string( <reffield> ) ) ).
+
+          temp79 = <reffield>.
+          lv_ref = to_upper( condense( temp79 ) ).
           IF lv_ref IS INITIAL.
             RETURN.
           ENDIF.
@@ -2587,7 +3016,9 @@ CLASS z2ui5_cl_cgui_context IMPLEMENTATION.
           ENDIF.
 
           result-name     = lv_ref.
-          result-currency = xsdbool( <datatype> = `CURR` ).
+
+          temp17 = boolc( <datatype> = `CURR` ).
+          result-currency = temp17.
           RETURN.
         ENDLOOP.
 
@@ -2622,11 +3053,14 @@ CLASS z2ui5_cl_cgui_context IMPLEMENTATION.
   METHOD zip_pack.
 
     DATA lo_zip TYPE REF TO object.
+        DATA ls_file LIKE LINE OF files.
+        DATA x TYPE REF TO cx_root.
 
     TRY.
 
         CREATE OBJECT lo_zip TYPE ('CL_ABAP_ZIP').
-        LOOP AT files INTO DATA(ls_file).
+
+        LOOP AT files INTO ls_file.
           CALL METHOD lo_zip->('ADD')
             EXPORTING
               name    = ls_file-name
@@ -2636,7 +3070,8 @@ CLASS z2ui5_cl_cgui_context IMPLEMENTATION.
           RECEIVING
             zip = result.
 
-      CATCH cx_root INTO DATA(x).
+
+      CATCH cx_root INTO x.
         RAISE EXCEPTION TYPE z2ui5_cx_cgui_error
           EXPORTING
             val      = `ZIP_PACK_ERROR - the ZIP archive cannot be written`
@@ -2656,6 +3091,7 @@ CLASS z2ui5_cl_cgui_context IMPLEMENTATION.
     FIELD-SYMBOLS <files> TYPE ANY TABLE.
     FIELD-SYMBOLS <file>  TYPE any.
     FIELD-SYMBOLS <name>  TYPE any.
+        DATA x TYPE REF TO cx_root.
 
     " every ZIP archive starts with PK. Checked here, for the same answer
     " on every runtime: what the ZIP class does with other bytes differs,
@@ -2686,7 +3122,8 @@ CLASS z2ui5_cl_cgui_context IMPLEMENTATION.
             ASSIGN COMPONENT `NAME` OF STRUCTURE <file> TO <name>.
             lv_name = <name>.
 
-            ls_result = VALUE #( name = lv_name ).
+            CLEAR ls_result.
+            ls_result-name = lv_name.
             CALL METHOD lo_zip->('GET')
               EXPORTING
                 name                    = lv_name
@@ -2704,7 +3141,8 @@ CLASS z2ui5_cl_cgui_context IMPLEMENTATION.
           ENDLOOP.
         ENDIF.
 
-      CATCH cx_root INTO DATA(x).
+
+      CATCH cx_root INTO x.
         RAISE EXCEPTION TYPE z2ui5_cx_cgui_error
           EXPORTING
             val      = `ZIP_PARSE_ERROR - the ZIP archive cannot be read`
@@ -2722,13 +3160,15 @@ CLASS z2ui5_cl_cgui_context IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD xml_reader_create.
+        DATA x TYPE REF TO cx_root.
 
     TRY.
         " no option set: as it comes, the reader reports a text of blanks
         " only where it is the whole content of an element and leaves out
         " the indentation between two elements - what a caller wants
         result = cl_sxml_string_reader=>create( val ).
-      CATCH cx_root INTO DATA(x).
+
+      CATCH cx_root INTO x.
         RAISE EXCEPTION TYPE z2ui5_cx_cgui_error
           EXPORTING
             val      = `XML_READER_ERROR - the document cannot be read`
@@ -2740,6 +3180,8 @@ CLASS z2ui5_cl_cgui_context IMPLEMENTATION.
   METHOD xml_reader_next.
 
     DATA lo_reader TYPE REF TO if_sxml_reader.
+                DATA temp80 TYPE z2ui5_cl_cgui_context=>ty_s_xml_attribute.
+        DATA x TYPE REF TO cx_root.
 
     CLEAR kind.
     CLEAR name.
@@ -2763,8 +3205,11 @@ CLASS z2ui5_cl_cgui_context IMPLEMENTATION.
                 IF lo_reader->node_type <> if_sxml_node=>co_nt_attribute.
                   EXIT.
                 ENDIF.
-                INSERT VALUE #( name  = lo_reader->name
-                                value = lo_reader->value ) INTO TABLE t_attribute.
+
+                CLEAR temp80.
+                temp80-name = lo_reader->name.
+                temp80-value = lo_reader->value.
+                INSERT temp80 INTO TABLE t_attribute.
               ENDDO.
             ENDIF.
           WHEN if_sxml_node=>co_nt_element_close.
@@ -2778,7 +3223,8 @@ CLASS z2ui5_cl_cgui_context IMPLEMENTATION.
             kind = cs_xml_node-end.
         ENDCASE.
 
-      CATCH cx_root INTO DATA(x).
+
+      CATCH cx_root INTO x.
         RAISE EXCEPTION TYPE z2ui5_cx_cgui_error
           EXPORTING
             val      = `XML_READER_ERROR - the document is not well-formed XML`
@@ -2789,24 +3235,55 @@ CLASS z2ui5_cl_cgui_context IMPLEMENTATION.
 
   METHOD c_ends_with.
 
-    DATA(lv_val) = CONV string( val ).
-    DATA(lv_suffix) = CONV string( suffix ).
-    DATA(lv_len_suffix) = strlen( lv_suffix ).
-    DATA(lv_len_val) = strlen( lv_val ).
+    DATA temp81 TYPE string.
+    DATA lv_val LIKE temp81.
+    DATA temp82 TYPE string.
+    DATA lv_suffix LIKE temp82.
+    DATA lv_len_suffix TYPE i.
+    DATA lv_len_val TYPE i.
+    DATA lv_off TYPE i.
+    DATA temp18 TYPE xsdboolean.
+    temp81 = val.
+
+    lv_val = temp81.
+
+    temp82 = suffix.
+
+    lv_suffix = temp82.
+
+    lv_len_suffix = strlen( lv_suffix ).
+
+    lv_len_val = strlen( lv_val ).
 
     IF lv_len_val < lv_len_suffix.
       result = abap_false.
       RETURN.
     ENDIF.
 
-    DATA(lv_off) = lv_len_val - lv_len_suffix.
-    result = xsdbool( lv_val+lv_off(lv_len_suffix) = lv_suffix ).
+
+    lv_off = lv_len_val - lv_len_suffix.
+
+    temp18 = boolc( lv_val+lv_off(lv_len_suffix) = lv_suffix ).
+    result = temp18.
 
   ENDMETHOD.
 
   METHOD conv_string_to_number.
 
-    DATA(lv_val) = c_trim( CONV string( val ) ).
+    DATA temp83 TYPE string.
+    DATA lv_val TYPE string.
+    DATA lv_dot_count TYPE i.
+    DATA lv_comma_count TYPE i.
+    DATA lv_decimal TYPE string.
+    DATA lv_i TYPE i.
+    DATA lv_len TYPE i.
+    DATA lv_last TYPE i.
+    DATA lv_clean TYPE string.
+      DATA lv_c TYPE string.
+    DATA lv_point_count TYPE i.
+    temp83 = val.
+
+    lv_val = c_trim( temp83 ).
 
     " Which separator is the decimal one:
     " - both a dot and a comma occur: the one that occurs LAST
@@ -2817,12 +3294,15 @@ CLASS z2ui5_cl_cgui_context IMPLEMENTATION.
     "   `1,000` is 1 (European convention) - a single separator cannot be
     "   told apart from a thousands separator, the decimal reading wins
     " Every other separator is a thousands separator and is skipped.
-    DATA lv_dot_count   TYPE i.
-    DATA lv_comma_count TYPE i.
-    DATA lv_decimal     TYPE string.
-    DATA(lv_i) = 0.
-    DATA(lv_len) = strlen( lv_val ).
-    DATA(lv_last) = lv_len - 1.
+
+
+
+
+    lv_i = 0.
+
+    lv_len = strlen( lv_val ).
+
+    lv_last = lv_len - 1.
     WHILE lv_i < lv_len.
       CASE lv_val+lv_i(1).
         WHEN `.`.
@@ -2840,10 +3320,12 @@ CLASS z2ui5_cl_cgui_context IMPLEMENTATION.
     ENDIF.
 
     " Normalize: keep only digits, minus, and the decimal separator as `.`
-    DATA(lv_clean) = ``.
+
+    lv_clean = ``.
     lv_i = 0.
     WHILE lv_i < lv_len.
-      DATA(lv_c) = lv_val+lv_i(1).
+
+      lv_c = lv_val+lv_i(1).
       IF lv_c >= `0` AND lv_c <= `9`.
         lv_clean = lv_clean && lv_c.
       ELSEIF lv_c = `-` AND lv_i = 0.
@@ -2862,7 +3344,8 @@ CLASS z2ui5_cl_cgui_context IMPLEMENTATION.
     " digit and at most one decimal point (`1,234.5.6` keeps two). Return 0
     " for invalid input - the JS transpiler converts such strings leniently
     " instead of raising
-    DATA(lv_point_count) = count( val = lv_clean
+
+    lv_point_count = count( val = lv_clean
                                   sub = `.` ).
     IF lv_point_count > 1 OR lv_clean NA `0123456789`.
       result = 0.
@@ -2911,10 +3394,17 @@ CLASS z2ui5_cl_cgui_context IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD rtti_get_type_name.
+        DATA lo_descr TYPE REF TO cl_abap_typedescr.
+        DATA temp84 TYPE REF TO cl_abap_elemdescr.
+        DATA lo_ele LIKE temp84.
     TRY.
 
-        DATA(lo_descr) = cl_abap_elemdescr=>describe_by_data( val ).
-        DATA(lo_ele) = CAST cl_abap_elemdescr( lo_descr ).
+
+        lo_descr = cl_abap_elemdescr=>describe_by_data( val ).
+
+        temp84 ?= lo_descr.
+
+        lo_ele = temp84.
         result = lo_ele->get_relative_name( ).
 
       CATCH cx_root ##NO_HANDLER.
@@ -2931,9 +3421,13 @@ CLASS z2ui5_cl_cgui_context IMPLEMENTATION.
 
     DATA lo_struct TYPE REF TO cl_abap_structdescr.
 
-    DATA(lo_type) = cl_abap_typedescr=>describe_by_data( val ).
+    DATA lo_type TYPE REF TO cl_abap_typedescr.
+      DATA temp85 TYPE REF TO cl_abap_tabledescr.
+    lo_type = cl_abap_typedescr=>describe_by_data( val ).
     IF lo_type->kind = cl_abap_typedescr=>kind_table.
-      lo_type = CAST cl_abap_tabledescr( lo_type )->get_table_line_type( ).
+
+      temp85 ?= lo_type.
+      lo_type = temp85->get_table_line_type( ).
     ENDIF.
     IF lo_type->kind <> cl_abap_typedescr=>kind_struct.
       RETURN.
@@ -2946,6 +3440,11 @@ CLASS z2ui5_cl_cgui_context IMPLEMENTATION.
   METHOD rtti_expand_components.
 
     DATA lo_include TYPE REF TO cl_abap_structdescr.
+    DATA temp86 LIKE LINE OF val.
+    DATA lr_comp LIKE REF TO temp86.
+      DATA lt_include TYPE abap_component_tab.
+        DATA temp87 LIKE LINE OF lt_include.
+        DATA lr_include LIKE REF TO temp87.
 
     " bounded, so that an include chain that reaches itself ends in an
     " error and not in a stack overflow
@@ -2955,7 +3454,9 @@ CLASS z2ui5_cl_cgui_context IMPLEMENTATION.
           val = `RTTI_INCLUDE_RECURSION - include expansion exceeded 16 levels`.
     ENDIF.
 
-    LOOP AT val REFERENCE INTO DATA(lr_comp).
+
+
+    LOOP AT val REFERENCE INTO lr_comp.
       IF lr_comp->as_include = abap_false.
         INSERT lr_comp->* INTO TABLE result.
         CONTINUE.
@@ -2963,10 +3464,13 @@ CLASS z2ui5_cl_cgui_context IMPLEMENTATION.
       " INCLUDE ... RENAMING WITH SUFFIX: the fields of the structure are
       " named <component><suffix>, at every level
       lo_include ?= lr_comp->type.
-      DATA(lt_include) = rtti_expand_components( val   = lo_include->get_components( )
+
+      lt_include = rtti_expand_components( val   = lo_include->get_components( )
                                                  depth = depth + 1 ).
       IF lr_comp->suffix IS NOT INITIAL.
-        LOOP AT lt_include REFERENCE INTO DATA(lr_include).
+
+
+        LOOP AT lt_include REFERENCE INTO lr_include.
           lr_include->name = lr_include->name && lr_comp->suffix.
         ENDLOOP.
       ENDIF.
@@ -2979,13 +3483,22 @@ CLASS z2ui5_cl_cgui_context IMPLEMENTATION.
 
     DATA lt_comp TYPE abap_component_tab.
 
-    LOOP AT val INTO DATA(lv_name).
+    DATA lv_name LIKE LINE OF val.
+      DATA temp88 TYPE abap_componentdescr.
+    DATA lo_struct TYPE REF TO cl_abap_structdescr.
+    DATA lo_table TYPE REF TO cl_abap_tabledescr.
+    LOOP AT val INTO lv_name.
       " a string per column - a fixed length would cut every longer value
-      INSERT VALUE #( name = lv_name
-                      type = cl_abap_elemdescr=>get_string( ) ) INTO TABLE lt_comp.
+
+      CLEAR temp88.
+      temp88-name = lv_name.
+      temp88-type = cl_abap_elemdescr=>get_string( ).
+      INSERT temp88 INTO TABLE lt_comp.
     ENDLOOP.
-    DATA(lo_struct) = cl_abap_structdescr=>create( lt_comp ).
-    DATA(lo_table) = cl_abap_tabledescr=>create( p_line_type  = lo_struct
+
+    lo_struct = cl_abap_structdescr=>create( lt_comp ).
+
+    lo_table = cl_abap_tabledescr=>create( p_line_type  = lo_struct
                                                  p_table_kind = cl_abap_tabledescr=>tablekind_std ).
     CREATE DATA result TYPE HANDLE lo_table.
 

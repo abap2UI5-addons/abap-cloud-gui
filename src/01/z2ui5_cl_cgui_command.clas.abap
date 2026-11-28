@@ -18,7 +18,7 @@ CLASS z2ui5_cl_cgui_command DEFINITION PUBLIC FINAL CREATE PUBLIC.
         key   TYPE string,
         ucomm TYPE string,
       END OF ty_s_shortcut.
-    TYPES ty_t_shortcut TYPE STANDARD TABLE OF ty_s_shortcut WITH EMPTY KEY.
+    TYPES ty_t_shortcut TYPE STANDARD TABLE OF ty_s_shortcut WITH DEFAULT KEY.
 
     TYPES:
       "! the state of the report a call reads: the client, the key of the
@@ -50,7 +50,7 @@ CLASS z2ui5_cl_cgui_command DEFINITION PUBLIC FINAL CREATE PUBLIC.
         command TYPE c LENGTH 40,
         text    TYPE c LENGTH 80,
       END OF ty_s_palette.
-    TYPES ty_t_palette TYPE STANDARD TABLE OF ty_s_palette WITH EMPTY KEY.
+    TYPES ty_t_palette TYPE STANDARD TABLE OF ty_s_palette WITH DEFAULT KEY.
 
     CONSTANTS:
       "! what a command of the field asks for
@@ -222,7 +222,8 @@ CLASS z2ui5_cl_cgui_command IMPLEMENTATION.
 
   METHOD url_search.
 
-    DATA(lv_search) = client->get( )-s_config-search.
+    DATA lv_search TYPE z2ui5_if_client=>ty_s_get-s_config-search.
+    lv_search = client->get( )-s_config-search.
     IF lv_search IS NOT INITIAL AND lv_search(1) = `?`.
       lv_search = lv_search+1.
     ENDIF.
@@ -236,29 +237,55 @@ CLASS z2ui5_cl_cgui_command IMPLEMENTATION.
     DATA lv_name  TYPE string.
     DATA lv_value TYPE string.
 
-    LOOP AT client->get( )-t_comp_params INTO DATA(ls_comp).
-      INSERT VALUE #( n = to_upper( ls_comp-n )
-                      v = ls_comp-v ) INTO TABLE result.
+    DATA temp1 TYPE z2ui5_if_client=>ty_t_name_value.
+    DATA ls_comp LIKE LINE OF temp1.
+      DATA temp2 TYPE z2ui5_if_client=>ty_s_name_value.
+    DATA temp3 TYPE string_table.
+    DATA lv_param LIKE LINE OF temp3.
+      DATA temp4 LIKE sy-subrc.
+      DATA temp5 TYPE z2ui5_if_client=>ty_s_name_value.
+    temp1 = client->get( )-t_comp_params.
+
+    LOOP AT temp1 INTO ls_comp.
+
+      CLEAR temp2.
+      temp2-n = to_upper( ls_comp-n ).
+      temp2-v = ls_comp-v.
+      INSERT temp2 INTO TABLE result.
     ENDLOOP.
 
-    LOOP AT url_search( client ) INTO DATA(lv_param).
+
+    temp3 = url_search( client ).
+
+    LOOP AT temp3 INTO lv_param.
       CLEAR: lv_name, lv_value.
       SPLIT lv_param AT `=` INTO lv_name lv_value.
       lv_name = to_upper( url_decode( lv_name ) ).
-      IF line_exists( result[ n = lv_name ] ).
+
+      READ TABLE result WITH KEY n = lv_name TRANSPORTING NO FIELDS.
+      temp4 = sy-subrc.
+      IF temp4 = 0.
         CONTINUE.
       ENDIF.
-      INSERT VALUE #( n = lv_name
-                      v = url_decode( lv_value ) ) INTO TABLE result.
+
+      CLEAR temp5.
+      temp5-n = lv_name.
+      temp5-v = url_decode( lv_value ).
+      INSERT temp5 INTO TABLE result.
     ENDLOOP.
 
   ENDMETHOD.
 
   METHOD url_param.
 
-    DATA(lt_param) = url_params( client ).
-    DATA(lv_name) = to_upper( name ).
-    READ TABLE lt_param INTO DATA(ls_param) WITH KEY n = lv_name.
+    DATA lt_param TYPE z2ui5_if_client=>ty_t_name_value.
+    DATA lv_name TYPE string.
+    DATA ls_param TYPE z2ui5_if_client=>ty_s_name_value.
+    lt_param = url_params( client ).
+
+    lv_name = to_upper( name ).
+
+    READ TABLE lt_param INTO ls_param WITH KEY n = lv_name.
     IF sy-subrc = 0.
       result = ls_param-v.
     ENDIF.
@@ -270,6 +297,11 @@ CLASS z2ui5_cl_cgui_command IMPLEMENTATION.
     DATA lv_hex  TYPE x LENGTH 1.
     DATA lv_xstr TYPE xstring.
     DATA lv_char TYPE xstring.
+    DATA lv_in LIKE result.
+    DATA lv_len TYPE i.
+    DATA lv_pos TYPE i.
+        DATA lv_digits TYPE string.
+    DATA lv_text TYPE string.
 
     result = replace( val = val sub = `+` with = ` ` occ = 0 ).
     IF result NA `%`.
@@ -277,12 +309,16 @@ CLASS z2ui5_cl_cgui_command IMPLEMENTATION.
     ENDIF.
 
     " %XX are the bytes of UTF-8
-    DATA(lv_in) = result.
-    DATA(lv_len) = strlen( lv_in ).
-    DATA(lv_pos) = 0.
+
+    lv_in = result.
+
+    lv_len = strlen( lv_in ).
+
+    lv_pos = 0.
     WHILE lv_pos < lv_len.
       IF lv_in+lv_pos(1) = `%` AND lv_pos + 3 <= lv_len.
-        DATA(lv_digits) = to_upper( substring( val = lv_in off = lv_pos + 1 len = 2 ) ).
+
+        lv_digits = to_upper( substring( val = lv_in off = lv_pos + 1 len = 2 ) ).
         IF lv_digits CO `0123456789ABCDEF`.
           lv_hex = lv_digits.
           CONCATENATE lv_xstr lv_hex INTO lv_xstr IN BYTE MODE.
@@ -295,7 +331,8 @@ CLASS z2ui5_cl_cgui_command IMPLEMENTATION.
       lv_pos = lv_pos + 1.
     ENDWHILE.
 
-    DATA(lv_text) = z2ui5_cl_cgui_context=>conv_get_string_by_xstring( lv_xstr ).
+
+    lv_text = z2ui5_cl_cgui_context=>conv_get_string_by_xstring( lv_xstr ).
     IF lv_text IS NOT INITIAL.
       result = lv_text.
     ENDIF.
@@ -306,9 +343,12 @@ CLASS z2ui5_cl_cgui_command IMPLEMENTATION.
 
     DATA lt_part TYPE string_table.
     DATA ls_value TYPE z2ui5_cl_cgui_variant=>ty_s_value.
+    DATA lv_part LIKE LINE OF lt_part.
+      DATA temp6 TYPE z2ui5_cl_cgui_variant=>ty_s_value.
 
     SPLIT val AT `,` INTO TABLE lt_part.
-    LOOP AT lt_part INTO DATA(lv_part).
+
+    LOOP AT lt_part INTO lv_part.
       CLEAR ls_value.
       ls_value-name = name.
       ls_value-kind = z2ui5_cl_cgui_variant=>cs_kind-select_option.
@@ -346,8 +386,11 @@ CLASS z2ui5_cl_cgui_command IMPLEMENTATION.
     ENDLOOP.
 
     IF result IS INITIAL.
-      INSERT VALUE #( name = name
-                      kind = z2ui5_cl_cgui_variant=>cs_kind-select_option ) INTO TABLE result.
+
+      CLEAR temp6.
+      temp6-name = name.
+      temp6-kind = z2ui5_cl_cgui_variant=>cs_kind-select_option.
+      INSERT temp6 INTO TABLE result.
     ENDIF.
 
   ENDMETHOD.
@@ -357,7 +400,11 @@ CLASS z2ui5_cl_cgui_command IMPLEMENTATION.
     DATA lv_part TYPE string.
     DATA lv_sign TYPE string.
 
-    LOOP AT values REFERENCE INTO DATA(lr_value) WHERE sign IS NOT INITIAL.
+    DATA temp7 LIKE LINE OF values.
+    DATA lr_value LIKE REF TO temp7.
+          DATA temp8 TYPE string.
+          DATA temp9 TYPE string.
+    LOOP AT values REFERENCE INTO lr_value WHERE sign IS NOT INITIAL.
       lv_sign = lr_value->sign.
       CASE lr_value->option.
         WHEN `BT`.
@@ -365,10 +412,22 @@ CLASS z2ui5_cl_cgui_command IMPLEMENTATION.
         " the URL has no NB or NP - I NB is E BT, I NP is E CP
         WHEN `NB`.
           lv_part = |{ lr_value->low }..{ lr_value->high }|.
-          lv_sign = COND #( WHEN lv_sign = `E` THEN `I` ELSE `E` ).
+
+          IF lv_sign = `E`.
+            temp8 = `I`.
+          ELSE.
+            temp8 = `E`.
+          ENDIF.
+          lv_sign = temp8.
         WHEN `NP`.
           lv_part = lr_value->low.
-          lv_sign = COND #( WHEN lv_sign = `E` THEN `I` ELSE `E` ).
+
+          IF lv_sign = `E`.
+            temp9 = `I`.
+          ELSE.
+            temp9 = `E`.
+          ENDIF.
+          lv_sign = temp9.
         WHEN `GE`.
           lv_part = |>={ lr_value->low }|.
         WHEN `LE`.
@@ -398,6 +457,11 @@ CLASS z2ui5_cl_cgui_command IMPLEMENTATION.
 
     FIELD-SYMBOLS <fields> TYPE z2ui5_cl_cgui_selscreen=>ty_t_field.
     FIELD-SYMBOLS <url>    TYPE z2ui5_cl_cgui_variant=>ty_t_value.
+    DATA lt_param TYPE z2ui5_if_client=>ty_t_name_value.
+    DATA temp10 LIKE LINE OF <fields>.
+    DATA lr_field LIKE REF TO temp10.
+      DATA ls_param TYPE z2ui5_if_client=>ty_s_name_value.
+        DATA temp11 TYPE z2ui5_cl_cgui_variant=>ty_s_value.
 
     ASSIGN ctx-fields->* TO <fields>.
     ASSIGN ctx-url->* TO <url>.
@@ -405,10 +469,14 @@ CLASS z2ui5_cl_cgui_command IMPLEMENTATION.
     " only fields of the screen the user could fill himself - no NO-DISPLAY
     " field and nothing else of the class is set from the URL
     CLEAR <url>.
-    DATA(lt_param) = url_params( ctx-client ).
 
-    LOOP AT <fields> REFERENCE INTO DATA(lr_field) WHERE no_display = abap_false.
-      READ TABLE lt_param INTO DATA(ls_param) WITH KEY n = lr_field->name.
+    lt_param = url_params( ctx-client ).
+
+
+
+    LOOP AT <fields> REFERENCE INTO lr_field WHERE no_display = abap_false.
+
+      READ TABLE lt_param INTO ls_param WITH KEY n = lr_field->name.
       IF sy-subrc <> 0.
         CONTINUE.
       ENDIF.
@@ -416,9 +484,12 @@ CLASS z2ui5_cl_cgui_command IMPLEMENTATION.
         INSERT LINES OF url_range( name = lr_field->name
                                    val  = ls_param-v ) INTO TABLE <url>.
       ELSE.
-        INSERT VALUE #( name = lr_field->name
-                        kind = z2ui5_cl_cgui_variant=>cs_kind-parameter
-                        low  = ls_param-v ) INTO TABLE <url>.
+
+        CLEAR temp11.
+        temp11-name = lr_field->name.
+        temp11-kind = z2ui5_cl_cgui_variant=>cs_kind-parameter.
+        temp11-low = ls_param-v.
+        INSERT temp11 INTO TABLE <url>.
       ENDIF.
     ENDLOOP.
 
@@ -443,52 +514,99 @@ CLASS z2ui5_cl_cgui_command IMPLEMENTATION.
     DATA lt_keep  TYPE string_table.
     DATA lv_name  TYPE string.
     DATA lv_value TYPE string.
+    DATA lv_search TYPE z2ui5_if_client=>ty_s_get-s_config-search.
+    DATA temp12 TYPE string_table.
+    DATA lv_param LIKE LINE OF temp12.
+      DATA temp13 LIKE sy-subrc.
+    DATA lv_app_start TYPE string.
+    DATA temp14 LIKE sy-subrc.
+    DATA temp15 LIKE LINE OF <fields>.
+    DATA lr_field LIKE REF TO temp15.
+    DATA lt_value TYPE z2ui5_cl_cgui_variant=>ty_t_value.
+      DATA temp16 TYPE z2ui5_cl_cgui_variant=>ty_t_value.
+      DATA ls_v LIKE LINE OF lt_value.
+      DATA lt_field_value LIKE temp16.
+        DATA temp18 TYPE string.
+        DATA temp19 TYPE z2ui5_cl_cgui_variant=>ty_s_value.
+      DATA temp20 LIKE LINE OF lt_keep.
+      DATA temp21 LIKE LINE OF lt_keep.
 
     ASSIGN ctx-fields->* TO <fields>.
 
     " the parameters of the URL that are no field of the screen stay - the
     " app to start, the client, the language
-    DATA(lv_search) = ctx-client->get( )-s_config-search.
-    LOOP AT url_search( ctx-client ) INTO DATA(lv_param).
+
+    lv_search = ctx-client->get( )-s_config-search.
+
+    temp12 = url_search( ctx-client ).
+
+    LOOP AT temp12 INTO lv_param.
       CLEAR: lv_name, lv_value.
       SPLIT lv_param AT `=` INTO lv_name lv_value.
       lv_name = to_upper( url_decode( lv_name ) ).
       " ctx-fields->* rather than <fields>: transpiler 2.14.35 hands the
       " field symbol itself to the table expression (getRowType is not a
       " function) - the same table, read through the typed reference
-      IF line_exists( ctx-fields->*[ name = lv_name ] ) OR lv_name = z2ui5_cl_cgui_report=>cv_cgui_url_skip OR lv_name = `VARIANT`.
+
+      READ TABLE ctx-fields->* WITH KEY name = lv_name TRANSPORTING NO FIELDS.
+      temp13 = sy-subrc.
+      IF temp13 = 0 OR lv_name = z2ui5_cl_cgui_report=>cv_cgui_url_skip OR lv_name = `VARIANT`.
         CONTINUE.
       ENDIF.
       INSERT lv_param INTO TABLE lt_keep.
     ENDLOOP.
     " a variable, not the template - a WITH KEY operand on 7.02
-    DATA(lv_app_start) = |app_start={ to_lower( ctx-key ) }|.
-    IF NOT line_exists( lt_keep[ table_line = lv_app_start ] )
+
+    lv_app_start = |app_start={ to_lower( ctx-key ) }|.
+
+    READ TABLE lt_keep WITH KEY table_line = lv_app_start TRANSPORTING NO FIELDS.
+    temp14 = sy-subrc.
+    IF NOT temp14 = 0
         AND lv_search NS `app_start`.
       INSERT lv_app_start INTO TABLE lt_keep.
     ENDIF.
 
-    LOOP AT <fields> REFERENCE INTO DATA(lr_field) WHERE no_display = abap_false.
+
+
+    LOOP AT <fields> REFERENCE INTO lr_field WHERE no_display = abap_false.
       INSERT lr_field->name INTO TABLE lt_name.
     ENDLOOP.
-    DATA(lt_value) = z2ui5_cl_cgui_variant=>values_get( app   = ctx-app
+
+    lt_value = z2ui5_cl_cgui_variant=>values_get( app   = ctx-app
                                                         names = lt_name ).
 
     LOOP AT <fields> REFERENCE INTO lr_field WHERE no_display = abap_false.
-      DATA(lt_field_value) = VALUE z2ui5_cl_cgui_variant=>ty_t_value(
-          FOR ls_v IN lt_value WHERE ( name = lr_field->name ) ( ls_v ) ).
+
+      CLEAR temp16.
+
+      LOOP AT lt_value INTO ls_v WHERE name = lr_field->name.
+        INSERT ls_v INTO TABLE temp16.
+      ENDLOOP.
+
+      lt_field_value = temp16.
       IF lr_field->kind = z2ui5_cl_cgui_selscreen=>cs_field_kind-select_option.
         lv_value = url_from_range( lt_field_value ).
       ELSE.
-        lv_value = VALUE #( lt_field_value[ 1 ]-low OPTIONAL ).
+
+        CLEAR temp18.
+
+        READ TABLE lt_field_value INTO temp19 INDEX 1.
+        IF sy-subrc = 0.
+          temp18 = temp19-low.
+        ENDIF.
+        lv_value = temp18.
       ENDIF.
       IF lv_value IS INITIAL.
         CONTINUE.
       ENDIF.
-      INSERT |{ to_lower( lr_field->name ) }={ z2ui5_cl_cgui_context=>url_escape( lv_value ) }| INTO TABLE lt_keep.
+
+      temp20 = |{ to_lower( lr_field->name ) }={ z2ui5_cl_cgui_context=>url_escape( lv_value ) }|.
+      INSERT temp20 INTO TABLE lt_keep.
     ENDLOOP.
     IF skip_screen = abap_true.
-      INSERT |{ to_lower( z2ui5_cl_cgui_report=>cv_cgui_url_skip ) }=X| INTO TABLE lt_keep.
+
+      temp21 = |{ to_lower( z2ui5_cl_cgui_report=>cv_cgui_url_skip ) }=X|.
+      INSERT temp21 INTO TABLE lt_keep.
     ENDIF.
 
     result = |{ ctx-client->get( )-s_config-origin }{ ctx-client->get( )-s_config-pathname }?{ concat_lines_of( table = lt_keep sep = `&` ) }|.
@@ -531,9 +649,11 @@ CLASS z2ui5_cl_cgui_command IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD start_resolve.
+    DATA ls_tcode TYPE z2ui5_if_cgui_catalog=>ty_s_transaction.
 
     result-report = code.
-    DATA(ls_tcode) = tcode_find( code    = code
+
+    ls_tcode = tcode_find( code    = code
                                  catalog = catalog ).
     IF ls_tcode IS NOT INITIAL.
       result-report = to_upper( ls_tcode-report ).
@@ -546,12 +666,19 @@ CLASS z2ui5_cl_cgui_command IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD tcode_find.
+    DATA lv_code TYPE string.
+    DATA temp22 TYPE z2ui5_if_cgui_catalog=>ty_t_transaction.
+    DATA ls_tcode LIKE LINE OF temp22.
 
     IF catalog IS NOT BOUND.
       RETURN.
     ENDIF.
-    DATA(lv_code) = to_upper( condense( code ) ).
-    LOOP AT catalog->get( ) INTO DATA(ls_tcode).
+
+    lv_code = to_upper( condense( code ) ).
+
+    temp22 = catalog->get( ).
+
+    LOOP AT temp22 INTO ls_tcode.
       IF to_upper( condense( ls_tcode-code ) ) = lv_code.
         result = ls_tcode.
         RETURN.
@@ -568,12 +695,20 @@ CLASS z2ui5_cl_cgui_command IMPLEMENTATION.
     DATA lo_me    TYPE REF TO z2ui5_cl_cgui_command.
     DATA lo_super TYPE REF TO cl_abap_classdescr.
 
-    DATA(lv_name) = to_upper( condense( name ) ).
+    DATA lv_name TYPE string.
+    DATA lo_type TYPE REF TO cl_abap_typedescr.
+    DATA temp23 TYPE REF TO cl_abap_refdescr.
+    DATA lv_me TYPE string.
+    DATA lv_base TYPE string.
+    DATA temp24 TYPE REF TO cl_abap_classdescr.
+    DATA lo_class LIKE temp24.
+    lv_name = to_upper( condense( name ) ).
     IF lv_name IS INITIAL.
       RETURN.
     ENDIF.
+
     cl_abap_typedescr=>describe_by_name( EXPORTING  p_name         = lv_name
-                                         RECEIVING  p_descr_ref    = DATA(lo_type)
+                                         RECEIVING  p_descr_ref    = lo_type
                                          EXCEPTIONS type_not_found = 1
                                                     OTHERS         = 2 ).
     IF sy-subrc <> 0 OR lo_type IS NOT BOUND OR lo_type->kind <> cl_abap_typedescr=>kind_class.
@@ -581,11 +716,17 @@ CLASS z2ui5_cl_cgui_command IMPLEMENTATION.
     ENDIF.
 
     " a subclass of the report runtime - checked before anything is created
-    DATA(lv_me) = CAST cl_abap_refdescr( cl_abap_typedescr=>describe_by_data( lo_me )
-                                       )->get_referenced_type( )->get_relative_name( ).
-    DATA(lv_base) = |{ substring( val = lv_me
+
+    temp23 ?= cl_abap_typedescr=>describe_by_data( lo_me ).
+
+    lv_me = temp23->get_referenced_type( )->get_relative_name( ).
+
+    lv_base = |{ substring( val = lv_me
                                   len = strlen( lv_me ) - strlen( `COMMAND` ) ) }REPORT|.
-    DATA(lo_class) = CAST cl_abap_classdescr( lo_type ).
+
+    temp24 ?= lo_type.
+
+    lo_class = temp24.
     WHILE lo_class->get_relative_name( ) <> lv_base.
       lo_class->get_super_class_type( RECEIVING  p_descr_ref           = lo_super
                                       EXCEPTIONS super_class_not_found = 1
@@ -608,16 +749,26 @@ CLASS z2ui5_cl_cgui_command IMPLEMENTATION.
 
     DATA lt_keep TYPE string_table.
 
-    LOOP AT url_search( client ) INTO DATA(lv_param).
+    DATA temp25 TYPE string_table.
+    DATA lv_param LIKE LINE OF temp25.
+    DATA temp26 LIKE LINE OF lt_keep.
+      DATA temp27 LIKE LINE OF lt_keep.
+    temp25 = url_search( client ).
+
+    LOOP AT temp25 INTO lv_param.
       IF to_upper( segment( val = lv_param index = 1 sep = `=` ) ) = `APP_START`
           OR to_upper( segment( val = lv_param index = 1 sep = `=` ) ) = `VARIANT`.
         CONTINUE.
       ENDIF.
       INSERT lv_param INTO TABLE lt_keep.
     ENDLOOP.
-    INSERT |app_start={ to_lower( report ) }| INTO TABLE lt_keep.
+
+    temp26 = |app_start={ to_lower( report ) }|.
+    INSERT temp26 INTO TABLE lt_keep.
     IF variant IS NOT INITIAL.
-      INSERT |variant={ z2ui5_cl_cgui_context=>url_escape( variant ) }| INTO TABLE lt_keep.
+
+      temp27 = |variant={ z2ui5_cl_cgui_context=>url_escape( variant ) }|.
+      INSERT temp27 INTO TABLE lt_keep.
     ENDIF.
     result = |{ client->get( )-s_config-origin }{ client->get( )-s_config-pathname }?| &&
              concat_lines_of( table = lt_keep sep = `&` ).
@@ -625,23 +776,60 @@ CLASS z2ui5_cl_cgui_command IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD palette_rows.
+      DATA temp28 TYPE z2ui5_if_cgui_catalog=>ty_t_transaction.
+      DATA ls_tcode LIKE LINE OF temp28.
+        DATA temp29 TYPE z2ui5_cl_cgui_command=>ty_s_palette.
+    DATA ls_fkey LIKE LINE OF ctx-fkeys.
+      DATA temp30 TYPE z2ui5_cl_cgui_command=>ty_s_palette.
+      DATA temp31 TYPE z2ui5_cl_cgui_command=>ty_s_palette.
+      DATA temp32 TYPE z2ui5_cl_cgui_command=>ty_s_palette.
+    DATA temp33 TYPE z2ui5_cl_cgui_command=>ty_s_palette.
+    DATA temp34 TYPE z2ui5_cl_cgui_command=>ty_s_palette.
 
     IF ctx-catalog IS BOUND.
-      LOOP AT ctx-catalog->get( ) INTO DATA(ls_tcode).
-        INSERT VALUE #( command = to_upper( ls_tcode-code ) text = ls_tcode-text ) INTO TABLE result.
+
+      temp28 = ctx-catalog->get( ).
+
+      LOOP AT temp28 INTO ls_tcode.
+
+        CLEAR temp29.
+        temp29-command = to_upper( ls_tcode-code ).
+        temp29-text = ls_tcode-text.
+        INSERT temp29 INTO TABLE result.
       ENDLOOP.
     ENDIF.
     " the function keys of the screen
-    LOOP AT ctx-fkeys INTO DATA(ls_fkey).
-      INSERT VALUE #( command = to_upper( ls_fkey-ucomm ) text = ls_fkey-text ) INTO TABLE result.
+
+    LOOP AT ctx-fkeys INTO ls_fkey.
+
+      CLEAR temp30.
+      temp30-command = to_upper( ls_fkey-ucomm ).
+      temp30-text = ls_fkey-text.
+      INSERT temp30 INTO TABLE result.
     ENDLOOP.
     IF ctx-selection = abap_true.
-      INSERT VALUE #( command = `ONLI` text = 'Execute'(001) ) INTO TABLE result.
+
+      CLEAR temp31.
+      temp31-command = `ONLI`.
+      temp31-text = 'Execute'(001).
+      INSERT temp31 INTO TABLE result.
     ELSEIF ctx-output = abap_true.
-      INSERT VALUE #( command = `PRI` text = 'Print'(002) ) INTO TABLE result.
+
+      CLEAR temp32.
+      temp32-command = `PRI`.
+      temp32-text = 'Print'(002).
+      INSERT temp32 INTO TABLE result.
     ENDIF.
-    INSERT VALUE #( command = `/O` text = 'This report in a new window'(003) ) INTO TABLE result.
-    INSERT VALUE #( command = `SU3` text = 'User parameters'(004) ) INTO TABLE result.
+
+    CLEAR temp33.
+    temp33-command = `/O`.
+    temp33-text = 'This report in a new window'(003).
+    INSERT temp33 INTO TABLE result.
+
+    CLEAR temp34.
+    temp34-command = `SU3`.
+    temp34-text = 'User parameters'(004).
+    INSERT temp34 INTO TABLE result.
 
   ENDMETHOD.
 
@@ -649,41 +837,87 @@ CLASS z2ui5_cl_cgui_command IMPLEMENTATION.
 
     FIELD-SYMBOLS <gui> TYPE z2ui5_if_cgui_gui=>ty_t_control.
     DATA lt_gui_key TYPE string_table.
+    DATA temp35 TYPE z2ui5_cl_cgui_command=>ty_s_shortcut.
+    DATA temp36 TYPE z2ui5_cl_cgui_command=>ty_s_shortcut.
+    DATA ls_editor LIKE LINE OF <gui>.
+      DATA lt_editor_key TYPE STANDARD TABLE OF string WITH DEFAULT KEY.
+      DATA lv_editor_key LIKE LINE OF lt_editor_key.
+    DATA lv_gui_key LIKE LINE OF lt_gui_key.
+      DATA temp37 TYPE z2ui5_cl_cgui_command=>ty_s_shortcut.
+      DATA temp1 TYPE z2ui5_cl_cgui_command=>ty_s_shortcut-ucomm.
+      DATA temp38 TYPE z2ui5_cl_cgui_command=>ty_s_shortcut.
+      DATA temp39 TYPE z2ui5_cl_cgui_command=>ty_s_shortcut.
+    DATA ls_key LIKE LINE OF ctx-pf_keys.
+      DATA temp40 TYPE string.
+      DATA temp2 LIKE sy-subrc.
 
     ASSIGN ctx-gui->* TO <gui>.
 
     " F8 Execute and F3 Back, as in the SAP GUI
-    INSERT VALUE #( key = `F8` ucomm = z2ui5_cl_cgui_report=>cs_ucomm-execute ) INTO TABLE result.
-    INSERT VALUE #( key = `F3` ucomm = z2ui5_cl_cgui_report=>cs_ucomm-back ) INTO TABLE result.
+
+    CLEAR temp35.
+    temp35-key = `F8`.
+    temp35-ucomm = z2ui5_cl_cgui_report=>cs_ucomm-execute.
+    INSERT temp35 INTO TABLE result.
+
+    CLEAR temp36.
+    temp36-key = `F3`.
+    temp36-ucomm = z2ui5_cl_cgui_report=>cs_ucomm-back.
+    INSERT temp36 INTO TABLE result.
     " F1 and F4 of a text editor that registered them
-    LOOP AT <gui> INTO DATA(ls_editor)
+
+    LOOP AT <gui> INTO ls_editor
          WHERE kind = z2ui5_if_cgui_gui=>cs_kind-textedit AND freed = abap_false AND keys IS NOT INITIAL.
-      SPLIT ls_editor-keys AT `,` INTO TABLE DATA(lt_editor_key).
-      LOOP AT lt_editor_key INTO DATA(lv_editor_key).
+
+      SPLIT ls_editor-keys AT `,` INTO TABLE lt_editor_key.
+
+      LOOP AT lt_editor_key INTO lv_editor_key.
         INSERT lv_editor_key INTO TABLE lt_gui_key.
       ENDLOOP.
     ENDLOOP.
     SORT lt_gui_key.
     DELETE ADJACENT DUPLICATES FROM lt_gui_key.
-    LOOP AT lt_gui_key INTO DATA(lv_gui_key).
-      INSERT VALUE #( key   = lv_gui_key
-                      ucomm = COND #( WHEN lv_gui_key = `F1`
-                                      THEN z2ui5_cl_cgui_report=>cs_ucomm-gui_f1
-                                      ELSE z2ui5_cl_cgui_report=>cs_ucomm-gui_f4 ) ) INTO TABLE result.
+
+    LOOP AT lt_gui_key INTO lv_gui_key.
+
+      CLEAR temp37.
+      temp37-key = lv_gui_key.
+
+      IF lv_gui_key = `F1`.
+        temp1 = z2ui5_cl_cgui_report=>cs_ucomm-gui_f1.
+      ELSE.
+        temp1 = z2ui5_cl_cgui_report=>cs_ucomm-gui_f4.
+      ENDIF.
+      temp37-ucomm = temp1.
+      INSERT temp37 INTO TABLE result.
     ENDLOOP.
 
     " the command palette - with a command field or a catalog to search
     IF ctx-cmd_on = abap_true OR ctx-catalog IS BOUND.
-      INSERT VALUE #( key = `Ctrl+K` ucomm = z2ui5_cl_cgui_report=>cs_ucomm-palette ) INTO TABLE result.
-      INSERT VALUE #( key = `Meta+K` ucomm = z2ui5_cl_cgui_report=>cs_ucomm-palette ) INTO TABLE result.
+
+      CLEAR temp38.
+      temp38-key = `Ctrl+K`.
+      temp38-ucomm = z2ui5_cl_cgui_report=>cs_ucomm-palette.
+      INSERT temp38 INTO TABLE result.
+
+      CLEAR temp39.
+      temp39-key = `Meta+K`.
+      temp39-ucomm = z2ui5_cl_cgui_report=>cs_ucomm-palette.
+      INSERT temp39 INTO TABLE result.
     ENDIF.
 
     " the function keys of SET PF-STATUS, on the output only
     IF ctx-selection = abap_true.
       RETURN.
     ENDIF.
-    LOOP AT ctx-pf_keys INTO DATA(ls_key).
-      IF line_exists( ctx-excl_out[ table_line = to_upper( ls_key-ucomm ) ] ).
+
+    LOOP AT ctx-pf_keys INTO ls_key.
+
+      temp40 = to_upper( ls_key-ucomm ).
+
+      READ TABLE ctx-excl_out WITH KEY table_line = temp40 TRANSPORTING NO FIELDS.
+      temp2 = sy-subrc.
+      IF temp2 = 0.
         CONTINUE.
       ENDIF.
       INSERT ls_key INTO TABLE result.

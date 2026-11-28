@@ -81,9 +81,13 @@ CLASS z2ui5_cl_cgui_sample_06 IMPLEMENTATION.
 
   METHOD at_selection_screen_output.
 
-    DATA(lt_screen) = screen->loop_at_screen( ).
+    DATA lt_screen TYPE z2ui5_cl_cgui_selscreen=>ty_t_screen.
+    DATA ls_screen LIKE LINE OF lt_screen.
+          DATA temp1 TYPE xsdboolean.
+    lt_screen = screen->loop_at_screen( ).
 
-    LOOP AT lt_screen INTO DATA(ls_screen).
+
+    LOOP AT lt_screen INTO ls_screen.
       CASE ls_screen-group1.
         WHEN `DIS`.
           ls_screen-active = p_disp.
@@ -97,7 +101,9 @@ CLASS z2ui5_cl_cgui_sample_06 IMPLEMENTATION.
 
       CASE ls_screen-name.
         WHEN `P_PLANT`.
-          ls_screen-input = xsdbool( p_create = abap_false ).
+
+          temp1 = boolc( p_create = abap_false ).
+          ls_screen-input = temp1.
         WHEN `P_TOKEN`.
           ls_screen-invisible = abap_true.
       ENDCASE.
@@ -116,11 +122,16 @@ CLASS z2ui5_cl_cgui_sample_06 IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD at_selection_screen_on.
+        DATA temp1 TYPE string.
+        DATA lv_matnr LIKE temp1.
 
     CASE field.
       WHEN `P_MATNR`.
         " a string has no trailing blanks, which CN would count
-        DATA(lv_matnr) = CONV string( p_matnr ).
+
+        temp1 = p_matnr.
+
+        lv_matnr = temp1.
         IF lv_matnr CN `0123456789`.
           message( text = `Enter the material number with digits only`
                    type = `E` ).

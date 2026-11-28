@@ -59,6 +59,7 @@ CLASS z2ui5_cl_cgui_r2c_22 IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD start_of_selection.
+    DATA ls_seats LIKE LINE OF gt_seats.
 
     z2ui5_cl_cgui_frontend=>gui_upload( EXPORTING  filename            = p_file
                                                    filetype            = 'ASC'
@@ -75,7 +76,8 @@ CLASS z2ui5_cl_cgui_r2c_22 IMPLEMENTATION.
     list( )->new_line(
         )->write( 'Seats per airline' ).
     list( )->uline( ).
-    LOOP AT gt_seats INTO DATA(ls_seats).
+
+    LOOP AT gt_seats INTO ls_seats.
       list( )->new_line(
           )->write( ls_seats-carrid
           )->write( ls_seats-seats ).
@@ -110,6 +112,7 @@ CLASS z2ui5_cl_cgui_r2c_22 IMPLEMENTATION.
       lt_files  TYPE z2ui5_cl_cgui_frontend=>ty_t_file_table,
       lv_rc     TYPE i,
       lv_action TYPE i.
+      DATA ls_file TYPE z2ui5_cl_cgui_frontend=>ty_s_file_table.
 
     z2ui5_cl_cgui_frontend=>file_open_dialog(
       EXPORTING
@@ -122,7 +125,8 @@ CLASS z2ui5_cl_cgui_r2c_22 IMPLEMENTATION.
       EXCEPTIONS
         OTHERS       = 1 ).
     IF sy-subrc = 0 AND lv_action = z2ui5_cl_cgui_frontend=>action_ok AND lv_rc = 1.
-      READ TABLE lt_files INDEX 1 INTO DATA(ls_file).
+
+      READ TABLE lt_files INDEX 1 INTO ls_file.
       cv_file = ls_file-filename.
     ENDIF.
 
@@ -136,6 +140,7 @@ CLASS z2ui5_cl_cgui_r2c_22 IMPLEMENTATION.
       lv_path     TYPE string,
       lv_fullpath TYPE string,
       lv_action   TYPE i.
+    DATA temp1 LIKE LINE OF lt_out.
 
     z2ui5_cl_cgui_frontend=>file_save_dialog(
       EXPORTING
@@ -148,7 +153,9 @@ CLASS z2ui5_cl_cgui_r2c_22 IMPLEMENTATION.
     IF lv_action <> z2ui5_cl_cgui_frontend=>action_ok.
       RETURN.
     ENDIF.
-    APPEND |Total seats: { gv_total }| TO lt_out.
+
+    temp1 = |Total seats: { gv_total }|.
+    APPEND temp1 TO lt_out.
     z2ui5_cl_cgui_frontend=>gui_download(
       EXPORTING
         filename = lv_fullpath

@@ -29,14 +29,14 @@ CLASS z2ui5_cl_cgui_sample_08 DEFINITION PUBLIC
         seatsocc TYPE i,
         seatsmax TYPE i,
       END OF ty_s_flight.
-    TYPES ty_t_flight TYPE STANDARD TABLE OF ty_s_flight WITH EMPTY KEY.
+    TYPES ty_t_flight TYPE STANDARD TABLE OF ty_s_flight WITH DEFAULT KEY.
     " the fields of BAPIRET2 messages_from_bapiret( ) reads
     TYPES:
       BEGIN OF ty_s_return,
         type    TYPE c LENGTH 1,
         message TYPE c LENGTH 220,
       END OF ty_s_return.
-    TYPES ty_t_return TYPE STANDARD TABLE OF ty_s_return WITH EMPTY KEY.
+    TYPES ty_t_return TYPE STANDARD TABLE OF ty_s_return WITH DEFAULT KEY.
 
     DATA p_carrid TYPE c LENGTH 3.
     DATA s_fldate TYPE RANGE OF d.
@@ -77,15 +77,37 @@ ENDCLASS.
 CLASS z2ui5_cl_cgui_sample_08 IMPLEMENTATION.
 
   METHOD initialization.
+    DATA temp5 TYPE z2ui5_cl_cgui_selscreen=>ty_t_value.
+    DATA temp6 LIKE LINE OF temp5.
+    DATA temp7 LIKE s_fldate.
+    DATA temp8 LIKE LINE OF temp7.
 
     set_title( `abap-cloud-gui - Flight Cockpit` ).
+
+    CLEAR temp5.
+
+    temp6-key = `Y`.
+    temp6-text = `Economy`.
+    INSERT temp6 INTO TABLE temp5.
+    temp6-key = `C`.
+    temp6-text = `Business`.
+    INSERT temp6 INTO TABLE temp5.
+    temp6-key = `F`.
+    temp6-text = `First`.
+    INSERT temp6 INTO TABLE temp5.
     vrm_set_values(
  name   = `P_CLASS`
-                    values = VALUE #( ( key = `Y` text = `Economy` )
-                                      ( key = `C` text = `Business` )
-                                      ( key = `F` text = `First` ) ) ).
+                    values = temp5 ).
     p_class = `Y`.
-    s_fldate = VALUE #( ( sign = `I` option = `BT` low = `20260101` high = `20260630` ) ).
+
+    CLEAR temp7.
+
+    temp8-sign = `I`.
+    temp8-option = `BT`.
+    temp8-low = `20260101`.
+    temp8-high = `20260630`.
+    INSERT temp8 INTO TABLE temp7.
+    s_fldate = temp7.
     mock_data( ).
 
   ENDMETHOD.
@@ -164,9 +186,13 @@ CLASS z2ui5_cl_cgui_sample_08 IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD start_of_selection.
+    DATA ls_flight LIKE LINE OF mt_flight.
+      DATA temp9 TYPE z2ui5_cl_cgui_sample_08=>ty_s_flight-status.
+    DATA temp10 TYPE string.
 
     CLEAR mt_result.
-    LOOP AT mt_flight INTO DATA(ls_flight).
+
+    LOOP AT mt_flight INTO ls_flight.
       IF z2ui5_cl_cgui_context=>range_check( val   = ls_flight-fldate
                                              range = s_fldate ) = abap_false
           OR z2ui5_cl_cgui_context=>range_check( val   = ls_flight-connid
@@ -175,9 +201,15 @@ CLASS z2ui5_cl_cgui_sample_08 IMPLEMENTATION.
           OR ( p_full = abap_true AND ls_flight-seatsocc < ls_flight-seatsmax ).
         CONTINUE.
       ENDIF.
-      ls_flight-status = COND #( WHEN ls_flight-seatsocc >= ls_flight-seatsmax THEN `sap-icon://status-negative`
-                                 WHEN ls_flight-seatsocc * 10 >= ls_flight-seatsmax * 8 THEN `sap-icon://status-critical`
-                                 ELSE `sap-icon://status-positive` ).
+
+      IF ls_flight-seatsocc >= ls_flight-seatsmax.
+        temp9 = `sap-icon://status-negative`.
+      ELSEIF ls_flight-seatsocc * 10 >= ls_flight-seatsmax * 8.
+        temp9 = `sap-icon://status-critical`.
+      ELSE.
+        temp9 = `sap-icon://status-positive`.
+      ENDIF.
+      ls_flight-status = temp9.
       INSERT ls_flight INTO TABLE mt_result.
     ENDLOOP.
 
@@ -185,8 +217,14 @@ CLASS z2ui5_cl_cgui_sample_08 IMPLEMENTATION.
       RETURN.
     ENDIF.
 
+
+    IF p_note IS NOT INITIAL.
+      temp10 = |Flights - { p_note }|.
+    ELSE.
+      temp10 = `Flights`.
+    ENDIF.
     alv( mt_result
-        )->set_title( COND #( WHEN p_note IS NOT INITIAL THEN |Flights - { p_note }| ELSE `Flights` )
+        )->set_title( temp10
         )->set_selection_mode(
         )->add_function( name = `BOOK`
                          text = `Book`
@@ -223,13 +261,16 @@ CLASS z2ui5_cl_cgui_sample_08 IMPLEMENTATION.
   METHOD at_link_click.
 
     " a click on the airline - a secondary list of its flights
-    READ TABLE mt_result INTO DATA(ls_clicked) INDEX row.
+    DATA ls_clicked TYPE z2ui5_cl_cgui_sample_08=>ty_s_flight.
+    DATA ls_flight LIKE LINE OF mt_result.
+    READ TABLE mt_result INTO ls_clicked INDEX row.
     IF sy-subrc <> 0.
       RETURN.
     ENDIF.
     p_carrid = ls_clicked-carrid.
 
-    LOOP AT mt_result INTO DATA(ls_flight) WHERE carrid = ls_clicked-carrid.
+
+    LOOP AT mt_result INTO ls_flight WHERE carrid = ls_clicked-carrid.
       write( val = ls_flight-connid pos = 1  len = 6
           )->write( val = ls_flight-fldate pos = 8  len = 12
           )->write( val = |{ ls_flight-seatsocc } / { ls_flight-seatsmax }| pos = 22 len = 12
@@ -241,31 +282,75 @@ CLASS z2ui5_cl_cgui_sample_08 IMPLEMENTATION.
   METHOD at_user_command.
 
     DATA lt_values TYPE z2ui5_cl_cgui_variant=>ty_t_value.
+        DATA lt_rows TYPE z2ui5_cl_cgui_alv=>ty_t_row.
+        DATA lv_row LIKE LINE OF lt_rows.
+          FIELD-SYMBOLS <temp11> LIKE LINE OF mt_result.
+          DATA temp12 LIKE sy-tabix.
+        DATA temp13 TYPE string_table.
+            DATA temp15 TYPE z2ui5_cl_cgui_popup=>ty_t_field.
+            DATA temp16 LIKE LINE OF temp15.
+        DATA lt_fields TYPE z2ui5_cl_cgui_popup=>ty_t_field.
+        DATA temp17 TYPE ty_t_return.
+        DATA temp18 LIKE LINE OF temp17.
+        FIELD-SYMBOLS <temp1> LIKE LINE OF lt_fields.
+        DATA temp2 LIKE sy-tabix.
+          DATA temp19 TYPE z2ui5_cl_cgui_variant=>ty_t_value.
+          DATA temp20 LIKE LINE OF temp19.
 
     CASE ucomm.
 
       WHEN `BOOK`.
-        DATA(lt_rows) = get_selected_rows( ).
+
+        lt_rows = get_selected_rows( ).
         IF lt_rows IS INITIAL.
           message( text = `Select the flights to book first`
                    type = `W` ).
           RETURN.
         ENDIF.
         CLEAR mt_booked.
-        LOOP AT lt_rows INTO DATA(lv_row).
-          INSERT mt_result[ lv_row ] INTO TABLE mt_booked.
+
+        LOOP AT lt_rows INTO lv_row.
+
+
+          temp12 = sy-tabix.
+          READ TABLE mt_result INDEX lv_row ASSIGNING <temp11>.
+          sy-tabix = temp12.
+          IF sy-subrc <> 0.
+            ASSERT 1 = 0.
+          ENDIF.
+          INSERT <temp11> INTO TABLE mt_booked.
         ENDLOOP.
+
+        CLEAR temp13.
+        INSERT `Book now` INTO TABLE temp13.
+        INSERT `Waiting list` INTO TABLE temp13.
         popup_to_decide( question = |Book { lines( mt_booked ) } flights?|
-                         options  = VALUE #( ( `Book now` ) ( `Waiting list` ) )
+                         options  = temp13
                          ucomm    = `BOOK_DECIDED`
                          title    = `Booking` ).
 
       WHEN `BOOK_DECIDED`.
         CASE popup_answer( ).
           WHEN `1`.
-            popup_get_values( fields = VALUE #( ( name = `NAME` text = `Passenger` required = abap_true )
-                                                ( name = `DATE` text = `Date of birth` kind = z2ui5_cl_cgui_popup=>cs_kind-date )
-                                                ( name = `MAIL` text = `Confirmation by mail` kind = z2ui5_cl_cgui_popup=>cs_kind-checkbox ) )
+
+            CLEAR temp15.
+
+            CLEAR temp16.
+            temp16-name = `NAME`.
+            temp16-text = `Passenger`.
+            temp16-required = abap_true.
+            INSERT temp16 INTO TABLE temp15.
+            CLEAR temp16.
+            temp16-name = `DATE`.
+            temp16-text = `Date of birth`.
+            temp16-kind = z2ui5_cl_cgui_popup=>cs_kind-date.
+            INSERT temp16 INTO TABLE temp15.
+            CLEAR temp16.
+            temp16-name = `MAIL`.
+            temp16-text = `Confirmation by mail`.
+            temp16-kind = z2ui5_cl_cgui_popup=>cs_kind-checkbox.
+            INSERT temp16 INTO TABLE temp15.
+            popup_get_values( fields = temp15
                               ucomm  = `BOOK_VALUES`
                               title  = `Passenger` ).
           WHEN `2`.
@@ -276,14 +361,28 @@ CLASS z2ui5_cl_cgui_sample_08 IMPLEMENTATION.
         ENDCASE.
 
       WHEN `BOOK_VALUES`.
-        DATA(lt_fields) = popup_values( ).
+
+        lt_fields = popup_values( ).
         IF popup_answer( ) = z2ui5_cl_cgui_popup=>cs_answer-cancel OR lt_fields IS INITIAL.
           RETURN.
         ENDIF.
         " the result as a BAPI returns it - one line of BAPIRET2
-        messages_from_bapiret( VALUE ty_t_return( ( type    = `I`
-                                                    message = |{ lines( mt_booked ) } flights booked for | &&
-                                                              |{ lt_fields[ name = `NAME` ]-value }| ) ) ).
+
+        CLEAR temp17.
+
+        temp18-type = `I`.
+
+
+        temp2 = sy-tabix.
+        READ TABLE lt_fields WITH KEY name = `NAME` ASSIGNING <temp1>.
+        sy-tabix = temp2.
+        IF sy-subrc <> 0.
+          ASSERT 1 = 0.
+        ENDIF.
+        temp18-message = |{ lines( mt_booked ) } flights booked for | &&
+|{ <temp1>-value }|.
+        INSERT temp18 INTO TABLE temp17.
+        messages_from_bapiret( temp17 ).
 
       WHEN `BOOK_POPUP`.
         call_selection_screen( dynnr = `0100`
@@ -292,7 +391,14 @@ CLASS z2ui5_cl_cgui_sample_08 IMPLEMENTATION.
       WHEN `REPORT`.
         " SUBMIT z2ui5_cl_cgui_sample_05 WITH p_carrid = ... AND RETURN
         IF p_carrid IS NOT INITIAL.
-          lt_values = VALUE #( ( name = `P_CARRID` kind = z2ui5_cl_cgui_variant=>cs_kind-parameter low = p_carrid ) ).
+
+          CLEAR temp19.
+
+          temp20-name = `P_CARRID`.
+          temp20-kind = z2ui5_cl_cgui_variant=>cs_kind-parameter.
+          temp20-low = p_carrid.
+          INSERT temp20 INTO TABLE temp19.
+          lt_values = temp19.
         ENDIF.
         submit( report = sample_05( )
                 values = lt_values ).
@@ -303,22 +409,84 @@ CLASS z2ui5_cl_cgui_sample_08 IMPLEMENTATION.
 
   METHOD mock_data.
 
-    mt_flight = VALUE #(
-        ( carrid = `LH` connid = `0400` fldate = `20260115` price = `666.00`  currency = `EUR` seatsocc = 120 seatsmax = 280 )
-        ( carrid = `LH` connid = `0400` fldate = `20260215` price = `666.00`  currency = `EUR` seatsocc = 270 seatsmax = 280 )
-        ( carrid = `LH` connid = `0402` fldate = `20260310` price = `720.50`  currency = `EUR` seatsocc = 280 seatsmax = 280 )
-        ( carrid = `AA` connid = `0017` fldate = `20260120` price = `422.94`  currency = `USD` seatsocc = 300 seatsmax = 385 )
-        ( carrid = `AA` connid = `0064` fldate = `20260412` price = `422.94`  currency = `USD` seatsocc = 385 seatsmax = 385 )
-        ( carrid = `UA` connid = `0941` fldate = `20260505` price = `879.82`  currency = `USD` seatsocc = 150 seatsmax = 330 )
-        ( carrid = `JL` connid = `0407` fldate = `20260221` price = `106136`  currency = `JPY` seatsocc = 90  seatsmax = 320 )
-        ( carrid = `SQ` connid = `0002` fldate = `20260601` price = `1016.00` currency = `SGD` seatsocc = 320 seatsmax = 400 ) ).
+    DATA temp21 TYPE z2ui5_cl_cgui_sample_08=>ty_t_flight.
+    DATA temp22 LIKE LINE OF temp21.
+    CLEAR temp21.
+
+    temp22-carrid = `LH`.
+    temp22-connid = `0400`.
+    temp22-fldate = `20260115`.
+    temp22-price = `666.00`.
+    temp22-currency = `EUR`.
+    temp22-seatsocc = 120.
+    temp22-seatsmax = 280.
+    INSERT temp22 INTO TABLE temp21.
+    temp22-carrid = `LH`.
+    temp22-connid = `0400`.
+    temp22-fldate = `20260215`.
+    temp22-price = `666.00`.
+    temp22-currency = `EUR`.
+    temp22-seatsocc = 270.
+    temp22-seatsmax = 280.
+    INSERT temp22 INTO TABLE temp21.
+    temp22-carrid = `LH`.
+    temp22-connid = `0402`.
+    temp22-fldate = `20260310`.
+    temp22-price = `720.50`.
+    temp22-currency = `EUR`.
+    temp22-seatsocc = 280.
+    temp22-seatsmax = 280.
+    INSERT temp22 INTO TABLE temp21.
+    temp22-carrid = `AA`.
+    temp22-connid = `0017`.
+    temp22-fldate = `20260120`.
+    temp22-price = `422.94`.
+    temp22-currency = `USD`.
+    temp22-seatsocc = 300.
+    temp22-seatsmax = 385.
+    INSERT temp22 INTO TABLE temp21.
+    temp22-carrid = `AA`.
+    temp22-connid = `0064`.
+    temp22-fldate = `20260412`.
+    temp22-price = `422.94`.
+    temp22-currency = `USD`.
+    temp22-seatsocc = 385.
+    temp22-seatsmax = 385.
+    INSERT temp22 INTO TABLE temp21.
+    temp22-carrid = `UA`.
+    temp22-connid = `0941`.
+    temp22-fldate = `20260505`.
+    temp22-price = `879.82`.
+    temp22-currency = `USD`.
+    temp22-seatsocc = 150.
+    temp22-seatsmax = 330.
+    INSERT temp22 INTO TABLE temp21.
+    temp22-carrid = `JL`.
+    temp22-connid = `0407`.
+    temp22-fldate = `20260221`.
+    temp22-price = `106136`.
+    temp22-currency = `JPY`.
+    temp22-seatsocc = 90.
+    temp22-seatsmax = 320.
+    INSERT temp22 INTO TABLE temp21.
+    temp22-carrid = `SQ`.
+    temp22-connid = `0002`.
+    temp22-fldate = `20260601`.
+    temp22-price = `1016.00`.
+    temp22-currency = `SGD`.
+    temp22-seatsocc = 320.
+    temp22-seatsmax = 400.
+    INSERT temp22 INTO TABLE temp21.
+    mt_flight = temp21.
 
   ENDMETHOD.
 
   METHOD sample_05.
 
     DATA lo_report TYPE REF TO z2ui5_cl_cgui_sample_05.
-    result = CAST cl_abap_refdescr( cl_abap_typedescr=>describe_by_data( lo_report ) )->get_referenced_type( )->get_relative_name( ).
+    DATA temp23 TYPE REF TO cl_abap_refdescr.
+    temp23 ?= cl_abap_typedescr=>describe_by_data( lo_report ).
+    result = temp23->get_referenced_type( )->get_relative_name( ).
 
   ENDMETHOD.
 

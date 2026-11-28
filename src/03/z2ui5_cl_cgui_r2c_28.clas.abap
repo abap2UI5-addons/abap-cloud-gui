@@ -50,17 +50,38 @@ CLASS z2ui5_cl_cgui_r2c_28 IMPLEMENTATION.
 
   METHOD start_of_selection.
 
-    DATA(lt_item) = VALUE ty_t_item( ( name = 'Coffee' price = '2.50' )
-                                     ( name = 'Tea'    price = '1.80' )
-                                     ( name = 'Cake'   price = '3.20' ) ).
+    DATA temp1 TYPE ty_t_item.
+    DATA temp2 LIKE LINE OF temp1.
+    DATA lt_item LIKE temp1.
+    DATA lv_rows TYPE string.
+    DATA ls_item LIKE LINE OF lt_item.
+      DATA lv_net TYPE p LENGTH 8 DECIMALS 0.
+    DATA lv_html TYPE string.
+    CLEAR temp1.
 
-    DATA(lv_rows) = ``.
-    LOOP AT lt_item INTO DATA(ls_item).
-      DATA(lv_net) = ls_item-price * ( 100 - p_disc ) / 100.
+    temp2-name = 'Coffee'.
+    temp2-price = '2.50'.
+    INSERT temp2 INTO TABLE temp1.
+    temp2-name = 'Tea'.
+    temp2-price = '1.80'.
+    INSERT temp2 INTO TABLE temp1.
+    temp2-name = 'Cake'.
+    temp2-price = '3.20'.
+    INSERT temp2 INTO TABLE temp1.
+
+    lt_item = temp1.
+
+
+    lv_rows = ``.
+
+    LOOP AT lt_item INTO ls_item.
+
+      lv_net = ls_item-price * ( 100 - p_disc ) / 100.
       lv_rows = lv_rows && |<tr><td>{ ls_item-name }</td><td>{ ls_item-price }</td><td>{ lv_net }</td></tr>|.
     ENDLOOP.
 
-    DATA(lv_html) = |<html><body><h2>{ p_title }</h2>| &&
+
+    lv_html = |<html><body><h2>{ p_title }</h2>| &&
                     |<p>{ p_disc } % off for members</p>| &&
                     |<table><tr><th>Item</th><th>Price</th><th>Members</th></tr>{ lv_rows }</table>| &&
                     |</body></html>|.

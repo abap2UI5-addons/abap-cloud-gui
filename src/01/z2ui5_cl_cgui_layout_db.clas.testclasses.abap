@@ -51,8 +51,12 @@ CLASS ltcl_test IMPLEMENTATION.
 
   METHOD delete_test_rows.
 
-    DATA(lv_report) = CONV z2ui5_t_18-report( cv_report ).
-    DELETE FROM z2ui5_t_18 WHERE report = @lv_report.
+    DATA temp1 TYPE z2ui5_t_18-report.
+    DATA lv_report LIKE temp1.
+    temp1 = cv_report.
+
+    lv_report = temp1.
+    DELETE FROM z2ui5_t_18 WHERE report = lv_report.
     " the store commits its writes, so the cleanup commits too
     COMMIT WORK.
 
@@ -60,16 +64,38 @@ CLASS ltcl_test IMPLEMENTATION.
 
   METHOD layout.
 
-    result = VALUE #( ( name = `CARRID` text = `Airline` hidden = abap_false position = 2 sort = z2ui5_cl_cgui_alv=>cs_sort-ascending
-                        sort_seq = 1 sum = abap_false subtotal = abap_true numeric = abap_false )
-                      ( name = `PRICE` text = `Price` hidden = abap_true position = 1 sort = ``
-                        sort_seq = 0 sum = abap_true subtotal = abap_false numeric = abap_true ) ).
+    DATA temp2 TYPE z2ui5_cl_cgui_alv=>ty_t_layout.
+    DATA temp3 LIKE LINE OF temp2.
+    CLEAR temp2.
+
+    temp3-name = `CARRID`.
+    temp3-text = `Airline`.
+    temp3-hidden = abap_false.
+    temp3-position = 2.
+    temp3-sort = z2ui5_cl_cgui_alv=>cs_sort-ascending.
+    temp3-sort_seq = 1.
+    temp3-sum = abap_false.
+    temp3-subtotal = abap_true.
+    temp3-numeric = abap_false.
+    INSERT temp3 INTO TABLE temp2.
+    temp3-name = `PRICE`.
+    temp3-text = `Price`.
+    temp3-hidden = abap_true.
+    temp3-position = 1.
+    temp3-sort = ``.
+    temp3-sort_seq = 0.
+    temp3-sum = abap_true.
+    temp3-subtotal = abap_false.
+    temp3-numeric = abap_true.
+    INSERT temp3 INTO TABLE temp2.
+    result = temp2.
 
   ENDMETHOD.
 
   METHOD other_user.
 
     DATA ls_db TYPE z2ui5_t_18.
+    DATA lt_layout TYPE z2ui5_cl_cgui_alv=>ty_t_layout.
 
     ls_db-report    = cv_report.
     ls_db-handle    = cv_handle.
@@ -78,28 +104,51 @@ CLASS ltcl_test IMPLEMENTATION.
     ls_db-shared    = is_shared.
     ls_db-protected = is_protected.
     ls_db-is_default = abap_true.
-    DATA(lt_layout) = layout( ).
+
+    lt_layout = layout( ).
     CALL TRANSFORMATION id SOURCE layout = lt_layout
                            RESULT XML ls_db-data.
-    MODIFY z2ui5_t_18 FROM @ls_db.
+    MODIFY z2ui5_t_18 FROM ls_db.
 
   ENDMETHOD.
 
   METHOD save_load_delete.
 
+    DATA temp4 TYPE z2ui5_cl_cgui_layout=>ty_s_saved.
+    DATA lt_saved TYPE z2ui5_cl_cgui_layout=>ty_t_saved.
+    DATA ls_saved LIKE LINE OF lt_saved.
+    FIELD-SYMBOLS <temp1> LIKE LINE OF lt_saved.
+    DATA temp2 LIKE sy-tabix.
+    DATA temp5 TYPE string.
+    CLEAR temp4.
+    temp4-name = `MINE`.
+    temp4-layout = layout( ).
+    temp4-shared = abap_true.
     mo_store->save( report = cv_report
                     handle = cv_handle
-                    layout = VALUE #( name = `MINE` layout = layout( ) shared = abap_true ) ).
+                    layout = temp4 ).
 
-    DATA(lt_saved) = mo_store->load( report = cv_report
+
+    lt_saved = mo_store->load( report = cv_report
                                      handle = cv_handle ).
     cl_abap_unit_assert=>assert_equals( act = lines( lt_saved )
                                         exp = 1 ).
-    DATA(ls_saved) = lt_saved[ 1 ].
+
+
+
+    temp2 = sy-tabix.
+    READ TABLE lt_saved INDEX 1 ASSIGNING <temp1>.
+    sy-tabix = temp2.
+    IF sy-subrc <> 0.
+      ASSERT 1 = 0.
+    ENDIF.
+    ls_saved = <temp1>.
     cl_abap_unit_assert=>assert_equals( act = ls_saved-name
                                         exp = `MINE` ).
+
+    temp5 = sy-uname.
     cl_abap_unit_assert=>assert_equals( act = ls_saved-owner
-                                        exp = CONV string( sy-uname ) ).
+                                        exp = temp5 ).
     cl_abap_unit_assert=>assert_true( ls_saved-shared ).
     " the columns as they were saved
     cl_abap_unit_assert=>assert_equals( act = ls_saved-layout
@@ -116,21 +165,68 @@ CLASS ltcl_test IMPLEMENTATION.
 
   METHOD one_default_per_user.
 
+    DATA temp6 TYPE z2ui5_cl_cgui_layout=>ty_s_saved.
+    DATA temp7 TYPE z2ui5_cl_cgui_layout=>ty_s_saved.
+    DATA lt_saved TYPE z2ui5_cl_cgui_layout=>ty_t_saved.
+    FIELD-SYMBOLS <temp8> LIKE LINE OF lt_saved.
+    DATA temp9 LIKE sy-tabix.
+    FIELD-SYMBOLS <temp10> LIKE LINE OF lt_saved.
+    DATA temp11 LIKE sy-tabix.
+    CLEAR temp6.
+    temp6-name = `FIRST`.
+    temp6-layout = layout( ).
+    temp6-is_default = abap_true.
     mo_store->save( report = cv_report
                     handle = cv_handle
-                    layout = VALUE #( name = `FIRST` layout = layout( ) is_default = abap_true ) ).
-    mo_store->save( report = cv_report
-                    handle = cv_handle
-                    layout = VALUE #( name = `SECOND` layout = layout( ) is_default = abap_true ) ).
+                    layout = temp6 ).
 
-    DATA(lt_saved) = mo_store->load( report = cv_report
+    CLEAR temp7.
+    temp7-name = `SECOND`.
+    temp7-layout = layout( ).
+    temp7-is_default = abap_true.
+    mo_store->save( report = cv_report
+                    handle = cv_handle
+                    layout = temp7 ).
+
+
+    lt_saved = mo_store->load( report = cv_report
                                      handle = cv_handle ).
-    cl_abap_unit_assert=>assert_false( lt_saved[ name = `FIRST` ]-is_default ).
-    cl_abap_unit_assert=>assert_true( lt_saved[ name = `SECOND` ]-is_default ).
+
+
+    temp9 = sy-tabix.
+    READ TABLE lt_saved WITH KEY name = `FIRST` ASSIGNING <temp8>.
+    sy-tabix = temp9.
+    IF sy-subrc <> 0.
+      ASSERT 1 = 0.
+    ENDIF.
+    cl_abap_unit_assert=>assert_false( <temp8>-is_default ).
+
+
+    temp11 = sy-tabix.
+    READ TABLE lt_saved WITH KEY name = `SECOND` ASSIGNING <temp10>.
+    sy-tabix = temp11.
+    IF sy-subrc <> 0.
+      ASSERT 1 = 0.
+    ENDIF.
+    cl_abap_unit_assert=>assert_true( <temp10>-is_default ).
 
   ENDMETHOD.
 
   METHOD other_users_layouts.
+    DATA lt_saved TYPE z2ui5_cl_cgui_layout=>ty_t_saved.
+    FIELD-SYMBOLS <temp12> LIKE LINE OF lt_saved.
+    DATA temp13 LIKE sy-tabix.
+    FIELD-SYMBOLS <temp14> LIKE LINE OF lt_saved.
+    DATA temp15 LIKE sy-tabix.
+        DATA temp16 TYPE z2ui5_cl_cgui_layout=>ty_s_saved.
+        DATA temp17 TYPE z2ui5_cl_cgui_layout=>ty_s_saved.
+    DATA temp18 TYPE z2ui5_t_18-report.
+    DATA lv_report LIKE temp18.
+    DATA temp19 TYPE z2ui5_t_18-handle.
+    DATA lv_handle LIKE temp19.
+    DATA temp20 TYPE z2ui5_t_18-layout.
+    DATA lv_private LIKE temp20.
+    DATA lv_owner TYPE z2ui5_t_18-owner.
 
     other_user( name         = `THEIRS`
                 is_shared    = abap_true
@@ -140,19 +236,40 @@ CLASS ltcl_test IMPLEMENTATION.
                 is_protected = abap_false ).
 
     " the shared one only - and its default is its owner's
-    DATA(lt_saved) = mo_store->load( report = cv_report
+
+    lt_saved = mo_store->load( report = cv_report
                                      handle = cv_handle ).
     cl_abap_unit_assert=>assert_equals( act = lines( lt_saved )
                                         exp = 1 ).
-    cl_abap_unit_assert=>assert_equals( act = lt_saved[ 1 ]-name
+
+
+    temp13 = sy-tabix.
+    READ TABLE lt_saved INDEX 1 ASSIGNING <temp12>.
+    sy-tabix = temp13.
+    IF sy-subrc <> 0.
+      ASSERT 1 = 0.
+    ENDIF.
+    cl_abap_unit_assert=>assert_equals( act = <temp12>-name
                                         exp = `THEIRS` ).
-    cl_abap_unit_assert=>assert_false( lt_saved[ 1 ]-is_default ).
+
+
+    temp15 = sy-tabix.
+    READ TABLE lt_saved INDEX 1 ASSIGNING <temp14>.
+    sy-tabix = temp15.
+    IF sy-subrc <> 0.
+      ASSERT 1 = 0.
+    ENDIF.
+    cl_abap_unit_assert=>assert_false( <temp14>-is_default ).
 
     " protected - neither changed nor deleted by another user
     TRY.
+
+        CLEAR temp16.
+        temp16-name = `THEIRS`.
+        temp16-layout = layout( ).
         mo_store->save( report = cv_report
                         handle = cv_handle
-                        layout = VALUE #( name = `THEIRS` layout = layout( ) ) ).
+                        layout = temp16 ).
         cl_abap_unit_assert=>fail( `a protected layout of another user was changed` ).
       CATCH z2ui5_cx_cgui_error ##NO_HANDLER.
         " refused, as it should be
@@ -168,9 +285,13 @@ CLASS ltcl_test IMPLEMENTATION.
 
     " private - not saved over: it was lost, and the new one went to its owner
     TRY.
+
+        CLEAR temp17.
+        temp17-name = `PRIVATE`.
+        temp17-layout = layout( ).
         mo_store->save( report = cv_report
                         handle = cv_handle
-                        layout = VALUE #( name = `PRIVATE` layout = layout( ) ) ).
+                        layout = temp17 ).
         cl_abap_unit_assert=>fail( `a private layout of another user was saved over` ).
       CATCH z2ui5_cx_cgui_error ##NO_HANDLER.
         " refused, as it should be
@@ -182,12 +303,22 @@ CLASS ltcl_test IMPLEMENTATION.
       CATCH z2ui5_cx_cgui_error ##NO_HANDLER.
         " refused is fine as well - the row must stay either way
     ENDTRY.
-    DATA(lv_report) = CONV z2ui5_t_18-report( cv_report ).
-    DATA(lv_handle) = CONV z2ui5_t_18-handle( cv_handle ).
-    DATA(lv_private) = CONV z2ui5_t_18-layout( `PRIVATE` ).
-    SELECT SINGLE owner FROM z2ui5_t_18
-      WHERE report = @lv_report AND handle = @lv_handle AND layout = @lv_private
-      INTO @DATA(lv_owner).
+
+    temp18 = cv_report.
+
+    lv_report = temp18.
+
+    temp19 = cv_handle.
+
+    lv_handle = temp19.
+
+    temp20 = `PRIVATE`.
+
+    lv_private = temp20.
+
+    SELECT SINGLE owner FROM z2ui5_t_18 INTO lv_owner
+      WHERE report = lv_report AND handle = lv_handle AND layout = lv_private
+      .
     cl_abap_unit_assert=>assert_subrc( exp = 0 ).
     cl_abap_unit_assert=>assert_equals( act = lv_owner
                                         exp = `ZZ_OTHER` ).
@@ -196,9 +327,13 @@ CLASS ltcl_test IMPLEMENTATION.
 
   METHOD handles_apart.
 
+    DATA temp21 TYPE z2ui5_cl_cgui_layout=>ty_s_saved.
+    CLEAR temp21.
+    temp21-name = `MINE`.
+    temp21-layout = layout( ).
     mo_store->save( report = cv_report
                     handle = cv_handle
-                    layout = VALUE #( name = `MINE` layout = layout( ) ) ).
+                    layout = temp21 ).
 
     cl_abap_unit_assert=>assert_initial( mo_store->load( report = cv_report
                                                          handle = `MT_OTHER` ) ).

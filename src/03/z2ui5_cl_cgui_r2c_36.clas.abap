@@ -63,11 +63,31 @@ CLASS z2ui5_cl_cgui_r2c_36 IMPLEMENTATION.
 
   METHOD start_of_selection.
 
-    gt_product = VALUE #( ( name = 'LAMP'  group = 'HOME' price = 45 )
-                          ( name = 'CHAIR' group = 'HOME' price = 120 )
-                          ( name = 'LAMP'  group = 'HOME' price = 45 )
-                          ( name = 'BIKE'  group = 'OUT'  price = 640 )
-                          ( name = 'TENT'  group = 'OUT'  price = 210 ) ).
+    DATA temp1 LIKE gt_product.
+    DATA temp2 LIKE LINE OF temp1.
+    CLEAR temp1.
+
+    temp2-name = 'LAMP'.
+    temp2-group = 'HOME'.
+    temp2-price = 45.
+    INSERT temp2 INTO TABLE temp1.
+    temp2-name = 'CHAIR'.
+    temp2-group = 'HOME'.
+    temp2-price = 120.
+    INSERT temp2 INTO TABLE temp1.
+    temp2-name = 'LAMP'.
+    temp2-group = 'HOME'.
+    temp2-price = 45.
+    INSERT temp2 INTO TABLE temp1.
+    temp2-name = 'BIKE'.
+    temp2-group = 'OUT'.
+    temp2-price = 640.
+    INSERT temp2 INTO TABLE temp1.
+    temp2-name = 'TENT'.
+    temp2-group = 'OUT'.
+    temp2-price = 210.
+    INSERT temp2 INTO TABLE temp1.
+    gt_product = temp1.
 
     DELETE gt_product WHERE NOT ( name IN s_name AND price IN s_price ).
     SORT gt_product BY group name.

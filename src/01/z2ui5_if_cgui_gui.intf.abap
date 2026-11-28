@@ -27,7 +27,7 @@ INTERFACE z2ui5_if_cgui_gui PUBLIC.
       input TYPE abap_bool,
       width TYPE i,
     END OF ty_s_tc_column,
-    ty_t_tc_column TYPE STANDARD TABLE OF ty_s_tc_column WITH EMPTY KEY.
+    ty_t_tc_column TYPE STANDARD TABLE OF ty_s_tc_column WITH DEFAULT KEY.
 
   TYPES:
     "! GET CURSOR - the field of a WRITE clicked, its value, line and offset
@@ -49,7 +49,7 @@ INTERFACE z2ui5_if_cgui_gui PUBLIC.
       disabled TYPE abap_bool,
       checked  TYPE abap_bool,
     END OF ty_s_button,
-    ty_t_button TYPE STANDARD TABLE OF ty_s_button WITH EMPTY KEY.
+    ty_t_button TYPE STANDARD TABLE OF ty_s_button WITH DEFAULT KEY.
 
   TYPES:
     "! one control: a container (custom, docking, splitter - name is the
@@ -89,7 +89,7 @@ INTERFACE z2ui5_if_cgui_gui PUBLIC.
       sel_from  TYPE i,
       sel_to    TYPE i,
     END OF ty_s_control,
-    ty_t_control TYPE STANDARD TABLE OF ty_s_control WITH EMPTY KEY,
+    ty_t_control TYPE STANDARD TABLE OF ty_s_control WITH DEFAULT KEY,
     "! SET HANDLER: the method of handler (or of the class, a static one)
     "! the control id calls for its event
     BEGIN OF ty_s_handler,
@@ -99,7 +99,7 @@ INTERFACE z2ui5_if_cgui_gui PUBLIC.
       class   TYPE string,
       method  TYPE string,
     END OF ty_s_handler,
-    ty_t_handler TYPE STANDARD TABLE OF ty_s_handler WITH EMPTY KEY,
+    ty_t_handler TYPE STANDARD TABLE OF ty_s_handler WITH DEFAULT KEY,
     "! a grid: copies of its field catalog, layout, sort, and the functions
     "! of its toolbar - its table is the one of the ALV
     BEGIN OF ty_s_grid,
@@ -111,7 +111,7 @@ INTERFACE z2ui5_if_cgui_gui PUBLIC.
       "! whether the grid is the one the ALV shows
       shown     TYPE abap_bool,
     END OF ty_s_grid,
-    ty_t_grid TYPE STANDARD TABLE OF ty_s_grid WITH EMPTY KEY.
+    ty_t_grid TYPE STANDARD TABLE OF ty_s_grid WITH DEFAULT KEY.
 
   "! a new control - its id; object is the control (z2ui5_cl_cgui_gui), to
   "! which the report passes the events of the browser

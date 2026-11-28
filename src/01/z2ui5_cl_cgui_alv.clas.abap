@@ -165,7 +165,7 @@ CLASS z2ui5_cl_cgui_alv DEFINITION PUBLIC FINAL CREATE PUBLIC.
         key  TYPE string,
         text TYPE string,
       END OF ty_s_value.
-    TYPES ty_t_value TYPE STANDARD TABLE OF ty_s_value WITH EMPTY KEY.
+    TYPES ty_t_value TYPE STANDARD TABLE OF ty_s_value WITH DEFAULT KEY.
 
     " the aggregate of column over the rows - of the rows of one currency
     " or unit (unit) where the column has one: amounts of different
@@ -178,7 +178,7 @@ CLASS z2ui5_cl_cgui_alv DEFINITION PUBLIC FINAL CREATE PUBLIC.
         value       TYPE decfloat34,
         unit        TYPE string,
       END OF ty_s_aggregate.
-    TYPES ty_t_aggregate TYPE STANDARD TABLE OF ty_s_aggregate WITH EMPTY KEY.
+    TYPES ty_t_aggregate TYPE STANDARD TABLE OF ty_s_aggregate WITH DEFAULT KEY.
 
     " a filter of the grid: the column and the lines of its multiple
     " selection - sign, option, low, high as text
@@ -187,10 +187,10 @@ CLASS z2ui5_cl_cgui_alv DEFINITION PUBLIC FINAL CREATE PUBLIC.
         name TYPE string,
         rows TYPE z2ui5_cl_cgui_range=>ty_t_row,
       END OF ty_s_filter.
-    TYPES ty_t_filter TYPE STANDARD TABLE OF ty_s_filter WITH EMPTY KEY.
+    TYPES ty_t_filter TYPE STANDARD TABLE OF ty_s_filter WITH DEFAULT KEY.
 
     "! row numbers of a table
-    TYPES ty_t_index TYPE STANDARD TABLE OF i WITH EMPTY KEY.
+    TYPES ty_t_index TYPE STANDARD TABLE OF i WITH DEFAULT KEY.
 
     " a line of the header above the grid - without label a heading
     TYPES:
@@ -198,7 +198,7 @@ CLASS z2ui5_cl_cgui_alv DEFINITION PUBLIC FINAL CREATE PUBLIC.
         label TYPE string,
         value TYPE string,
       END OF ty_s_header.
-    TYPES ty_t_header TYPE STANDARD TABLE OF ty_s_header WITH EMPTY KEY.
+    TYPES ty_t_header TYPE STANDARD TABLE OF ty_s_header WITH DEFAULT KEY.
 
     " a column of the layout: position from 1, sort cs_sort and sort_seq
     " its rank among the sorted columns, numeric whether it can be summed
@@ -214,7 +214,7 @@ CLASS z2ui5_cl_cgui_alv DEFINITION PUBLIC FINAL CREATE PUBLIC.
         subtotal TYPE abap_bool,
         numeric  TYPE abap_bool,
       END OF ty_s_layout.
-    TYPES ty_t_layout TYPE STANDARD TABLE OF ty_s_layout WITH EMPTY KEY.
+    TYPES ty_t_layout TYPE STANDARD TABLE OF ty_s_layout WITH DEFAULT KEY.
 
     " the subtotal of column for the rows whose subtotal columns hold group
     " - and, where the column has a currency or unit, that one (unit)
@@ -225,8 +225,8 @@ CLASS z2ui5_cl_cgui_alv DEFINITION PUBLIC FINAL CREATE PUBLIC.
         value  TYPE decfloat34,
         unit   TYPE string,
       END OF ty_s_subtotal.
-    TYPES ty_t_subtotal TYPE STANDARD TABLE OF ty_s_subtotal WITH EMPTY KEY.
-    TYPES ty_t_column TYPE STANDARD TABLE OF ty_s_column WITH EMPTY KEY.
+    TYPES ty_t_subtotal TYPE STANDARD TABLE OF ty_s_subtotal WITH DEFAULT KEY.
+    TYPES ty_t_column TYPE STANDARD TABLE OF ty_s_column WITH DEFAULT KEY.
 
     TYPES:
       BEGIN OF ty_s_function,
@@ -235,9 +235,9 @@ CLASS z2ui5_cl_cgui_alv DEFINITION PUBLIC FINAL CREATE PUBLIC.
         icon    TYPE string,
         tooltip TYPE string,
       END OF ty_s_function.
-    TYPES ty_t_function TYPE STANDARD TABLE OF ty_s_function WITH EMPTY KEY.
+    TYPES ty_t_function TYPE STANDARD TABLE OF ty_s_function WITH DEFAULT KEY.
 
-    TYPES ty_t_row TYPE STANDARD TABLE OF i WITH EMPTY KEY.
+    TYPES ty_t_row TYPE STANDARD TABLE OF i WITH DEFAULT KEY.
 
     TYPES:
       "! a line of LVC_T_ROW, the rows of the classic grid (cl_gui_alv_grid,
@@ -247,7 +247,7 @@ CLASS z2ui5_cl_cgui_alv DEFINITION PUBLIC FINAL CREATE PUBLIC.
         index   TYPE i,
         rowtype TYPE c LENGTH 30,
       END OF ty_s_lvc_row.
-    TYPES ty_t_lvc_row TYPE STANDARD TABLE OF ty_s_lvc_row WITH EMPTY KEY ##NEEDED.
+    TYPES ty_t_lvc_row TYPE STANDARD TABLE OF ty_s_lvc_row WITH DEFAULT KEY ##NEEDED.
 
     TYPES:
       "! a line of LVC_T_ROID - et_row_no of get_selected_rows( )
@@ -255,7 +255,7 @@ CLASS z2ui5_cl_cgui_alv DEFINITION PUBLIC FINAL CREATE PUBLIC.
         row_id     TYPE i,
         sub_row_id TYPE i,
       END OF ty_s_lvc_roid.
-    TYPES ty_t_lvc_roid TYPE STANDARD TABLE OF ty_s_lvc_roid WITH EMPTY KEY ##NEEDED.
+    TYPES ty_t_lvc_roid TYPE STANDARD TABLE OF ty_s_lvc_roid WITH DEFAULT KEY ##NEEDED.
 
     TYPES:
       "! LVC_S_COL - e_column_id of the HOTSPOT_CLICK handler of the grid
@@ -973,7 +973,7 @@ CLASS z2ui5_cl_cgui_alv DEFINITION PUBLIC FINAL CREATE PUBLIC.
         text   TYPE c LENGTH 60,
         filter TYPE c LENGTH 60,
       END OF ty_s_filter_col.
-    TYPES ty_t_filter_col TYPE STANDARD TABLE OF ty_s_filter_col WITH EMPTY KEY.
+    TYPES ty_t_filter_col TYPE STANDARD TABLE OF ty_s_filter_col WITH DEFAULT KEY.
 
     "! an event of the grid the report runtime handles - the toolbar, the
     "! selection, the filter, the paging, F4 of a cell
@@ -1094,7 +1094,8 @@ CLASS z2ui5_cl_cgui_alv DEFINITION PUBLIC FINAL CREATE PUBLIC.
     DATA mv_no_search      TYPE abap_bool.
     DATA mv_search         TYPE string.
     DATA mv_single_row     TYPE i.
-    DATA mt_dropdown       TYPE STANDARD TABLE OF ty_s_value WITH EMPTY KEY.
+    TYPES temp1_6defa0496a TYPE STANDARD TABLE OF ty_s_value WITH DEFAULT KEY.
+DATA mt_dropdown       TYPE temp1_6defa0496a.
     DATA mt_dropdown_col   TYPE string_table.
     " the sort and the filter a column menu of the paged grid asked for, and
     " the sort of the layout then
@@ -1118,7 +1119,7 @@ CLASS z2ui5_cl_cgui_alv DEFINITION PUBLIC FINAL CREATE PUBLIC.
         seq      TYPE i,
         comp     TYPE z2ui5_cl_cgui_context=>ty_s_comp,
       END OF ty_s_ordered.
-    TYPES ty_t_ordered TYPE STANDARD TABLE OF ty_s_ordered WITH EMPTY KEY.
+    TYPES ty_t_ordered TYPE STANDARD TABLE OF ty_s_ordered WITH DEFAULT KEY.
 
     "! the range of column name of tab typed like the column - with pattern
     "! a range of strings, for CP / NP on the text of the cell - filled with
@@ -1370,7 +1371,7 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
 
   METHOD factory.
 
-    result = NEW #( ).
+    CREATE OBJECT result.
 
   ENDMETHOD.
 
@@ -1390,13 +1391,25 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
   METHOD row_by_path.
 
     DATA lt_path TYPE string_table.
+    DATA lv_last LIKE LINE OF lt_path.
+    FIELD-SYMBOLS <temp32> LIKE LINE OF lt_path.
+    DATA temp33 LIKE sy-tabix.
 
     SPLIT val AT `/` INTO TABLE lt_path.
     IF lt_path IS INITIAL.
       RETURN.
     ENDIF.
 
-    DATA(lv_last) = lt_path[ lines( lt_path ) ].
+
+
+
+    temp33 = sy-tabix.
+    READ TABLE lt_path INDEX lines( lt_path ) ASSIGNING <temp32>.
+    sy-tabix = temp33.
+    IF sy-subrc <> 0.
+      ASSERT 1 = 0.
+    ENDIF.
+    lv_last = <temp32>.
     IF lv_last IS INITIAL OR lv_last CN `0123456789`.
       RETURN.
     ENDIF.
@@ -1413,7 +1426,8 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
 
   METHOD set_column_text.
 
-    DATA(lr_column) = column_get( name ).
+    DATA lr_column TYPE REF TO z2ui5_cl_cgui_alv=>ty_s_column.
+    lr_column = column_get( name ).
     lr_column->text = text.
     result = me.
 
@@ -1421,7 +1435,8 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
 
   METHOD set_column_hidden.
 
-    DATA(lr_column) = column_get( name ).
+    DATA lr_column TYPE REF TO z2ui5_cl_cgui_alv=>ty_s_column.
+    lr_column = column_get( name ).
     lr_column->hidden = hidden.
     result = me.
 
@@ -1429,7 +1444,8 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
 
   METHOD set_column_width.
 
-    DATA(lr_column) = column_get( name ).
+    DATA lr_column TYPE REF TO z2ui5_cl_cgui_alv=>ty_s_column.
+    lr_column = column_get( name ).
     lr_column->width = width.
     result = me.
 
@@ -1437,7 +1453,8 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
 
   METHOD set_column_icon.
 
-    DATA(lr_column) = column_get( name ).
+    DATA lr_column TYPE REF TO z2ui5_cl_cgui_alv=>ty_s_column.
+    lr_column = column_get( name ).
     lr_column->icon = val.
     result = me.
 
@@ -1445,7 +1462,8 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
 
   METHOD set_column_hotspot.
 
-    DATA(lr_column) = column_get( name ).
+    DATA lr_column TYPE REF TO z2ui5_cl_cgui_alv=>ty_s_column.
+    lr_column = column_get( name ).
     lr_column->hotspot = val.
     result = me.
 
@@ -1453,7 +1471,8 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
 
   METHOD set_column_currency.
 
-    DATA(lr_column) = column_get( name ).
+    DATA lr_column TYPE REF TO z2ui5_cl_cgui_alv=>ty_s_column.
+    lr_column = column_get( name ).
     lr_column->currency = to_upper( currency_field ).
     result = me.
 
@@ -1461,7 +1480,8 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
 
   METHOD set_column_sum.
 
-    DATA(lr_column) = column_get( name ).
+    DATA lr_column TYPE REF TO z2ui5_cl_cgui_alv=>ty_s_column.
+    lr_column = column_get( name ).
     lr_column->sum = val.
     result = me.
 
@@ -1512,17 +1532,22 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
 
   METHOD add_function.
 
-    INSERT VALUE #( name    = name
-                    text    = text
-                    icon    = icon
-                    tooltip = tooltip ) INTO TABLE mt_function.
+    DATA temp165 TYPE z2ui5_cl_cgui_alv=>ty_s_function.
+    CLEAR temp165.
+    temp165-name = name.
+    temp165-text = text.
+    temp165-icon = icon.
+    temp165-tooltip = tooltip.
+    INSERT temp165 INTO TABLE mt_function.
     result = me.
 
   ENDMETHOD.
 
   METHOD set_export.
 
-    mv_no_export = xsdbool( val = abap_false ).
+    DATA temp1 TYPE xsdboolean.
+    temp1 = boolc( val = abap_false ).
+    mv_no_export = temp1.
     mv_separator = separator.
     result = me.
 
@@ -1530,7 +1555,9 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
 
   METHOD set_optimize.
 
-    mv_no_optimize = xsdbool( val = abap_false ).
+    DATA temp2 TYPE xsdboolean.
+    temp2 = boolc( val = abap_false ).
+    mv_no_optimize = temp2.
     result = me.
 
   ENDMETHOD.
@@ -1544,28 +1571,43 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
 
   METHOD set_column_edit.
 
-    DATA(lr_column) = column_get( name ).
+    DATA lr_column TYPE REF TO z2ui5_cl_cgui_alv=>ty_s_column.
+    DATA temp3 TYPE xsdboolean.
+    lr_column = column_get( name ).
     lr_column->edit = val.
-    lr_column->no_edit = xsdbool( val = abap_false ).
+
+    temp3 = boolc( val = abap_false ).
+    lr_column->no_edit = temp3.
     result = me.
 
   ENDMETHOD.
 
   METHOD is_editable.
 
-    result = xsdbool( mv_edit = abap_true
-                   OR line_exists( mt_column[ edit = abap_true ] )
-                   OR line_exists( mt_column[ cell_type = cs_cell_type-checkbox_hotspot ] ) ).
+    DATA temp166 LIKE sy-subrc.
+    DATA temp34 LIKE sy-subrc.
+    DATA temp4 TYPE xsdboolean.
+    READ TABLE mt_column WITH KEY edit = abap_true TRANSPORTING NO FIELDS.
+    temp166 = sy-subrc.
+
+    READ TABLE mt_column WITH KEY cell_type = cs_cell_type-checkbox_hotspot TRANSPORTING NO FIELDS.
+    temp34 = sy-subrc.
+
+    temp4 = boolc( mv_edit = abap_true OR temp166 = 0 OR temp34 = 0 ).
+    result = temp4.
 
   ENDMETHOD.
 
   METHOD column_editable.
+    DATA temp5 TYPE xsdboolean.
 
     IF column-icon = abap_true OR column-hotspot = abap_true OR column-no_edit = abap_true
         OR column-cell_type = cs_cell_type-button OR column-cell_type = cs_cell_type-checkbox_hotspot.
       RETURN.
     ENDIF.
-    result = xsdbool( column-edit = abap_true OR mv_edit = abap_true ).
+
+    temp5 = boolc( column-edit = abap_true OR mv_edit = abap_true ).
+    result = temp5.
 
   ENDMETHOD.
 
@@ -1573,14 +1615,24 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
 
     DATA lv_seq TYPE i.
 
-    LOOP AT mt_column INTO DATA(ls_column) WHERE sort IS NOT INITIAL.
+    DATA ls_column LIKE LINE OF mt_column.
+    DATA lr_column TYPE REF TO z2ui5_cl_cgui_alv=>ty_s_column.
+    DATA temp167 TYPE z2ui5_cl_cgui_alv=>ty_s_column-sort.
+    LOOP AT mt_column INTO ls_column WHERE sort IS NOT INITIAL.
       lv_seq = nmax( val1 = lv_seq val2 = ls_column-sort_seq ).
     ENDLOOP.
-    DATA(lr_column) = column_get( name ).
+
+    lr_column = column_get( name ).
     IF lr_column->sort IS INITIAL.
       lr_column->sort_seq = lv_seq + 1.
     ENDIF.
-    lr_column->sort = COND #( WHEN descending = abap_true THEN cs_sort-descending ELSE cs_sort-ascending ).
+
+    IF descending = abap_true.
+      temp167 = cs_sort-descending.
+    ELSE.
+      temp167 = cs_sort-ascending.
+    ENDIF.
+    lr_column->sort = temp167.
     lr_column->subtotal = subtotal.
     result = me.
 
@@ -1588,7 +1640,8 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
 
   METHOD set_column_position.
 
-    DATA(lr_column) = column_get( name ).
+    DATA lr_column TYPE REF TO z2ui5_cl_cgui_alv=>ty_s_column.
+    lr_column = column_get( name ).
     lr_column->position = position.
     result = me.
 
@@ -1623,12 +1676,16 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD page_turn.
+    DATA lv_pages TYPE i.
+    DATA lv_direction TYPE string.
 
     IF mv_page_size <= 0.
       RETURN.
     ENDIF.
-    DATA(lv_pages) = nmax( val1 = 1 val2 = ( lines + mv_page_size - 1 ) DIV mv_page_size ).
-    DATA(lv_direction) = to_upper( direction ).
+
+    lv_pages = nmax( val1 = 1 val2 = ( lines + mv_page_size - 1 ) DIV mv_page_size ).
+
+    lv_direction = to_upper( direction ).
     CASE lv_direction.
       WHEN cs_page-first.
         mv_page = 1.
@@ -1645,7 +1702,8 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
 
   METHOD set_column_tooltip.
 
-    DATA(lr_column) = column_get( name ).
+    DATA lr_column TYPE REF TO z2ui5_cl_cgui_alv=>ty_s_column.
+    lr_column = column_get( name ).
     lr_column->tooltip = text.
     result = me.
 
@@ -1653,7 +1711,8 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
 
   METHOD set_column_key.
 
-    DATA(lr_column) = column_get( name ).
+    DATA lr_column TYPE REF TO z2ui5_cl_cgui_alv=>ty_s_column.
+    lr_column = column_get( name ).
     lr_column->key = val.
     result = me.
 
@@ -1661,7 +1720,8 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
 
   METHOD set_column_technical.
 
-    DATA(lr_column) = column_get( name ).
+    DATA lr_column TYPE REF TO z2ui5_cl_cgui_alv=>ty_s_column.
+    lr_column = column_get( name ).
     lr_column->technical = val.
     result = me.
 
@@ -1669,7 +1729,8 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
 
   METHOD set_column_no_zero.
 
-    DATA(lr_column) = column_get( name ).
+    DATA lr_column TYPE REF TO z2ui5_cl_cgui_alv=>ty_s_column.
+    lr_column = column_get( name ).
     lr_column->no_zero = val.
     result = me.
 
@@ -1677,7 +1738,8 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
 
   METHOD set_column_quantity.
 
-    DATA(lr_column) = column_get( name ).
+    DATA lr_column TYPE REF TO z2ui5_cl_cgui_alv=>ty_s_column.
+    lr_column = column_get( name ).
     lr_column->quantity = to_upper( unit_field ).
     result = me.
 
@@ -1685,7 +1747,8 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
 
   METHOD set_column_alignment.
 
-    DATA(lr_column) = column_get( name ).
+    DATA lr_column TYPE REF TO z2ui5_cl_cgui_alv=>ty_s_column.
+    lr_column = column_get( name ).
     lr_column->align = align.
     result = me.
 
@@ -1693,17 +1756,22 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
 
   METHOD set_column_aggregation.
 
-    DATA(lr_column) = column_get( name ).
+    DATA lr_column TYPE REF TO z2ui5_cl_cgui_alv=>ty_s_column.
+    DATA temp6 TYPE xsdboolean.
+    lr_column = column_get( name ).
     lr_column->aggregation = to_upper( aggregation ).
     " totals and subtotals stay the sum
-    lr_column->sum = xsdbool( lr_column->aggregation = cs_aggregation-sum ).
+
+    temp6 = boolc( lr_column->aggregation = cs_aggregation-sum ).
+    lr_column->sum = temp6.
     result = me.
 
   ENDMETHOD.
 
   METHOD set_column_cell_type.
 
-    DATA(lr_column) = column_get( name ).
+    DATA lr_column TYPE REF TO z2ui5_cl_cgui_alv=>ty_s_column.
+    lr_column = column_get( name ).
     lr_column->cell_type = to_upper( type ).
     result = me.
 
@@ -1711,17 +1779,30 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
 
   METHOD set_column_dropdown.
 
-    DATA(lv_name) = to_upper( name ).
-    DATA(lr_column) = column_get( lv_name ).
+    DATA lv_name TYPE string.
+    DATA lr_column TYPE REF TO z2ui5_cl_cgui_alv=>ty_s_column.
+    DATA ls_value LIKE LINE OF values.
+      DATA temp168 TYPE z2ui5_cl_cgui_alv=>ty_s_value.
+    DATA temp169 LIKE sy-subrc.
+    lv_name = to_upper( name ).
+
+    lr_column = column_get( lv_name ).
     lr_column->cell_type = cs_cell_type-dropdown.
     " the values per column: name in mt_dropdown_col, values in mt_dropdown
     " with the column as prefix of the key
     DELETE mt_dropdown WHERE key CP |{ lv_name }~*|.
-    LOOP AT values INTO DATA(ls_value).
-      INSERT VALUE #( key  = |{ lv_name }~{ ls_value-key }|
-                      text = ls_value-text ) INTO TABLE mt_dropdown.
+
+    LOOP AT values INTO ls_value.
+
+      CLEAR temp168.
+      temp168-key = |{ lv_name }~{ ls_value-key }|.
+      temp168-text = ls_value-text.
+      INSERT temp168 INTO TABLE mt_dropdown.
     ENDLOOP.
-    IF NOT line_exists( mt_dropdown_col[ table_line = lv_name ] ).
+
+    READ TABLE mt_dropdown_col WITH KEY table_line = lv_name TRANSPORTING NO FIELDS.
+    temp169 = sy-subrc.
+    IF NOT temp169 = 0.
       INSERT lv_name INTO TABLE mt_dropdown_col.
     ENDIF.
     result = me.
@@ -1730,12 +1811,21 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
 
   METHOD dropdown_values.
 
-    DATA(lv_prefix) = |{ name }~|.
-    DATA(lv_len) = strlen( lv_prefix ).
-    LOOP AT mt_dropdown INTO DATA(ls_value).
+    DATA lv_prefix TYPE string.
+    DATA lv_len TYPE i.
+    DATA ls_value LIKE LINE OF mt_dropdown.
+        DATA temp170 TYPE z2ui5_cl_cgui_alv=>ty_s_value.
+    lv_prefix = |{ name }~|.
+
+    lv_len = strlen( lv_prefix ).
+
+    LOOP AT mt_dropdown INTO ls_value.
       IF strlen( ls_value-key ) >= lv_len AND substring( val = ls_value-key len = lv_len ) = lv_prefix.
-        INSERT VALUE #( key  = substring( val = ls_value-key off = lv_len )
-                        text = ls_value-text ) INTO TABLE result.
+
+        CLEAR temp170.
+        temp170-key = substring( val = ls_value-key off = lv_len ).
+        temp170-text = ls_value-text.
+        INSERT temp170 INTO TABLE result.
       ENDIF.
     ENDLOOP.
 
@@ -1743,7 +1833,8 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
 
   METHOD set_column_f4.
 
-    DATA(lr_column) = column_get( name ).
+    DATA lr_column TYPE REF TO z2ui5_cl_cgui_alv=>ty_s_column.
+    lr_column = column_get( name ).
     lr_column->f4 = val.
     result = me.
 
@@ -1757,9 +1848,11 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD edit_binding.
+      DATA lv_path TYPE string.
 
     IF mv_edit_field IS NOT INITIAL.
-      DATA(lv_path) = z2ui5_cl_ui5_view_builder=>component_path( mv_edit_field ).
+
+      lv_path = z2ui5_cl_ui5_view_builder=>component_path( mv_edit_field ).
       result = |\{= $\{{ lv_path }\} === true \|\| $\{{ lv_path }\} === 'X' \}|.
     ENDIF.
 
@@ -1785,8 +1878,33 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
 
   METHOD set_fieldcat.
 
-    LOOP AT fieldcat ASSIGNING FIELD-SYMBOL(<fcat>).
-      DATA(lv_name) = to_upper( classic_value( row  = <fcat>
+    FIELD-SYMBOLS <fcat> TYPE ANY.
+      DATA lv_name TYPE string.
+      DATA temp35 TYPE string_table.
+      DATA temp171 LIKE temp35.
+      DATA lv_text_field LIKE LINE OF temp171.
+        DATA lv_text TYPE string.
+      DATA temp7 TYPE xsdboolean.
+      DATA temp8 TYPE xsdboolean.
+      DATA temp9 TYPE xsdboolean.
+      DATA temp10 TYPE xsdboolean.
+      DATA temp11 TYPE xsdboolean.
+      DATA temp12 TYPE xsdboolean.
+      DATA temp13 TYPE xsdboolean.
+      DATA lr_column TYPE REF TO z2ui5_cl_cgui_alv=>ty_s_column.
+      DATA temp14 TYPE xsdboolean.
+      DATA lv_length TYPE string.
+      DATA temp172 TYPE i.
+        DATA temp173 TYPE i.
+      DATA lv_position TYPE string.
+      DATA temp174 TYPE i.
+        DATA temp175 TYPE i.
+      DATA lv_field TYPE string.
+      DATA lv_just TYPE string.
+      DATA lv_tooltip TYPE string.
+    LOOP AT fieldcat ASSIGNING <fcat>.
+
+      lv_name = to_upper( classic_value( row  = <fcat>
                                                name = `FIELDNAME` ) ).
       IF lv_name IS INITIAL.
         CONTINUE.
@@ -1795,10 +1913,23 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
       " the text the report gave the column first - COLTEXT of the LVC
       " catalog, SELTEXT_* of the SLIS one -, then the texts of the DDIC,
       " the longest first
-      LOOP AT VALUE string_table( ( `COLTEXT` ) ( `SELTEXT_L` ) ( `SELTEXT_M` ) ( `SELTEXT_S` )
-                                  ( `SCRTEXT_L` ) ( `REPTEXT` ) ( `REPTEXT_DDIC` )
-                                  ( `SCRTEXT_M` ) ( `SCRTEXT_S` ) ) INTO DATA(lv_text_field).
-        DATA(lv_text) = classic_value( row  = <fcat>
+
+      CLEAR temp35.
+      INSERT `COLTEXT` INTO TABLE temp35.
+      INSERT `SELTEXT_L` INTO TABLE temp35.
+      INSERT `SELTEXT_M` INTO TABLE temp35.
+      INSERT `SELTEXT_S` INTO TABLE temp35.
+      INSERT `SCRTEXT_L` INTO TABLE temp35.
+      INSERT `REPTEXT` INTO TABLE temp35.
+      INSERT `REPTEXT_DDIC` INTO TABLE temp35.
+      INSERT `SCRTEXT_M` INTO TABLE temp35.
+      INSERT `SCRTEXT_S` INTO TABLE temp35.
+
+      temp171 = temp35.
+
+      LOOP AT temp171 INTO lv_text_field.
+
+        lv_text = classic_value( row  = <fcat>
                                        name = lv_text_field ).
         IF lv_text IS NOT INITIAL.
           set_column_text( name = lv_name
@@ -1809,40 +1940,68 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
 
       " the flags as the field catalog has them - a catalog set again on
       " the grid that shows switches them off as well
+
+      temp7 = boolc( classic_value( row = <fcat> name = `NO_OUT` ) = abap_true ).
       set_column_hidden( name   = lv_name
-                         hidden = xsdbool( classic_value( row = <fcat> name = `NO_OUT` ) = abap_true ) ).
+                         hidden = temp7 ).
+
+      temp8 = boolc( classic_value( row = <fcat> name = `TECH` ) = abap_true ).
       set_column_technical( name = lv_name
-                            val  = xsdbool( classic_value( row = <fcat> name = `TECH` ) = abap_true ) ).
+                            val  = temp8 ).
+
+      temp9 = boolc( classic_value( row = <fcat> name = `DO_SUM` ) = abap_true ).
       set_column_sum( name = lv_name
-                      val  = xsdbool( classic_value( row = <fcat> name = `DO_SUM` ) = abap_true ) ).
+                      val  = temp9 ).
+
+      temp10 = boolc( classic_value( row = <fcat> name = `HOTSPOT` ) = abap_true ).
       set_column_hotspot( name = lv_name
-                          val  = xsdbool( classic_value( row = <fcat> name = `HOTSPOT` ) = abap_true ) ).
+                          val  = temp10 ).
+
+      temp11 = boolc( classic_value( row = <fcat> name = `KEY` ) = abap_true ).
       set_column_key( name = lv_name
-                      val  = xsdbool( classic_value( row = <fcat> name = `KEY` ) = abap_true ) ).
+                      val  = temp11 ).
+
+      temp12 = boolc( classic_value( row = <fcat> name = `ICON` ) = abap_true ).
       set_column_icon( name = lv_name
-                       val  = xsdbool( classic_value( row = <fcat> name = `ICON` ) = abap_true ) ).
+                       val  = temp12 ).
+
+      temp13 = boolc( classic_value( row = <fcat> name = `NO_ZERO` ) = abap_true ).
       set_column_no_zero( name = lv_name
-                          val  = xsdbool( classic_value( row = <fcat> name = `NO_ZERO` ) = abap_true ) ).
+                          val  = temp13 ).
       " EDIT makes this column an input column - not the whole grid, and
       " without it the column still follows the EDIT of the layout
-      DATA(lr_column) = column_get( lv_name ).
-      lr_column->edit = xsdbool( classic_value( row = <fcat> name = `EDIT` ) = abap_true ).
 
-      DATA(lv_length) = classic_value( row  = <fcat>
+      lr_column = column_get( lv_name ).
+
+      temp14 = boolc( classic_value( row = <fcat> name = `EDIT` ) = abap_true ).
+      lr_column->edit = temp14.
+
+
+      lv_length = classic_value( row  = <fcat>
                                        name = `OUTPUTLEN` ).
-      IF lv_length CO ` 0123456789` AND lv_length IS NOT INITIAL AND CONV i( lv_length ) > 0.
+
+      temp172 = lv_length.
+      IF lv_length CO ` 0123456789` AND lv_length IS NOT INITIAL AND temp172 > 0.
         " a character is about 0.6 rem wide
+
+        temp173 = lv_length.
         set_column_width( name  = lv_name
-                          width = |{ CONV i( lv_length ) * 6 / 10 + 1 }rem| ).
-      ENDIF.
-      DATA(lv_position) = classic_value( row  = <fcat>
-                                         name = `COL_POS` ).
-      IF lv_position CO ` 0123456789` AND lv_position IS NOT INITIAL AND CONV i( lv_position ) > 0.
-        set_column_position( name     = lv_name
-                             position = CONV i( lv_position ) ).
+                          width = |{ temp173 * 6 / 10 + 1 }rem| ).
       ENDIF.
 
-      DATA(lv_field) = to_upper( classic_value( row  = <fcat>
+      lv_position = classic_value( row  = <fcat>
+                                         name = `COL_POS` ).
+
+      temp174 = lv_position.
+      IF lv_position CO ` 0123456789` AND lv_position IS NOT INITIAL AND temp174 > 0.
+
+        temp175 = lv_position.
+        set_column_position( name     = lv_name
+                             position = temp175 ).
+      ENDIF.
+
+
+      lv_field = to_upper( classic_value( row  = <fcat>
                                                 name = `CFIELDNAME` ) ).
       IF lv_field IS NOT INITIAL.
         set_column_currency( name           = lv_name
@@ -1855,7 +2014,8 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
                              unit_field = lv_field ).
       ENDIF.
 
-      DATA(lv_just) = to_upper( classic_value( row  = <fcat>
+
+      lv_just = to_upper( classic_value( row  = <fcat>
                                                name = `JUST` ) ).
       CASE lv_just.
 
@@ -1870,7 +2030,8 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
                                 align = cs_align-left ).
       ENDCASE.
 
-      DATA(lv_tooltip) = classic_value( row  = <fcat>
+
+      lv_tooltip = classic_value( row  = <fcat>
                                         name = `TOOLTIP` ).
       IF lv_tooltip IS NOT INITIAL.
         set_column_tooltip( name = lv_name
@@ -1884,6 +2045,12 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
   METHOD set_layout_classic.
 
     DATA lo_struct TYPE REF TO cl_abap_structdescr.
+    DATA lt_comp TYPE abap_component_view_tab.
+    DATA temp176 LIKE sy-subrc.
+      DATA temp15 TYPE xsdboolean.
+    DATA lv_box TYPE string.
+    DATA lv_info TYPE string.
+    DATA lv_title TYPE string.
 
     TRY.
         lo_struct ?= cl_abap_typedescr=>describe_by_data( layout ).
@@ -1892,9 +2059,15 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
         RETURN.
     ENDTRY.
     " ZEBRA off is the classic default - the grid follows it
-    DATA(lt_comp) = lo_struct->get_included_view( ).
-    IF line_exists( lt_comp[ name = `ZEBRA` ] ).
-      set_striped( xsdbool( classic_value( row = layout name = `ZEBRA` ) = abap_true ) ).
+
+    lt_comp = lo_struct->get_included_view( ).
+
+    READ TABLE lt_comp WITH KEY name = `ZEBRA` TRANSPORTING NO FIELDS.
+    temp176 = sy-subrc.
+    IF temp176 = 0.
+
+      temp15 = boolc( classic_value( row = layout name = `ZEBRA` ) = abap_true ).
+      set_striped( temp15 ).
     ENDIF.
     IF classic_value( row = layout name = `COLWIDTH_OPTIMIZE` ) = abap_true
         OR classic_value( row = layout name = `CWIDTH_OPT` ) = abap_true.
@@ -1904,7 +2077,8 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
       set_edit( ).
     ENDIF.
 
-    DATA(lv_box) = to_upper( classic_value( row = layout name = `BOX_FIELDNAME` ) ).
+
+    lv_box = to_upper( classic_value( row = layout name = `BOX_FIELDNAME` ) ).
     IF lv_box IS INITIAL.
       lv_box = to_upper( classic_value( row = layout name = `BOX_FNAME` ) ).
     ENDIF.
@@ -1921,7 +2095,8 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
       ENDCASE.
     ENDIF.
 
-    DATA(lv_info) = to_upper( classic_value( row = layout name = `INFO_FIELDNAME` ) ).
+
+    lv_info = to_upper( classic_value( row = layout name = `INFO_FIELDNAME` ) ).
     IF lv_info IS INITIAL.
       lv_info = to_upper( classic_value( row = layout name = `INFO_FNAME` ) ).
     ENDIF.
@@ -1929,7 +2104,8 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
       set_color_field( lv_info ).
     ENDIF.
 
-    DATA(lv_title) = classic_value( row = layout name = `GRID_TITLE` ).
+
+    lv_title = classic_value( row = layout name = `GRID_TITLE` ).
     IF lv_title IS NOT INITIAL.
       set_title( lv_title ).
     ENDIF.
@@ -1940,18 +2116,30 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
   METHOD set_sort_classic.
 
     " the sort table is the whole sort - one set again replaces the last
-    LOOP AT mt_column REFERENCE INTO DATA(lr_column) WHERE sort IS NOT INITIAL OR subtotal = abap_true.
+    DATA temp177 LIKE LINE OF mt_column.
+    DATA lr_column LIKE REF TO temp177.
+    FIELD-SYMBOLS <sort> TYPE ANY.
+      DATA lv_name TYPE string.
+      DATA temp16 TYPE xsdboolean.
+      DATA temp1 TYPE xsdboolean.
+    LOOP AT mt_column REFERENCE INTO lr_column WHERE sort IS NOT INITIAL OR subtotal = abap_true.
       CLEAR: lr_column->sort, lr_column->sort_seq, lr_column->subtotal.
     ENDLOOP.
-    LOOP AT sort ASSIGNING FIELD-SYMBOL(<sort>).
-      DATA(lv_name) = to_upper( classic_value( row  = <sort>
+
+    LOOP AT sort ASSIGNING <sort>.
+
+      lv_name = to_upper( classic_value( row  = <sort>
                                                name = `FIELDNAME` ) ).
       IF lv_name IS INITIAL.
         CONTINUE.
       ENDIF.
+
+      temp16 = boolc( classic_value( row = <sort> name = `DOWN` ) = abap_true ).
+
+      temp1 = boolc( classic_value( row = <sort> name = `SUBTOT` ) = abap_true ).
       set_sort( name       = lv_name
-                descending = xsdbool( classic_value( row = <sort> name = `DOWN` ) = abap_true )
-                subtotal   = xsdbool( classic_value( row = <sort> name = `SUBTOT` ) = abap_true ) ).
+                descending = temp16
+                subtotal   = temp1 ).
     ENDLOOP.
     result = me.
 
@@ -1960,39 +2148,57 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
   METHOD classic_value.
 
     FIELD-SYMBOLS <value> TYPE any.
+      DATA temp178 TYPE string.
 
     ASSIGN COMPONENT name OF STRUCTURE row TO <value>.
     IF sy-subrc = 0 AND <value> IS NOT INITIAL.
-      result = condense( CONV string( <value> ) ).
+
+      temp178 = <value>.
+      result = condense( temp178 ).
     ENDIF.
 
   ENDMETHOD.
 
   METHOD set_striped.
 
-    mv_no_stripes = xsdbool( val = abap_false ).
+    DATA temp17 TYPE xsdboolean.
+    temp17 = boolc( val = abap_false ).
+    mv_no_stripes = temp17.
     result = me.
 
   ENDMETHOD.
 
   METHOD set_chart.
 
-    mv_no_chart = xsdbool( val = abap_false ).
+    DATA temp18 TYPE xsdboolean.
+    temp18 = boolc( val = abap_false ).
+    mv_no_chart = temp18.
     result = me.
 
   ENDMETHOD.
 
   METHOD chart_value_select.
 
-    DATA(lo_select) = node->ele( `Select`
+    DATA temp179 TYPE string_table.
+    DATA lo_select TYPE REF TO z2ui5_cl_ui5_view_builder.
+    DATA temp181 TYPE string.
+    DATA ls_comp LIKE LINE OF comps.
+    CLEAR temp179.
+    INSERT which INTO TABLE temp179.
+    INSERT `${$source>/selectedKey}` INTO TABLE temp179.
+
+    lo_select = node->ele( `Select`
         )->a( n = `selectedKey` t = current
         )->a( n = `change`      v = client->_event( val   = cs_event-chart
-                                                    t_arg = VALUE #( ( which ) ( `${$source>/selectedKey}` ) ) )
+                                                    t_arg = temp179 )
         )->a( n = `class`       v = `sapUiTinyMarginBegin` ).
+
+    temp181 = '(none)'(028).
     lo_select->tag( n = `Item` ns = `core`
         )->a( n = `key`  v = ``
-        )->a( n = `text` t = CONV #( '(none)'(028) ) ).
-    LOOP AT comps INTO DATA(ls_comp).
+        )->a( n = `text` t = temp181 ).
+
+    LOOP AT comps INTO ls_comp.
       IF is_numeric( ls_comp-type_kind ) = abap_true.
         lo_select->tag( n = `Item` ns = `core`
             )->a( n = `key`  t = ls_comp-name
@@ -2004,14 +2210,53 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
 
   METHOD chart_popup.
 
-    DATA(lt_comp) = columns_visible( tab ).
+    DATA lt_comp TYPE z2ui5_cl_cgui_context=>ty_t_comp.
+    DATA temp182 LIKE sy-subrc.
+    DATA temp183 LIKE sy-subrc.
+      DATA ls_comp LIKE LINE OF lt_comp.
+    DATA temp184 LIKE sy-subrc.
+    DATA temp185 LIKE sy-subrc.
+    DATA lt_value TYPE string_table.
+    DATA lt_name TYPE string_table.
+      DATA temp186 LIKE LINE OF lt_name.
+      DATA temp187 TYPE string_table.
+      DATA lt_series LIKE temp187.
+      DATA lv_series LIKE LINE OF lt_series.
+        DATA temp189 LIKE sy-subrc.
+        DATA temp190 LIKE sy-subrc.
+    DATA lt_point TYPE z2ui5_cl_cgui_chart=>ty_t_point.
+    DATA temp191 TYPE string.
+    DATA lo_dialog TYPE REF TO z2ui5_cl_ui5_view_builder.
+    DATA lo_box TYPE REF TO z2ui5_cl_ui5_view_builder.
+    DATA lo_pick TYPE REF TO z2ui5_cl_ui5_view_builder.
+    DATA temp192 TYPE string_table.
+    DATA lo_cat TYPE REF TO z2ui5_cl_ui5_view_builder.
+    DATA temp194 TYPE string_table.
+    DATA lo_val TYPE REF TO z2ui5_cl_ui5_view_builder.
+    DATA temp196 TYPE string.
+    DATA temp197 TYPE string_table.
+    DATA lo_kind TYPE REF TO z2ui5_cl_ui5_view_builder.
+    DATA temp199 TYPE string.
+    DATA temp200 TYPE string.
+    DATA temp201 TYPE string.
+    DATA temp202 TYPE string.
+    DATA lv_svg TYPE string.
+    DATA temp203 TYPE string.
+    lt_comp = columns_visible( tab ).
     " the columns picked - else the first text and the first number; no
     " number: the rows are counted
     " the first text column with more than one value - a column of one
     " value is one bar
-    IF NOT line_exists( lt_comp[ name = mv_chart_category ] ).
+
+
+    temp183 = sy-subrc.
+    READ TABLE lt_comp WITH KEY name = mv_chart_category TRANSPORTING NO FIELDS.
+    temp182 = sy-subrc.
+    sy-subrc = temp183.
+    IF NOT temp182 = 0.
       CLEAR mv_chart_category.
-      LOOP AT lt_comp INTO DATA(ls_comp) WHERE boolean = abap_false.
+
+      LOOP AT lt_comp INTO ls_comp WHERE boolean = abap_false.
         IF is_numeric( ls_comp-type_kind ) = abap_true.
           CONTINUE.
         ENDIF.
@@ -2027,7 +2272,13 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
       ENDLOOP.
     ENDIF.
     " %COUNT: the rows counted
-    IF mv_chart_value IS NOT INITIAL AND mv_chart_value <> `%COUNT` AND NOT line_exists( lt_comp[ name = mv_chart_value ] ).
+
+
+    temp185 = sy-subrc.
+    READ TABLE lt_comp WITH KEY name = mv_chart_value TRANSPORTING NO FIELDS.
+    temp184 = sy-subrc.
+    sy-subrc = temp185.
+    IF mv_chart_value IS NOT INITIAL AND mv_chart_value <> `%COUNT` AND NOT temp184 = 0.
       CLEAR mv_chart_value.
     ENDIF.
     IF mv_chart_value IS INITIAL.
@@ -2042,15 +2293,30 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
 
     " the series: the value column and up to two more - the rows counted
     " are one series of their own
-    DATA lt_value TYPE string_table.
-    DATA lt_name  TYPE string_table.
+
+
     IF mv_chart_value = `%COUNT`.
-      INSERT CONV string( 'Number of rows'(023) ) INTO TABLE lt_name.
+
+      temp186 = 'Number of rows'(023).
+      INSERT temp186 INTO TABLE lt_name.
     ELSE.
-      DATA(lt_series) = VALUE string_table( ( mv_chart_value ) ( mv_chart_value2 ) ( mv_chart_value3 ) ).
-      LOOP AT lt_series INTO DATA(lv_series).
+
+      CLEAR temp187.
+      INSERT mv_chart_value INTO TABLE temp187.
+      INSERT mv_chart_value2 INTO TABLE temp187.
+      INSERT mv_chart_value3 INTO TABLE temp187.
+
+      lt_series = temp187.
+
+      LOOP AT lt_series INTO lv_series.
         READ TABLE lt_comp INTO ls_comp WITH KEY name = lv_series.
-        IF sy-subrc = 0 AND is_numeric( ls_comp-type_kind ) = abap_true AND NOT line_exists( lt_value[ table_line = lv_series ] ).
+
+
+        temp190 = sy-subrc.
+        READ TABLE lt_value WITH KEY table_line = lv_series TRANSPORTING NO FIELDS.
+        temp189 = sy-subrc.
+        sy-subrc = temp190.
+        IF sy-subrc = 0 AND is_numeric( ls_comp-type_kind ) = abap_true AND NOT temp189 = 0.
           INSERT lv_series INTO TABLE lt_value.
           INSERT ls_comp-label INTO TABLE lt_name.
         ENDIF.
@@ -2059,50 +2325,72 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
     IF mv_chart_kind IS INITIAL.
       mv_chart_kind = z2ui5_cl_cgui_chart=>cs_kind-bar.
     ENDIF.
-    DATA(lt_point) = z2ui5_cl_cgui_chart=>series( tab      = tab
+
+    lt_point = z2ui5_cl_cgui_chart=>series( tab      = tab
                                                   category = mv_chart_category
                                                   values   = lt_value
                                                   other    = 'Other'(020) ).
 
-    DATA(lo_dialog) = z2ui5_cl_ui5_view_builder=>factory(
+
+    IF mv_title IS NOT INITIAL.
+      temp191 = mv_title.
+    ELSE.
+      temp191 = 'Chart'(019).
+    ENDIF.
+
+    lo_dialog = z2ui5_cl_ui5_view_builder=>factory(
         )->ele( n = `FragmentDefinition` ns = `core`
         )->a( n = `xmlns`      v = `sap.m`
         )->a( n = `xmlns:core` v = `sap.ui.core`
         )->ele( `Dialog`
-        )->a( n = `title`        t = COND #( WHEN mv_title IS NOT INITIAL THEN mv_title ELSE 'Chart'(019) )
+        )->a( n = `title`        t = temp191
         )->a( n = `contentWidth` v = `44rem`
         )->a( n = `resizable`    b = abap_true ).
-    DATA(lo_box) = lo_dialog->ele( `content`
+
+    lo_box = lo_dialog->ele( `content`
         )->ele( `VBox`
         )->a( n = `class` v = `sapUiSmallMargin` ).
 
     " the two columns to pick - every change draws the chart anew
-    DATA(lo_pick) = lo_box->ele( `HBox`
+
+    lo_pick = lo_box->ele( `HBox`
         )->a( n = `wrap`       v = `Wrap`
         )->a( n = `alignItems` v = `Center` ).
-    DATA(lo_cat) = lo_pick->tag( `Label`
+
+    CLEAR temp192.
+    INSERT `CATEGORY` INTO TABLE temp192.
+    INSERT `${$source>/selectedKey}` INTO TABLE temp192.
+
+    lo_cat = lo_pick->tag( `Label`
         )->a( n = `text`  t = |{ 'Categories'(021) }:|
         )->a( n = `class` v = `sapUiTinyMarginEnd`
         )->ele( `Select`
         )->a( n = `selectedKey` t = mv_chart_category
         )->a( n = `change`      v = client->_event( val   = cs_event-chart
-                                                    t_arg = VALUE #( ( `CATEGORY` ) ( `${$source>/selectedKey}` ) ) )
+                                                    t_arg = temp192 )
         )->a( n = `class`       v = `sapUiSmallMarginEnd` ).
     LOOP AT lt_comp INTO ls_comp.
       lo_cat->tag( n = `Item` ns = `core`
           )->a( n = `key`  t = ls_comp-name
           )->a( n = `text` t = ls_comp-label ).
     ENDLOOP.
-    DATA(lo_val) = lo_pick->tag( `Label`
+
+    CLEAR temp194.
+    INSERT `VALUE` INTO TABLE temp194.
+    INSERT `${$source>/selectedKey}` INTO TABLE temp194.
+
+    lo_val = lo_pick->tag( `Label`
         )->a( n = `text`  t = |{ 'Values'(022) }:|
         )->a( n = `class` v = `sapUiTinyMarginEnd`
         )->ele( `Select`
         )->a( n = `selectedKey` t = mv_chart_value
         )->a( n = `change`      v = client->_event( val   = cs_event-chart
-                                                    t_arg = VALUE #( ( `VALUE` ) ( `${$source>/selectedKey}` ) ) ) ).
+                                                    t_arg = temp194 ) ).
+
+    temp196 = 'Number of rows'(023).
     lo_val->tag( n = `Item` ns = `core`
         )->a( n = `key`  v = `%COUNT`
-        )->a( n = `text` t = CONV #( 'Number of rows'(023) ) ).
+        )->a( n = `text` t = temp196 ).
     LOOP AT lt_comp INTO ls_comp.
       IF is_numeric( ls_comp-type_kind ) = abap_true.
         lo_val->tag( n = `Item` ns = `core`
@@ -2126,40 +2414,56 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
     ENDIF.
 
     " the kind of the chart
-    DATA(lo_kind) = lo_pick->tag( `Label`
+
+    CLEAR temp197.
+    INSERT `KIND` INTO TABLE temp197.
+    INSERT `${$source>/selectedKey}` INTO TABLE temp197.
+
+    lo_kind = lo_pick->tag( `Label`
         )->a( n = `text`  t = |{ 'Chart'(019) }:|
         )->a( n = `class` v = `sapUiSmallMarginBegin sapUiTinyMarginEnd`
         )->ele( `SegmentedButton`
         )->a( n = `selectedKey`     t = mv_chart_kind
         )->a( n = `selectionChange` v = client->_event( val   = cs_event-chart
-                                                        t_arg = VALUE #( ( `KIND` ) ( `${$source>/selectedKey}` ) ) )
+                                                        t_arg = temp197 )
         )->ele( `items` ).
+
+    temp199 = 'Bars'(024).
     lo_kind->tag( `SegmentedButtonItem`
         )->a( n = `key`     v = z2ui5_cl_cgui_chart=>cs_kind-bar
         )->a( n = `icon`    v = `sap-icon://horizontal-bar-chart`
-        )->a( n = `tooltip` t = CONV #( 'Bars'(024) ) ).
+        )->a( n = `tooltip` t = temp199 ).
+
+    temp200 = 'Columns'(025).
     lo_kind->tag( `SegmentedButtonItem`
         )->a( n = `key`     v = z2ui5_cl_cgui_chart=>cs_kind-column
         )->a( n = `icon`    v = `sap-icon://vertical-bar-chart`
-        )->a( n = `tooltip` t = CONV #( 'Columns'(025) ) ).
+        )->a( n = `tooltip` t = temp200 ).
+
+    temp201 = 'Lines'(026).
     lo_kind->tag( `SegmentedButtonItem`
         )->a( n = `key`     v = z2ui5_cl_cgui_chart=>cs_kind-line
         )->a( n = `icon`    v = `sap-icon://line-chart`
-        )->a( n = `tooltip` t = CONV #( 'Lines'(026) ) ).
+        )->a( n = `tooltip` t = temp201 ).
+
+    temp202 = 'Pie'(027).
     lo_kind->tag( `SegmentedButtonItem`
         )->a( n = `key`     v = z2ui5_cl_cgui_chart=>cs_kind-pie
         )->a( n = `icon`    v = `sap-icon://pie-chart`
-        )->a( n = `tooltip` t = CONV #( 'Pie'(027) ) ).
+        )->a( n = `tooltip` t = temp202 ).
 
-    DATA(lv_svg) = z2ui5_cl_cgui_chart=>chart_svg( points = lt_point
+
+    lv_svg = z2ui5_cl_cgui_chart=>chart_svg( points = lt_point
                                                    names  = lt_name
                                                    kind   = mv_chart_kind ).
     lo_box->tag( n = `HTML` ns = `core`
         )->a( n = `content` t = |<div>{ lv_svg }</div>| ).
 
+
+    temp203 = 'Close'(013).
     lo_dialog->ele( `buttons`
         )->tag( `Button`
-        )->a( n = `text`  t = CONV #( 'Close'(013) )
+        )->a( n = `text`  t = temp203
         )->a( n = `type`  v = `Emphasized`
         )->a( n = `press` v = client->_event( cs_event-chart_close ) ).
 
@@ -2169,14 +2473,18 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
 
   METHOD set_details.
 
-    mv_no_details = xsdbool( val = abap_false ).
+    DATA temp19 TYPE xsdboolean.
+    temp19 = boolc( val = abap_false ).
+    mv_no_details = temp19.
     result = me.
 
   ENDMETHOD.
 
   METHOD set_search_field.
 
-    mv_no_search = xsdbool( val = abap_false ).
+    DATA temp20 TYPE xsdboolean.
+    temp20 = boolc( val = abap_false ).
+    mv_no_search = temp20.
     result = me.
 
   ENDMETHOD.
@@ -2197,15 +2505,19 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
 
   METHOD is_filtered.
 
-    result = xsdbool( mt_filter IS NOT INITIAL OR mv_search IS NOT INITIAL
-                      OR ( mv_page_size > 0 AND mt_window_filter IS NOT INITIAL ) ).
+    DATA temp21 TYPE xsdboolean.
+    temp21 = boolc( mt_filter IS NOT INITIAL OR mv_search IS NOT INITIAL OR ( mv_page_size > 0 AND mt_window_filter IS NOT INITIAL ) ).
+    result = temp21.
 
   ENDMETHOD.
 
   METHOD add_footer.
 
-    INSERT VALUE #( label = label
-                    value = value ) INTO TABLE mt_footer.
+    DATA temp204 TYPE z2ui5_cl_cgui_alv=>ty_s_header.
+    CLEAR temp204.
+    temp204-label = label.
+    temp204-value = value.
+    INSERT temp204 INTO TABLE mt_footer.
     result = me.
 
   ENDMETHOD.
@@ -2218,14 +2530,16 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
 
   METHOD has_selection.
 
-    result = xsdbool( mv_selection_mode = cs_selection_mode-multiple
-                   OR mv_selection_mode = cs_selection_mode-single ).
+    DATA temp22 TYPE xsdboolean.
+    temp22 = boolc( mv_selection_mode = cs_selection_mode-multiple OR mv_selection_mode = cs_selection_mode-single ).
+    result = temp22.
 
   ENDMETHOD.
 
   METHOD column_skipped.
 
-    DATA(lv_box) = get_box_field( ).
+    DATA lv_box TYPE string.
+    lv_box = get_box_field( ).
     IF name = lv_box AND ( has_selection( ) = abap_true OR lv_box = cv_box_field ).
       result = abap_true.
     ELSEIF mv_color_field IS NOT INITIAL AND name = mv_color_field.
@@ -2242,14 +2556,34 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
 
     FIELD-SYMBOLS <box> TYPE any.
 
-    DATA(lv_box) = get_box_field( ).
-    LOOP AT tab ASSIGNING FIELD-SYMBOL(<row>).
-      DATA(lv_index) = sy-tabix.
+    DATA lv_box TYPE string.
+    FIELD-SYMBOLS <row> TYPE ANY.
+      DATA lv_index LIKE sy-tabix.
+      DATA temp205 LIKE sy-subrc.
+      DATA temp206 LIKE sy-subrc.
+      DATA temp207 LIKE sy-tabix.
+      DATA temp23 TYPE xsdboolean.
+    lv_box = get_box_field( ).
+
+    LOOP AT tab ASSIGNING <row>.
+
+      lv_index = sy-tabix.
       ASSIGN COMPONENT lv_box OF STRUCTURE <row> TO <box>.
       IF sy-subrc <> 0.
         RETURN.
       ENDIF.
-      <box> = xsdbool( line_exists( rows[ table_line = lv_index ] ) ).
+
+
+
+      temp206 = sy-subrc.
+      temp207 = sy-tabix.
+      READ TABLE rows WITH KEY table_line = lv_index TRANSPORTING NO FIELDS.
+      temp205 = sy-subrc.
+      sy-subrc = temp206.
+      sy-tabix = temp207.
+
+      temp23 = boolc( temp205 = 0 ).
+      <box> = temp23.
     ENDLOOP.
     IF mv_selection_mode = cs_selection_mode-single.
       single_normalize( CHANGING tab = tab ).
@@ -2260,22 +2594,44 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
   METHOD single_normalize.
 
     FIELD-SYMBOLS <box> TYPE any.
+    DATA lt_selected TYPE z2ui5_cl_cgui_alv=>ty_t_row.
+      DATA lv_keep LIKE LINE OF lt_selected.
+      FIELD-SYMBOLS <temp37> LIKE LINE OF lt_selected.
+      DATA temp38 LIKE sy-tabix.
+      DATA lv_row LIKE LINE OF lt_selected.
+      DATA lv_box TYPE string.
+        FIELD-SYMBOLS <line> TYPE any.
+      FIELD-SYMBOLS <temp208> LIKE LINE OF lt_selected.
+      DATA temp209 LIKE sy-tabix.
 
     IF mv_selection_mode <> cs_selection_mode-single.
       RETURN.
     ENDIF.
     " the radio buttons of rows scrolled out of view are not reset by the
     " browser - the row that is new wins
-    DATA(lt_selected) = get_selected_rows( tab ).
+
+    lt_selected = get_selected_rows( tab ).
     IF lines( lt_selected ) > 1.
-      DATA(lv_keep) = lt_selected[ 1 ].
-      LOOP AT lt_selected INTO DATA(lv_row) WHERE table_line <> mv_single_row.
+
+
+
+      temp38 = sy-tabix.
+      READ TABLE lt_selected INDEX 1 ASSIGNING <temp37>.
+      sy-tabix = temp38.
+      IF sy-subrc <> 0.
+        ASSERT 1 = 0.
+      ENDIF.
+      lv_keep = <temp37>.
+
+      LOOP AT lt_selected INTO lv_row WHERE table_line <> mv_single_row.
         lv_keep = lv_row.
         EXIT.
       ENDLOOP.
-      DATA(lv_box) = get_box_field( ).
+
+      lv_box = get_box_field( ).
       LOOP AT lt_selected INTO lv_row WHERE table_line <> lv_keep.
-        READ TABLE tab ASSIGNING FIELD-SYMBOL(<line>) INDEX lv_row.
+
+        READ TABLE tab ASSIGNING <line> INDEX lv_row.
         ASSIGN COMPONENT lv_box OF STRUCTURE <line> TO <box>.
         IF sy-subrc = 0.
           <box> = abap_false.
@@ -2283,7 +2639,15 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
       ENDLOOP.
       mv_single_row = lv_keep.
     ELSEIF lines( lt_selected ) = 1.
-      mv_single_row = lt_selected[ 1 ].
+
+
+      temp209 = sy-tabix.
+      READ TABLE lt_selected INDEX 1 ASSIGNING <temp208>.
+      sy-tabix = temp209.
+      IF sy-subrc <> 0.
+        ASSERT 1 = 0.
+      ENDIF.
+      mv_single_row = <temp208>.
     ELSE.
       CLEAR mv_single_row.
     ENDIF.
@@ -2300,7 +2664,8 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
         value TYPE decfloat34,
         count TYPE i,
       END OF ty_s_part.
-    DATA lt_part      TYPE SORTED TABLE OF ty_s_part WITH UNIQUE KEY unit.
+    TYPES temp2 TYPE SORTED TABLE OF ty_s_part WITH UNIQUE KEY unit.
+DATA lt_part      TYPE temp2.
     DATA ls_part      TYPE ty_s_part.
     DATA ls_aggregate TYPE ty_s_aggregate.
     DATA lv_value     TYPE decfloat34.
@@ -2310,10 +2675,27 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
     FIELD-SYMBOLS <unit> TYPE any.
     FIELD-SYMBOLS <part> TYPE ty_s_part.
 
-    LOOP AT columns_visible( tab ) INTO DATA(ls_comp).
-      DATA(ls_column) = column_setting( ls_comp-name ).
-      DATA(lv_kind) = COND string( WHEN ls_column-aggregation IS NOT INITIAL THEN ls_column-aggregation
-                                   WHEN ls_column-sum = abap_true THEN cs_aggregation-sum ).
+    DATA temp210 TYPE z2ui5_cl_cgui_context=>ty_t_comp.
+    DATA ls_comp LIKE LINE OF temp210.
+      DATA ls_column TYPE z2ui5_cl_cgui_alv=>ty_s_column.
+      DATA temp211 TYPE string.
+      DATA lv_kind LIKE temp211.
+      FIELD-SYMBOLS <row> TYPE ANY.
+    temp210 = columns_visible( tab ).
+
+    LOOP AT temp210 INTO ls_comp.
+
+      ls_column = column_setting( ls_comp-name ).
+
+      IF ls_column-aggregation IS NOT INITIAL.
+        temp211 = ls_column-aggregation.
+      ELSEIF ls_column-sum = abap_true.
+        temp211 = cs_aggregation-sum.
+      ELSE.
+        CLEAR temp211.
+      ENDIF.
+
+      lv_kind = temp211.
       IF lv_kind IS INITIAL.
         CONTINUE.
       ENDIF.
@@ -2324,7 +2706,8 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
                                    tab    = tab ).
       ENDIF.
       CLEAR lt_part.
-      LOOP AT tab ASSIGNING FIELD-SYMBOL(<row>).
+
+      LOOP AT tab ASSIGNING <row>.
         ASSIGN COMPONENT ls_comp-name OF STRUCTURE <row> TO <cell>.
         IF sy-subrc <> 0.
           EXIT.
@@ -2372,11 +2755,12 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
         INSERT ls_part INTO TABLE lt_part.
       ENDIF.
       LOOP AT lt_part INTO ls_part.
-        ls_aggregate = VALUE #( column      = ls_comp-name
-                                label       = ls_comp-label
-                                aggregation = lv_kind
-                                value       = ls_part-value
-                                unit        = ls_part-unit ).
+        CLEAR ls_aggregate.
+        ls_aggregate-column = ls_comp-name.
+        ls_aggregate-label = ls_comp-label.
+        ls_aggregate-aggregation = lv_kind.
+        ls_aggregate-value = ls_part-value.
+        ls_aggregate-unit = ls_part-unit.
         IF lv_kind = cs_aggregation-count.
           ls_aggregate-value = ls_part-count.
         ELSEIF lv_kind = cs_aggregation-average AND ls_part-count > 0.
@@ -2390,13 +2774,24 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
 
   METHOD unit_column.
 
-    result = COND #( WHEN column-currency IS NOT INITIAL THEN column-currency
-                     ELSE column-quantity ).
+    DATA temp212 TYPE string.
+    DATA lt_comp TYPE z2ui5_cl_cgui_context=>ty_t_comp.
+    DATA temp213 LIKE sy-subrc.
+    IF column-currency IS NOT INITIAL.
+      temp212 = column-currency.
+    ELSE.
+      temp212 = column-quantity.
+    ENDIF.
+    result = temp212.
     IF result IS INITIAL.
       RETURN.
     ENDIF.
-    DATA(lt_comp) = z2ui5_cl_cgui_context=>rtti_get_t_comp( tab ).
-    IF NOT line_exists( lt_comp[ name = result ] ).
+
+    lt_comp = z2ui5_cl_cgui_context=>rtti_get_t_comp( tab ).
+
+    READ TABLE lt_comp WITH KEY name = result TRANSPORTING NO FIELDS.
+    temp213 = sy-subrc.
+    IF NOT temp213 = 0.
       CLEAR result.
     ENDIF.
 
@@ -2406,25 +2801,45 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
 
     FIELD-SYMBOLS <cell> TYPE any.
 
-    READ TABLE tab ASSIGNING FIELD-SYMBOL(<row>) INDEX row.
+    FIELD-SYMBOLS <row> TYPE any.
+    DATA temp214 TYPE string.
+    DATA lo_dialog TYPE REF TO z2ui5_cl_ui5_view_builder.
+    DATA lo_box TYPE REF TO z2ui5_cl_ui5_view_builder.
+    DATA temp215 TYPE z2ui5_cl_cgui_context=>ty_t_comp.
+    DATA ls_comp LIKE LINE OF temp215.
+      DATA ls_column TYPE z2ui5_cl_cgui_alv=>ty_s_column.
+      DATA temp216 TYPE string.
+    DATA temp217 TYPE string.
+    READ TABLE tab ASSIGNING <row> INDEX row.
     IF sy-subrc <> 0.
       RETURN.
     ENDIF.
 
-    DATA(lo_dialog) = z2ui5_cl_ui5_view_builder=>factory(
+
+    IF mv_title IS NOT INITIAL.
+      temp214 = mv_title.
+    ELSE.
+      temp214 = 'Details'(012).
+    ENDIF.
+
+    lo_dialog = z2ui5_cl_ui5_view_builder=>factory(
         )->ele( n = `FragmentDefinition` ns = `core`
         )->a( n = `xmlns`      v = `sap.m`
         )->a( n = `xmlns:core` v = `sap.ui.core`
         )->ele( `Dialog`
-        )->a( n = `title`        t = COND #( WHEN mv_title IS NOT INITIAL THEN mv_title ELSE 'Details'(012) )
+        )->a( n = `title`        t = temp214
         )->a( n = `contentWidth` v = `32rem`
         )->a( n = `resizable`    b = abap_true ).
 
     " every column of the row - hidden ones too, technical ones not
-    DATA(lo_box) = lo_dialog->ele( `content`
+
+    lo_box = lo_dialog->ele( `content`
         )->ele( `VBox`
         )->a( n = `class` v = `sapUiSmallMargin` ).
-    LOOP AT z2ui5_cl_cgui_context=>rtti_get_t_comp( tab ) INTO DATA(ls_comp).
+
+    temp215 = z2ui5_cl_cgui_context=>rtti_get_t_comp( tab ).
+
+    LOOP AT temp215 INTO ls_comp.
       IF column_skipped( ls_comp-name ) = abap_true.
         CONTINUE.
       ENDIF.
@@ -2432,19 +2847,28 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
       IF sy-subrc <> 0.
         CONTINUE.
       ENDIF.
-      DATA(ls_column) = column_setting( ls_comp-name ).
+
+      ls_column = column_setting( ls_comp-name ).
+
+      IF ls_column-text IS NOT INITIAL.
+        temp216 = ls_column-text.
+      ELSE.
+        temp216 = ls_comp-label.
+      ENDIF.
       lo_box->ele( `HBox`
           )->tag( `Label`
-          )->a( n = `text`  t = |{ COND #( WHEN ls_column-text IS NOT INITIAL THEN ls_column-text ELSE ls_comp-label ) }:|
+          )->a( n = `text`  t = |{ temp216 }:|
           )->a( n = `width` v = `12rem`
           )->tag( `Text`
           )->a( n = `text` t = cell_to_text( val  = <cell>
                                              comp = ls_comp ) ).
     ENDLOOP.
 
+
+    temp217 = 'Close'(013).
     lo_dialog->ele( `buttons`
         )->tag( `Button`
-        )->a( n = `text`  t = CONV #( 'Close'(013) )
+        )->a( n = `text`  t = temp217
         )->a( n = `type`  v = `Emphasized`
         )->a( n = `press` v = client->_event( cs_event-details_close ) ).
 
@@ -2461,7 +2885,8 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
 
   METHOD set_column_color.
 
-    DATA(lr_column) = column_get( name ).
+    DATA lr_column TYPE REF TO z2ui5_cl_cgui_alv=>ty_s_column.
+    lr_column = column_get( name ).
     lr_column->color = to_upper( color ).
     lr_column->color_field = to_upper( field ).
     result = me.
@@ -2470,7 +2895,8 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
 
   METHOD color_state.
 
-    DATA(lv_code) = to_upper( condense( code ) ).
+    DATA lv_code TYPE string.
+    lv_code = to_upper( condense( code ) ).
     IF strlen( lv_code ) < 2 OR lv_code(1) <> `C`.
       result = `None`.
       RETURN.
@@ -2497,7 +2923,8 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
   METHOD color_binding.
 
     " the same as color_state( ), in the browser
-    DATA(lv_code) = |(String($\{{ z2ui5_cl_ui5_view_builder=>component_path( to_upper( field ) ) }\} \|\| '')).substring(1,2)|.
+    DATA lv_code TYPE string.
+    lv_code = |(String($\{{ z2ui5_cl_ui5_view_builder=>component_path( to_upper( field ) ) }\} \|\| '')).substring(1,2)|.
     result = |\{= { lv_code } === '1' ? 'Indication05' : { lv_code } === '3' ? 'Warning' : |
           && |{ lv_code } === '4' ? 'Indication06' : { lv_code } === '5' ? 'Success' : |
           && |{ lv_code } === '6' ? 'Error' : { lv_code } === '7' ? 'Indication03' : 'None' \}|.
@@ -2506,13 +2933,20 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
 
   METHOD set_filter.
 
-    DATA(lv_name) = to_upper( name ).
+    DATA lv_name TYPE string.
+    DATA lt_rows LIKE rows.
+      DATA temp218 TYPE z2ui5_cl_cgui_alv=>ty_s_filter.
+    lv_name = to_upper( name ).
     DELETE mt_filter WHERE name = lv_name.
-    DATA(lt_rows) = rows.
+
+    lt_rows = rows.
     DELETE lt_rows WHERE low IS INITIAL AND high IS INITIAL.
     IF lt_rows IS NOT INITIAL.
-      INSERT VALUE #( name = lv_name
-                      rows = lt_rows ) INTO TABLE mt_filter.
+
+      CLEAR temp218.
+      temp218-name = lv_name.
+      temp218-rows = lt_rows.
+      INSERT temp218 INTO TABLE mt_filter.
     ENDIF.
     mv_page = 1.
     result = me.
@@ -2526,12 +2960,14 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD clear_filter.
+      DATA lv_name TYPE string.
 
     " the filter of a column menu of the paged grid with it
     IF name IS INITIAL.
       CLEAR: mt_filter, mt_window_filter.
     ELSE.
-      DATA(lv_name) = to_upper( name ).
+
+      lv_name = to_upper( name ).
       DELETE mt_filter WHERE name = lv_name.
       DELETE mt_window_filter WHERE path = lv_name.
     ENDIF.
@@ -2555,11 +2991,13 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD filter_split.
+    DATA ls_row LIKE LINE OF rows.
 
     " a pattern needs the text of the cell - a number or a NUMC would lose
     " the * of it
     CLEAR: typed, pattern.
-    LOOP AT rows INTO DATA(ls_row).
+
+    LOOP AT rows INTO ls_row.
       IF ls_row-option = `CP` OR ls_row-option = `NP`
           OR ( ( ls_row-option = `EQ` OR ls_row-option = `NE` OR ls_row-option IS INITIAL ) AND ls_row-low CA `*+` ).
         INSERT ls_row INTO TABLE pattern.
@@ -2573,28 +3011,72 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
   METHOD filter_range.
 
     FIELD-SYMBOLS <range> TYPE STANDARD TABLE.
+    DATA temp219 TYPE REF TO cl_abap_tabledescr.
+    DATA lo_table LIKE temp219.
+    DATA temp220 TYPE REF TO cl_abap_structdescr.
+    DATA lo_struct LIKE temp220.
+    DATA lv_name TYPE string.
+    DATA lt_comp TYPE abap_component_tab.
+    DATA ls_comp TYPE abap_componentdescr.
+        DATA temp221 TYPE REF TO cl_abap_datadescr.
+        DATA temp39 TYPE REF TO cl_abap_datadescr.
+        DATA lo_value LIKE temp39.
+        DATA temp222 TYPE abap_component_tab.
+        DATA temp223 LIKE LINE OF temp222.
+        DATA lo_line TYPE REF TO cl_abap_structdescr.
+        DATA lo_range TYPE REF TO cl_abap_tabledescr.
 
     CLEAR error.
-    DATA(lo_table) = CAST cl_abap_tabledescr( cl_abap_typedescr=>describe_by_data( tab ) ).
-    DATA(lo_struct) = CAST cl_abap_structdescr( lo_table->get_table_line_type( ) ).
-    DATA(lv_name) = to_upper( name ).
-    DATA(lt_comp) = lo_struct->get_components( ).
-    READ TABLE lt_comp INTO DATA(ls_comp) WITH KEY name = lv_name.
+
+    temp219 ?= cl_abap_typedescr=>describe_by_data( tab ).
+
+    lo_table = temp219.
+
+    temp220 ?= lo_table->get_table_line_type( ).
+
+    lo_struct = temp220.
+
+    lv_name = to_upper( name ).
+
+    lt_comp = lo_struct->get_components( ).
+
+    READ TABLE lt_comp INTO ls_comp WITH KEY name = lv_name.
     IF sy-subrc <> 0 OR ls_comp-type->kind <> cl_abap_typedescr=>kind_elem.
       RETURN.
     ENDIF.
 
     TRY.
-        DATA(lo_value) = COND #( WHEN pattern = abap_true
-                                 THEN CAST cl_abap_datadescr( cl_abap_elemdescr=>get_string( ) )
-                                 ELSE ls_comp-type ).
+
+        temp221 ?= cl_abap_elemdescr=>get_string( ).
+
+        IF pattern = abap_true.
+          temp39 = temp221.
+        ELSE.
+          temp39 = ls_comp-type.
+        ENDIF.
+
+        lo_value = temp39.
         " create( ), not get( ) - get( ) is a stub in the transpiled runtime
-        DATA(lo_line) = cl_abap_structdescr=>create(
-            VALUE #( ( name = `SIGN`   type = cl_abap_elemdescr=>get_c( 1 ) )
-                     ( name = `OPTION` type = cl_abap_elemdescr=>get_c( 2 ) )
-                     ( name = `LOW`    type = lo_value )
-                     ( name = `HIGH`   type = lo_value ) ) ).
-        DATA(lo_range) = cl_abap_tabledescr=>create( lo_line ).
+
+        CLEAR temp222.
+
+        temp223-name = `SIGN`.
+        temp223-type = cl_abap_elemdescr=>get_c( 1 ).
+        INSERT temp223 INTO TABLE temp222.
+        temp223-name = `OPTION`.
+        temp223-type = cl_abap_elemdescr=>get_c( 2 ).
+        INSERT temp223 INTO TABLE temp222.
+        temp223-name = `LOW`.
+        temp223-type = lo_value.
+        INSERT temp223 INTO TABLE temp222.
+        temp223-name = `HIGH`.
+        temp223-type = lo_value.
+        INSERT temp223 INTO TABLE temp222.
+
+        lo_line = cl_abap_structdescr=>create(
+            temp222 ).
+
+        lo_range = cl_abap_tabledescr=>create( lo_line ).
 
         CREATE DATA result TYPE HANDLE lo_range.
       CATCH cx_root.
@@ -2623,7 +3105,8 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
         excl_typed   TYPE REF TO data,
         excl_pattern TYPE REF TO data,
       END OF ty_s_check.
-    DATA lt_check   TYPE STANDARD TABLE OF ty_s_check WITH EMPTY KEY.
+    TYPES temp3 TYPE STANDARD TABLE OF ty_s_check WITH DEFAULT KEY.
+DATA lt_check   TYPE temp3.
     DATA ls_check   TYPE ty_s_check.
     DATA lt_typed   TYPE z2ui5_cl_cgui_range=>ty_t_row.
     DATA lt_pattern TYPE z2ui5_cl_cgui_range=>ty_t_row.
@@ -2635,12 +3118,30 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
 
     " the filter of the grid and, paged, the one of the column menus - the
     " browser holds only some of the rows there and filters none of them
-    DATA(lt_filter) = mt_filter.
+    DATA lt_filter LIKE mt_filter.
+    DATA ls_filter LIKE LINE OF lt_filter.
+      DATA temp224 LIKE sy-subrc.
+      DATA temp225 LIKE sy-subrc.
+      DATA temp226 LIKE sy-tabix.
+      DATA temp40 LIKE sy-subrc.
+      DATA temp41 LIKE sy-subrc.
+      DATA temp42 LIKE sy-tabix.
+      DATA temp24 TYPE xsdboolean.
+      DATA temp25 TYPE xsdboolean.
+    DATA lt_visible TYPE z2ui5_cl_cgui_context=>ty_t_comp.
+    FIELD-SYMBOLS <row> TYPE ANY.
+      DATA lv_index LIKE sy-tabix.
+      DATA lv_pass LIKE abap_true.
+        DATA ls_visible LIKE LINE OF lt_visible.
+        DATA lv_incl TYPE abap_bool.
+        DATA temp26 TYPE xsdboolean.
+    lt_filter = mt_filter.
     IF mv_page_size > 0.
       INSERT LINES OF window_filter( tab ) INTO TABLE lt_filter.
     ENDIF.
 
-    LOOP AT lt_filter INTO DATA(ls_filter).
+
+    LOOP AT lt_filter INTO ls_filter.
       IF check_filter( name = ls_filter-name
                        rows = ls_filter-rows
                        tab  = tab ) IS NOT INITIAL.
@@ -2651,8 +3152,27 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
       filter_split( EXPORTING rows    = ls_filter-rows
                     IMPORTING typed   = lt_typed
                               pattern = lt_pattern ).
-      ls_check-has_incl = xsdbool( line_exists( ls_filter-rows[ sign = `I` ] )
-                                   OR line_exists( ls_filter-rows[ sign = `` ] ) ).
+
+
+
+      temp225 = sy-subrc.
+      temp226 = sy-tabix.
+      READ TABLE ls_filter-rows WITH KEY sign = `I` TRANSPORTING NO FIELDS.
+      temp224 = sy-subrc.
+      sy-subrc = temp225.
+      sy-tabix = temp226.
+
+
+
+      temp41 = sy-subrc.
+      temp42 = sy-tabix.
+      READ TABLE ls_filter-rows WITH KEY sign = `` TRANSPORTING NO FIELDS.
+      temp40 = sy-subrc.
+      sy-subrc = temp41.
+      sy-tabix = temp42.
+
+      temp24 = boolc( temp224 = 0 OR temp40 = 0 ).
+      ls_check-has_incl = temp24.
       lt_incl = lt_typed.
       DELETE lt_incl WHERE sign = `E`.
       lt_excl = lt_typed.
@@ -2684,20 +3204,27 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
       filter_include( ls_check-excl_typed ).
       filter_include( ls_check-incl_pattern ).
       filter_include( ls_check-excl_pattern ).
-      ls_check-has_pattern = xsdbool( lt_pattern IS NOT INITIAL ).
+
+      temp25 = boolc( lt_pattern IS NOT INITIAL ).
+      ls_check-has_pattern = temp25.
       IF ls_check-incl_typed IS BOUND.
         INSERT ls_check INTO TABLE lt_check.
       ENDIF.
     ENDLOOP.
 
-    DATA(lt_visible) = columns_visible( tab ).
-    LOOP AT tab ASSIGNING FIELD-SYMBOL(<row>).
-      DATA(lv_index) = sy-tabix.
-      DATA(lv_pass) = abap_true.
+
+    lt_visible = columns_visible( tab ).
+
+    LOOP AT tab ASSIGNING <row>.
+
+      lv_index = sy-tabix.
+
+      lv_pass = abap_true.
       " the search: the text in one of the columns shown, case ignored (CS)
       IF mv_search IS NOT INITIAL.
         lv_pass = abap_false.
-        LOOP AT lt_visible INTO DATA(ls_visible).
+
+        LOOP AT lt_visible INTO ls_visible.
           ASSIGN COMPONENT ls_visible-name OF STRUCTURE <row> TO <cell>.
           IF sy-subrc = 0 AND cell_to_text( val  = <cell>
                                             comp = ls_visible ) CS mv_search.
@@ -2719,11 +3246,10 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
         IF ls_check-has_pattern = abap_true.
           lv_text = |{ <cell> }|.
         ENDIF.
-        DATA(lv_incl) = xsdbool( ls_check-has_incl = abap_false
-                                 OR filter_match( val   = <cell>
-                                                  range = ls_check-incl_typed ) = abap_true
-                                 OR filter_match( val   = lv_text
-                                                  range = ls_check-incl_pattern ) = abap_true ).
+
+
+        temp26 = boolc( ls_check-has_incl = abap_false OR filter_match( val = <cell> range = ls_check-incl_typed ) = abap_true OR filter_match( val = lv_text range = ls_check-incl_pattern ) = abap_true ).
+        lv_incl = temp26.
         IF lv_incl = abap_false
             OR filter_match( val   = <cell>
                              range = ls_check-excl_typed ) = abap_true
@@ -2779,15 +3305,20 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
 
   METHOD set_filter_change.
 
-    mv_no_filter = xsdbool( val = abap_false ).
+    DATA temp27 TYPE xsdboolean.
+    temp27 = boolc( val = abap_false ).
+    mv_no_filter = temp27.
     result = me.
 
   ENDMETHOD.
 
   METHOD add_header.
 
-    INSERT VALUE #( label = label
-                    value = value ) INTO TABLE mt_header.
+    DATA temp227 TYPE z2ui5_cl_cgui_alv=>ty_s_header.
+    CLEAR temp227.
+    temp227-label = label.
+    temp227-value = value.
+    INSERT temp227 INTO TABLE mt_header.
     result = me.
 
   ENDMETHOD.
@@ -2806,13 +3337,25 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
 
   METHOD render_header.
 
-    DATA(lt_line) = COND ty_t_header( WHEN items IS SUPPLIED THEN items ELSE mt_header ).
+    DATA temp228 TYPE ty_t_header.
+    DATA lt_line LIKE temp228.
+    DATA lo_box TYPE REF TO z2ui5_cl_ui5_view_builder.
+    DATA ls_header LIKE LINE OF lt_line.
+    IF items IS SUPPLIED.
+      temp228 = items.
+    ELSE.
+      temp228 = mt_header.
+    ENDIF.
+
+    lt_line = temp228.
     IF lt_line IS INITIAL.
       RETURN.
     ENDIF.
-    DATA(lo_box) = node->ele( `VBox`
+
+    lo_box = node->ele( `VBox`
         )->a( n = `class` v = `sapUiSmallMarginBeginEnd sapUiSmallMarginTop` ).
-    LOOP AT lt_line INTO DATA(ls_header).
+
+    LOOP AT lt_line INTO ls_header.
       IF ls_header-label IS INITIAL.
         lo_box->tag( `Title`
             )->a( n = `text`  t = ls_header-value
@@ -2832,14 +3375,18 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
 
   METHOD set_layout_change.
 
-    mv_no_layout = xsdbool( val = abap_false ).
+    DATA temp28 TYPE xsdboolean.
+    temp28 = boolc( val = abap_false ).
+    mv_no_layout = temp28.
     result = me.
 
   ENDMETHOD.
 
   METHOD get_layout_change.
 
-    result = xsdbool( mv_no_layout = abap_false ).
+    DATA temp29 TYPE xsdboolean.
+    temp29 = boolc( mv_no_layout = abap_false ).
+    result = temp29.
 
   ENDMETHOD.
 
@@ -2847,25 +3394,53 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
 
     DATA lv_seq TYPE i.
 
-    LOOP AT z2ui5_cl_cgui_context=>rtti_get_t_comp( tab ) INTO DATA(ls_comp).
+    DATA temp229 TYPE z2ui5_cl_cgui_context=>ty_t_comp.
+    DATA ls_comp LIKE LINE OF temp229.
+      DATA ls_column TYPE z2ui5_cl_cgui_alv=>ty_s_column.
+      DATA temp230 TYPE z2ui5_cl_cgui_alv=>ty_s_layout.
+      DATA temp43 TYPE z2ui5_cl_cgui_alv=>ty_s_layout-text.
+      DATA temp44 TYPE z2ui5_cl_cgui_alv=>ty_s_layout-position.
+    DATA temp231 LIKE LINE OF result.
+    DATA lr_layout LIKE REF TO temp231.
+    temp229 = z2ui5_cl_cgui_context=>rtti_get_t_comp( tab ).
+
+    LOOP AT temp229 INTO ls_comp.
       IF column_skipped( ls_comp-name ) = abap_true.
         CONTINUE.
       ENDIF.
       lv_seq = lv_seq + 1.
-      DATA(ls_column) = column_setting( ls_comp-name ).
-      INSERT VALUE #( name     = ls_comp-name
-                      text     = COND #( WHEN ls_column-text IS NOT INITIAL THEN ls_column-text ELSE ls_comp-label )
-                      hidden   = ls_column-hidden
-                      position = COND #( WHEN ls_column-position > 0 THEN ls_column-position ELSE 1000 + lv_seq )
-                      sort     = ls_column-sort
-                      sort_seq = ls_column-sort_seq
-                      sum      = ls_column-sum
-                      subtotal = ls_column-subtotal
-                      numeric  = is_numeric( ls_comp-type_kind ) ) INTO TABLE result.
+
+      ls_column = column_setting( ls_comp-name ).
+
+      CLEAR temp230.
+      temp230-name = ls_comp-name.
+
+      IF ls_column-text IS NOT INITIAL.
+        temp43 = ls_column-text.
+      ELSE.
+        temp43 = ls_comp-label.
+      ENDIF.
+      temp230-text = temp43.
+      temp230-hidden = ls_column-hidden.
+
+      IF ls_column-position > 0.
+        temp44 = ls_column-position.
+      ELSE.
+        temp44 = 1000 + lv_seq.
+      ENDIF.
+      temp230-position = temp44.
+      temp230-sort = ls_column-sort.
+      temp230-sort_seq = ls_column-sort_seq.
+      temp230-sum = ls_column-sum.
+      temp230-subtotal = ls_column-subtotal.
+      temp230-numeric = is_numeric( ls_comp-type_kind ).
+      INSERT temp230 INTO TABLE result.
     ENDLOOP.
 
     SORT result STABLE BY position.
-    LOOP AT result REFERENCE INTO DATA(lr_layout).
+
+
+    LOOP AT result REFERENCE INTO lr_layout.
       lr_layout->position = sy-tabix.
     ENDLOOP.
 
@@ -2873,12 +3448,22 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
 
   METHOD set_layout.
 
-    LOOP AT layout INTO DATA(ls_layout).
-      DATA(lr_column) = column_get( ls_layout-name ).
+    DATA ls_layout LIKE LINE OF layout.
+      DATA lr_column TYPE REF TO z2ui5_cl_cgui_alv=>ty_s_column.
+      DATA temp232 TYPE z2ui5_cl_cgui_alv=>ty_s_column-sort_seq.
+    LOOP AT layout INTO ls_layout.
+
+      lr_column = column_get( ls_layout-name ).
       lr_column->hidden   = ls_layout-hidden.
       lr_column->position = ls_layout-position.
       lr_column->sort     = to_upper( ls_layout-sort ).
-      lr_column->sort_seq = COND #( WHEN ls_layout-sort IS NOT INITIAL THEN ls_layout-sort_seq ).
+
+      IF ls_layout-sort IS NOT INITIAL.
+        temp232 = ls_layout-sort_seq.
+      ELSE.
+        CLEAR temp232.
+      ENDIF.
+      lr_column->sort_seq = temp232.
       lr_column->sum      = ls_layout-sum.
       lr_column->subtotal = ls_layout-subtotal.
     ENDLOOP.
@@ -2888,7 +3473,9 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
 
   METHOD render_functions.
 
-    LOOP AT functions REFERENCE INTO DATA(lr_function).
+    DATA temp233 LIKE LINE OF functions.
+    DATA lr_function LIKE REF TO temp233.
+    LOOP AT functions REFERENCE INTO lr_function.
       bar->tag( `Button`
           )->a( n = `text`    t = lr_function->text
           )->a( n = `icon`    v = lr_function->icon
@@ -2923,8 +3510,12 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
     FIELD-SYMBOLS <copy> TYPE STANDARD TABLE.
     FIELD-SYMBOLS <row>  TYPE any.
 
-    DATA(lt_order) = sort_order( tab ).
-    DATA(lv_lines) = lines( tab ).
+    DATA lt_order TYPE abap_sortorder_tab.
+    DATA lv_lines TYPE i.
+    DATA lv_row LIKE LINE OF lt_index.
+    lt_order = sort_order( tab ).
+
+    lv_lines = lines( tab ).
     IF lt_order IS INITIAL OR lv_lines < 2.
       RETURN.
     ENDIF.
@@ -2941,7 +3532,8 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
     ASSIGN lr_copy->* TO <copy>.
     <copy> = tab.
     CLEAR tab.
-    LOOP AT lt_index INTO DATA(lv_row).
+
+    LOOP AT lt_index INTO lv_row.
       READ TABLE <copy> INDEX lv_row ASSIGNING <row>.
       INSERT <row> INTO TABLE tab.
     ENDLOOP.
@@ -2959,23 +3551,36 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
     DATA lv_b      TYPE i.
     DATA lv_number TYPE i.
 
-    DATA(lv_lines) = lines( index ).
+    DATA lv_lines TYPE i.
+    DATA lv_width TYPE i.
+      DATA lv_left TYPE i.
+        DATA lv_mid TYPE i.
+        DATA lv_end TYPE i.
+        DATA lv_i LIKE lv_left.
+        DATA lv_j LIKE lv_mid.
+    lv_lines = lines( index ).
     IF order IS INITIAL OR lv_lines < 2.
       RETURN.
     ENDIF.
 
-    DATA(lv_width) = 1.
+
+    lv_width = 1.
     WHILE lv_width < lv_lines.
       CLEAR lt_merged.
-      DATA(lv_left) = 1.
+
+      lv_left = 1.
       WHILE lv_left <= lv_lines.
         " the runs [left, mid) and [mid, end) into one
-        DATA(lv_mid) = nmin( val1 = lv_left + lv_width
+
+        lv_mid = nmin( val1 = lv_left + lv_width
                              val2 = lv_lines + 1 ).
-        DATA(lv_end) = nmin( val1 = lv_left + 2 * lv_width
+
+        lv_end = nmin( val1 = lv_left + 2 * lv_width
                              val2 = lv_lines + 1 ).
-        DATA(lv_i) = lv_left.
-        DATA(lv_j) = lv_mid.
+
+        lv_i = lv_left.
+
+        lv_j = lv_mid.
         WHILE lv_i < lv_mid OR lv_j < lv_end.
           IF lv_j >= lv_end.
             lv_right = abap_false.
@@ -3013,11 +3618,17 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
     FIELD-SYMBOLS <row_b> TYPE any.
     FIELD-SYMBOLS <val_a> TYPE any.
     FIELD-SYMBOLS <val_b> TYPE any.
+    DATA ls_order LIKE LINE OF order.
+      DATA lv_name TYPE string.
+        DATA temp30 TYPE xsdboolean.
+        DATA temp31 TYPE xsdboolean.
 
     READ TABLE tab INDEX a ASSIGNING <row_a>.
     READ TABLE tab INDEX b ASSIGNING <row_b>.
-    LOOP AT order INTO DATA(ls_order).
-      DATA(lv_name) = condense( ls_order-name ).
+
+    LOOP AT order INTO ls_order.
+
+      lv_name = condense( ls_order-name ).
       UNASSIGN: <val_a>, <val_b>.
       ASSIGN COMPONENT lv_name OF STRUCTURE <row_a> TO <val_a>.
       ASSIGN COMPONENT lv_name OF STRUCTURE <row_b> TO <val_b>.
@@ -3025,9 +3636,13 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
         CONTINUE.
       ENDIF.
       IF ls_order-descending = abap_true.
-        result = xsdbool( <val_a> > <val_b> ).
+
+        temp30 = boolc( <val_a> > <val_b> ).
+        result = temp30.
       ELSE.
-        result = xsdbool( <val_a> < <val_b> ).
+
+        temp31 = boolc( <val_a> < <val_b> ).
+        result = temp31.
       ENDIF.
       RETURN.
     ENDLOOP.
@@ -3036,9 +3651,19 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
 
   METHOD sort_order.
 
-    DATA(lt_comp) = z2ui5_cl_cgui_context=>rtti_get_t_comp( tab ).
-    LOOP AT sort_layout( ) INTO DATA(ls_order).
-      IF line_exists( lt_comp[ name = ls_order-name ] ).
+    DATA lt_comp TYPE z2ui5_cl_cgui_context=>ty_t_comp.
+    DATA temp234 TYPE abap_sortorder_tab.
+    DATA ls_order LIKE LINE OF temp234.
+      DATA temp235 LIKE sy-subrc.
+    lt_comp = z2ui5_cl_cgui_context=>rtti_get_t_comp( tab ).
+
+    temp234 = sort_layout( ).
+
+    LOOP AT temp234 INTO ls_order.
+
+      READ TABLE lt_comp WITH KEY name = ls_order-name TRANSPORTING NO FIELDS.
+      temp235 = sy-subrc.
+      IF temp235 = 0.
         INSERT ls_order INTO TABLE result.
       ENDIF.
     ENDLOOP.
@@ -3047,12 +3672,22 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
 
   METHOD sort_layout.
 
-    DATA(lt_sorted) = mt_column.
+    DATA lt_sorted LIKE mt_column.
+    DATA ls_column LIKE LINE OF lt_sorted.
+      DATA temp236 TYPE abap_sortorder.
+      DATA temp32 TYPE xsdboolean.
+    lt_sorted = mt_column.
     DELETE lt_sorted WHERE sort IS INITIAL.
     SORT lt_sorted BY sort_seq name.
-    LOOP AT lt_sorted INTO DATA(ls_column).
-      INSERT VALUE #( name       = ls_column-name
-                      descending = xsdbool( ls_column-sort = cs_sort-descending ) ) INTO TABLE result.
+
+    LOOP AT lt_sorted INTO ls_column.
+
+      CLEAR temp236.
+      temp236-name = ls_column-name.
+
+      temp32 = boolc( ls_column-sort = cs_sort-descending ).
+      temp236-descending = temp32.
+      INSERT temp236 INTO TABLE result.
     ENDLOOP.
 
   ENDMETHOD.
@@ -3074,7 +3709,10 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
     DATA lt_order TYPE abap_sortorder_tab.
 
     " what a column menu asked for holds until the layout sorts anew
-    DATA(lt_layout) = sort_layout( ).
+    DATA lt_layout TYPE abap_sortorder_tab.
+    DATA ls_sort LIKE LINE OF mt_window_sort.
+      DATA temp237 TYPE abap_sortorder.
+    lt_layout = sort_layout( ).
     IF mt_window_layout <> lt_layout.
       CLEAR: mt_window_sort, mt_window_filter, mt_window_layout.
     ENDIF.
@@ -3082,9 +3720,13 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
     " the filter of the grid and the one of the column menus together
     result = filter_index( tab ).
 
-    LOOP AT mt_window_sort INTO DATA(ls_sort).
-      INSERT VALUE #( name       = ls_sort-path
-                      descending = ls_sort-descending ) INTO TABLE lt_order.
+
+    LOOP AT mt_window_sort INTO ls_sort.
+
+      CLEAR temp237.
+      temp237-name = ls_sort-path.
+      temp237-descending = ls_sort-descending.
+      INSERT temp237 INTO TABLE lt_order.
     ENDLOOP.
     IF lt_order IS INITIAL.
       lt_order = sort_order( tab ).
@@ -3107,23 +3749,41 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
         mixed TYPE abap_bool,
         rows  TYPE z2ui5_cl_cgui_range=>ty_t_row,
       END OF ty_s_group.
-    DATA lt_group TYPE STANDARD TABLE OF ty_s_group WITH EMPTY KEY.
+    TYPES temp4 TYPE STANDARD TABLE OF ty_s_group WITH DEFAULT KEY.
+DATA lt_group TYPE temp4.
     DATA ls_row   TYPE z2ui5_cl_cgui_range=>ty_s_row.
 
-    DATA(lt_comp) = z2ui5_cl_cgui_context=>rtti_get_t_comp( tab ).
-    LOOP AT mt_window_filter INTO DATA(ls_cond).
-      READ TABLE lt_group ASSIGNING FIELD-SYMBOL(<group>) WITH KEY group = ls_cond-group.
+    DATA lt_comp TYPE z2ui5_cl_cgui_context=>ty_t_comp.
+    DATA ls_cond LIKE LINE OF mt_window_filter.
+      FIELD-SYMBOLS <group> TYPE ty_s_group.
+        DATA temp238 TYPE ty_s_group.
+      DATA lv_low LIKE ls_cond-value1.
+      DATA lv_high LIKE ls_cond-value2.
+      DATA ls_comp TYPE z2ui5_cl_cgui_context=>ty_s_comp.
+    DATA ls_group LIKE LINE OF lt_group.
+      DATA temp239 TYPE z2ui5_cl_cgui_alv=>ty_s_filter.
+    lt_comp = z2ui5_cl_cgui_context=>rtti_get_t_comp( tab ).
+
+    LOOP AT mt_window_filter INTO ls_cond.
+
+      READ TABLE lt_group ASSIGNING <group> WITH KEY group = ls_cond-group.
       IF sy-subrc <> 0.
-        INSERT VALUE #( group = ls_cond-group
-                        name  = ls_cond-path ) INTO TABLE lt_group ASSIGNING <group>.
+
+        CLEAR temp238.
+        temp238-group = ls_cond-group.
+        temp238-name = ls_cond-path.
+        INSERT temp238 INTO TABLE lt_group ASSIGNING <group>.
       ELSEIF <group>-name <> ls_cond-path.
         <group>-mixed = abap_true.
       ENDIF.
 
       " a date or a time comes as the browser writes it, the cell has digits
-      DATA(lv_low) = ls_cond-value1.
-      DATA(lv_high) = ls_cond-value2.
-      READ TABLE lt_comp INTO DATA(ls_comp) WITH KEY name = ls_cond-path.
+
+      lv_low = ls_cond-value1.
+
+      lv_high = ls_cond-value2.
+
+      READ TABLE lt_comp INTO ls_comp WITH KEY name = ls_cond-path.
       IF sy-subrc = 0 AND ls_comp-type_kind = cl_abap_typedescr=>typekind_date.
         lv_low = replace( val = lv_low sub = `-` with = `` occ = 0 ).
         lv_high = replace( val = lv_high sub = `-` with = `` occ = 0 ).
@@ -3133,8 +3793,9 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
       ENDIF.
 
       " a sap.ui.model.FilterOperator as a line of a multiple selection
-      ls_row = VALUE #( sign = `I`
-                        low  = lv_low ).
+      CLEAR ls_row.
+      ls_row-sign = `I`.
+      ls_row-low = lv_low.
       CASE ls_cond-operator.
         WHEN `EQ` OR `NE` OR `LT` OR `LE` OR `GT` OR `GE`.
           ls_row-option = ls_cond-operator.
@@ -3168,9 +3829,13 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
       INSERT ls_row INTO TABLE <group>-rows.
     ENDLOOP.
 
-    LOOP AT lt_group INTO DATA(ls_group) WHERE mixed = abap_false.
-      INSERT VALUE #( name = ls_group-name
-                      rows = ls_group-rows ) INTO TABLE result.
+
+    LOOP AT lt_group INTO ls_group WHERE mixed = abap_false.
+
+      CLEAR temp239.
+      temp239-name = ls_group-name.
+      temp239-rows = ls_group-rows.
+      INSERT temp239 INTO TABLE result.
     ENDLOOP.
 
   ENDMETHOD.
@@ -3179,8 +3844,22 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
 
     DATA lt_part TYPE string_table.
 
-    LOOP AT sort_order( tab ) INTO DATA(ls_order).
-      INSERT |\{path: '{ ls_order-name }', descending: { COND #( WHEN ls_order-descending = abap_true THEN `true` ELSE `false` ) }\}| INTO TABLE lt_part.
+    DATA temp240 TYPE abap_sortorder_tab.
+    DATA ls_order LIKE LINE OF temp240.
+      DATA temp241 TYPE string.
+      DATA temp45 LIKE LINE OF lt_part.
+    temp240 = sort_order( tab ).
+
+    LOOP AT temp240 INTO ls_order.
+
+      IF ls_order-descending = abap_true.
+        temp241 = `true`.
+      ELSE.
+        temp241 = `false`.
+      ENDIF.
+
+      temp45 = |\{path: '{ ls_order-name }', descending: { temp241 }\}|.
+      INSERT temp45 INTO TABLE lt_part.
     ENDLOOP.
     IF lt_part IS NOT INITIAL.
       result = |[{ concat_lines_of( table = lt_part sep = `, ` ) }]|.
@@ -3206,28 +3885,50 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
     FIELD-SYMBOLS <cell> TYPE any.
     FIELD-SYMBOLS <unit> TYPE any.
     DATA lt_part     TYPE string_table.
-    DATA lt_seen     TYPE SORTED TABLE OF ty_s_seen WITH UNIQUE KEY group column unit.
-    DATA lt_unit_col TYPE STANDARD TABLE OF ty_s_unit_col WITH EMPTY KEY.
+    TYPES temp5 TYPE SORTED TABLE OF ty_s_seen WITH UNIQUE KEY group column unit.
+DATA lt_seen     TYPE temp5.
+    TYPES temp6 TYPE STANDARD TABLE OF ty_s_unit_col WITH DEFAULT KEY.
+DATA lt_unit_col TYPE temp6.
     DATA lt_index    TYPE ty_t_index.
     DATA lv_value    TYPE decfloat34.
     DATA lv_number   TYPE i.
     DATA lv_unit     TYPE string.
 
-    DATA(lt_comp) = z2ui5_cl_cgui_context=>rtti_get_t_comp( tab ).
-    DATA(lt_group) = mt_column.
+    DATA lt_comp TYPE z2ui5_cl_cgui_context=>ty_t_comp.
+    DATA lt_group LIKE mt_column.
+    DATA lt_summed LIKE mt_column.
+    DATA ls_with_unit LIKE LINE OF lt_summed.
+      DATA temp242 TYPE ty_s_unit_col.
+    DATA lv_row LIKE LINE OF lt_index.
+      DATA ls_group LIKE LINE OF lt_group.
+        DATA ls_comp TYPE z2ui5_cl_cgui_context=>ty_s_comp.
+      DATA lv_group TYPE string.
+      DATA ls_summed LIKE LINE OF lt_summed.
+        DATA ls_unit_col TYPE ty_s_unit_col.
+        DATA ls_seen TYPE ty_s_seen.
+          FIELD-SYMBOLS <sum> TYPE z2ui5_cl_cgui_alv=>ty_s_subtotal.
+          DATA temp243 TYPE z2ui5_cl_cgui_alv=>ty_s_subtotal.
+          DATA temp244 TYPE ty_s_seen.
+    lt_comp = z2ui5_cl_cgui_context=>rtti_get_t_comp( tab ).
+
+    lt_group = mt_column.
     DELETE lt_group WHERE subtotal = abap_false OR sort IS INITIAL.
     SORT lt_group BY sort_seq name.
-    DATA(lt_summed) = mt_column.
+
+    lt_summed = mt_column.
     DELETE lt_summed WHERE sum = abap_false OR hidden = abap_true.
     IF lt_group IS INITIAL OR lt_summed IS INITIAL.
       RETURN.
     ENDIF.
     " a subtotal per currency or unit as well - amounts of two currencies
     " are not added up
-    LOOP AT lt_summed INTO DATA(ls_with_unit).
-      INSERT VALUE #( column = ls_with_unit-name
-                      unit   = unit_column( column = ls_with_unit
-                                            tab    = tab ) ) INTO TABLE lt_unit_col.
+
+    LOOP AT lt_summed INTO ls_with_unit.
+
+      CLEAR temp242.
+      temp242-column = ls_with_unit-name.
+      temp242-unit = unit_column( column = ls_with_unit tab = tab ).
+      INSERT temp242 INTO TABLE lt_unit_col.
     ENDLOOP.
 
     " the rows in the order of the sorting - the groups follow it, not the
@@ -3240,11 +3941,14 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
                           order = sort_order( tab )
                 CHANGING  index = lt_index ).
 
-    LOOP AT lt_index INTO DATA(lv_row).
+
+    LOOP AT lt_index INTO lv_row.
       READ TABLE tab ASSIGNING <row> INDEX lv_row.
       CLEAR lt_part.
-      LOOP AT lt_group INTO DATA(ls_group).
-        READ TABLE lt_comp INTO DATA(ls_comp) WITH KEY name = ls_group-name.
+
+      LOOP AT lt_group INTO ls_group.
+
+        READ TABLE lt_comp INTO ls_comp WITH KEY name = ls_group-name.
         IF sy-subrc <> 0.
           CONTINUE.
         ENDIF.
@@ -3252,9 +3956,11 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
         INSERT cell_to_text( val  = <cell>
                              comp = ls_comp ) INTO TABLE lt_part.
       ENDLOOP.
-      DATA(lv_group) = concat_lines_of( table = lt_part sep = ` / ` ).
 
-      LOOP AT lt_summed INTO DATA(ls_summed).
+      lv_group = concat_lines_of( table = lt_part sep = ` / ` ).
+
+
+      LOOP AT lt_summed INTO ls_summed.
         ASSIGN COMPONENT ls_summed-name OF STRUCTURE <row> TO <cell>.
         IF sy-subrc <> 0.
           CONTINUE.
@@ -3265,26 +3971,35 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
             CONTINUE.
         ENDTRY.
         CLEAR lv_unit.
-        READ TABLE lt_unit_col INTO DATA(ls_unit_col) WITH KEY column = ls_summed-name.
+
+        READ TABLE lt_unit_col INTO ls_unit_col WITH KEY column = ls_summed-name.
         IF sy-subrc = 0 AND ls_unit_col-unit IS NOT INITIAL.
           ASSIGN COMPONENT ls_unit_col-unit OF STRUCTURE <row> TO <unit>.
           lv_unit = <unit>.
         ENDIF.
-        READ TABLE lt_seen INTO DATA(ls_seen) WITH TABLE KEY group  = lv_group
+
+        READ TABLE lt_seen INTO ls_seen WITH TABLE KEY group  = lv_group
                                                              column = ls_summed-name
                                                              unit   = lv_unit.
         IF sy-subrc = 0.
-          READ TABLE result ASSIGNING FIELD-SYMBOL(<sum>) INDEX ls_seen-pos.
+
+          READ TABLE result ASSIGNING <sum> INDEX ls_seen-pos.
           <sum>-value = <sum>-value + lv_value.
         ELSE.
-          INSERT VALUE #( group  = lv_group
-                          column = ls_summed-name
-                          value  = lv_value
-                          unit   = lv_unit ) INTO TABLE result.
-          INSERT VALUE #( group  = lv_group
-                          column = ls_summed-name
-                          unit   = lv_unit
-                          pos    = lines( result ) ) INTO TABLE lt_seen.
+
+          CLEAR temp243.
+          temp243-group = lv_group.
+          temp243-column = ls_summed-name.
+          temp243-value = lv_value.
+          temp243-unit = lv_unit.
+          INSERT temp243 INTO TABLE result.
+
+          CLEAR temp244.
+          temp244-group = lv_group.
+          temp244-column = ls_summed-name.
+          temp244-unit = lv_unit.
+          temp244-pos = lines( result ).
+          INSERT temp244 INTO TABLE lt_seen.
         ENDIF.
       ENDLOOP.
     ENDLOOP.
@@ -3299,8 +4014,10 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
         width TYPE i,
         right TYPE abap_bool,
       END OF ty_s_width.
-    DATA lt_width TYPE STANDARD TABLE OF ty_s_width WITH EMPTY KEY.
-    DATA lt_cells TYPE STANDARD TABLE OF string_table WITH EMPTY KEY.
+    TYPES temp7 TYPE STANDARD TABLE OF ty_s_width WITH DEFAULT KEY.
+DATA lt_width TYPE temp7.
+    TYPES temp8 TYPE STANDARD TABLE OF string_table WITH DEFAULT KEY.
+DATA lt_cells TYPE temp8.
     DATA lt_cell  TYPE string_table.
     DATA lv_line  TYPE string.
     DATA lv_text  TYPE string.
@@ -3313,17 +4030,48 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
     FIELD-SYMBOLS <copy> TYPE STANDARD TABLE.
     FIELD-SYMBOLS <row>  TYPE any.
     FIELD-SYMBOLS <cell> TYPE any.
+    DATA lt_comp TYPE z2ui5_cl_cgui_context=>ty_t_comp.
+    DATA ls_comp LIKE LINE OF lt_comp.
+      DATA temp245 TYPE ty_s_width.
+        FIELD-SYMBOLS <temp246> LIKE LINE OF lt_width.
+        DATA temp247 LIKE sy-tabix.
+        FIELD-SYMBOLS <temp46> LIKE LINE OF lt_width.
+        DATA temp47 LIKE sy-tabix.
+    DATA lv_rows TYPE i.
+    DATA lt_aggregate TYPE z2ui5_cl_cgui_alv=>ty_t_aggregate.
+        DATA ls_aggregate LIKE LINE OF lt_aggregate.
+        FIELD-SYMBOLS <temp248> LIKE LINE OF lt_width.
+        DATA temp249 LIKE sy-tabix.
+        FIELD-SYMBOLS <temp48> LIKE LINE OF lt_width.
+        DATA temp49 LIKE sy-tabix.
+      DATA lv_width TYPE ty_s_width-width.
+      FIELD-SYMBOLS <temp50> LIKE LINE OF lt_width.
+      DATA temp51 LIKE sy-tabix.
+    DATA ls_header LIKE LINE OF mt_header.
+      DATA temp250 TYPE string.
+    DATA lv_rule TYPE string.
+    DATA lt_values LIKE LINE OF lt_cells.
+        DATA ls_width LIKE LINE OF lt_width.
+        FIELD-SYMBOLS <temp52> LIKE LINE OF lt_width.
+        DATA temp53 LIKE sy-tabix.
+    DATA ls_footer LIKE LINE OF mt_footer.
+      DATA temp251 TYPE string.
 
     CREATE DATA lr_copy LIKE tab.
     ASSIGN lr_copy->* TO <copy>.
     <copy> = tab.
     sort_rows( CHANGING tab = <copy> ).
 
-    DATA(lt_comp) = columns_visible( tab ).
-    LOOP AT lt_comp INTO DATA(ls_comp).
-      INSERT VALUE #( name  = ls_comp-name
-                      width = strlen( ls_comp-label )
-                      right = is_numeric( ls_comp-type_kind ) ) INTO TABLE lt_width.
+
+    lt_comp = columns_visible( tab ).
+
+    LOOP AT lt_comp INTO ls_comp.
+
+      CLEAR temp245.
+      temp245-name = ls_comp-name.
+      temp245-width = strlen( ls_comp-label ).
+      temp245-right = is_numeric( ls_comp-type_kind ).
+      INSERT temp245 INTO TABLE lt_width.
     ENDLOOP.
 
     LOOP AT <copy> ASSIGNING <row>.
@@ -3337,8 +4085,24 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
                                   comp = ls_comp ).
         ENDIF.
         INSERT lv_text INTO TABLE lt_cell.
-        lt_width[ lv_index ]-width = nmin( val1 = 40
-                                           val2 = nmax( val1 = lt_width[ lv_index ]-width
+
+
+        temp247 = sy-tabix.
+        READ TABLE lt_width INDEX lv_index ASSIGNING <temp246>.
+        sy-tabix = temp247.
+        IF sy-subrc <> 0.
+          ASSERT 1 = 0.
+        ENDIF.
+
+
+        temp47 = sy-tabix.
+        READ TABLE lt_width INDEX lv_index ASSIGNING <temp46>.
+        sy-tabix = temp47.
+        IF sy-subrc <> 0.
+          ASSERT 1 = 0.
+        ENDIF.
+        <temp246>-width = nmin( val1 = 40
+                                           val2 = nmax( val1 = <temp46>-width
                                                         val2 = strlen( lv_text ) ) ).
       ENDLOOP.
       INSERT lt_cell INTO TABLE lt_cells.
@@ -3347,15 +4111,18 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
     " the aggregates of the columns - a total, an average, a minimum, a
     " maximum or a count, as the grid shows them: a line per currency or
     " unit, the n-th line the n-th aggregate of each column
-    DATA(lv_rows) = lines( lt_cells ).
-    DATA(lt_aggregate) = get_aggregates( <copy> ).
+
+    lv_rows = lines( lt_cells ).
+
+    lt_aggregate = get_aggregates( <copy> ).
     DO.
       lv_rank = sy-index.
       CLEAR: lt_cell, lv_found.
       LOOP AT lt_comp INTO ls_comp.
         lv_index = sy-tabix.
         CLEAR: lv_text, lv_count.
-        LOOP AT lt_aggregate INTO DATA(ls_aggregate) WHERE column = ls_comp-name.
+
+        LOOP AT lt_aggregate INTO ls_aggregate WHERE column = ls_comp-name.
           lv_count = lv_count + 1.
           IF lv_count = lv_rank.
             lv_text = aggregate_text( ls_aggregate ).
@@ -3364,7 +4131,23 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
           ENDIF.
         ENDLOOP.
         INSERT lv_text INTO TABLE lt_cell.
-        lt_width[ lv_index ]-width = nmax( val1 = lt_width[ lv_index ]-width
+
+
+        temp249 = sy-tabix.
+        READ TABLE lt_width INDEX lv_index ASSIGNING <temp248>.
+        sy-tabix = temp249.
+        IF sy-subrc <> 0.
+          ASSERT 1 = 0.
+        ENDIF.
+
+
+        temp49 = sy-tabix.
+        READ TABLE lt_width INDEX lv_index ASSIGNING <temp48>.
+        sy-tabix = temp49.
+        IF sy-subrc <> 0.
+          ASSERT 1 = 0.
+        ENDIF.
+        <temp248>-width = nmax( val1 = <temp48>-width
                                            val2 = strlen( lv_text ) ).
       ENDLOOP.
       IF lv_found = abap_false.
@@ -3377,32 +4160,58 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
     " header, rule, rows, rule and totals
     LOOP AT lt_comp INTO ls_comp.
       lv_index = sy-tabix.
-      DATA(lv_width) = lt_width[ lv_index ]-width.
+
+
+
+      temp51 = sy-tabix.
+      READ TABLE lt_width INDEX lv_index ASSIGNING <temp50>.
+      sy-tabix = temp51.
+      IF sy-subrc <> 0.
+        ASSERT 1 = 0.
+      ENDIF.
+      lv_width = <temp50>-width.
       lv_text = ls_comp-label.
       IF strlen( lv_text ) > lv_width.
         lv_text = substring( val = lv_text len = lv_width ).
       ENDIF.
       lv_line = |{ lv_line }{ lv_text WIDTH = lv_width } |.
     ENDLOOP.
-    LOOP AT mt_header INTO DATA(ls_header).
-      INSERT COND string( WHEN ls_header-label IS INITIAL THEN ls_header-value
-                          ELSE |{ ls_header-label }: { ls_header-value }| ) INTO TABLE result.
+
+    LOOP AT mt_header INTO ls_header.
+
+      IF ls_header-label IS INITIAL.
+        temp250 = ls_header-value.
+      ELSE.
+        temp250 = |{ ls_header-label }: { ls_header-value }|.
+      ENDIF.
+      INSERT temp250 INTO TABLE result.
     ENDLOOP.
     IF mt_header IS NOT INITIAL.
       INSERT `` INTO TABLE result.
     ENDIF.
     INSERT lv_line INTO TABLE result.
-    DATA(lv_rule) = repeat( val = `-` occ = strlen( lv_line ) ).
+
+    lv_rule = repeat( val = `-` occ = strlen( lv_line ) ).
     INSERT lv_rule INTO TABLE result.
 
-    LOOP AT lt_cells INTO DATA(lt_values).
+
+    LOOP AT lt_cells INTO lt_values.
       IF lv_total = abap_true AND sy-tabix = lv_rows + 1.
         INSERT lv_rule INTO TABLE result.
       ENDIF.
       CLEAR lv_line.
       LOOP AT lt_values INTO lv_text.
         lv_index = sy-tabix.
-        DATA(ls_width) = lt_width[ lv_index ].
+
+
+
+        temp53 = sy-tabix.
+        READ TABLE lt_width INDEX lv_index ASSIGNING <temp52>.
+        sy-tabix = temp53.
+        IF sy-subrc <> 0.
+          ASSERT 1 = 0.
+        ENDIF.
+        ls_width = <temp52>.
         IF strlen( lv_text ) > ls_width-width.
           lv_text = substring( val = lv_text len = ls_width-width ).
         ENDIF.
@@ -3420,9 +4229,15 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
     IF mt_footer IS NOT INITIAL.
       INSERT `` INTO TABLE result.
     ENDIF.
-    LOOP AT mt_footer INTO DATA(ls_footer).
-      INSERT COND string( WHEN ls_footer-label IS INITIAL THEN ls_footer-value
-                          ELSE |{ ls_footer-label }: { ls_footer-value }| ) INTO TABLE result.
+
+    LOOP AT mt_footer INTO ls_footer.
+
+      IF ls_footer-label IS INITIAL.
+        temp251 = ls_footer-value.
+      ELSE.
+        temp251 = |{ ls_footer-label }: { ls_footer-value }|.
+      ENDIF.
+      INSERT temp251 INTO TABLE result.
     ENDLOOP.
 
   ENDMETHOD.
@@ -3436,23 +4251,35 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
     DATA lr_copy   TYPE REF TO data.
     DATA lt_column TYPE z2ui5_cl_cgui_xlsx=>ty_t_column.
     FIELD-SYMBOLS <copy> TYPE STANDARD TABLE.
+    DATA temp252 TYPE z2ui5_cl_cgui_context=>ty_t_comp.
+    DATA ls_visible LIKE LINE OF temp252.
+      DATA lv_format TYPE string.
+      DATA temp253 TYPE z2ui5_cl_cgui_xlsx=>ty_s_column.
+    DATA temp254 TYPE z2ui5_cl_cgui_xlsx=>ty_s_layout.
 
     CREATE DATA lr_copy LIKE tab.
     ASSIGN lr_copy->* TO <copy>.
     <copy> = tab.
     sort_rows( CHANGING tab = <copy> ).
 
-    LOOP AT columns_visible( tab ) INTO DATA(ls_visible).
-      DATA(lv_format) = ``.
+
+    temp252 = columns_visible( tab ).
+
+    LOOP AT temp252 INTO ls_visible.
+
+      lv_format = ``.
       IF ls_visible-type_kind = cl_abap_typedescr=>typekind_packed AND ls_visible-decimals > 0.
         " the decimals the list shows, grouped and separated the way the
         " user's Excel is set up
         lv_format = |#,##0.{ repeat( val = `0`
                                      occ = ls_visible-decimals ) }|.
       ENDIF.
-      INSERT VALUE #( name   = ls_visible-name
-                      header = ls_visible-label
-                      format = lv_format ) INTO TABLE lt_column.
+
+      CLEAR temp253.
+      temp253-name = ls_visible-name.
+      temp253-header = ls_visible-label.
+      temp253-format = lv_format.
+      INSERT temp253 INTO TABLE lt_column.
     ENDLOOP.
     IF lt_column IS INITIAL.
       " no column is shown: a sheet without a cell - an empty column list
@@ -3461,17 +4288,25 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
       RETURN.
     ENDIF.
 
+
+    CLEAR temp254.
+    temp254-t_column = lt_column.
     result = z2ui5_cl_cgui_xlsx=>xlsx_by_itab( val    = <copy>
-                                               layout = VALUE #( t_column = lt_column ) ).
+                                               layout = temp254 ).
 
   ENDMETHOD.
 
   METHOD column_get.
 
-    DATA(lv_name) = to_upper( name ).
+    DATA lv_name TYPE string.
+      DATA temp255 TYPE z2ui5_cl_cgui_alv=>ty_s_column.
+    lv_name = to_upper( name ).
     READ TABLE mt_column REFERENCE INTO result WITH KEY name = lv_name.
     IF sy-subrc <> 0.
-      INSERT VALUE #( name = lv_name ) INTO TABLE mt_column REFERENCE INTO result.
+
+      CLEAR temp255.
+      temp255-name = lv_name.
+      INSERT temp255 INTO TABLE mt_column REFERENCE INTO result.
     ENDIF.
 
   ENDMETHOD.
@@ -3484,9 +4319,19 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
 
   METHOD has_box_field.
 
-    DATA(lt_comp) = z2ui5_cl_cgui_context=>rtti_get_t_comp( tab ).
-    DATA(lv_box) = get_box_field( ).
-    result = xsdbool( line_exists( lt_comp[ name = lv_box ] ) ).
+    DATA lt_comp TYPE z2ui5_cl_cgui_context=>ty_t_comp.
+    DATA lv_box TYPE string.
+    DATA temp256 LIKE sy-subrc.
+    DATA temp33 TYPE xsdboolean.
+    lt_comp = z2ui5_cl_cgui_context=>rtti_get_t_comp( tab ).
+
+    lv_box = get_box_field( ).
+
+    READ TABLE lt_comp WITH KEY name = lv_box TRANSPORTING NO FIELDS.
+    temp256 = sy-subrc.
+
+    temp33 = boolc( temp256 = 0 ).
+    result = temp33.
 
   ENDMETHOD.
 
@@ -3495,9 +4340,12 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
     FIELD-SYMBOLS <row> TYPE any.
     FIELD-SYMBOLS <box> TYPE any.
 
-    DATA(lv_box) = get_box_field( ).
+    DATA lv_box TYPE string.
+      DATA lv_index LIKE sy-tabix.
+    lv_box = get_box_field( ).
     LOOP AT tab ASSIGNING <row>.
-      DATA(lv_index) = sy-tabix.
+
+      lv_index = sy-tabix.
       ASSIGN COMPONENT lv_box OF STRUCTURE <row> TO <box>.
       IF sy-subrc <> 0.
         RETURN.
@@ -3514,7 +4362,8 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
     FIELD-SYMBOLS <row> TYPE any.
     FIELD-SYMBOLS <box> TYPE any.
 
-    DATA(lv_box) = get_box_field( ).
+    DATA lv_box TYPE string.
+    lv_box = get_box_field( ).
     LOOP AT tab ASSIGNING <row>.
       ASSIGN COMPONENT lv_box OF STRUCTURE <row> TO <box>.
       IF sy-subrc <> 0.
@@ -3526,6 +4375,9 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD handle_event.
+        DATA lt_selected TYPE z2ui5_cl_cgui_alv=>ty_t_row.
+          FIELD-SYMBOLS <temp257> LIKE LINE OF lt_selected.
+          DATA temp258 LIKE sy-tabix.
 
     result = abap_true.
     CASE client->get_event( ).
@@ -3542,11 +4394,20 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
                 tab    = tab
                 format = cs_format-xlsx ).
       WHEN cs_event-details.
-        DATA(lt_selected) = get_selected_rows( tab ).
+
+        lt_selected = get_selected_rows( tab ).
         IF lt_selected IS NOT INITIAL.
+
+
+          temp258 = sy-tabix.
+          READ TABLE lt_selected INDEX 1 ASSIGNING <temp257>.
+          sy-tabix = temp258.
+          IF sy-subrc <> 0.
+            ASSERT 1 = 0.
+          ENDIF.
           details_popup( client = client
                          tab    = tab
-                         row    = lt_selected[ 1 ] ).
+                         row    = <temp257> ).
         ENDIF.
       WHEN cs_event-details_close OR cs_event-chart_close.
         client->popup_destroy( ).
@@ -3585,25 +4446,44 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
     DATA lv_seq     TYPE i.
 
     " in the order of the components - a position set comes first
-    LOOP AT z2ui5_cl_cgui_context=>rtti_get_t_comp( tab ) INTO DATA(ls_comp).
+    DATA temp259 TYPE z2ui5_cl_cgui_context=>ty_t_comp.
+    DATA ls_comp LIKE LINE OF temp259.
+      DATA ls_column TYPE z2ui5_cl_cgui_alv=>ty_s_column.
+      DATA temp260 TYPE z2ui5_cl_cgui_alv=>ty_s_ordered.
+      DATA temp54 TYPE z2ui5_cl_cgui_alv=>ty_s_ordered-position.
+    DATA ls_ordered LIKE LINE OF lt_ordered.
+    temp259 = z2ui5_cl_cgui_context=>rtti_get_t_comp( tab ).
+
+    LOOP AT temp259 INTO ls_comp.
       IF column_skipped( ls_comp-name ) = abap_true.
         CONTINUE.
       ENDIF.
       lv_seq = lv_seq + 1.
-      DATA(ls_column) = column_setting( ls_comp-name ).
+
+      ls_column = column_setting( ls_comp-name ).
       IF ls_column-hidden = abap_true.
         CONTINUE.
       ENDIF.
       IF ls_column-text IS NOT INITIAL.
         ls_comp-label = ls_column-text.
       ENDIF.
-      INSERT VALUE #( position = COND #( WHEN ls_column-position > 0 THEN ls_column-position ELSE 1000 + lv_seq )
-                      seq      = lv_seq
-                      comp     = ls_comp ) INTO TABLE lt_ordered.
+
+      CLEAR temp260.
+
+      IF ls_column-position > 0.
+        temp54 = ls_column-position.
+      ELSE.
+        temp54 = 1000 + lv_seq.
+      ENDIF.
+      temp260-position = temp54.
+      temp260-seq = lv_seq.
+      temp260-comp = ls_comp.
+      INSERT temp260 INTO TABLE lt_ordered.
     ENDLOOP.
 
     SORT lt_ordered BY position seq.
-    LOOP AT lt_ordered INTO DATA(ls_ordered).
+
+    LOOP AT lt_ordered INTO ls_ordered.
       INSERT ls_ordered-comp INTO TABLE result.
     ENDLOOP.
 
@@ -3613,7 +4493,20 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
 
     FIELD-SYMBOLS <sums> TYPE STANDARD TABLE.
 
-    DATA(lv_rows) = mv_visible_rows.
+    DATA lv_rows LIKE mv_visible_rows.
+    DATA lv_multi TYPE abap_bool.
+    DATA temp34 TYPE xsdboolean.
+    DATA lv_sorter TYPE string.
+    DATA temp261 TYPE string.
+    DATA lo_table TYPE REF TO z2ui5_cl_ui5_view_builder.
+    DATA temp35 TYPE xsdboolean.
+    DATA lv_fixed LIKE mv_fixed_columns.
+      DATA temp262 TYPE z2ui5_cl_cgui_context=>ty_t_comp.
+      DATA ls_visible LIKE LINE OF temp262.
+    DATA lt_comp TYPE z2ui5_cl_cgui_context=>ty_t_comp.
+    DATA temp263 LIKE sy-subrc.
+    DATA temp264 TYPE i.
+    lv_rows = mv_visible_rows.
     IF lv_rows <= 0.
       lv_rows = lines( tab ).
       IF lv_rows > 15.
@@ -3623,8 +4516,12 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
       ENDIF.
     ENDIF.
 
-    DATA(lv_multi) = xsdbool( has_selection( ) = abap_true AND has_box_field( tab ) = abap_true ).
-    DATA(lv_sorter) = sorter( tab ).
+
+
+    temp34 = boolc( has_selection( ) = abap_true AND has_box_field( tab ) = abap_true ).
+    lv_multi = temp34.
+
+    lv_sorter = sorter( tab ).
     " a large table (set_paging) is bound with window_bind_tab( ): tab holds
     " the rows loaded so far in the order the app loaded them (window_order( )),
     " total the rows there are - a sorter in the binding would order the
@@ -3634,25 +4531,26 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
 
     render_header( node ).
 
-    DATA(lo_table) = node->ele( n = `Table` ns = `table`
+
+    IF mv_page_size > 0 AND total >= 0.
+      temp261 = client->window_bind_tab( val = tab total = total event = cs_event-rows window = mv_page_size ).
+    ELSEIF mv_page_size > 0.
+      temp261 = client->window_bind_tab( val = tab total = lines( tab ) event = cs_event-rows window = mv_page_size ).
+    ELSEIF lv_sorter IS INITIAL.
+      temp261 = client->_bind( tab ).
+    ELSE.
+      temp261 = |\{path: '{ client->_bind_path( tab ) }', sorter: { lv_sorter }\}|.
+    ENDIF.
+
+
+    temp35 = boolc( mv_no_stripes = abap_false ).
+    lo_table = node->ele( n = `Table` ns = `table`
         )->a( n = `xmlns:table`        v = `sap.ui.table`
         )->a( n = `xmlns:core`         v = `sap.ui.core`
         )->a( n = `core:require`       v = type_require( )
-        )->a( n = `rows`               v = COND #( WHEN mv_page_size > 0 AND total >= 0
-                                                   THEN client->window_bind_tab( val    = tab
-                                                                                 total  = total
-                                                                                 event  = cs_event-rows
-                                                                                 window = mv_page_size )
-                                                   WHEN mv_page_size > 0
-                                                   THEN client->window_bind_tab( val    = tab
-                                                                                 total  = lines( tab )
-                                                                                 event  = cs_event-rows
-                                                                                 window = mv_page_size )
-                                                   WHEN lv_sorter IS INITIAL
-                                                   THEN client->_bind( tab )
-                                                   ELSE |\{path: '{ client->_bind_path( tab ) }', sorter: { lv_sorter }\}| )
+        )->a( n = `rows`               v = temp261
         )->a( n = `selectionMode`      v = `None`
-        )->a( n = `alternateRowColors` b = xsdbool( mv_no_stripes = abap_false )
+        )->a( n = `alternateRowColors` b = temp35
         )->a( n = `visibleRowCount`    v = |{ lv_rows }|
         )->a( n = `class`              v = `sapUiSmallMargin` ).
 
@@ -3664,9 +4562,13 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
     ENDIF.
 
     " fixed: as set, or the key columns from the left
-    DATA(lv_fixed) = mv_fixed_columns.
+
+    lv_fixed = mv_fixed_columns.
     IF lv_fixed = 0.
-      LOOP AT columns_visible( tab ) INTO DATA(ls_visible).
+
+      temp262 = columns_visible( tab ).
+
+      LOOP AT temp262 INTO ls_visible.
         IF column_setting( ls_visible-name )-key = abap_false.
           EXIT.
         ENDIF.
@@ -3680,17 +4582,27 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
       lo_table->a( n = `fixedColumnCount` v = |{ lv_fixed }| ).
     ENDIF.
 
-    DATA(lt_comp) = z2ui5_cl_cgui_context=>rtti_get_t_comp( tab ).
-    IF mv_color_field IS NOT INITIAL AND line_exists( lt_comp[ name = mv_color_field ] ).
+
+    lt_comp = z2ui5_cl_cgui_context=>rtti_get_t_comp( tab ).
+
+    READ TABLE lt_comp WITH KEY name = mv_color_field TRANSPORTING NO FIELDS.
+    temp263 = sy-subrc.
+    IF mv_color_field IS NOT INITIAL AND temp263 = 0.
       lo_table->ele( n = `rowSettingsTemplate` ns = `table`
           )->tag( n = `RowSettings` ns = `table`
           )->a( n = `highlight` v = color_binding( mv_color_field ) ).
     ENDIF.
 
+
+    IF total >= 0.
+      temp264 = total.
+    ELSE.
+      temp264 = lines( tab ).
+    ENDIF.
     render_toolbar( node   = lo_table->ele( n = `extension` ns = `table` )
                     client = client
                     multi  = lv_multi
-                    total  = COND #( WHEN total >= 0 THEN total ELSE lines( tab ) )
+                    total  = temp264
                     all    = all ).
 
     render_columns( node   = lo_table->ele( n = `columns` ns = `table` )
@@ -3717,8 +4629,23 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
 
   METHOD render_toolbar.
 
-    DATA(lo_bar) = node->ele( `OverflowToolbar` ).
-    DATA(lv_count) = |{ total }|.
+    DATA lo_bar TYPE REF TO z2ui5_cl_ui5_view_builder.
+    DATA lv_count TYPE string.
+      DATA temp265 TYPE string.
+      DATA temp55 TYPE string.
+      DATA temp266 TYPE string.
+      DATA temp267 TYPE string.
+      DATA temp268 TYPE string.
+      DATA temp56 TYPE string.
+      DATA temp1 TYPE string.
+        DATA temp269 TYPE string.
+      DATA temp270 TYPE string.
+      DATA temp271 TYPE string.
+      DATA temp272 TYPE string.
+      DATA temp57 TYPE string.
+    lo_bar = node->ele( `OverflowToolbar` ).
+
+    lv_count = |{ total }|.
     IF all >= 0 AND all <> total.
       lv_count = replace( val  = replace( val  = '&1 of &2'(009)
                                           sub  = `&1`
@@ -3732,13 +4659,17 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
 
 
     IF multi = abap_true.
+
+      temp265 = 'Select All'(001).
+
+      temp55 = 'Deselect All'(002).
       lo_bar->tag( `Button`
           )->a( n = `icon`    v = `sap-icon://multiselect-all`
-          )->a( n = `tooltip` t = CONV #( 'Select All'(001) )
+          )->a( n = `tooltip` t = temp265
           )->a( n = `press`   v = client->_event( cs_event-select_all )
           )->tag( `Button`
           )->a( n = `icon`    v = `sap-icon://multiselect-none`
-          )->a( n = `tooltip` t = CONV #( 'Deselect All'(002) )
+          )->a( n = `tooltip` t = temp55
           )->a( n = `press`   v = client->_event( cs_event-deselect_all ) ).
     ENDIF.
 
@@ -3747,64 +4678,101 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
                       functions = mt_function ).
 
     IF mv_no_search = abap_false.
+
+      temp266 = 'Search'(014).
       lo_bar->tag( `SearchField`
           )->a( n = `value`       t = mv_search
           )->a( n = `width`       v = `14rem`
-          )->a( n = `placeholder` t = CONV #( 'Search'(014) )
+          )->a( n = `placeholder` t = temp266
           )->a( n = `search`      v = client->_event( val = cs_event-search
                                                       arg = `${$parameters>/query}` ) ).
     ENDIF.
 
     IF multi = abap_true AND mv_no_details = abap_false.
+
+      temp267 = 'Details'(012).
       lo_bar->tag( `Button`
           )->a( n = `icon`    v = `sap-icon://detail-view`
-          )->a( n = `tooltip` t = CONV #( 'Details'(012) )
+          )->a( n = `tooltip` t = temp267
           )->a( n = `press`   v = client->_event( cs_event-details ) ).
     ENDIF.
 
     IF mv_no_filter = abap_false.
+
+      temp268 = 'Filter'(010).
+
+      IF mt_filter IS NOT INITIAL.
+        temp56 = |{ lines( mt_filter ) }|.
+      ELSE.
+        CLEAR temp56.
+      ENDIF.
+
+      IF mt_filter IS NOT INITIAL.
+        temp1 = `Emphasized`.
+      ELSE.
+        temp1 = `Default`.
+      ENDIF.
       lo_bar->tag( `Button`
           )->a( n = `icon`    v = `sap-icon://filter`
-          )->a( n = `text`    v = COND #( WHEN mt_filter IS NOT INITIAL THEN |{ lines( mt_filter ) }| )
-          )->a( n = `type`    v = COND #( WHEN mt_filter IS NOT INITIAL THEN `Emphasized` ELSE `Default` )
-          )->a( n = `tooltip` t = CONV #( 'Filter'(010) )
+          )->a( n = `text`    v = temp56
+          )->a( n = `type`    v = temp1
+          )->a( n = `tooltip` t = temp268
           )->a( n = `press`   v = client->_event( cs_event-filter ) ).
       IF is_filtered( ) = abap_true.
+
+        temp269 = 'Delete Filter'(011).
         lo_bar->tag( `Button`
             )->a( n = `icon`    v = `sap-icon://clear-filter`
-            )->a( n = `tooltip` t = CONV #( 'Delete Filter'(011) )
+            )->a( n = `tooltip` t = temp269
             )->a( n = `press`   v = client->_event( cs_event-filter_clear ) ).
       ENDIF.
     ENDIF.
 
     IF mv_no_layout = abap_false.
+
+      temp270 = 'Change Layout'(005).
       lo_bar->tag( `Button`
           )->a( n = `icon`    v = `sap-icon://action-settings`
-          )->a( n = `tooltip` t = CONV #( 'Change Layout'(005) )
+          )->a( n = `tooltip` t = temp270
           )->a( n = `press`   v = client->_event( cs_event-layout ) ).
     ENDIF.
 
     IF mv_no_chart = abap_false.
+
+      temp271 = 'Chart'(019).
       lo_bar->tag( `Button`
           )->a( n = `icon`    v = `sap-icon://bar-chart`
-          )->a( n = `tooltip` t = CONV #( 'Chart'(019) )
+          )->a( n = `tooltip` t = temp271
           )->a( n = `press`   v = client->_event( cs_event-chart ) ).
     ENDIF.
 
     IF mv_no_export = abap_false.
+
+      temp272 = 'Export to Excel'(006).
+
+      temp57 = 'Export'(003).
       lo_bar->tag( `Button`
           )->a( n = `icon`    v = `sap-icon://excel-attachment`
-          )->a( n = `tooltip` t = CONV #( 'Export to Excel'(006) )
+          )->a( n = `tooltip` t = temp272
           )->a( n = `press`   v = client->_event( cs_event-export_xlsx )
           )->tag( `Button`
           )->a( n = `icon`    v = `sap-icon://document-text`
-          )->a( n = `tooltip` t = CONV #( 'Export'(003) )
+          )->a( n = `tooltip` t = temp57
           )->a( n = `press`   v = client->_event( cs_event-export ) ).
     ENDIF.
 
   ENDMETHOD.
 
   METHOD render_columns.
+    DATA temp273 TYPE z2ui5_cl_cgui_context=>ty_t_comp.
+    DATA ls_comp LIKE LINE OF temp273.
+      DATA ls_column TYPE z2ui5_cl_cgui_alv=>ty_s_column.
+      DATA temp274 TYPE string.
+      DATA lv_align LIKE temp274.
+      DATA lv_width LIKE ls_column-width.
+      DATA lo_column TYPE REF TO z2ui5_cl_ui5_view_builder.
+        DATA temp275 TYPE string.
+      DATA temp276 TYPE string.
 
     IF multi = abap_true AND mv_selection_mode = cs_selection_mode-single.
       node->ele( n = `Column` ns = `table`
@@ -3823,11 +4791,22 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
               )->a( n = `selected` v = |\{{ z2ui5_cl_ui5_view_builder=>component_path( get_box_field( ) ) }\}| ).
     ENDIF.
 
-    LOOP AT columns_visible( tab ) INTO DATA(ls_comp).
 
-      DATA(ls_column) = column_setting( ls_comp-name ).
+    temp273 = columns_visible( tab ).
 
-      DATA(lv_align) = COND string( WHEN is_numeric( ls_comp-type_kind ) = abap_true THEN `End` ELSE `Begin` ).
+    LOOP AT temp273 INTO ls_comp.
+
+
+      ls_column = column_setting( ls_comp-name ).
+
+
+      IF is_numeric( ls_comp-type_kind ) = abap_true.
+        temp274 = `End`.
+      ELSE.
+        temp274 = `Begin`.
+      ENDIF.
+
+      lv_align = temp274.
       IF ls_column-icon = abap_true OR ls_comp-boolean = abap_true.
         lv_align = `Center`.
       ENDIF.
@@ -3835,13 +4814,15 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
         lv_align = ls_column-align.
       ENDIF.
 
-      DATA(lv_width) = ls_column-width.
+
+      lv_width = ls_column-width.
       IF lv_width IS INITIAL AND mv_no_optimize = abap_false.
         lv_width = column_width( comp = ls_comp
                                  tab  = tab ).
       ENDIF.
 
-      DATA(lo_column) = node->ele( n = `Column` ns = `table`
+
+      lo_column = node->ele( n = `Column` ns = `table`
           )->a( n = `sortProperty` t = z2ui5_cl_ui5_view_builder=>component_path( ls_comp-name )
           )->a( n = `hAlign`       v = lv_align ).
       " the filter of a column menu reaches the backend through the paged
@@ -3856,8 +4837,14 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
         lo_column->a( n = `width` t = lv_width ).
       ENDIF.
       IF ls_column-sort IS NOT INITIAL.
+
+        IF ls_column-sort = cs_sort-descending.
+          temp275 = `Descending`.
+        ELSE.
+          temp275 = `Ascending`.
+        ENDIF.
         lo_column->a( n = `sorted`    b = abap_true
-            )->a( n = `sortOrder` v = COND #( WHEN ls_column-sort = cs_sort-descending THEN `Descending` ELSE `Ascending` ) ).
+            )->a( n = `sortOrder` v = temp275 ).
       ENDIF.
       " the tooltip of the column - before its label: a( ) goes to the last
       " child of a node that has one
@@ -3865,10 +4852,16 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
         lo_column->a( n = `tooltip` t = ls_column-tooltip ).
       ENDIF.
 
+
+      IF ls_column-key = abap_true.
+        temp276 = `Bold`.
+      ELSE.
+        temp276 = `Standard`.
+      ENDIF.
       lo_column->ele( n = `label` ns = `table`
           )->tag( `Label`
               )->a( n = `text`   t = ls_comp-label
-              )->a( n = `design` v = COND #( WHEN ls_column-key = abap_true THEN `Bold` ELSE `Standard` ) ).
+              )->a( n = `design` v = temp276 ).
 
       render_template( node   = lo_column->ele( n = `template` ns = `table` )
                        client = client
@@ -3883,7 +4876,15 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
 
     " the binding path of the column - a namespace's leading slash dropped:
     " /ABC/FIELD is the member FIELD of ABC, not an absolute path
-    DATA(lv_path) = z2ui5_cl_ui5_view_builder=>component_path( comp-name ).
+    DATA lv_path TYPE string.
+        DATA temp277 TYPE string_table.
+        DATA temp279 TYPE string_table.
+        DATA lt_value TYPE z2ui5_cl_cgui_alv=>ty_t_value.
+        DATA lv_expr TYPE string.
+        DATA ls_value LIKE LINE OF lt_value.
+      DATA temp281 TYPE string_table.
+      DATA temp283 TYPE string.
+    lv_path = z2ui5_cl_ui5_view_builder=>component_path( comp-name ).
 
     IF column_editable( column ) = abap_true.
       render_edit( node   = node
@@ -3896,25 +4897,34 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
     CASE column-cell_type.
       WHEN cs_cell_type-checkbox_hotspot.
         " a checkbox that can be clicked - the value changes, the event follows
+
+        CLEAR temp277.
+        INSERT `$event.getSource().getBindingContext().getPath()` INTO TABLE temp277.
+        INSERT comp-name INTO TABLE temp277.
         node->tag( `CheckBox`
             )->a( n = `selected` v = |\{{ lv_path }\}|
             )->a( n = `select`   v = client->_event( val   = cs_event-hotspot
-                                                     t_arg = VALUE #( ( `$event.getSource().getBindingContext().getPath()` )
-                                                                      ( comp-name ) ) ) ).
+                                                     t_arg = temp277 ) ).
         RETURN.
       WHEN cs_cell_type-button.
+
+        CLEAR temp279.
+        INSERT `$event.getSource().getBindingContext().getPath()` INTO TABLE temp279.
+        INSERT comp-name INTO TABLE temp279.
         node->tag( `Button`
             )->a( n = `text`  v = cell_binding( comp   = comp
                                                 column = column )
             )->a( n = `press` v = client->_event( val   = cs_event-hotspot
-                                                  t_arg = VALUE #( ( `$event.getSource().getBindingContext().getPath()` )
-                                                                   ( comp-name ) ) ) ).
+                                                  t_arg = temp279 ) ).
         RETURN.
       WHEN cs_cell_type-dropdown.
         " shown: the text of the key
-        DATA(lt_value) = dropdown_values( comp-name ).
-        DATA(lv_expr) = |$\{{ lv_path }\}|.
-        LOOP AT lt_value INTO DATA(ls_value).
+
+        lt_value = dropdown_values( comp-name ).
+
+        lv_expr = |$\{{ lv_path }\}|.
+
+        LOOP AT lt_value INTO ls_value.
           lv_expr = |$\{{ lv_path }\} === '{ expr_escape( ls_value-key ) }' ? '{ expr_escape( ls_value-text ) }' : { lv_expr }|.
         ENDLOOP.
         node->tag( `Text`
@@ -3937,22 +4947,29 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
     ENDIF.
 
     IF column-hotspot = abap_true.
+
+      CLEAR temp281.
+      INSERT `$event.getSource().getBindingContext().getPath()` INTO TABLE temp281.
+      INSERT comp-name INTO TABLE temp281.
       node->tag( `Link`
           )->a( n = `text`  v = cell_binding( comp   = comp
                                               column = column )
           )->a( n = `press` v = client->_event( val   = cs_event-hotspot
-                                                t_arg = VALUE #( ( `$event.getSource().getBindingContext().getPath()` )
-                                                                 ( comp-name ) ) ) ).
+                                                t_arg = temp281 ) ).
       RETURN.
     ENDIF.
 
     IF column-color IS NOT INITIAL OR column-color_field IS NOT INITIAL.
+
+      IF column-color_field IS NOT INITIAL.
+        temp283 = color_binding( column-color_field ).
+      ELSE.
+        temp283 = color_state( column-color ).
+      ENDIF.
       node->tag( `ObjectStatus`
           )->a( n = `text`  v = cell_binding( comp   = comp
                                               column = column )
-          )->a( n = `state` v = COND #( WHEN column-color_field IS NOT INITIAL
-                                        THEN color_binding( column-color_field )
-                                        ELSE color_state( column-color ) ) ).
+          )->a( n = `state` v = temp283 ).
       RETURN.
     ENDIF.
 
@@ -3973,25 +4990,48 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
 
     " the binding path of the column - a namespace's leading slash dropped:
     " /ABC/FIELD is the member FIELD of ABC, not an absolute path
-    DATA(lv_path) = z2ui5_cl_ui5_view_builder=>component_path( comp-name ).
+    DATA lv_path TYPE string.
+    DATA lv_editable TYPE string.
+      DATA temp284 TYPE string_table.
+      DATA lo_select TYPE REF TO z2ui5_cl_ui5_view_builder.
+      DATA lo_items TYPE REF TO z2ui5_cl_ui5_view_builder.
+      DATA temp286 TYPE z2ui5_cl_cgui_alv=>ty_t_value.
+      DATA ls_value LIKE LINE OF temp286.
+      DATA temp287 TYPE string_table.
+        DATA temp289 TYPE string_table.
+        DATA temp291 TYPE string_table.
+          DATA temp293 TYPE string_table.
+            DATA temp295 TYPE string_table.
+          DATA temp297 TYPE string_table.
+            DATA temp299 TYPE string_table.
+    lv_path = z2ui5_cl_ui5_view_builder=>component_path( comp-name ).
 
-    DATA(lv_editable) = edit_binding( ).
+
+    lv_editable = edit_binding( ).
 
     IF column-cell_type = cs_cell_type-dropdown.
-      DATA(lo_select) = node->ele( `Select`
+
+      CLEAR temp284.
+      INSERT `$event.getSource().getBindingContext().getPath()` INTO TABLE temp284.
+      INSERT comp-name INTO TABLE temp284.
+
+      lo_select = node->ele( `Select`
           )->a( n = `selectedKey`    v = |\{{ lv_path }\}|
           )->a( n = `forceSelection` b = abap_false
           )->a( n = `change`         v = client->_event( val   = cs_event-data_changed
-                                                         t_arg = VALUE #( ( `$event.getSource().getBindingContext().getPath()` )
-                                                                          ( comp-name ) ) ) ).
+                                                         t_arg = temp284 ) ).
       IF lv_editable IS NOT INITIAL.
         lo_select->a( n = `enabled` v = lv_editable ).
       ENDIF.
-      DATA(lo_items) = lo_select->ele( `items` ).
+
+      lo_items = lo_select->ele( `items` ).
       lo_items->tag( n = `Item` ns = `core`
           )->a( n = `key`  v = ``
           )->a( n = `text` v = `` ).
-      LOOP AT dropdown_values( comp-name ) INTO DATA(ls_value).
+
+      temp286 = dropdown_values( comp-name ).
+
+      LOOP AT temp286 INTO ls_value.
         lo_items->tag( n = `Item` ns = `core`
             )->a( n = `key`  t = ls_value-key
             )->a( n = `text` t = ls_value-text ).
@@ -4000,11 +5040,14 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
     ENDIF.
 
     IF comp-boolean = abap_true.
+
+      CLEAR temp287.
+      INSERT `$event.getSource().getBindingContext().getPath()` INTO TABLE temp287.
+      INSERT comp-name INTO TABLE temp287.
       node->tag( `CheckBox`
           )->a( n = `selected` v = |\{{ lv_path }\}|
           )->a( n = `select`   v = client->_event( val   = cs_event-data_changed
-                                                   t_arg = VALUE #( ( `$event.getSource().getBindingContext().getPath()` )
-                                                                    ( comp-name ) ) ) ).
+                                                   t_arg = temp287 ) ).
       IF lv_editable IS NOT INITIAL.
         node->a( n = `editable` v = lv_editable ).
       ENDIF.
@@ -4013,56 +5056,74 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
 
     CASE comp-type_kind.
       WHEN cl_abap_typedescr=>typekind_date.
+
+        CLEAR temp289.
+        INSERT `$event.getSource().getBindingContext().getPath()` INTO TABLE temp289.
+        INSERT comp-name INTO TABLE temp289.
         node->tag( `DatePicker`
             )->a( n = `value`         v = |\{{ lv_path }\}|
             )->a( n = `valueFormat`   v = `yyyy-MM-dd`
             )->a( n = `displayFormat` v = `medium`
             )->a( n = `change`        v = client->_event( val   = cs_event-data_changed
-                                                          t_arg = VALUE #( ( `$event.getSource().getBindingContext().getPath()` )
-                                                                           ( comp-name ) ) ) ).
+                                                          t_arg = temp289 ) ).
         IF lv_editable IS NOT INITIAL.
           node->a( n = `editable` v = lv_editable ).
         ENDIF.
       WHEN cl_abap_typedescr=>typekind_time.
+
+        CLEAR temp291.
+        INSERT `$event.getSource().getBindingContext().getPath()` INTO TABLE temp291.
+        INSERT comp-name INTO TABLE temp291.
         node->tag( `TimePicker`
             )->a( n = `value`         v = |\{{ lv_path }\}|
             )->a( n = `valueFormat`   v = `HH:mm:ss`
             )->a( n = `displayFormat` v = `HH:mm:ss`
             )->a( n = `change`        v = client->_event( val   = cs_event-data_changed
-                                                          t_arg = VALUE #( ( `$event.getSource().getBindingContext().getPath()` )
-                                                                           ( comp-name ) ) ) ).
+                                                          t_arg = temp291 ) ).
         IF lv_editable IS NOT INITIAL.
           node->a( n = `editable` v = lv_editable ).
         ENDIF.
       WHEN OTHERS.
         IF is_numeric( comp-type_kind ) = abap_true.
+
+          CLEAR temp293.
+          INSERT `$event.getSource().getBindingContext().getPath()` INTO TABLE temp293.
+          INSERT comp-name INTO TABLE temp293.
           node->tag( `Input`
               )->a( n = `value`     v = cell_binding( comp   = comp
                                                       column = column )
               )->a( n = `textAlign` v = `End`
               )->a( n = `change`    v = client->_event( val   = cs_event-data_changed
-                                                        t_arg = VALUE #( ( `$event.getSource().getBindingContext().getPath()` )
-                                                                         ( comp-name ) ) ) ).
+                                                        t_arg = temp293 ) ).
           IF column-f4 = abap_true.
+
+            CLEAR temp295.
+            INSERT `$event.getSource().getBindingContext().getPath()` INTO TABLE temp295.
+            INSERT comp-name INTO TABLE temp295.
             node->a( n = `showValueHelp`    b = abap_true
                 )->a( n = `valueHelpRequest` v = client->_event( val   = cs_event-f4
-                                                                 t_arg = VALUE #( ( `$event.getSource().getBindingContext().getPath()` )
-                                                                                  ( comp-name ) ) ) ).
+                                                                 t_arg = temp295 ) ).
           ENDIF.
           IF lv_editable IS NOT INITIAL.
             node->a( n = `editable` v = lv_editable ).
           ENDIF.
         ELSE.
+
+          CLEAR temp297.
+          INSERT `$event.getSource().getBindingContext().getPath()` INTO TABLE temp297.
+          INSERT comp-name INTO TABLE temp297.
           node->tag( `Input`
               )->a( n = `value`  v = |\{{ lv_path }\}|
               )->a( n = `change` v = client->_event( val   = cs_event-data_changed
-                                                     t_arg = VALUE #( ( `$event.getSource().getBindingContext().getPath()` )
-                                                                      ( comp-name ) ) ) ).
+                                                     t_arg = temp297 ) ).
           IF column-f4 = abap_true.
+
+            CLEAR temp299.
+            INSERT `$event.getSource().getBindingContext().getPath()` INTO TABLE temp299.
+            INSERT comp-name INTO TABLE temp299.
             node->a( n = `showValueHelp`    b = abap_true
                 )->a( n = `valueHelpRequest` v = client->_event( val   = cs_event-f4
-                                                                 t_arg = VALUE #( ( `$event.getSource().getBindingContext().getPath()` )
-                                                                                  ( comp-name ) ) ) ).
+                                                                 t_arg = temp299 ) ).
           ENDIF.
           IF lv_editable IS NOT INITIAL.
             node->a( n = `editable` v = lv_editable ).
@@ -4077,43 +5138,74 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
 
   METHOD render_subtotals.
 
-    DATA(lt_subtotal) = get_subtotals( tab ).
+    DATA lt_subtotal TYPE z2ui5_cl_cgui_alv=>ty_t_subtotal.
+    DATA lt_layout TYPE z2ui5_cl_cgui_alv=>ty_t_layout.
+    DATA lt_group LIKE lt_layout.
+    DATA lt_text TYPE string_table.
+    DATA ls_group LIKE LINE OF lt_group.
+    DATA lt_summed LIKE lt_layout.
+    DATA temp301 TYPE string.
+    DATA lo_table TYPE REF TO z2ui5_cl_ui5_view_builder.
+    DATA lo_columns TYPE REF TO z2ui5_cl_ui5_view_builder.
+    DATA ls_summed LIKE LINE OF lt_summed.
+    DATA lo_items TYPE REF TO z2ui5_cl_ui5_view_builder.
+    DATA lv_group TYPE string.
+    DATA lv_number TYPE string.
+    DATA lo_cells TYPE REF TO z2ui5_cl_ui5_view_builder.
+    DATA lo_numbers TYPE REF TO z2ui5_cl_ui5_view_builder.
+    DATA lt_value TYPE ty_t_subtotal.
+    DATA ls_subtotal LIKE LINE OF lt_subtotal.
+          DATA ls_value LIKE LINE OF lt_subtotal.
+            DATA temp302 TYPE z2ui5_cl_cgui_alv=>ty_s_subtotal.
+            DATA temp303 TYPE string.
+    lt_subtotal = get_subtotals( tab ).
     IF lt_subtotal IS INITIAL.
       RETURN.
     ENDIF.
 
-    DATA(lt_layout) = get_layout( tab ).
-    DATA(lt_group) = lt_layout.
+
+    lt_layout = get_layout( tab ).
+
+    lt_group = lt_layout.
     DELETE lt_group WHERE subtotal = abap_false OR sort IS INITIAL.
     SORT lt_group BY sort_seq name.
-    DATA lt_text TYPE string_table.
-    LOOP AT lt_group INTO DATA(ls_group).
+
+
+    LOOP AT lt_group INTO ls_group.
       INSERT ls_group-text INTO TABLE lt_text.
     ENDLOOP.
-    DATA(lt_summed) = lt_layout.
+
+    lt_summed = lt_layout.
     DELETE lt_summed WHERE sum = abap_false OR hidden = abap_true.
 
-    DATA(lo_table) = node->ele( `Table`
-        )->a( n = `headerText` t = CONV #( 'Subtotals'(007) )
+
+    temp301 = 'Subtotals'(007).
+
+    lo_table = node->ele( `Table`
+        )->a( n = `headerText` t = temp301
         )->a( n = `class`      v = `sapUiSmallMargin` ).
-    DATA(lo_columns) = lo_table->ele( `columns` ).
+
+    lo_columns = lo_table->ele( `columns` ).
     lo_columns->ele( `Column`
         )->tag( `Text`
         )->a( n = `text` t = concat_lines_of( table = lt_text sep = ` / ` ) ).
-    LOOP AT lt_summed INTO DATA(ls_summed).
+
+    LOOP AT lt_summed INTO ls_summed.
       lo_columns->ele( `Column`
           )->a( n = `hAlign` v = `End`
           )->tag( `Text`
           )->a( n = `text` t = ls_summed-text ).
     ENDLOOP.
 
-    DATA(lo_items) = lo_table->ele( `items` ).
-    DATA lv_group   TYPE string.
-    DATA lv_number  TYPE string.
-    DATA lo_cells   TYPE REF TO z2ui5_cl_ui5_view_builder.
-    DATA lo_numbers TYPE REF TO z2ui5_cl_ui5_view_builder.
-    DATA lt_value   TYPE ty_t_subtotal.
-    LOOP AT lt_subtotal INTO DATA(ls_subtotal).
+
+    lo_items = lo_table->ele( `items` ).
+
+
+
+
+
+
+    LOOP AT lt_subtotal INTO ls_subtotal.
       IF lo_cells IS NOT BOUND OR ls_subtotal-group <> lv_group.
         lv_group = ls_subtotal-group.
         lo_cells = lo_items->ele( `ColumnListItem` )->ele( `cells` ).
@@ -4123,7 +5215,8 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
           " one number per currency or unit of the group - stacked where
           " the group has several
           CLEAR lt_value.
-          LOOP AT lt_subtotal INTO DATA(ls_value) WHERE group = lv_group AND column = ls_summed-name.
+
+          LOOP AT lt_subtotal INTO ls_value WHERE group = lv_group AND column = ls_summed-name.
             INSERT ls_value INTO TABLE lt_value.
           ENDLOOP.
           IF lines( lt_value ) > 1.
@@ -4132,10 +5225,18 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
             lo_numbers = lo_cells.
           ENDIF.
           IF lt_value IS INITIAL.
-            INSERT VALUE #( ) INTO TABLE lt_value.
+
+            CLEAR temp302.
+            INSERT temp302 INTO TABLE lt_value.
           ENDIF.
           LOOP AT lt_value INTO ls_value.
-            lv_number = COND #( WHEN ls_value-column IS NOT INITIAL THEN |{ ls_value-value NUMBER = USER }| ).
+
+            IF ls_value-column IS NOT INITIAL.
+              temp303 = |{ ls_value-value NUMBER = USER }|.
+            ELSE.
+              CLEAR temp303.
+            ENDIF.
+            lv_number = temp303.
             lo_numbers->tag( `ObjectNumber`
                 )->a( n = `number`     t = lv_number
                 )->a( n = `emphasized` b = abap_true ).
@@ -4164,13 +5265,15 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
 
     FIELD-SYMBOLS <row>  TYPE any.
     FIELD-SYMBOLS <cell> TYPE any.
+    DATA lv_len TYPE i.
 
     IF comp-boolean = abap_true.
       result = `5rem`.
       RETURN.
     ENDIF.
 
-    DATA(lv_len) = strlen( comp-label ).
+
+    lv_len = strlen( comp-label ).
     CASE comp-type_kind.
       WHEN cl_abap_typedescr=>typekind_date.
         lv_len = nmax( val1 = lv_len val2 = 12 ).
@@ -4198,11 +5301,18 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
 
   METHOD aggregate_text.
 
-    result = COND #( WHEN aggregate-aggregation = cs_aggregation-count
-                     THEN |{ CONV i( aggregate-value ) NUMBER = USER }|
-                     WHEN aggregate-aggregation = cs_aggregation-average
-                     THEN |{ aggregate-value NUMBER = USER DECIMALS = 2 }|
-                     ELSE |{ aggregate-value NUMBER = USER }| ).
+    DATA temp304 TYPE i.
+    DATA temp58 TYPE string.
+    temp304 = aggregate-value.
+
+    IF aggregate-aggregation = cs_aggregation-count.
+      temp58 = |{ temp304 NUMBER = USER }|.
+    ELSEIF aggregate-aggregation = cs_aggregation-average.
+      temp58 = |{ aggregate-value NUMBER = USER DECIMALS = 2 }|.
+    ELSE.
+      temp58 = |{ aggregate-value NUMBER = USER }|.
+    ENDIF.
+    result = temp58.
     IF aggregate-unit IS NOT INITIAL.
       result = |{ result } { aggregate-unit }|.
     ENDIF.
@@ -4214,6 +5324,7 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
     DATA lv_date   TYPE d.
     DATA lv_time   TYPE t.
     DATA lv_number TYPE decfloat34.
+          DATA temp305 TYPE string.
 
     CASE comp-type_kind.
       WHEN cl_abap_typedescr=>typekind_date.
@@ -4232,7 +5343,13 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
           lv_number = val.
           result = |{ lv_number NUMBER = USER }|.
         ELSEIF comp-boolean = abap_true.
-          result = COND #( WHEN val IS NOT INITIAL THEN `X` ).
+
+          IF val IS NOT INITIAL.
+            temp305 = `X`.
+          ELSE.
+            CLEAR temp305.
+          ENDIF.
+          result = temp305.
         ELSE.
           result = |{ val }|.
         ENDIF.
@@ -4244,20 +5361,37 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
 
     DATA lo_sums TYPE REF TO z2ui5_cl_ui5_view_builder.
 
-    LOOP AT get_aggregates( tab ) INTO DATA(ls_aggregate).
+    DATA temp306 TYPE z2ui5_cl_cgui_alv=>ty_t_aggregate.
+    DATA ls_aggregate LIKE LINE OF temp306.
+      DATA temp307 TYPE string.
+      DATA lv_title LIKE temp307.
+      DATA lv_value TYPE string.
+    temp306 = get_aggregates( tab ).
+
+    LOOP AT temp306 INTO ls_aggregate.
       IF lo_sums IS NOT BOUND.
         lo_sums = node->ele( `HBox`
             )->a( n = `justifyContent` v = `End`
             )->a( n = `wrap`           v = `Wrap`
             )->a( n = `class`          v = `sapUiSmallMarginEnd` ).
       ENDIF.
-      DATA(lv_title) = SWITCH string( ls_aggregate-aggregation
-                                      WHEN cs_aggregation-average THEN 'Average'(015)
-                                      WHEN cs_aggregation-minimum THEN 'Minimum'(016)
-                                      WHEN cs_aggregation-maximum THEN 'Maximum'(017)
-                                      WHEN cs_aggregation-count   THEN 'Count'(018)
-                                      ELSE 'Total'(004) ).
-      DATA(lv_value) = aggregate_text( ls_aggregate ).
+
+      CASE ls_aggregate-aggregation.
+        WHEN cs_aggregation-average.
+          temp307 = 'Average'(015).
+        WHEN cs_aggregation-minimum.
+          temp307 = 'Minimum'(016).
+        WHEN cs_aggregation-maximum.
+          temp307 = 'Maximum'(017).
+        WHEN cs_aggregation-count.
+          temp307 = 'Count'(018).
+        WHEN OTHERS.
+          temp307 = 'Total'(004).
+      ENDCASE.
+
+      lv_title = temp307.
+
+      lv_value = aggregate_text( ls_aggregate ).
       lo_sums->tag( `ObjectStatus`
           )->a( n = `title` t = |{ lv_title } { ls_aggregate-label }|
           )->a( n = `text`  t = lv_value
@@ -4275,6 +5409,11 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
     DATA lt_line TYPE string_table.
     DATA lt_cell TYPE string_table.
     DATA lr_copy TYPE REF TO data.
+    DATA lv_sep LIKE mv_separator.
+    DATA lt_comp TYPE z2ui5_cl_cgui_context=>ty_t_comp.
+    DATA ls_comp LIKE LINE OF lt_comp.
+    DATA temp1 TYPE string.
+      DATA temp2 TYPE string.
 
     " in the order of the layout, as to_text( ) and to_xlsx( ) have it
     CREATE DATA lr_copy LIKE tab.
@@ -4282,17 +5421,22 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
     <copy> = tab.
     sort_rows( CHANGING tab = <copy> ).
 
-    DATA(lv_sep) = mv_separator.
+
+    lv_sep = mv_separator.
     IF lv_sep IS INITIAL.
       lv_sep = `;`.
     ENDIF.
-    DATA(lt_comp) = columns_visible( tab ).
 
-    LOOP AT lt_comp INTO DATA(ls_comp).
+    lt_comp = columns_visible( tab ).
+
+
+    LOOP AT lt_comp INTO ls_comp.
       INSERT csv_escape( val       = ls_comp-label
                          separator = lv_sep ) INTO TABLE lt_cell.
     ENDLOOP.
-    INSERT concat_lines_of( table = lt_cell sep = lv_sep ) INTO TABLE lt_line.
+
+    temp1 = concat_lines_of( table = lt_cell sep = lv_sep ).
+    INSERT temp1 INTO TABLE lt_line.
 
     LOOP AT <copy> ASSIGNING <row>.
       CLEAR lt_cell.
@@ -4306,7 +5450,9 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
                                                      comp = ls_comp )
                            separator = lv_sep ) INTO TABLE lt_cell.
       ENDLOOP.
-      INSERT concat_lines_of( table = lt_cell sep = lv_sep ) INTO TABLE lt_line.
+
+      temp2 = concat_lines_of( table = lt_cell sep = lv_sep ).
+      INSERT temp2 INTO TABLE lt_line.
     ENDLOOP.
 
     result = concat_lines_of( table = lt_line sep = |\r\n| ).
@@ -4324,30 +5470,59 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
 
   METHOD export.
 
-    DATA(lv_name) = mv_title.
+    DATA lv_name LIKE mv_title.
+      DATA lv_xlsx TYPE xstring.
+        DATA temp308 TYPE string_table.
+        DATA temp59 LIKE LINE OF temp308.
+        DATA temp60 LIKE LINE OF temp308.
+    DATA lv_csv TYPE xstring.
+    DATA temp310 TYPE xstring.
+    DATA lv_bom LIKE temp310.
+    DATA temp311 TYPE string_table.
+    DATA temp61 LIKE LINE OF temp311.
+    DATA temp62 LIKE LINE OF temp311.
+    lv_name = mv_title.
     IF lv_name IS INITIAL.
       lv_name = `export`.
     ENDIF.
 
     IF to_upper( format ) = cs_format-xlsx.
-      DATA(lv_xlsx) = to_xlsx( tab ).
+
+      lv_xlsx = to_xlsx( tab ).
       IF lv_xlsx IS NOT INITIAL.
+
+        CLEAR temp308.
+
+        temp59 = |data:{ z2ui5_cl_cgui_xlsx=>mime_type };base64,| && z2ui5_cl_cgui_context=>conv_encode_x_base64( lv_xlsx ).
+        INSERT temp59 INTO TABLE temp308.
+
+        temp60 = |{ lv_name }.xlsx|.
+        INSERT temp60 INTO TABLE temp308.
         client->follow_up_action( val   = client->cs_event-download_b64_file
-                                  t_arg = VALUE #( ( |data:{ z2ui5_cl_cgui_xlsx=>mime_type };base64,|
-                                                  && z2ui5_cl_cgui_context=>conv_encode_x_base64( lv_xlsx ) )
-                                                   ( |{ lv_name }.xlsx| ) ) ).
+                                  t_arg = temp308 ).
         RETURN.
       ENDIF.
     ENDIF.
 
     " UTF-8 with a byte order mark - Excel reads the umlauts right then
-    DATA(lv_csv) = z2ui5_cl_cgui_context=>conv_get_xstring_by_string( to_csv( tab ) ).
-    DATA(lv_bom) = CONV xstring( `EFBBBF` ).
+
+    lv_csv = z2ui5_cl_cgui_context=>conv_get_xstring_by_string( to_csv( tab ) ).
+
+    temp310 = `EFBBBF`.
+
+    lv_bom = temp310.
     CONCATENATE lv_bom lv_csv INTO lv_csv IN BYTE MODE.
 
+
+    CLEAR temp311.
+
+    temp61 = |data:text/csv;charset=utf-8;base64,{ z2ui5_cl_cgui_context=>conv_encode_x_base64( lv_csv ) }|.
+    INSERT temp61 INTO TABLE temp311.
+
+    temp62 = |{ lv_name }.csv|.
+    INSERT temp62 INTO TABLE temp311.
     client->follow_up_action( val   = client->cs_event-download_b64_file
-                              t_arg = VALUE #( ( |data:text/csv;charset=utf-8;base64,{ z2ui5_cl_cgui_context=>conv_encode_x_base64( lv_csv ) }| )
-                                               ( |{ lv_name }.csv| ) ) ).
+                              t_arg = temp311 ).
 
   ENDMETHOD.
 
@@ -4359,14 +5534,17 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
 
   METHOD stringify.
 
-    DATA(view) = z2ui5_cl_ui5_view_builder=>factory(
+    DATA view TYPE REF TO z2ui5_cl_ui5_view_builder.
+    DATA page TYPE REF TO z2ui5_cl_ui5_view_builder.
+    view = z2ui5_cl_ui5_view_builder=>factory(
         )->ele( n = `View` ns = `mvc`
             )->a( n = `xmlns`        v = `sap.m`
             )->a( n = `xmlns:mvc`    v = `sap.ui.core.mvc`
             )->a( n = `displayBlock` v = `true`
             )->a( n = `height`       v = `100%` ).
 
-    DATA(page) = view->ele( `Page`
+
+    page = view->ele( `Page`
         )->a( n = `title` t = mv_title ).
 
     render( node   = page
@@ -4414,6 +5592,16 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
     FIELD-SYMBOLS <copy> TYPE STANDARD TABLE.
     FIELD-SYMBOLS <row> TYPE any.
     FIELD-SYMBOLS <box> TYPE any.
+    DATA temp313 TYPE REF TO cl_abap_structdescr.
+    DATA temp63 TYPE REF TO cl_abap_tabledescr.
+    DATA lo_line LIKE temp313.
+    DATA temp314 TYPE abap_componentdescr.
+    DATA temp64 TYPE REF TO cl_abap_datadescr.
+    DATA lo_type TYPE REF TO cl_abap_tabledescr.
+    FIELD-SYMBOLS <line> TYPE ANY.
+      DATA lv_index LIKE sy-tabix.
+      DATA temp315 LIKE sy-subrc.
+      DATA temp316 LIKE sy-tabix.
 
     ASSIGN source->* TO <src>.
     IF old IS BOUND.
@@ -4423,21 +5611,39 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
       ENDIF.
     ENDIF.
 
-    DATA(lo_line) = CAST cl_abap_structdescr( CAST cl_abap_tabledescr(
-        cl_abap_typedescr=>describe_by_data( <src> ) )->get_table_line_type( ) ).
+
+
+    temp63 ?= cl_abap_typedescr=>describe_by_data( <src> ).
+    temp313 ?= temp63->get_table_line_type( ).
+
+    lo_line = temp313.
     lt_comp = lo_line->get_components( ).
-    INSERT VALUE #( name = cv_box_field
-                    type = CAST #( cl_abap_typedescr=>describe_by_data( lv_flag ) ) ) INTO TABLE lt_comp.
-    DATA(lo_type) = cl_abap_tabledescr=>create( cl_abap_structdescr=>create( lt_comp ) ).
+
+    CLEAR temp314.
+    temp314-name = cv_box_field.
+
+    temp64 ?= cl_abap_typedescr=>describe_by_data( lv_flag ).
+    temp314-type = temp64.
+    INSERT temp314 INTO TABLE lt_comp.
+
+    lo_type = cl_abap_tabledescr=>create( cl_abap_structdescr=>create( lt_comp ) ).
     CREATE DATA result TYPE HANDLE lo_type.
     ASSIGN result->* TO <copy>.
 
-    LOOP AT <src> ASSIGNING FIELD-SYMBOL(<line>).
-      DATA(lv_index) = sy-tabix.
+
+    LOOP AT <src> ASSIGNING <line>.
+
+      lv_index = sy-tabix.
       CREATE DATA lr_row LIKE LINE OF <copy>.
       ASSIGN lr_row->* TO <row>.
       MOVE-CORRESPONDING <line> TO <row>.
-      IF line_exists( lt_selected[ table_line = lv_index ] ).
+
+
+      temp316 = sy-tabix.
+      READ TABLE lt_selected WITH KEY table_line = lv_index TRANSPORTING NO FIELDS.
+      temp315 = sy-subrc.
+      sy-tabix = temp316.
+      IF temp315 = 0.
         ASSIGN COMPONENT cv_box_field OF STRUCTURE <row> TO <box>.
         <box> = abap_true.
       ENDIF.
@@ -4473,16 +5679,22 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
     FIELD-SYMBOLS <src>   TYPE STANDARD TABLE.
     FIELD-SYMBOLS <shown> TYPE STANDARD TABLE.
     FIELD-SYMBOLS <copy>  TYPE STANDARD TABLE.
+    DATA lt_index TYPE z2ui5_cl_cgui_alv=>ty_t_index.
+    DATA lv_row LIKE LINE OF lt_index.
+      FIELD-SYMBOLS <line> TYPE any.
 
     ASSIGN source->* TO <src>.
     ASSIGN shown->* TO <shown>.
-    DATA(lt_index) = filter_index( <shown> ).
+
+    lt_index = filter_index( <shown> ).
     CREATE DATA result LIKE <src>.
     ASSIGN result->* TO <copy>.
     " empty - the transpiled runtime copies the rows along with LIKE
     CLEAR <copy>.
-    LOOP AT lt_index INTO DATA(lv_row).
-      READ TABLE <src> ASSIGNING FIELD-SYMBOL(<line>) INDEX lv_row.
+
+    LOOP AT lt_index INTO lv_row.
+
+      READ TABLE <src> ASSIGNING <line> INDEX lv_row.
       IF sy-subrc = 0.
         INSERT <line> INTO TABLE <copy>.
       ENDIF.
@@ -4494,16 +5706,24 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
 
     FIELD-SYMBOLS <full> TYPE STANDARD TABLE.
     FIELD-SYMBOLS <page> TYPE STANDARD TABLE.
+    FIELD-SYMBOLS <row> TYPE ANY.
+      DATA lv_shown LIKE sy-tabix.
+      DATA lv_row TYPE i.
+      FIELD-SYMBOLS <line> TYPE any.
 
     ASSIGN full->* TO <full>.
     ASSIGN page->* TO <page>.
-    LOOP AT <page> ASSIGNING FIELD-SYMBOL(<row>).
-      DATA(lv_shown) = sy-tabix.
-      READ TABLE index INTO DATA(lv_row) INDEX lv_shown.
+
+    LOOP AT <page> ASSIGNING <row>.
+
+      lv_shown = sy-tabix.
+
+      READ TABLE index INTO lv_row INDEX lv_shown.
       IF sy-subrc <> 0.
         CONTINUE.
       ENDIF.
-      READ TABLE <full> ASSIGNING FIELD-SYMBOL(<line>) INDEX lv_row.
+
+      READ TABLE <full> ASSIGNING <line> INDEX lv_row.
       IF sy-subrc = 0.
         <line> = <row>.
       ENDIF.
@@ -4515,10 +5735,17 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
 
     FIELD-SYMBOLS <box> TYPE any.
 
-    DATA(lt_index) = filter_index( tab ).
-    DATA(lv_box) = get_box_field( ).
-    LOOP AT lt_index INTO DATA(lv_row).
-      READ TABLE tab ASSIGNING FIELD-SYMBOL(<line>) INDEX lv_row.
+    DATA lt_index TYPE z2ui5_cl_cgui_alv=>ty_t_index.
+    DATA lv_box TYPE string.
+    DATA lv_row LIKE LINE OF lt_index.
+      FIELD-SYMBOLS <line> TYPE any.
+    lt_index = filter_index( tab ).
+
+    lv_box = get_box_field( ).
+
+    LOOP AT lt_index INTO lv_row.
+
+      READ TABLE tab ASSIGNING <line> INDEX lv_row.
       IF sy-subrc <> 0.
         CONTINUE.
       ENDIF.
@@ -4534,34 +5761,69 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
 
     DATA lt_low TYPE string_table.
 
-    DATA(lt_filter) = get_filter( ).
-    DATA(lt_layout) = get_layout( tab ).
+    DATA lt_filter TYPE z2ui5_cl_cgui_alv=>ty_t_filter.
+    DATA lt_layout TYPE z2ui5_cl_cgui_alv=>ty_t_layout.
+    DATA ls_layout LIKE LINE OF lt_layout.
+      DATA ls_filter TYPE z2ui5_cl_cgui_alv=>ty_s_filter.
+        DATA ls_row LIKE LINE OF ls_filter-rows.
+          DATA temp317 TYPE string.
+      DATA temp318 TYPE z2ui5_cl_cgui_alv=>ty_s_filter_col.
+    lt_filter = get_filter( ).
+
+    lt_layout = get_layout( tab ).
     SORT lt_layout BY position.
-    LOOP AT lt_layout INTO DATA(ls_layout).
+
+    LOOP AT lt_layout INTO ls_layout.
       CLEAR lt_low.
-      READ TABLE lt_filter INTO DATA(ls_filter) WITH KEY name = ls_layout-name.
+
+      READ TABLE lt_filter INTO ls_filter WITH KEY name = ls_layout-name.
       IF sy-subrc = 0.
-        LOOP AT ls_filter-rows INTO DATA(ls_row).
-          INSERT COND string( WHEN ls_row-sign = `E` THEN |≠{ ls_row-low }|
-                              WHEN ls_row-high IS NOT INITIAL THEN |{ ls_row-low }…{ ls_row-high }|
-                              ELSE ls_row-low ) INTO TABLE lt_low.
+
+        LOOP AT ls_filter-rows INTO ls_row.
+
+          IF ls_row-sign = `E`.
+            temp317 = |≠{ ls_row-low }|.
+          ELSEIF ls_row-high IS NOT INITIAL.
+            temp317 = |{ ls_row-low }…{ ls_row-high }|.
+          ELSE.
+            temp317 = ls_row-low.
+          ENDIF.
+          INSERT temp317 INTO TABLE lt_low.
         ENDLOOP.
       ENDIF.
-      INSERT VALUE #( column = ls_layout-name
-                      text   = ls_layout-text
-                      filter = concat_lines_of( table = lt_low sep = `, ` ) ) INTO TABLE result.
+
+      CLEAR temp318.
+      temp318-column = ls_layout-name.
+      temp318-text = ls_layout-text.
+      temp318-filter = concat_lines_of( table = lt_low sep = `, ` ).
+      INSERT temp318 INTO TABLE result.
     ENDLOOP.
 
   ENDMETHOD.
 
   METHOD filter_setting.
+    DATA lt_layout TYPE z2ui5_cl_cgui_alv=>ty_t_layout.
+    DATA ls_layout TYPE z2ui5_cl_cgui_alv=>ty_s_layout.
+    DATA temp319 TYPE z2ui5_cl_cgui_range=>ty_s_setting-title.
+    DATA lt_comp TYPE z2ui5_cl_cgui_context=>ty_t_comp.
+    DATA ls_comp TYPE z2ui5_cl_cgui_context=>ty_s_comp.
 
     result-control = z2ui5_cl_cgui_range=>cs_control-input.
-    DATA(lt_layout) = get_layout( tab ).
-    READ TABLE lt_layout INTO DATA(ls_layout) WITH KEY name = name.
-    result-title = COND #( WHEN ls_layout-text IS NOT INITIAL THEN ls_layout-text ELSE name ).
-    DATA(lt_comp) = z2ui5_cl_cgui_context=>rtti_get_t_comp( tab ).
-    READ TABLE lt_comp INTO DATA(ls_comp) WITH KEY name = name.
+
+    lt_layout = get_layout( tab ).
+
+    READ TABLE lt_layout INTO ls_layout WITH KEY name = name.
+
+    IF ls_layout-text IS NOT INITIAL.
+      temp319 = ls_layout-text.
+    ELSE.
+      temp319 = name.
+    ENDIF.
+    result-title = temp319.
+
+    lt_comp = z2ui5_cl_cgui_context=>rtti_get_t_comp( tab ).
+
+    READ TABLE lt_comp INTO ls_comp WITH KEY name = name.
     CASE ls_comp-type_kind.
       WHEN cl_abap_typedescr=>typekind_date.
         result-control = z2ui5_cl_cgui_range=>cs_control-date.

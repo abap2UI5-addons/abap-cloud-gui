@@ -15,14 +15,19 @@ CLASS z2ui5_cl_cgui_r2c_39 DEFINITION LOCAL FRIENDS lcl_note.
 CLASS lcl_note IMPLEMENTATION.
   METHOD constructor.
     DATA lt_event TYPE z2ui5_cl_cgui_gui=>ty_t_simple_events.
-    mo_tool = NEW z2ui5_cl_cgui_toolbar( parent = z2ui5_cl_cgui_container=>default_screen ).
+    DATA temp1 TYPE z2ui5_cl_cgui_gui=>ty_s_simple_event.
+    CREATE OBJECT mo_tool TYPE z2ui5_cl_cgui_toolbar EXPORTING parent = z2ui5_cl_cgui_container=>default_screen.
     mo_tool->add_button( fcode = 'COUNT' icon = `sap-icon://accept` butn_type = z2ui5_cl_cgui_toolbar=>cntb_btype_button text = 'Count' ).
-    APPEND VALUE #( eventid = z2ui5_cl_cgui_toolbar=>m_id_function_selected appl_event = abap_true ) TO lt_event.
+
+    CLEAR temp1.
+    temp1-eventid = z2ui5_cl_cgui_toolbar=>m_id_function_selected.
+    temp1-appl_event = abap_true.
+    APPEND temp1 TO lt_event.
     mo_tool->set_registered_events( lt_event ).
     mo_tool->set_handler( handler = me
                           method  = `ON_FUNCTION`
                           event   = `FUNCTION_SELECTED` ).
-    mo_edit = NEW z2ui5_cl_cgui_textedit( parent = z2ui5_cl_cgui_container=>default_screen ).
+    CREATE OBJECT mo_edit TYPE z2ui5_cl_cgui_textedit EXPORTING parent = z2ui5_cl_cgui_container=>default_screen.
     mo_edit->set_textstream( lcl_r2c=>app->p_text ).
   ENDMETHOD.
 

@@ -42,7 +42,7 @@ CLASS z2ui5_cl_cgui_r2c_41 IMPLEMENTATION.
 
   METHOD start_of_selection.
 
-    go_stamp = NEW lcl_stamp( ).
+    CREATE OBJECT go_stamp TYPE lcl_stamp.
     list( )->new_line(
         )->write( 'Click the stamp' ).
 

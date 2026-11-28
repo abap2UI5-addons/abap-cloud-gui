@@ -27,7 +27,7 @@ CLASS z2ui5_cl_cgui_variant_db IMPLEMENTATION.
 
   METHOD factory.
 
-    result = NEW #( ).
+    CREATE OBJECT result.
 
   ENDMETHOD.
 
@@ -49,17 +49,40 @@ CLASS z2ui5_cl_cgui_variant_db IMPLEMENTATION.
 
     DATA ls_variant TYPE z2ui5_cl_cgui_variant=>ty_s_variant.
 
-    DATA(lv_report) = CONV z2ui5_t_19-report( to_upper( report ) ).
-    DATA(lv_user) = CONV z2ui5_cgui_var_owner( user( ) ).
+    DATA temp12 TYPE z2ui5_t_19-report.
+    DATA lv_report LIKE temp12.
+    DATA temp13 TYPE z2ui5_cgui_var_owner.
+    DATA lv_user LIKE temp13.
+TYPES BEGIN OF temp14.
+TYPES variant TYPE z2ui5_t_19-variant.
+TYPES owner TYPE z2ui5_t_19-owner.
+TYPES shared TYPE z2ui5_t_19-shared.
+TYPES protected TYPE z2ui5_t_19-protected.
+TYPES data TYPE z2ui5_t_19-data.
+TYPES END OF temp14.
+    DATA lt_db TYPE STANDARD TABLE OF temp14 WITH DEFAULT KEY.
+    DATA temp15 LIKE LINE OF lt_db.
+    DATA lr_db LIKE REF TO temp15.
+    temp12 = to_upper( report ).
 
-    SELECT variant, owner, shared, protected, data
-      FROM z2ui5_t_19
-      WHERE report = @lv_report
-        AND ( owner = @lv_user OR shared = @abap_true )
+    lv_report = temp12.
+
+    temp13 = user( ).
+
+    lv_user = temp13.
+
+
+
+    SELECT variant owner shared protected data
+      FROM z2ui5_t_19 INTO TABLE lt_db
+      WHERE report = lv_report
+        AND ( owner = lv_user OR shared = abap_true )
       ORDER BY variant
-      INTO TABLE @DATA(lt_db).
+      .
 
-    LOOP AT lt_db REFERENCE INTO DATA(lr_db).
+
+
+    LOOP AT lt_db REFERENCE INTO lr_db.
       CLEAR ls_variant.
       TRY.
           CALL TRANSFORMATION id SOURCE XML lr_db->data
@@ -82,15 +105,25 @@ CLASS z2ui5_cl_cgui_variant_db IMPLEMENTATION.
   METHOD z2ui5_if_cgui_variants~save.
 
     DATA ls_db TYPE z2ui5_t_19.
+    DATA lv_user TYPE string.
+DATA BEGIN OF ls_old.
+DATA owner TYPE z2ui5_t_19-owner.
+DATA shared TYPE z2ui5_t_19-shared.
+DATA protected TYPE z2ui5_t_19-protected.
+DATA END OF ls_old.
+    DATA temp16 TYPE z2ui5_cgui_var_shared.
+    DATA temp17 TYPE z2ui5_cgui_var_protected.
 
     ls_db-report  = to_upper( report ).
     ls_db-variant = variant-name.
-    DATA(lv_user) = user( ).
 
-    SELECT SINGLE owner, shared, protected
-      FROM z2ui5_t_19
-      WHERE report = @ls_db-report AND variant = @ls_db-variant
-      INTO @DATA(ls_old).
+    lv_user = user( ).
+
+
+    SELECT SINGLE owner shared protected
+      FROM z2ui5_t_19 INTO ls_old
+      WHERE report = ls_db-report AND variant = ls_db-variant
+      .
     IF sy-subrc = 0.
       " another user's private variant is not in this user's list - saved
       " over, it was lost and the new one went to its owner, out of sight
@@ -119,10 +152,20 @@ CLASS z2ui5_cl_cgui_variant_db IMPLEMENTATION.
 
     " sharing and protection belong to the owner - another user keeps them
     " as they are: a shared variant saved over stays in everyone's list
-    ls_db-shared    = COND #( WHEN ls_db-owner = lv_user THEN variant-shared
-                              ELSE ls_old-shared ).
-    ls_db-protected = COND #( WHEN ls_db-owner = lv_user THEN variant-protected
-                              ELSE ls_old-protected ).
+
+    IF ls_db-owner = lv_user.
+      temp16 = variant-shared.
+    ELSE.
+      temp16 = ls_old-shared.
+    ENDIF.
+    ls_db-shared    = temp16.
+
+    IF ls_db-owner = lv_user.
+      temp17 = variant-protected.
+    ELSE.
+      temp17 = ls_old-protected.
+    ENDIF.
+    ls_db-protected = temp17.
     GET TIME STAMP FIELD ls_db-changed_at.
     CALL TRANSFORMATION id SOURCE text    = variant-text
                                   values  = variant-values
@@ -130,7 +173,7 @@ CLASS z2ui5_cl_cgui_variant_db IMPLEMENTATION.
                                   hide    = variant-hide
                            RESULT XML ls_db-data.
 
-    MODIFY z2ui5_t_19 FROM @ls_db.
+    MODIFY z2ui5_t_19 FROM ls_db.
     " abap2UI5 rolls back what an app leaves open after its main( )
     COMMIT WORK.
 
@@ -138,13 +181,28 @@ CLASS z2ui5_cl_cgui_variant_db IMPLEMENTATION.
 
   METHOD z2ui5_if_cgui_variants~delete.
 
-    DATA(lv_report) = CONV z2ui5_t_19-report( to_upper( report ) ).
-    DATA(lv_name) = CONV z2ui5_cgui_var_name( name ).
+    DATA temp18 TYPE z2ui5_t_19-report.
+    DATA lv_report LIKE temp18.
+    DATA temp19 TYPE z2ui5_cgui_var_name.
+    DATA lv_name LIKE temp19.
+DATA BEGIN OF ls_old.
+DATA owner TYPE z2ui5_t_19-owner.
+DATA shared TYPE z2ui5_t_19-shared.
+DATA protected TYPE z2ui5_t_19-protected.
+DATA END OF ls_old.
+    temp18 = to_upper( report ).
 
-    SELECT SINGLE owner, shared, protected
-      FROM z2ui5_t_19
-      WHERE report = @lv_report AND variant = @lv_name
-      INTO @DATA(ls_old).
+    lv_report = temp18.
+
+    temp19 = name.
+
+    lv_name = temp19.
+
+
+    SELECT SINGLE owner shared protected
+      FROM z2ui5_t_19 INTO ls_old
+      WHERE report = lv_report AND variant = lv_name
+      .
     " another user's private variant is none of this user's business
     IF sy-subrc <> 0 OR ( ls_old-shared = abap_false AND ls_old-owner <> user( ) ).
       RETURN.
@@ -159,7 +217,7 @@ CLASS z2ui5_cl_cgui_variant_db IMPLEMENTATION.
                          with = ls_old-owner ).
     ENDIF.
 
-    DELETE FROM z2ui5_t_19 WHERE report = @lv_report AND variant = @lv_name.
+    DELETE FROM z2ui5_t_19 WHERE report = lv_report AND variant = lv_name.
     COMMIT WORK.
 
   ENDMETHOD.
