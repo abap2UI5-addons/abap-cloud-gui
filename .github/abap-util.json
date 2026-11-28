@@ -1,0 +1,24 @@
+{
+  "master": "abap-util/abap-util",
+  "commit": "3974e39206c30fd602369f53df511ddf40281de3",
+  "rename": [
+    [
+      "z2ui5_cl_cgui_context",
+      "zabaputil_cl_util_context"
+    ],
+    [
+      "z2ui5_cx_cgui_error",
+      "zabaputil_cx_util_error"
+    ],
+    [
+      "z2ui5_cl_cgui_xlsx",
+      "zabaputil_cl_util_xlsx"
+    ]
+  ],
+  "copies": [
+    {
+      "copy": "src/01/z2ui5_cl_cgui_xlsx.clas.abap",
+      "master": "src/zabaputil_cl_util_xlsx.clas.abap"
+    }
+  ]
+}

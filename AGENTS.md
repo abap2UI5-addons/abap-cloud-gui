@@ -237,6 +237,17 @@ toolbar and the grid are not frozen.
   `z2ui5_cl_cgui_context`, copied from abap-util's context class. Its reading
   tests are slow in the transpiled runtime (the runtime's XML parser searches
   the document from the start for every node) - keep their workbooks small.
+  `.github/abap-util.json` names the copy and the abap-util commit it was
+  taken from; abap-util's `sync-check` (`node ../abap-util/.github/scripts/sync-check.mjs
+  --consumer .`) has to report 0 findings for it. The context class is not
+  in the manifest: it is this repository's own class (32 methods abap-util
+  does not have, 13 written its own way), into which the methods the XLSX
+  class calls are copied. Where its own form differs from abap-util's, the
+  XLSX class takes both: it reads a fixed value's text by position (the third
+  component - `descr` in abap-util, `text` here), and
+  `rtti_get_t_ddic_fixed_values( rollname )` here answers through this
+  class's `rtti_get_fixed_values( )`. Bring the context under the manifest
+  only together with a sync of those 45 differences into abap-util.
 
 ## report2UI5
 
