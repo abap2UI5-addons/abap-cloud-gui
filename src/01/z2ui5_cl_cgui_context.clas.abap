@@ -582,6 +582,25 @@ CLASS z2ui5_cl_cgui_context DEFINITION PUBLIC FINAL CREATE PUBLIC.
       RETURNING
         VALUE(result) TYPE REF TO data.
 
+    "! The current time stamp in whole seconds, as GET TIME STAMP fills a
+    "! TIMESTAMP: truncated. time_get_timestampl assigned to a TIMESTAMP
+    "! field rounds instead, and can land a second in the future.
+    CLASS-METHODS time_get_timestamp
+      RETURNING
+        VALUE(result) TYPE timestamp.
+
+    "! tz: an SAP time zone key (TTZZ, at most six characters: `UTC`,
+    "! `CET`, `EST`) - not an IANA name like Europe/Berlin. A zone that is
+    "! no key, or a conversion that fails, raises z2ui5_cx_cgui_error;
+    "! it returned an empty or wrong date and time.
+    CLASS-METHODS time_stampl_to_tz
+      IMPORTING
+        val  TYPE timestampl
+        tz   TYPE clike DEFAULT `UTC`
+      EXPORTING
+        date TYPE d
+        time TYPE t.
+
   PROTECTED SECTION.
   PRIVATE SECTION.
 
@@ -654,6 +673,14 @@ CLASS z2ui5_cl_cgui_context DEFINITION PUBLIC FINAL CREATE PUBLIC.
         high          TYPE any
       RETURNING
         VALUE(result) TYPE abap_bool.
+
+    " the zone trimmed - raises when it is longer than the six characters
+    " of an SAP time zone key: `Europe/Berlin` was cut to `Europe`
+    CLASS-METHODS time_check_zone
+      IMPORTING
+        tz            TYPE clike
+      RETURNING
+        VALUE(result) TYPE string.
 
 ENDCLASS.
 
@@ -2988,6 +3015,39 @@ CLASS z2ui5_cl_cgui_context IMPLEMENTATION.
     DATA(lo_table) = cl_abap_tabledescr=>create( p_line_type  = lo_struct
                                                  p_table_kind = cl_abap_tabledescr=>tablekind_std ).
     CREATE DATA result TYPE HANDLE lo_table.
+
+  ENDMETHOD.
+
+  METHOD time_get_timestamp.
+    GET TIME STAMP FIELD result.
+  ENDMETHOD.
+
+  METHOD time_stampl_to_tz.
+
+    DATA lv_tz TYPE c LENGTH 6.
+
+    CLEAR date.
+    CLEAR time.
+    lv_tz = time_check_zone( tz ).
+
+    " 8: the zone is not in TTZZ, 12: the time stamp is no valid one
+    CONVERT TIME STAMP val TIME ZONE lv_tz INTO DATE date TIME time.
+    IF sy-subrc >= 8.
+      RAISE EXCEPTION TYPE z2ui5_cx_cgui_error
+        EXPORTING
+          val = |TIME_STAMPL_TO_TZ: { val } cannot be converted to time zone { lv_tz } (sy-subrc { sy-subrc })|.
+    ENDIF.
+
+  ENDMETHOD.
+
+  METHOD time_check_zone.
+
+    result = c_trim( tz ).
+    IF strlen( result ) > 6.
+      RAISE EXCEPTION TYPE z2ui5_cx_cgui_error
+        EXPORTING
+          val = |{ result } is no SAP time zone key (TTZZ, at most six characters)|.
+    ENDIF.
 
   ENDMETHOD.
 
