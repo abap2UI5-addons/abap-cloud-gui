@@ -881,7 +881,8 @@ CLASS z2ui5_cl_cgui_alv DEFINITION PUBLIC FINAL CREATE PUBLIC.
       RETURNING
         VALUE(result) TYPE abap_bool.
 
-    "! the visible columns of tab as Excel file (Office Open XML)
+    "! the visible columns of tab as Excel file (Office Open XML), every
+    "! value in its own cell type - see z2ui5_cl_cgui_xlsx
     METHODS to_xlsx
       IMPORTING
         tab           TYPE STANDARD TABLE
@@ -3428,84 +3429,40 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
 
   METHOD to_xlsx.
 
-    " an Office Open XML workbook of one sheet, written as XML and zipped
-    " with CL_ABAP_ZIP - released on ABAP Cloud and on every release down
-    " to 7.02, no CL_SALV_TABLE. Numbers are cells with a value, everything
-    " else inline text as the list shows it
-    CONSTANTS lc_xml TYPE string VALUE `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>`.
-    CONSTANTS lc_rel TYPE string VALUE `http://schemas.openxmlformats.org/officeDocument/2006/relationships`.
-    DATA lr_copy  TYPE REF TO data.
-    DATA lt_xml   TYPE string_table.
-    DATA lt_cell  TYPE string_table.
+    " The visible columns in the order of the layout, under their labels,
+    " and the rows as the ALV sorts them - written by z2ui5_cl_cgui_xlsx: a
+    " number is a number cell, a date a date, a time a time, a flag a
+    " boolean, everything else text
+    DATA lr_copy   TYPE REF TO data.
+    DATA lt_column TYPE z2ui5_cl_cgui_xlsx=>ty_t_column.
     FIELD-SYMBOLS <copy> TYPE STANDARD TABLE.
-    FIELD-SYMBOLS <row>  TYPE any.
-    FIELD-SYMBOLS <cell> TYPE any.
 
     CREATE DATA lr_copy LIKE tab.
     ASSIGN lr_copy->* TO <copy>.
     <copy> = tab.
     sort_rows( CHANGING tab = <copy> ).
-    DATA(lt_visible) = columns_visible( tab ).
 
-    INSERT |{ lc_xml }<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>|
-           INTO TABLE lt_xml.
-    LOOP AT lt_visible INTO DATA(ls_visible).
-      INSERT |<c t="inlineStr"><is><t xml:space="preserve">{ z2ui5_cl_cgui_context=>c_escape_xml( ls_visible-label ) }</t></is></c>|
-             INTO TABLE lt_cell.
+    LOOP AT columns_visible( tab ) INTO DATA(ls_visible).
+      DATA(lv_format) = ``.
+      IF ls_visible-type_kind = cl_abap_typedescr=>typekind_packed AND ls_visible-decimals > 0.
+        " the decimals the list shows, grouped and separated the way the
+        " user's Excel is set up
+        lv_format = |#,##0.{ repeat( val = `0`
+                                     occ = ls_visible-decimals ) }|.
+      ENDIF.
+      INSERT VALUE #( name   = ls_visible-name
+                      header = ls_visible-label
+                      format = lv_format ) INTO TABLE lt_column.
     ENDLOOP.
-    INSERT |<row>{ concat_lines_of( lt_cell ) }</row>| INTO TABLE lt_xml.
+    IF lt_column IS INITIAL.
+      " no column is shown: a sheet without a cell - an empty column list
+      " would mean every field to the XLSX class
+      result = z2ui5_cl_cgui_xlsx=>factory( )->get_xlsx( ).
+      RETURN.
+    ENDIF.
 
-    LOOP AT <copy> ASSIGNING <row>.
-      CLEAR lt_cell.
-      LOOP AT lt_visible INTO ls_visible.
-        ASSIGN COMPONENT ls_visible-name OF STRUCTURE <row> TO <cell>.
-        IF sy-subrc <> 0.
-          INSERT `<c/>` INTO TABLE lt_cell.
-          CONTINUE.
-        ENDIF.
-        IF is_numeric( ls_visible-type_kind ) = abap_true.
-          INSERT |<c><v>{ <cell> }</v></c>| INTO TABLE lt_cell.
-        ELSE.
-          " the control characters XML forbids are dropped (a legacy text
-          " carries them, and Excel repairs a workbook with one), leading
-          " and trailing blanks kept (xml:space)
-          DATA(lv_cell) = z2ui5_cl_cgui_context=>c_escape_xml( cell_to_text( val  = <cell>
-                                                                             comp = ls_visible ) ).
-          INSERT |<c t="inlineStr"><is><t xml:space="preserve">{ lv_cell }</t></is></c>| INTO TABLE lt_cell.
-        ENDIF.
-      ENDLOOP.
-      INSERT |<row>{ concat_lines_of( lt_cell ) }</row>| INTO TABLE lt_xml.
-    ENDLOOP.
-    INSERT `</sheetData></worksheet>` INTO TABLE lt_xml.
-
-    DATA(lo_zip) = NEW cl_abap_zip( ).
-    lo_zip->add( name    = `[Content_Types].xml`
-                 content = z2ui5_cl_cgui_context=>conv_get_xstring_by_string(
-                     |{ lc_xml }<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">|
-                  && |<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>|
-                  && |<Default Extension="xml" ContentType="application/xml"/>|
-                  && |<Override PartName="/xl/workbook.xml" |
-                  && |ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>|
-                  && |<Override PartName="/xl/worksheets/sheet1.xml" |
-                  && |ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>|
-                  && |</Types>| ) ).
-    lo_zip->add( name    = `_rels/.rels`
-                 content = z2ui5_cl_cgui_context=>conv_get_xstring_by_string(
-                     |{ lc_xml }<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">|
-                  && |<Relationship Id="rId1" Type="{ lc_rel }/officeDocument" Target="xl/workbook.xml"/>|
-                  && |</Relationships>| ) ).
-    lo_zip->add( name    = `xl/workbook.xml`
-                 content = z2ui5_cl_cgui_context=>conv_get_xstring_by_string(
-                     |{ lc_xml }<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" |
-                  && |xmlns:r="{ lc_rel }"><sheets><sheet name="Sheet1" sheetId="1" r:id="rId1"/></sheets></workbook>| ) ).
-    lo_zip->add( name    = `xl/_rels/workbook.xml.rels`
-                 content = z2ui5_cl_cgui_context=>conv_get_xstring_by_string(
-                     |{ lc_xml }<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">|
-                  && |<Relationship Id="rId1" Type="{ lc_rel }/worksheet" Target="worksheets/sheet1.xml"/>|
-                  && |</Relationships>| ) ).
-    lo_zip->add( name    = `xl/worksheets/sheet1.xml`
-                 content = z2ui5_cl_cgui_context=>conv_get_xstring_by_string( concat_lines_of( lt_xml ) ) ).
-    result = lo_zip->save( ).
+    result = z2ui5_cl_cgui_xlsx=>xlsx_by_itab( val    = <copy>
+                                               layout = VALUE #( t_column = lt_column ) ).
 
   ENDMETHOD.
 
@@ -4376,7 +4333,7 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
       DATA(lv_xlsx) = to_xlsx( tab ).
       IF lv_xlsx IS NOT INITIAL.
         client->follow_up_action( val   = client->cs_event-download_b64_file
-                                  t_arg = VALUE #( ( |data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,|
+                                  t_arg = VALUE #( ( |data:{ z2ui5_cl_cgui_xlsx=>mime_type };base64,|
                                                   && z2ui5_cl_cgui_context=>conv_encode_x_base64( lv_xlsx ) )
                                                    ( |{ lv_name }.xlsx| ) ) ).
         RETURN.

@@ -503,8 +503,10 @@ OpenUI5 has no sap.viz, so `z2ui5_cl_cgui_chart` draws it as SVG of plain
 attributes, which the page's content security policy lets in.
 `set_chart( abap_false )` takes the button off the toolbar.
 
-**Export** writes the ALV as CSV or as an Excel file (Office Open XML, zipped
-with `CL_ABAP_ZIP` - no `CL_SALV_TABLE`). **Print** hands the output to the
+**Export** writes the ALV as CSV or as an Excel file (Office Open XML, written
+by `z2ui5_cl_cgui_xlsx` - no `CL_SALV_TABLE`, no abap2xlsx): a number is a
+number cell, a date a date, a time a time, a flag a boolean. A report can use
+the class for its own workbooks, to write and to read them. **Print** hands the output to the
 browser as a PDF - ABAP Cloud has no spool. The PDF is written in ABAP
 (`z2ui5_cl_cgui_pdf`) in Courier, a font every PDF reader has, so nothing is
 embedded; a wide list turns the page to landscape and shrinks the font.

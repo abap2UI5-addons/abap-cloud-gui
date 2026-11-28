@@ -6,6 +6,26 @@ release.
 
 ## Unreleased
 
+**ALV: the Excel export writes typed cells (`z2ui5_cl_cgui_xlsx`)**
+
+- The Excel export of the ALV wrote every value that is no number as text,
+  the way the list shows it - a date arrived in Excel as `05.01.2026`, a
+  text Excel does not sort or filter as a date. A date is a date cell now, a
+  time a time cell and a flag a boolean (TRUE, or an empty cell); a packed
+  number carries a number format with the decimals of the column; the header
+  row is bold. Numbers, a NUMC with its leading zeros, the order of the
+  columns and the sorting of the rows are as before.
+- The file is written by `z2ui5_cl_cgui_xlsx`, a copy of abap-util's
+  `zabaputil_cl_util_xlsx`, which also reads workbooks: `factory( )`,
+  `add_sheet( )` and `get_xlsx( )` write one or more internal tables with a
+  layout (columns, headers, number formats, a frozen header, filter buttons,
+  an Excel table, a totals row, formula columns), `factory_by_xlsx( )` with
+  `get_table( )`, `get_table_ref( )` and `get_cells( )` read a file. A report
+  can use it for its own files; what the class takes from the system (ZIP,
+  the XML reader) is in `z2ui5_cl_cgui_context`.
+- `z2ui5_cl_cgui_context=>zip_unpack( )` raises `z2ui5_cx_cgui_error` for
+  data that is no ZIP archive.
+
 **Fixes**
 
 - Selection variants, ALV layouts, the default layout and the SU3 / SPRO

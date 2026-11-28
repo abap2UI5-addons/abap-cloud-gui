@@ -489,6 +489,27 @@ CLASS ltcl_test IMPLEMENTATION.
     cl_abap_unit_assert=>assert_equals( act = lv_head
                                         exp = lv_pk ).
 
+    " read back: the columns the ALV shows under their labels, a NUMC with
+    " its zeros as text, a date as a date, a price as a number
+    DATA(lt_cell) = z2ui5_cl_cgui_xlsx=>factory_by_xlsx( lv_xlsx )->get_cells( ).
+    DATA(lt_visible) = z2ui5_cl_cgui_alv=>factory( )->get_columns( mo_app->mt_row ).
+    cl_abap_unit_assert=>assert_equals( act = lt_cell[ row = 1 col = 1 ]-value
+                                        exp = lt_visible[ 1 ]-label ).
+    DATA(lv_col) = line_index( lt_visible[ name = `CONNID` ] ).
+    cl_abap_unit_assert=>assert_equals(
+        act = lt_cell[ row = 2 col = lv_col ]
+        exp = VALUE z2ui5_cl_cgui_xlsx=>ty_s_cell( row = 2 col = lv_col kind = `S` value = `0400` ) ).
+    lv_col = line_index( lt_visible[ name = `FLDATE` ] ).
+    cl_abap_unit_assert=>assert_equals(
+        act = lt_cell[ row = 2 col = lv_col ]
+        exp = VALUE z2ui5_cl_cgui_xlsx=>ty_s_cell( row = 2 col = lv_col kind = `D` value = `2026-01-05` ) ).
+    lv_col = line_index( lt_visible[ name = `PRICE` ] ).
+    cl_abap_unit_assert=>assert_equals(
+        act = lt_cell[ row = 2 col = lv_col ]
+        exp = VALUE z2ui5_cl_cgui_xlsx=>ty_s_cell( row = 2 col = lv_col kind = `N` value = `100.5` ) ).
+    cl_abap_unit_assert=>assert_equals( act = lt_cell[ row = 4 col = lv_col ]-value
+                                        exp = `300` ).
+
     z2ui5_cl_cgui_alv=>factory( )->set_title( `Flights` )->export( client = mo_client
                                                                   tab    = mo_app->mt_row
                                                                   format = z2ui5_cl_cgui_alv=>cs_format-xlsx ).
