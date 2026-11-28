@@ -2,6 +2,8 @@ CLASS z2ui5_cl_cgui_context DEFINITION PUBLIC FINAL CREATE PUBLIC.
 
   PUBLIC SECTION.
 
+    TYPES ty_t_codepoint TYPE STANDARD TABLE OF i WITH EMPTY KEY.
+
     TYPES:
       BEGIN OF ty_s_data_element_text,
         header TYPE string,
@@ -600,6 +602,50 @@ CLASS z2ui5_cl_cgui_context DEFINITION PUBLIC FINAL CREATE PUBLIC.
       EXPORTING
         date TYPE d
         time TYPE t.
+
+    "! The Unicode code points of a text, one row per character. A
+    "! character outside the Basic Multilingual Plane, which a string
+    "! holds as two UTF-16 code units, is one row
+    CLASS-METHODS c_get_codepoints
+      IMPORTING
+        val           TYPE clike
+      RETURNING
+        VALUE(result) TYPE ty_t_codepoint.
+
+    "! Run a conversion exit: CONVERSION_EXIT_&lt;convexit&gt;_INPUT, or _OUTPUT.
+    "!
+    "!   conv_exit( EXPORTING convexit = `MATN1` CHANGING value = lv_matnr ).
+    "!   conv_exit( EXPORTING convexit = `ALPHA` from = i_vbeln CHANGING value = lv_docno ).
+    "!
+    "! A value the exit refuses - a unit that does not exist, a material
+    "! number too long - raises z2ui5_cx_cgui_error with the exit's own
+    "! message; VALUE is then left as it was. A caller that can live with
+    "! the unconverted value catches it and carries on.
+    "!
+    "! @parameter convexit | the exit's name: ALPHA, MATN1, CUNIT, HUID, ...
+    "! @parameter output   | abap_true: the _OUTPUT direction
+    "! @parameter from     | the value to convert, when it is not VALUE itself. The
+    "!                       target's type decides the result - ALPHA pads to its length
+    "! @parameter value    | converted in place, or the target of FROM
+    "! @raising z2ui5_cx_cgui_error | the exit refused the value, or does not exist
+    CLASS-METHODS conv_exit
+      IMPORTING
+        convexit TYPE clike
+        output   TYPE abap_bool DEFAULT abap_false
+        from     TYPE any       OPTIONAL
+      CHANGING
+        value    TYPE data
+      RAISING
+        z2ui5_cx_cgui_error.
+
+    "! the fixed values of the domain of a data element, by its name - the
+    "! form the XLSX class asks for (abap-util's rtti_get_t_ddic_fixed_values),
+    "! answered by rtti_get_fixed_values
+    CLASS-METHODS rtti_get_t_ddic_fixed_values
+      IMPORTING
+        rollname      TYPE clike
+      RETURNING
+        VALUE(result) TYPE ty_t_fix_val.
 
   PROTECTED SECTION.
   PRIVATE SECTION.
@@ -3047,6 +3093,155 @@ CLASS z2ui5_cl_cgui_context IMPLEMENTATION.
       RAISE EXCEPTION TYPE z2ui5_cx_cgui_error
         EXPORTING
           val = |{ result } is no SAP time zone key (TTZZ, at most six characters)|.
+    ENDIF.
+
+  ENDMETHOD.
+
+  METHOD c_get_codepoints.
+
+    DATA lv_x     TYPE xstring.
+    DATA lv_byte  TYPE i.
+    DATA lv_cp    TYPE i.
+    DATA lv_more  TYPE i.
+    DATA lv_off   TYPE i.
+    DATA lv_high  TYPE i.
+    DATA lv_lines TYPE i.
+
+    " the UTF-8 bytes, decoded by hand: the one conversion every release
+    " and the transpiler have, and no character-code API is needed
+    lv_x = conv_get_xstring_by_string( CONV string( val ) ).
+    DATA(lv_len) = xstrlen( lv_x ).
+
+    WHILE lv_off < lv_len.
+
+      lv_byte = lv_x+lv_off(1).
+      lv_off = lv_off + 1.
+      IF lv_byte < 128.
+        lv_cp = lv_byte.
+        lv_more = 0.
+      ELSEIF lv_byte < 224.
+        lv_cp = lv_byte MOD 32.
+        lv_more = 1.
+      ELSEIF lv_byte < 240.
+        lv_cp = lv_byte MOD 16.
+        lv_more = 2.
+      ELSE.
+        lv_cp = lv_byte MOD 8.
+        lv_more = 3.
+      ENDIF.
+
+      DO lv_more TIMES.
+        IF lv_off >= lv_len.
+          EXIT.
+        ENDIF.
+        lv_byte = lv_x+lv_off(1).
+        lv_off = lv_off + 1.
+        lv_cp = lv_cp * 64 + ( lv_byte MOD 64 ).
+      ENDDO.
+
+      " a converter that writes a surrogate pair as two three-byte
+      " sequences (CESU-8): the low half joins the high half before it
+      IF lv_cp >= 56320 AND lv_cp <= 57343 AND lv_high > 0.
+        lv_cp = 65536 + ( lv_high - 55296 ) * 1024 + ( lv_cp - 56320 ).
+        lv_lines = lines( result ).
+        DELETE result INDEX lv_lines.
+      ENDIF.
+      IF lv_cp >= 55296 AND lv_cp <= 56319.
+        lv_high = lv_cp.
+      ELSE.
+        lv_high = 0.
+      ENDIF.
+
+      INSERT lv_cp INTO TABLE result.
+
+    ENDWHILE.
+
+  ENDMETHOD.
+
+  METHOD conv_exit.
+
+    DATA lv_message TYPE string.
+    DATA lx_error   TYPE REF TO cx_root.
+
+    DATA(conex) = COND string( WHEN output = abap_true
+                               THEN |CONVERSION_EXIT_{ convexit }_OUTPUT|
+                               ELSE |CONVERSION_EXIT_{ convexit }_INPUT| ).
+
+    TRY.
+        " CUNIT reads the unit in a language; the others take no such parameter
+        IF from IS SUPPLIED AND convexit = `CUNIT`.
+          CALL FUNCTION conex
+            EXPORTING
+              input    = from
+              language = sy-langu
+            IMPORTING
+              output   = value
+            EXCEPTIONS
+              " a plain MESSAGE TYPE E of the exit ends the request without it
+              error_message = 98
+              OTHERS        = 99.
+        ELSEIF from IS SUPPLIED.
+          CALL FUNCTION conex
+            EXPORTING
+              input  = from
+            IMPORTING
+              output = value
+            EXCEPTIONS
+              error_message = 98
+              OTHERS        = 99.
+        ELSEIF convexit = `CUNIT`.
+          CALL FUNCTION conex
+            EXPORTING
+              input    = value
+              language = sy-langu
+            IMPORTING
+              output   = value
+            EXCEPTIONS
+              error_message = 98
+              OTHERS        = 99.
+        ELSE.
+          CALL FUNCTION conex
+            EXPORTING
+              input  = value
+            IMPORTING
+              output = value
+            EXCEPTIONS
+              error_message = 98
+              OTHERS        = 99.
+        ENDIF.
+
+      CATCH cx_root INTO lx_error.
+        " no such exit, or a parameter it does not accept
+        RAISE EXCEPTION TYPE z2ui5_cx_cgui_error
+          EXPORTING
+            val      = lx_error->get_text( )
+            previous = lx_error.
+    ENDTRY.
+
+    IF sy-subrc <> 0.
+      " the exit raised its exception with MESSAGE ... RAISING, or sent a
+      " plain MESSAGE TYPE E (error_message) - both leave it in sy-msg*
+      IF sy-msgid IS NOT INITIAL.
+        MESSAGE ID sy-msgid TYPE `E` NUMBER sy-msgno
+                WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4 INTO lv_message.
+      ELSE.
+        lv_message = |{ conex } failed|.
+      ENDIF.
+      RAISE EXCEPTION TYPE z2ui5_cx_cgui_error
+        EXPORTING
+          val = lv_message.
+    ENDIF.
+
+  ENDMETHOD.
+
+  METHOD rtti_get_t_ddic_fixed_values.
+
+    cl_abap_typedescr=>describe_by_name( EXPORTING  p_name         = rollname
+                                         RECEIVING  p_descr_ref    = DATA(lo_descr)
+                                         EXCEPTIONS type_not_found = 1
+                                                    OTHERS         = 2 ).
+    IF sy-subrc = 0.
+      result = rtti_get_fixed_values( lo_descr ).
     ENDIF.
 
   ENDMETHOD.
