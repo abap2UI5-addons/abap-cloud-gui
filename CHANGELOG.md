@@ -6,6 +6,26 @@ release.
 
 ## Unreleased
 
+**ALV: the Excel export writes typed cells (`z2ui5_cl_cgui_xlsx`)**
+
+- The Excel export of the ALV wrote every value that is no number as text,
+  the way the list shows it - a date arrived in Excel as `05.01.2026`, a
+  text Excel does not sort or filter as a date. A date is a date cell now, a
+  time a time cell and a flag a boolean (TRUE, or an empty cell); a packed
+  number carries a number format with the decimals of the column; the header
+  row is bold. Numbers, a NUMC with its leading zeros, the order of the
+  columns and the sorting of the rows are as before.
+- The file is written by `z2ui5_cl_cgui_xlsx`, a copy of abap-util's
+  `zabaputil_cl_util_xlsx`, which also reads workbooks: `factory( )`,
+  `add_sheet( )` and `get_xlsx( )` write one or more internal tables with a
+  layout (columns, headers, number formats, a frozen header, filter buttons,
+  an Excel table, a totals row, formula columns), `factory_by_xlsx( )` with
+  `get_table( )`, `get_table_ref( )` and `get_cells( )` read a file. A report
+  can use it for its own files; what the class takes from the system (ZIP,
+  the XML reader) is in `z2ui5_cl_cgui_context`.
+- `z2ui5_cl_cgui_context=>zip_unpack( )` raises `z2ui5_cx_cgui_error` for
+  data that is no ZIP archive.
+
 **Fixes**
 
 - Selection variants, ALV layouts, the default layout and the SU3 / SPRO
@@ -21,6 +41,11 @@ release.
   alone, the backend never heard of it) - the toolbar's filter is the one.
 - The ALV and the list activate on NW 7.02 - 7.40 again: they named
   `cl_abap_typedescr=>typekind_int8`, which these releases do not have.
+- The 7.02 build has no line of more than 255 characters any more: two
+  conditions of the ALV and of the list came out of the downport as one line
+  of 449 and of 371 characters, which a 7.02 system cuts on import. The 7.02
+  gate reads the line length now (`line_length` in
+  `.github/abaplint/abap_702.jsonc`).
 - ALV totals and subtotals: a column with a currency or unit
   (`set_column_currency( )`, `set_column_quantity( )`) is totalled per
   currency or unit, as the classic ALV does - 100 EUR and 200 USD were a

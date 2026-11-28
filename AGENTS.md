@@ -13,7 +13,7 @@ list, ALV grid, messages. Language of code, comments, commits and docs:
 
 | Path | Content |
 |---|---|
-| `src/01` | the framework: `z2ui5_cl_cgui_report` (report runtime), `_selscreen`, `_list`, `_alv`, `_tree`, `_layout` (the layout dialog of the ALV), `_popup`, `_range`, `_select`, `_variant` (selection variants), `_context` (RTTI and conversion helpers), `z2ui5_cx_cgui_error`; the two stores: `z2ui5_if_cgui_variants` with `z2ui5_cl_cgui_variant_db` (table `Z2UI5_T_19`, data elements `Z2UI5_CGUI_VAR_*`) and `z2ui5_if_cgui_layouts` with `z2ui5_cl_cgui_layout_db` (table `Z2UI5_T_18`) |
+| `src/01` | the framework: `z2ui5_cl_cgui_report` (report runtime), `_selscreen`, `_list`, `_alv`, `_tree`, `_layout` (the layout dialog of the ALV), `_popup`, `_range`, `_select`, `_variant` (selection variants), `_context` (RTTI and conversion helpers), `_xlsx` (Excel workbooks written and read - a renamed copy of abap-util's `zabaputil_cl_util_xlsx`, see the rules below), `z2ui5_cx_cgui_error`; the two stores: `z2ui5_if_cgui_variants` with `z2ui5_cl_cgui_variant_db` (table `Z2UI5_T_19`, data elements `Z2UI5_CGUI_VAR_*`) and `z2ui5_if_cgui_layouts` with `z2ui5_cl_cgui_layout_db` (table `Z2UI5_T_18`) |
 | `src/02` | samples `z2ui5_cl_cgui_sample_01` … `_11` |
 | `src/03` | the test set: the corpus reports of report2UI5 as converted (`z2ui5_cl_cgui_r2c_NN`), generated - never edit by hand, `UPDATE_SNAPSHOTS=1 npm run test:report2ui5` writes it. Only the reports of `CLOUD_READY` in `tools/report2ui5/test/corpus.mjs` - those that read no table and call no API ABAP Cloud lacks, so the package activates there too; the gate test's scratch copy leaves it out and lints the conversion of now under `src/r2c` |
 | `tools/report2ui5` | `report2UI5`, a Node CLI (no ABAP object) that converts a classic report into a report class of this addon - THE generator of this repository, see below |
@@ -77,7 +77,11 @@ Three release targets and one runtime, every one a CI gate with no excludes:
 - **Standard ABAP** - 7.50 syntax that downports, `npm run lint` (its
   API set is the intersection of ABAP Cloud and 7.02);
 - **NW 7.02** - a downported copy, `npm run check:702` (it also refuses
-  `=>typekind_int8`, which its API set has and 7.02 does not - write `` `8` ``);
+  `=>typekind_int8`, which its API set has and 7.02 does not - write `` `8` ``,
+  and a downported line of more than 255 characters, which 7.02 cuts on
+  import: the downport writes `xsdbool( a OR b OR ... )` and a `&&` chain
+  inside an INSERT or a VALUE on one line - use a `CASE`, or one piece per
+  statement);
 - **the transpiled Node runtime** - `npm run unit` runs every ABAP Unit test
   there, the DANGEROUS ones of the two stores against SQLite.
 
@@ -221,6 +225,18 @@ toolbar and the grid are not frozen.
   `check_on_navigated`, `check_on_event`, and every branch that shows the
   screen calls `view_display( )` — unless a popup app was called in the same
   roundtrip (`mv_cgui_nav`).
+
+- **`z2ui5_cl_cgui_xlsx` is a copy - change it in abap-util.** The class
+  and its test include are abap-util's `zabaputil_cl_util_xlsx` with three
+  names replaced (`zabaputil_cl_util_xlsx`, `zabaputil_cl_util_context`,
+  `zabaputil_cx_util_error`), nothing else. A fix goes to abap-util first
+  and is copied from there, so the two do not drift; this repository's
+  stricter lint is the reason abap-util's class is written the way it is.
+  The class names no SAP class: ZIP, the XML reader (sXML, node by node),
+  the type kinds and the conversions it needs are methods of
+  `z2ui5_cl_cgui_context`, copied from abap-util's context class. Its reading
+  tests are slow in the transpiled runtime (the runtime's XML parser searches
+  the document from the start for every node) - keep their workbooks small.
 
 ## report2UI5
 
