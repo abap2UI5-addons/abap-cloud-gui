@@ -4379,21 +4379,27 @@ CLASS z2ui5_cl_cgui_alv IMPLEMENTATION.
 
   METHOD is_grid_event.
 
-    result = xsdbool( event = cs_event-select_all
-                   OR event = cs_event-deselect_all
-                   OR event = cs_event-export
-                   OR event = cs_event-export_xlsx
-                   OR event = cs_event-layout
-                   OR event = cs_event-page
-                   OR event = cs_event-filter
-                   OR event = cs_event-filter_clear
-                   OR event = cs_event-details
-                   OR event = cs_event-details_close
-                   OR event = cs_event-chart
-                   OR event = cs_event-chart_close
-                   OR event = cs_event-search
-                   OR event = cs_event-f4
-                   OR event = cs_event-rows ).
+    " a CASE, not xsdbool( a OR b OR ... ): the 7.02 downport writes that
+    " expression on one line - 449 characters here - and a 7.02 system cuts
+    " a line of more than 255 on import
+    CASE event.
+      WHEN cs_event-select_all
+          OR cs_event-deselect_all
+          OR cs_event-export
+          OR cs_event-export_xlsx
+          OR cs_event-layout
+          OR cs_event-page
+          OR cs_event-filter
+          OR cs_event-filter_clear
+          OR cs_event-details
+          OR cs_event-details_close
+          OR cs_event-chart
+          OR cs_event-chart_close
+          OR cs_event-search
+          OR cs_event-f4
+          OR cs_event-rows.
+        result = abap_true.
+    ENDCASE.
 
   ENDMETHOD.
 

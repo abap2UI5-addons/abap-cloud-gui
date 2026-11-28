@@ -41,6 +41,11 @@ release.
   alone, the backend never heard of it) - the toolbar's filter is the one.
 - The ALV and the list activate on NW 7.02 - 7.40 again: they named
   `cl_abap_typedescr=>typekind_int8`, which these releases do not have.
+- The 7.02 build has no line of more than 255 characters any more: two
+  conditions of the ALV and of the list came out of the downport as one line
+  of 449 and of 371 characters, which a 7.02 system cuts on import. The 7.02
+  gate reads the line length now (`line_length` in
+  `.github/abaplint/abap_702.jsonc`).
 - ALV totals and subtotals: a column with a currency or unit
   (`set_column_currency( )`, `set_column_quantity( )`) is totalled per
   currency or unit, as the classic ALV does - 100 EUR and 200 USD were a

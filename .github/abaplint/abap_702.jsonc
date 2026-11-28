@@ -36,6 +36,13 @@
   "rules": {
     "wrong_abapdoc_position": true,
     "downport": true,
+    // read after the downport: it writes a long expression - an
+    // xsdbool( a OR b OR ... ), the operands of a `&&` inside an INSERT or a
+    // VALUE - on one line, and a 7.02 system cuts a line of more than 255
+    // characters on import: the class does not activate
+    "line_length": {
+      "length": 255
+    },
     "begin_end_names": true,
     "check_ddic": true,
     "check_include": true,
