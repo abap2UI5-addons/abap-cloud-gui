@@ -2821,7 +2821,9 @@ CLASS z2ui5_cl_cgui_context IMPLEMENTATION.
     DATA lv_comma_count TYPE i.
     DATA lv_decimal     TYPE string.
     DATA(lv_i) = 0.
-    WHILE lv_i < strlen( lv_val ).
+    DATA(lv_len) = strlen( lv_val ).
+    DATA(lv_last) = lv_len - 1.
+    WHILE lv_i < lv_len.
       CASE lv_val+lv_i(1).
         WHEN `.`.
           lv_dot_count = lv_dot_count + 1.
@@ -2840,13 +2842,13 @@ CLASS z2ui5_cl_cgui_context IMPLEMENTATION.
     " Normalize: keep only digits, minus, and the decimal separator as `.`
     DATA(lv_clean) = ``.
     lv_i = 0.
-    WHILE lv_i < strlen( lv_val ).
+    WHILE lv_i < lv_len.
       DATA(lv_c) = lv_val+lv_i(1).
       IF lv_c >= `0` AND lv_c <= `9`.
         lv_clean = lv_clean && lv_c.
       ELSEIF lv_c = `-` AND lv_i = 0.
         lv_clean = lv_clean && lv_c.
-      ELSEIF lv_c = `-` AND lv_i = strlen( lv_val ) - 1 AND lv_val(1) <> `-`.
+      ELSEIF lv_c = `-` AND lv_i = lv_last AND lv_val(1) <> `-`.
         " the sign behind the number, as a MOVE and WRITE put it
         lv_clean = `-` && lv_clean.
       ELSEIF lv_c = lv_decimal.
